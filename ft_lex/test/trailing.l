@@ -1,0 +1,6 @@
+%%
+
+salut/bonjour printf("SALUT");
+
+%%
+

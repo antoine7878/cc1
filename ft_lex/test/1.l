@@ -1,0 +1,1 @@
+    #define TEXT "COUCOU"

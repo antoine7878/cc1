@@ -1,0 +1,5 @@
+%%
+
+^salut$ printf("SALUT");
+
+%%

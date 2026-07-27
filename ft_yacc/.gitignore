@@ -1,0 +1,10 @@
+./target/*
+yacc
+file.svg
+file.dot
+# *.output
+test_yacc
+test_lex.rs
+test_lex.rs
+gen/
+flamegraph.svg
