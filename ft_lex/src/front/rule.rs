@@ -33,7 +33,9 @@ impl Rule {
                     }
                 }
                 None => {
-                    return Err(LexError::InputFile(format!("start condition {a} not declared")));
+                    return Err(LexError::InputFile(format!(
+                        "start condition {a} not declared"
+                    )));
                 }
             }
         }
@@ -52,7 +54,10 @@ impl Rule {
         Ok((nfa, depth, in_comment))
     }
 
-    pub fn split_line(line: &mut Vec<u8>, substitutions: &HashMap<Vec<u8>, Vec<u8>>) -> Result<Vec<u8>, LexError> {
+    pub fn split_line(
+        line: &mut Vec<u8>,
+        substitutions: &HashMap<Vec<u8>, Vec<u8>>,
+    ) -> Result<Vec<u8>, LexError> {
         let mut in_quotes = false;
         let mut in_brakets = false;
         let mut escaped = false;
@@ -77,7 +82,10 @@ impl Rule {
                     break;
                 }
                 b'{' => {
-                    if let Some((k, v)) = substitutions.iter().find(|(k, _)| line[i..].starts_with(k.as_slice())) {
+                    if let Some((k, v)) = substitutions
+                        .iter()
+                        .find(|(k, _)| line[i..].starts_with(k.as_slice()))
+                    {
                         line.splice(i..(i + k.len()), v.iter().cloned());
                     }
                 }
@@ -115,7 +123,11 @@ impl Rule {
         Ok(states)
     }
 
-    pub fn parse_fragment(line: &[u8], curly_depth: u32, in_comment: bool) -> Result<(u32, bool), LexError> {
+    pub fn parse_fragment(
+        line: &[u8],
+        curly_depth: u32,
+        in_comment: bool,
+    ) -> Result<(u32, bool), LexError> {
         let mut it = line.iter().peekable();
         let mut curly_depth = curly_depth;
         let mut in_quotes = false;
@@ -128,6 +140,7 @@ impl Rule {
                 (b'*', Some(b'/')) => in_comment = false,
                 _ if in_comment => continue,
                 (b'"', _) => in_quotes = !in_quotes,
+                (b'\'', _) => in_quotes = !in_quotes,
                 (b'\\', _) => is_escaped = true,
                 _ if in_quotes => continue,
                 (b'/', Some(b'/')) => return Ok((curly_depth, false)),

@@ -30,11 +30,13 @@ pub struct YYLex<R: Read> {
     bol: bool,
     more: bool,
     accept_stack: Vec<AcceptData>,
+    yycontinue: Box<dyn FnMut() -> Option<R>>,
+    finished: bool,
 
     pub yyin: R,
     pub yytext: String,
-    yycontinue: Box<dyn FnMut() -> Option<R>>,
-    finished: bool,
+    pub line_no: isize,
+    pub col_no: isize,
 }
 
 #[allow(unused)]
@@ -60,6 +62,8 @@ impl<R: Read> YYLex<R> {
             yyin,
             yytext: String::new(),
             finished: false,
+            line_no: 0,
+            col_no: 0,
         }
     }
 }
@@ -176,10 +180,24 @@ impl<R: Read> YYLex<R> {
         });
     }
 
+    fn count(&mut self) {
+        for c in self.yytext.chars() {
+            if c == '\n' {
+                self.line_no += 1;
+                self.col_no = 0;
+            } else if c == '\t' {
+                self.col_no += 4 - (self.col_no % 4);
+            } else {
+                self.col_no += 1;
+            }
+        }
+    }
+
     fn build_yytext(&mut self) {
         self.yytext = from_utf8(&self.buffer[self.buffer_position..self.run_position])
             .unwrap()
             .to_string();
+        self.count();
     }
 }
 
@@ -191,7 +209,7 @@ impl<R: Read> YYLex<R> {
 
     pub fn yyless(&mut self, n: usize) {
         self.run_position -= self.yytext.len() - n;
-        let _ = self.build_yytext();
+        self.build_yytext();
     }
 
     pub fn input(&mut self) -> u8 {
@@ -310,7 +328,7 @@ impl<R: Read> Iterator for YYLex<R> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.yylex() {
-            YYToken::yyeof => {
+            YYToken::yyeof if self.finished => {
                 self.finished = true;
                 Some(YYToken::yyeof)
             }

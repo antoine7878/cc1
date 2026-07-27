@@ -41,7 +41,6 @@ pub fn escape_of_char(c: char) -> char {
         '\\' => '\x5C',
         '\'' => '\x27',
         '"' => '\x22',
-        '?' => '\x3F',
         c => c,
     }
 }
@@ -59,7 +58,6 @@ pub fn str_of_escape(c: char) -> String {
         '\x5C' => "\\'".to_string(),
         '\x27' => "\\\\".to_string(),
         '\x33' => "\\\"".to_string(),
-        '\x3F' => "\\?".to_string(),
         c => c.to_string(),
     }
 }
@@ -77,7 +75,6 @@ pub fn str_of_double_escape(c: char) -> String {
         '\x5C' => "\\\\'".to_string(),
         '\x27' => "\\\\\\".to_string(),
         '\x33' => "\\\\\"".to_string(),
-        '\x3F' => "\\\\?".to_string(),
         c => c.to_string(),
     }
 }

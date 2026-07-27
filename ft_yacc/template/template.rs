@@ -42,7 +42,7 @@ impl<T: Iterator<Item = YYToken>> Yacc<T> {
     /* TABLES */
     /* DEBUGGING_TABLES */
 
-    fn new(lexer: T) -> Yacc<T> {
+    pub fn new(lexer: T) -> Yacc<T> {
         Yacc {
             state_stack: Vec::new(),
             value_stack: Vec::new(),
@@ -72,7 +72,7 @@ impl<T: Iterator<Item = YYToken>> Yacc<T> {
         if dflt != 0 {
             return dflt;
         }
-        return Self::YY_DEFAULT_REDUCE_ACT[state_id];
+        Self::YY_DEFAULT_REDUCE_ACT[state_id]
     }
 
     pub fn yyparse(&mut self) -> i32 {
@@ -251,13 +251,10 @@ impl<T: Iterator<Item = YYToken>> Yacc<T> {
         }
 
         let &top = self.state_stack.last().unwrap();
-
-        match Self::YY_GOTO_TABLE[top][product] + 1 {
-            goto => self.push_statcks(-goto as usize, yyval),
-        }
+        self.push_statcks(-(Self::YY_GOTO_TABLE[top][product] + 1) as usize, yyval);
     }
 
-    #[allow(unused_braces)]
+    #[allow(unused_braces, clippy::let_and_return)]
     fn action(&mut self) -> YYToken {
         let idx = self.value_stack.len() - Self::YY_RLEN_TABLE[self.act as usize];
         let values = self.value_stack.drain(idx..).collect::<Vec<YYToken>>().clone();

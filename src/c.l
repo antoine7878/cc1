@@ -1,1 +1,136 @@
+%no_main
+
+%{
+use crate::YYToken;
+%}
+
+D			[0-9]
+L			[a-zA-Z_]
+H			[a-fA-F0-9]
+E			[Ee][+-]?{D}+
+FS			(f|F|l|L)
+IS			(u|U|l|L)*
+
 %%
+
+"/*"			            { comment(self); }
+"auto"			            { return(YYToken::AUTO); }
+"break"			            { return(YYToken::BREAK); }
+"case"			            { return(YYToken::CASE); }
+"char"			            { return(YYToken::CHAR); }
+"const"			            { return(YYToken::CONST); }
+"continue"		            { return(YYToken::CONTINUE); }
+"default"		            { return(YYToken::DEFAULT); }
+"do"			            { return(YYToken::DO); }
+"double"		            { return(YYToken::DOUBLE); }
+"else"			            { return(YYToken::ELSE); }
+"enum"			            { return(YYToken::ENUM); }
+"extern"		            { return(YYToken::EXTERN); }
+"float"			            { return(YYToken::FLOAT); }
+"for"			            { return(YYToken::FOR); }
+"goto"			            { return(YYToken::GOTO); }
+"if"			            { return(YYToken::IF); }
+"int"			            { return(YYToken::INT); }
+"long"			            { return(YYToken::LONG); }
+"register"		            { return(YYToken::REGISTER); }
+"return"		            { return(YYToken::RETURN); }
+"short"			            { return(YYToken::SHORT); }
+"signed"		            { return(YYToken::SIGNED); }
+"sizeof"		            { return(YYToken::SIZEOF); }
+"static"		            { return(YYToken::STATIC); }
+"struct"		            { return(YYToken::STRUCT); }
+"switch"		            { return(YYToken::SWITCH); }
+"typedef"		            { return(YYToken::TYPEDEF); }
+"union"			            { return(YYToken::UNION); }
+"unsigned"		            { return(YYToken::UNSIGNED); }
+"void"			            { return(YYToken::VOID); }
+"volatile"		            { return(YYToken::VOLATILE); }
+"while"			            { return(YYToken::WHILE); }
+{L}({L}|{D})*		        { return(check_type(&self.yytext)); }
+0[xX]{H}+{IS}?		        { return(YYToken::CONSTANT); }
+0{D}+{IS}?		            { return(YYToken::CONSTANT); }
+{D}+{IS}?		            { return(YYToken::CONSTANT); }
+L?'(\\.|[^\\'])+'	        { return(YYToken::CONSTANT); }
+{D}+{E}{FS}?		        { return(YYToken::CONSTANT); }
+{D}*"."{D}+({E})?{FS}?	    { return(YYToken::CONSTANT); }
+{D}+"."{D}*({E})?{FS}?	    { return(YYToken::CONSTANT); }
+L?\"(\\.|[^\\"])*\"	        { return(YYToken::STRING_LITERAL); }
+"..."			            { return(YYToken::ELLIPSIS); }
+">>="			            { return(YYToken::RIGHT_ASSIGN); }
+"<<="			            { return(YYToken::LEFT_ASSIGN); }
+"+="			            { return(YYToken::ADD_ASSIGN); }
+"-="			            { return(YYToken::SUB_ASSIGN); }
+"*="			            { return(YYToken::MUL_ASSIGN); }
+"/="			            { return(YYToken::DIV_ASSIGN); }
+"%="			            { return(YYToken::MOD_ASSIGN); }
+"&="			            { return(YYToken::AND_ASSIGN); }
+"^="			            { return(YYToken::XOR_ASSIGN); }
+"|="			            { return(YYToken::OR_ASSIGN); }
+">>"			            { return(YYToken::RIGHT_OP); }
+"<<"			            { return(YYToken::LEFT_OP); }
+"++"			            { return(YYToken::INC_OP); }
+"--"			            { return(YYToken::DEC_OP); }
+"->"			            { return(YYToken::PTR_OP); }
+"&&"			            { return(YYToken::AND_OP); }
+"||"			            { return(YYToken::OR_OP); }
+"<="			            { return(YYToken::LE_OP); }
+">="			            { return(YYToken::GE_OP); }
+"=="			            { return(YYToken::EQ_OP); }
+"!="			            { return(YYToken::NE_OP); }
+";"			                { return(YYToken::Char(';')); }
+
+
+","			                { return(YYToken::Char(',')); }
+":"			                { return(YYToken::Char(':')); }
+"="			                { return(YYToken::Char('=')); }
+"("			                { return(YYToken::Char('(')); }
+")"			                { return(YYToken::Char(')')); }
+("["|"<:")		            { return(YYToken::Char('[')); }
+("]"|":>")		            { return(YYToken::Char(']')); }
+"."			                { return(YYToken::Char('.')); }
+"&"			                { return(YYToken::Char('&')); }
+"!"			                { return(YYToken::Char('!')); }
+"~"			                { return(YYToken::Char('~')); }
+"-"			                { return(YYToken::Char('-')); }
+"+"			                { return(YYToken::Char('+')); }
+"*"			                { return(YYToken::Char('*')); }
+"/"			                { return(YYToken::Char('/')); }
+"%"			                { return(YYToken::Char('%')); }
+"<"			                { return(YYToken::Char('<')); }
+">"			                { return(YYToken::Char('>')); }
+"^"			                { return(YYToken::Char('^')); }
+"|"			                { return(YYToken::Char('|')); }
+"?"			                { return(YYToken::Char('?')); }
+
+("["|"<%")		            { return(YYToken::Char('{')); }
+("]"|"%>")		            { return(YYToken::Char('}')); }
+
+[ \t\v\n\f]		            { }
+.			                { /* ignore bad characters */ }
+
+%%
+
+fn comment<T: Read>(lex: &mut YYLex<T>)
+{
+    let mut c = lex.input();
+    loop {
+        while c != b'*' && c != 0 {
+            c = lex.input();
+        }
+
+        let c1 = lex.input();
+        if c1 != b'/' && c != 0 {
+            lex.unput(c1);
+        }
+    }
+}
+
+
+fn check_type(_yytext: &str) -> YYToken {
+// pseudo code --- this is what it should check
+//
+//	if (yytext == type_name)
+//	    return(YYToken::TYPE_NAME);
+	YYToken::IDENTIFIER
+}
+
