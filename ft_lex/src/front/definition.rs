@@ -13,6 +13,8 @@ pub struct Definition {
     pub indented_code: String,
     pub no_main: bool,
     pub tokens: Vec<String>,
+    pub no_context: bool,
+    pub no_yacc: bool,
 }
 
 impl Default for Definition {
@@ -27,6 +29,8 @@ impl Default for Definition {
             indented_code: String::default(),
             no_main: false,
             tokens: vec![],
+            no_context: true,
+            no_yacc: false,
         }
     }
 }

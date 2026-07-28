@@ -22,7 +22,7 @@ struct AcceptData {
     buf_pos: usize,
 }
 
-pub struct YYLex<R: Read, C> {
+pub struct YYLex<R: Read> {
     state: LexerState,
     action: isize,
     current_state: usize,
@@ -36,36 +36,42 @@ pub struct YYLex<R: Read, C> {
     more: bool,
     accept_stack: Vec<AcceptData>,
     yycontinue: Box<dyn FnMut() -> Option<R>>,
+    uncounted: usize,
 
     pub yyin: R,
     pub yytext: String,
     pub line_no: isize,
     pub col_no: isize,
-    pub ctx: C,
+    pub ctx: Context,
 }
 
+/* CONTEXT */
+pub struct Context;
+
 #[allow(unused)]
-impl Default for YYLex<std::io::Stdin, u32> {
+impl Default for YYLex<std::io::Stdin> {
     fn default() -> Self {
-        Self::new(stdin(), || None, 1)
+        Self::new(stdin(), || None, Context {})
     }
 }
 
-impl<R: Read> YYLex<R, u32> {
-    pub fn with_reader(yyin: R) -> YYLex<R, u32> {
-        Self::new(yyin, || None, 1)
+impl<R: Read> YYLex<R> {
+    pub fn with_reader(yyin: R) -> YYLex<R> {
+        Self::new(yyin, || None, Context {})
     }
 }
+/* CONTEXT */
 
 #[allow(unused)]
-impl<R: Read, C> YYLex<R, C> {
-    pub fn new<F>(yyin: R, yycontinue: F, ctx: C) -> Self
+impl<R: Read> YYLex<R> {
+    pub fn new<F>(yyin: R, yycontinue: F, ctx: Context) -> Self
     where
         F: FnMut() -> Option<R> + 'static,
     {
         Self {
             state: LexerState::Running,
             action: 0,
+            uncounted: 0,
             current_state: 1,
             start_condition: 0,
             buffer: Vec::new(),
@@ -105,8 +111,7 @@ impl<R: Read, C> YYLex<R, C> {
     }
 
     fn reject(&mut self) {
-        let next_action = Self::YY_NEXT_ACCEPT
-            [self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
+        let next_action = Self::YY_NEXT_ACCEPT[self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
         self.action = if next_action >= 0 {
             next_action
         } else {
@@ -126,9 +131,7 @@ impl<R: Read, C> YYLex<R, C> {
     }
 
     fn shift_all_positions(&mut self, offset: usize) {
-        self.accept_stack
-            .iter_mut()
-            .for_each(|s| s.buf_pos -= offset);
+        self.accept_stack.iter_mut().for_each(|s| s.buf_pos -= offset);
         self.run_position -= offset;
         self.trailing_end_pos = self.trailing_end_pos.saturating_sub(offset);
         self.buffer_position -= offset;
@@ -181,24 +184,34 @@ impl<R: Read, C> YYLex<R, C> {
         });
     }
 
-    fn count(&mut self) {
-        for c in self.yytext.chars() {
-            if c == '\n' {
-                self.line_no += 1;
-                self.col_no = 0;
-            } else if c == '\t' {
-                self.col_no += 4 - (self.col_no % 4);
-            } else {
-                self.col_no += 1;
-            }
+    fn uncount(&mut self, c: u8) {
+        self.uncounted += 1;
+    }
+
+    fn count_c(&mut self, c: u8) {
+        if self.uncounted != 0 {
+            self.uncounted -= 1;
+            return;
         }
+        if c == b'\n' {
+            self.line_no += 1;
+            self.col_no = 0;
+        } else if c == b'\t' {
+            self.col_no += 4 - (self.col_no % 4);
+        } else {
+            self.col_no += 1;
+        }
+    }
+
+    fn count_yytext(&mut self) {
+        self.yytext.clone().bytes().for_each(|c| self.count_c(c))
     }
 
     fn build_yytext(&mut self) {
         self.yytext = from_utf8(&self.buffer[self.buffer_position..self.run_position])
             .unwrap()
             .to_string();
-        self.count();
+        self.count_yytext();
     }
 
     pub fn yymore(&mut self) {
@@ -207,6 +220,7 @@ impl<R: Read, C> YYLex<R, C> {
 
     pub fn yyless(&mut self, n: usize) {
         self.run_position -= self.yytext.len() - n;
+        self.uncounted += self.yytext.len() - n;
         self.build_yytext();
     }
 
@@ -217,11 +231,9 @@ impl<R: Read, C> YYLex<R, C> {
         if self.run_position >= self.buffer.len() {
             return 0;
         }
-        let ret = *self
-            .buffer
-            .get(self.run_position)
-            .expect("run_position out of bounds");
+        let ret = *self.buffer.get(self.run_position).expect("run_position out of bounds");
         self.run_position += 1;
+        self.count_c(ret);
         ret
     }
 
@@ -282,14 +294,11 @@ impl<R: Read, C> YYLex<R, C> {
                 break;
             }
 
-            let char_class: usize =
-                Self::YY_CHAR_EQ[self.buffer[self.run_position] as usize] as usize;
-            self.current_state =
-                Self::YY_BASE[self.current_state * Self::YY_CLASS_COUNT + char_class] as usize;
+            let char_class: usize = Self::YY_CHAR_EQ[self.buffer[self.run_position] as usize] as usize;
+            self.current_state = Self::YY_BASE[self.current_state * Self::YY_CLASS_COUNT + char_class] as usize;
             if self.current_state == 0 {
                 break;
             }
-
             self.try_accept();
             self.run_position += 1;
         }
@@ -304,7 +313,9 @@ impl<R: Read, C> YYLex<R, C> {
         self.run_position = std::cmp::min(self.stack_top().buf_pos + 1, self.buffer.len());
         self.build_yytext();
     }
+}
 
+impl<R: Read> YYLexer for YYLex<R> {
     fn yylex(&mut self) -> YYToken {
         loop {
             if self.prepare_run().is_none() {
@@ -318,6 +329,10 @@ impl<R: Read, C> YYLex<R, C> {
                 _ => panic!("wrong action\n"),
             }
         }
+    }
+
+    fn ctx(&mut self) -> &mut Context {
+        &mut self.ctx
     }
 }
 

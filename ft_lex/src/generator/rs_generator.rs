@@ -14,14 +14,8 @@ impl Generator for RSGenerator {
             .map(|&(name, table)| Self::table_to_rust(name, table))
             .collect::<Vec<_>>()
             .join("\n")
-            + &format!(
-                "\nconst YY_CLASS_COUNT: usize = {};\n",
-                lex.table_dfa.class_count
-            )
-            + &format!(
-                "const YY_RULE_COUNT: usize = {};\n",
-                lex.code_fragments.len()
-            )
+            + &format!("\nconst YY_CLASS_COUNT: usize = {};\n", lex.table_dfa.class_count)
+            + &format!("const YY_RULE_COUNT: usize = {};\n", lex.code_fragments.len())
     }
 
     fn dump_actions(&self, code_fragments: &[String]) -> String {
@@ -34,11 +28,7 @@ impl Generator for RSGenerator {
     }
 
     fn dump_defines(&self, lex: &Lex) -> String {
-        [
-            Self::start_condition_defines(&lex.start_conditions),
-            "\n".to_string(),
-        ]
-        .join("\n")
+        [Self::start_condition_defines(&lex.start_conditions), "\n".to_string()].join("\n")
     }
 
     fn dump_tokens(&self, tokens: &[String]) -> String {
@@ -52,7 +42,7 @@ impl Generator for RSGenerator {
             .collect::<Vec<_>>()
             .join("");
         ret += "yyeof\n}\n\n";
-        ret += "pub trait YYLexer {\nfn yylex(&mut self) -> YYToken;\n}\n";
+        ret += "pub trait YYLexer {\nfn yylex(&mut self) -> YYToken;\nfn ctx(&mut self) -> &mut Context;\n}\n";
         ret
     }
 }
@@ -72,12 +62,7 @@ impl RSGenerator {
             .map(|(i, s)| if i % 128 == 0 { format!("\n{s}") } else { s })
             .collect::<Vec<_>>()
             .join(", ");
-        format!(
-            "const {}: [isize; {}] = [{}];",
-            name.to_uppercase(),
-            table.len(),
-            inner
-        )
+        format!("const {}: [isize; {}] = [{}];", name.to_uppercase(), table.len(), inner)
     }
 
     fn action_to_rust(id: FragmentId, fragment: &str) -> String {

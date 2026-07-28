@@ -122,15 +122,29 @@ fn comment<T: Read>(lex: &mut YYLex<T>)
         if c1 != b'/' && c != 0 {
             lex.unput(c1);
         }
+        break
     }
 }
 
+fn comment<T: Read>(lex: &mut YYLex<T>) {
+    let mut c = lex.input();
+
+    while c != b'*' && c != 0 {
+        c = lex.input();
+        if c == b'*' {
+            while c == '*' {
+                c = lex.input();
+            }
+            if c == b'/' || c == 0
+                return;
+        }
+    }
+}
 
 fn check_type(_yytext: &str) -> YYToken {
 // pseudo code --- this is what it should check
 //
 //	if (yytext == type_name)
-//	    return(YYToken::TYPE_NAME);
+//	    return YYToken::TYPE_NAME;
 	YYToken::IDENTIFIER
 }
-

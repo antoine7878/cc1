@@ -11,7 +11,6 @@ mod test {
     use crate::front::lex;
     use crate::generator::Lang;
     use crate::tester::test;
-
     #[derive(Debug)]
     pub struct TmpFile {
         pub name: String,
@@ -79,7 +78,7 @@ mod test {
     fn ft_lex(lex_file: &str, parser_file: &str, lang: &Lang) -> Vec<u8> {
         cmd_with_out(
             "./target/release/ft_lex",
-            &["-y", "-x", lang.lex_flag(), "-o", parser_file, lex_file],
+            &["-x", lang.lex_flag(), "-o", parser_file, lex_file],
         )
     }
 
@@ -92,11 +91,7 @@ mod test {
     }
 
     fn get_lang(file: &str) -> Lang {
-        if file.ends_with("_r.l") {
-            Lang::Rust
-        } else {
-            Lang::C
-        }
+        if file.ends_with("_r.l") { Lang::Rust } else { Lang::C }
     }
 
     fn test_lex(lexfile: &str, test_input: &str, expected_output: &[u8]) {
@@ -203,14 +198,8 @@ mod test {
             "salutbonjoursalut\nsalut\naurevoir\n",
             b"salut\n\n\n",
         );
-        test_lex_compare(
-            "./test/condition_1.l",
-            "salutbonjoursalut\nsalut\naurevoir\n",
-        );
-        test_lex_compare(
-            "./test/condition_2.l",
-            "salutbonjoursalut\nsalut\naurevoir\n",
-        );
+        test_lex_compare("./test/condition_1.l", "salutbonjoursalut\nsalut\naurevoir\n");
+        test_lex_compare("./test/condition_2.l", "salutbonjoursalut\nsalut\naurevoir\n");
     }
 
     #[test]
@@ -253,10 +242,7 @@ mod test {
             "salutbonjoursalut\nsalut\naurevoir\n",
             b"SALUTbonjoursalut\nsalut\naurevoir\n",
         );
-        test_lex_compare(
-            "./test/substitution.l",
-            "salutbonjoursalut\nsalut\naurevoir\n",
-        );
+        test_lex_compare("./test/substitution.l", "salutbonjoursalut\nsalut\naurevoir\n");
     }
 
     #[test]
@@ -271,11 +257,7 @@ mod test {
     #[test]
     fn reject_c() {
         test_lex("./test/reject_1.l", "salut\n", b"12345salut\n");
-        test_lex(
-            "./test/reject_2.l",
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
-            b"123\n",
-        );
+        test_lex("./test/reject_2.l", "aaaaaaaaaaaaaaaaaaaaaaaaaaaa\n", b"123\n");
         test_lex_compare("./test/reject_1.l", "salut\n");
         test_lex_compare("./test/reject_2.l", "aaaaaaaaaaaaaaaaaaaaaaaaaaaa\n");
     }
@@ -322,20 +304,12 @@ mod test {
 
     #[test]
     fn yymore_rs() {
-        test_lex(
-            "./test/yymore_r.l",
-            "salutbonjour\n",
-            b"salutsalutbonjour\n",
-        );
+        test_lex("./test/yymore_r.l", "salutbonjour\n", b"salutsalutbonjour\n");
     }
 
     #[test]
     fn input_c() {
-        test_lex(
-            "./test/input_1.l",
-            "salut /* bonjour */ coucou\n",
-            b"salut  coucou\n",
-        );
+        test_lex("./test/input_1.l", "salut /* bonjour */ coucou\n", b"salut  coucou\n");
         test_lex("./test/input_2.l", "salutbonjour\n", b"MATCHnjour\n");
         test_lex_compare("./test/input_1.l", "salutbonjour\n");
         test_lex_compare("./test/input_2.l", "salutbonjour\n");
@@ -343,11 +317,7 @@ mod test {
 
     #[test]
     fn input_rs() {
-        test_lex(
-            "./test/input_1_r.l",
-            "salut /* bonjour */ coucou\n",
-            b"salut  coucou\n",
-        );
+        test_lex("./test/input_1_r.l", "salut /* bonjour */ coucou\n", b"salut  coucou\n");
         test_lex("./test/input_2_r.l", "salutbonjour\n", b"MATCHnjour\n");
     }
 
@@ -383,21 +353,13 @@ mod test {
 
     #[test]
     fn yywrap_c() {
-        test_lex(
-            "./test/yywrap.l",
-            "salut",
-            b"COUCOU\nCOUCOU\nCOUCOU\nCOUCOU\n",
-        );
+        test_lex("./test/yywrap.l", "salut", b"COUCOU\nCOUCOU\nCOUCOU\nCOUCOU\n");
         test_lex_compare("./test/yywrap.l", "salut");
     }
 
     #[test]
     fn yywrap_rs() {
-        test_lex(
-            "./test/yywrap_r.l",
-            "salut",
-            b"COUCOU\nCOUCOU\nCOUCOU\nCOUCOU\n",
-        );
+        test_lex("./test/yywrap_r.l", "salut", b"COUCOU\nCOUCOU\nCOUCOU\nCOUCOU\n");
     }
 
     fn test_lex_multi(lexfiles: &[&str], test_input: &str, expected_output: &[u8]) {
@@ -416,11 +378,7 @@ mod test {
 
     #[test]
     fn multi_c() {
-        test_lex_multi(
-            &["./test/1.l", "./test/2.l", "./test/3.l"],
-            "salut\n",
-            b"COUCOU\n",
-        );
+        test_lex_multi(&["./test/1.l", "./test/2.l", "./test/3.l"], "salut\n", b"COUCOU\n");
     }
 
     #[test]

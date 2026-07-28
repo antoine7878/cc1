@@ -194,6 +194,8 @@ impl LexParser {
             "%array" => definition.yytext_storage = YytextStorage::Array,
             "%pointer" => definition.yytext_storage = YytextStorage::Pointer,
             "%no_main" => definition.no_main = true,
+            "%no_context" => definition.no_context = false,
+            "%no_yacc" => definition.no_yacc = true,
             line => {
                 let parts = line.split_once([' ', '\t', '\n']);
                 let parts = match parts {

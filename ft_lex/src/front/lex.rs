@@ -30,19 +30,19 @@ impl Lex {
         for line in template_file.lines() {
             match line.trim() {
                 "/* REMOVE */" => remove = !remove,
+                "/* CONTEXT */" if self.definition.no_context => remove = !remove,
                 _ if remove => (),
                 "/* CODE_BEFORE */" => {
                     out_buffer.write_all(self.definition.percent_brace_code.as_bytes())?;
                     out_buffer.write_all(self.definition.indented_code.as_bytes())?;
                 }
                 "/* MAIN */" if self.definition.no_main => break,
-                "/* TOKENS */" if !args.y => out_buffer
-                    .write_all(generator.dump_tokens(&self.definition.tokens).as_bytes())?,
+                "/* TOKENS */" if self.definition.no_yacc => {
+                    out_buffer.write_all(generator.dump_tokens(&self.definition.tokens).as_bytes())?
+                }
                 "/* DEFINES */" => out_buffer.write_all(generator.dump_defines(self).as_bytes())?,
                 "/* TABLES */" => out_buffer.write_all(generator.dump_tables(self).as_bytes())?,
-                "/* ACTIONS */" => {
-                    out_buffer.write_all(generator.dump_actions(&self.code_fragments).as_bytes())?
-                }
+                "/* ACTIONS */" => out_buffer.write_all(generator.dump_actions(&self.code_fragments).as_bytes())?,
                 _ => {
                     out_buffer.write_all(line.as_bytes())?;
                     out_buffer.write_all(b"\n")?;
