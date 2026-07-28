@@ -141,7 +141,7 @@ mod test {
 
     fn ft_lex(lex_file: &str, parser_file: &str, lang: &Lang) -> Vec<u8> {
         cmd_with_out(
-            "./ft_lex/target/release/ft_lex",
+            "./../ft_lex/target/release/ft_lex",
             &["-x", lang.lex_flag(), "-o", parser_file, lex_file],
         )
     }

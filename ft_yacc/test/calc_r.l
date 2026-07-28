@@ -1,6 +1,6 @@
 %no_main
 %{
-use crate::YYToken;
+use crate::{YYToken, YYLexer};
 %}
 
 %%

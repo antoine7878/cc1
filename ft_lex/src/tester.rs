@@ -37,7 +37,7 @@ mod test {
     impl Drop for TmpFile {
         fn drop(&mut self) {
             let path = Path::new(&self.name);
-            // let _ = remove_file(path);
+            let _ = remove_file(path);
         }
     }
 
@@ -79,17 +79,42 @@ mod test {
         Command::new(lang.compiler()).args(cc_flags).output();
     }
 
-    fn run_parser(exec_file: &TmpFile, test_file: &str, expected_output: &[u8]) {
-        let echo_out = echo(test_file);
-        let mut lex_process = Command::new(&exec_file.name)
-            .stdin(Stdio::from(echo_out))
+    fn run_cmd(cmd: &str, args: &[&str]) -> Output {
+        println!("{}: {:?}", cmd, args);
+        Command::new(cmd)
+            .args(args)
+            .stderr(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()
-            .unwrap();
-        let output = lex_process.wait_with_output().unwrap();
-        let out = output.stdout.as_slice();
+            .unwrap()
+            .wait_with_output()
+            .unwrap()
+    }
+    fn cmd_with_out(cmd: &str, args: &[&str]) -> Vec<u8> {
+        let child = run_cmd(cmd, args);
+        let out = child
+            .stdout
+            .iter()
+            .chain(child.stderr.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        println!("{}", String::from_utf8_lossy(&out));
+        assert!(child.status.success());
+        out
+    }
+
+    fn ft_lex(lex_file: &str, parser_file: &str, lang: &Lang) -> Vec<u8> {
+        cmd_with_out(
+            "./../ft_lex/target/release/ft_lex",
+            &["-x", lang.lex_flag(), "-o", parser_file, lex_file],
+        )
+    }
+
+    fn run_parser(exec_file: &TmpFile, test_file: &str, expected_output: &[u8]) {
+        let echo_out = echo(test_file);
+        let mut out = cmd_with_out(&exec_file.name, &[]);
         println!("===========================================");
-        println!("{}", String::from_utf8_lossy(out));
+        println!("{}", String::from_utf8_lossy(&out));
         println!("-------------------------------------------");
         println!("{}", String::from_utf8_lossy(expected_output));
         println!("===========================================");

@@ -5,7 +5,11 @@ use std::fmt;
 
 /* TOKENS */
 
-pub struct Yacc<T: Iterator<Item = YYToken>> {
+pub trait YYLexer {
+    fn yylex(&mut self) -> YYToken;
+}
+
+pub struct Yacc<T: YYLexer> {
     state_stack: Vec<usize>,
     value_stack: Vec<YYToken>,
     default_prod_table: Vec<YYToken>,
@@ -30,7 +34,7 @@ macro_rules! yylog {
 }
 /* DEBUGGING */
 
-impl<T: Iterator<Item = YYToken>> Yacc<T> {
+impl<T: YYLexer> Yacc<T> {
     /* REMOVE */
     const YY_EOF_TOKEN_ID: usize = 2;
     const YY_ERROR_TOKEN_ID: usize = 3;
@@ -53,7 +57,7 @@ impl<T: Iterator<Item = YYToken>> Yacc<T> {
             continue_parse: true,
             is_recovering: false,
             ret: 0,
-            lexer: lexer.into_iter(),
+            lexer: lexer,
             token_since_error: 0,
             /* DEFINES */
         }
@@ -194,8 +198,9 @@ impl<T: Iterator<Item = YYToken>> Yacc<T> {
     }
 
     fn read_token(&mut self) {
-        self.lookahead = self.lexer.next();
-        self.lookahead_id = self.lookahead.as_ref().unwrap().index();
+        let c = self.lexer.yylex();
+        self.lookahead_id = c.index();
+        self.lookahead = Some(c);
         /* DEBUGGING */
         yylog!(self, "Reading a token");
         match &self.lookahead {

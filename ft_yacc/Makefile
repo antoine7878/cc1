@@ -5,9 +5,14 @@ all: $(NAME)
 $(NAME):
 	cargo build --release
 
+test:
+	make -C ../ft_lex/
+	cargo test
+
+
 clean:
 	cargo clean
 
 re: clean all
 
-.PHONY: all clean re
+.PHONY: all clean re test

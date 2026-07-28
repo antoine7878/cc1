@@ -31,7 +31,6 @@ pub struct YYLex<R: Read> {
     more: bool,
     accept_stack: Vec<AcceptData>,
     yycontinue: Box<dyn FnMut() -> Option<R>>,
-    finished: bool,
 
     pub yyin: R,
     pub yytext: String,
@@ -50,18 +49,17 @@ impl<R: Read> YYLex<R> {
             action: 0,
             current_state: 1,
             start_condition: 0,
-            buffer: vec![],
+            buffer: Vec::new(),
             buffer_position: 0,
             run_position: 0,
             trailing_end_pos: 0,
             trailing_action: -1,
             bol: true,
             more: false,
-            accept_stack: vec![],
+            accept_stack: Vec::new(),
             yycontinue: Box::new(yycontinue),
             yyin,
             yytext: String::new(),
-            finished: false,
             line_no: 0,
             col_no: 0,
         }
@@ -306,8 +304,10 @@ impl<R: Read> YYLex<R> {
         self.run_position = std::cmp::min(self.stack_top().buf_pos + 1, self.buffer.len());
         self.build_yytext();
     }
+}
 
-    pub fn yylex(&mut self) -> YYToken {
+impl<R: Read> YYLexer for YYLex<R> {
+    fn yylex(&mut self) -> YYToken {
         loop {
             if self.prepare_run().is_none() {
                 return YYToken::yyeof;
@@ -319,21 +319,6 @@ impl<R: Read> YYLex<R> {
                 -1 => print!("{}", self.yytext),
                 _ => panic!("wrong action\n"),
             }
-        }
-    }
-}
-
-impl<R: Read> Iterator for YYLex<R> {
-    type Item = YYToken;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.yylex() {
-            YYToken::yyeof if self.finished => {
-                self.finished = true;
-                Some(YYToken::yyeof)
-            }
-            YYToken::yyeof => None,
-            tok => Some(tok),
         }
     }
 }
