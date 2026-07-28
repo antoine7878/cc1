@@ -26,20 +26,22 @@ impl fmt::Display for ArgError {
 
 #[derive(Debug)]
 pub struct Args {
-    // Input lex File(s)
+    /// Input lex File(s)
     pub i: Vec<String>,
-    // Path file generated parser, default is lex.yy.c.
+    /// Path file generated parser, default is lex.yy.c.
     pub o: Option<String>,
-    // Compress table represetations.
+    /// Compress table represetations.
     pub c: bool,
-    // Suppress the summary of statistics usually written with the -v option.
+    /// Suppress the summary of statistics usually written with the -v option.
     pub n: bool,
-    // Print usage statisics.
+    /// Print usage statisics.
     pub v: bool,
-    // Write the resulting program to standard output instead of in_file.
+    /// Write the resulting program to standard output instead of in_file.
     pub t: bool,
-    // Target language
+    /// Target language
     pub x: Lang,
+    /// Lexer NOT used with Yacc (skip enum YYToken and trait YYLexer generation)
+    pub y: bool,
     argv: std::env::Args,
 }
 
@@ -54,6 +56,7 @@ impl Default for Args {
             n: false,
             v: false,
             t: false,
+            y: true,
             x: Lang::C,
             argv,
         }
@@ -61,28 +64,6 @@ impl Default for Args {
 }
 
 impl Args {
-    // pub fn parse() -> Result<Args, ArgError> {
-    //     let mut argv = args();
-    //     let _ = argv.next();
-    //     let mut args = Args::default();
-    //     let mut only_unamed: bool = false;
-    //     while let Some(arg) = argv.next() {
-    //         match arg.as_str() {
-    //             "--" => only_unamed = true,
-    //             _ if only_unamed => args.i.push(arg),
-    //             "-o" => args.o = Some(argv.next().ok_or(ArgError::MissingValue("-o"))?),
-    //             "-x" => Self::parse_value(&mut args.x, &mut argv, "-x")?,
-    //             "-c" => args.c = true,
-    //             "-n" => args.n = true,
-    //             "-v" => args.v = true,
-    //             "-t" => args.t = true,
-    //             "-h" | "--help" => Self::help(),
-    //             _ if !arg.starts_with("-") => args.i.push(arg),
-    //             _ => return Err(ArgError::UnkownOption(arg)),
-    //         }
-    //     }
-    //     Ok(args)
-    // }
     pub fn parse() -> Result<Self, ArgError> {
         let mut args = Args::default();
         let mut only_unamed: bool = false;
@@ -113,6 +94,7 @@ impl Args {
             'n' => self.n = true,
             'v' => self.v = true,
             't' => self.t = true,
+            'y' => self.y = false,
             'h' => Self::help(),
 
             c => return Err(ArgError::UnkownOption(c)),

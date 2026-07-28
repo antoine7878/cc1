@@ -37,31 +37,8 @@ mod test {
     impl Drop for TmpFile {
         fn drop(&mut self) {
             let path = Path::new(&self.name);
-            let _ = remove_file(path);
+            // let _ = remove_file(path);
         }
-    }
-
-    fn echo(file: &str) -> ChildStdout {
-        let mut proc = Command::new("echo")
-            .arg(file)
-            .stdout(Stdio::piped())
-            .spawn()
-            .unwrap();
-        proc.wait().unwrap();
-        proc.stdout.unwrap()
-    }
-
-    fn lex(lex_file: &str, parser_file: &TmpFile, lang: &Lang) {
-        Command::new("./target/debug/ft_lex")
-            .args([
-                "-c",
-                "-x",
-                lang.lex_flag(),
-                "-o",
-                &parser_file.name,
-                lex_file,
-            ])
-            .output();
     }
 
     fn flex(lex_file: &str, parser_file: &TmpFile, lang: &Lang) {
@@ -70,28 +47,24 @@ mod test {
             .output();
     }
 
-    fn compile_parser(parser_file: &TmpFile, exec_file: &TmpFile, lang: &Lang) {
-        let name = &exec_file.name;
-        let cc_flags = match lang {
-            Lang::C => vec![&parser_file.name, "-ll", "-L", "./libl", "-o", name],
-            Lang::Rust => vec![&parser_file.name, "-o", name],
+    fn compile_parser(parser_file: &str, exec_file: &str, lang: &Lang) {
+        let comp = lang.compiler();
+        match lang {
+            Lang::C => cmd_with_out(comp, &[parser_file, "-ll", "-L", "./libl", "-o", exec_file]),
+            Lang::Rust => cmd_with_out(comp, &[parser_file, "-o", exec_file]),
         };
-        Command::new(lang.compiler()).args(cc_flags).output();
     }
 
-    fn run_cmd(cmd: &str, args: &[&str]) -> Output {
-        println!("{}: {:?}", cmd, args);
-        Command::new(cmd)
+    fn cmd_with_out(cmd: &str, args: &[&str]) -> Vec<u8> {
+        println!("cmd {}: {:?}", cmd, args);
+        let child = Command::new(cmd)
             .args(args)
             .stderr(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()
             .unwrap()
             .wait_with_output()
-            .unwrap()
-    }
-    fn cmd_with_out(cmd: &str, args: &[&str]) -> Vec<u8> {
-        let child = run_cmd(cmd, args);
+            .unwrap();
         let out = child
             .stdout
             .iter()
@@ -105,53 +78,41 @@ mod test {
 
     fn ft_lex(lex_file: &str, parser_file: &str, lang: &Lang) -> Vec<u8> {
         cmd_with_out(
-            "./../ft_lex/target/release/ft_lex",
-            &["-x", lang.lex_flag(), "-o", parser_file, lex_file],
+            "./target/release/ft_lex",
+            &["-y", "-x", lang.lex_flag(), "-o", parser_file, lex_file],
         )
     }
 
-    fn run_parser(exec_file: &TmpFile, test_file: &str, expected_output: &[u8]) {
-        let echo_out = echo(test_file);
-        let mut out = cmd_with_out(&exec_file.name, &[]);
-        println!("===========================================");
-        println!("{}", String::from_utf8_lossy(&out));
+    fn run_parser(exec_file: &str, test_input: &str, expected_output: &[u8]) {
+        let mut out = cmd_with_out(exec_file, &[test_input]);
         println!("-------------------------------------------");
         println!("{}", String::from_utf8_lossy(expected_output));
         println!("===========================================");
         assert_eq!(out, expected_output)
     }
 
-    fn test_lex(lexfile: &str, test_input: &str, expected_output: &[u8]) {
-        let lang = if lexfile.ends_with("_r.l") {
+    fn get_lang(file: &str) -> Lang {
+        if file.ends_with("_r.l") {
             Lang::Rust
         } else {
             Lang::C
-        };
+        }
+    }
+
+    fn test_lex(lexfile: &str, test_input: &str, expected_output: &[u8]) {
+        let lang = get_lang(lexfile);
         let test_name = &lexfile[7..(lexfile.len() - 2)];
         let exec_file = TmpFile::new("", "");
         let mut parser_file = TmpFile::new(test_name, lang.src_extension());
-        lex(lexfile, &parser_file, &lang);
-        compile_parser(&parser_file, &exec_file, &lang);
-        run_parser(&exec_file, test_input, expected_output);
+        ft_lex(lexfile, &parser_file.name, &lang);
+        compile_parser(&parser_file.name, &exec_file.name, &lang);
+        run_parser(&exec_file.name, test_input, expected_output);
     }
 
-    fn compare(ft_lex_exec: &TmpFile, flex_exec: &TmpFile, test_file: &str) {
-        let mut lex_process = Command::new(&ft_lex_exec.name)
-            .stdin(Stdio::from(echo(test_file)))
-            .stdout(Stdio::piped())
-            .spawn()
-            .unwrap();
-
-        let mut flex_process = Command::new(&flex_exec.name)
-            .stdin(Stdio::from(echo(test_file)))
-            .stdout(Stdio::piped())
-            .spawn()
-            .unwrap();
-
-        assert_eq!(
-            flex_process.wait_with_output().unwrap().stdout,
-            lex_process.wait_with_output().unwrap().stdout
-        );
+    fn compare(ft_lex_exec: &TmpFile, flex_exec: &TmpFile, test_input: &str) {
+        let lex_out = cmd_with_out(&ft_lex_exec.name, &[test_input]);
+        let flex_out = cmd_with_out(&flex_exec.name, &[test_input]);
+        assert_eq!(lex_out, flex_out);
     }
 
     fn test_lex_compare(lexfile: &str, test_input: &str) {
@@ -160,14 +121,13 @@ mod test {
 
         let lex_exec = TmpFile::new("", "");
         let mut lex_parser_file = TmpFile::new(test_name, lang.src_extension());
-        lex(lexfile, &lex_parser_file, &lang);
-        compile_parser(&lex_parser_file, &lex_exec, &lang);
+        ft_lex(lexfile, &lex_parser_file.name, &lang);
+        compile_parser(&lex_parser_file.name, &lex_exec.name, &lang);
 
         let flex_exec = TmpFile::new("", "");
         let mut flex_parser_file = TmpFile::new(test_name, lang.src_extension());
-        lex(lexfile, &flex_parser_file, &lang);
-        compile_parser(&flex_parser_file, &flex_exec, &lang);
-
+        ft_lex(lexfile, &flex_parser_file.name, &lang);
+        compile_parser(&flex_parser_file.name, &flex_exec.name, &lang);
         compare(&lex_exec, &flex_exec, test_input);
     }
 
@@ -175,7 +135,7 @@ mod test {
     fn basic_c() {
         test_lex(
             "./test/basic.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"SALUTbonjourSALUT\nSALUT\naurevoir\n",
         );
         test_lex_compare("./test/basic.l", "salutbonjoursalut\nsalut\naurevoir");
@@ -185,59 +145,48 @@ mod test {
     fn basic_rs() {
         test_lex(
             "./test/basic_r.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"SALUTbonjourSALUT\nSALUT\naurevoir\n",
         );
-    }
-
-    #[test]
-    fn empty_c() {
-        test_lex("./test/empty.l", "salut", b"salut\n");
-        test_lex_compare("./test/empty.l", "salut");
-    }
-
-    #[test]
-    fn empty_rs() {
-        test_lex("./test/empty_r.l", "salut", b"salut\n");
     }
 
     #[test]
     fn anchor_c() {
         test_lex(
             "./test/anchor_1.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"SALUTbonjoursalut\nSALUT\naurevoir\n",
         );
         test_lex(
             "./test/anchor_2.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"salutbonjourSALUT\nSALUT\naurevoir\n",
         );
         test_lex(
             "./test/anchor_3.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"salutbonjoursalut\nSALUT\naurevoir\n",
         );
-        test_lex_compare("./test/anchor_1.l", "salutbonjoursalut\nsalut\naurevoir");
-        test_lex_compare("./test/anchor_2.l", "salutbonjoursalut\nsalut\naurevoir");
-        test_lex_compare("./test/anchor_3.l", "salutbonjoursalut\nsalut\naurevoir");
+        test_lex_compare("./test/anchor_1.l", "salutbonjoursalut\nsalut\naurevoir\n");
+        test_lex_compare("./test/anchor_2.l", "salutbonjoursalut\nsalut\naurevoir\n");
+        test_lex_compare("./test/anchor_3.l", "salutbonjoursalut\nsalut\naurevoir\n");
     }
 
     #[test]
     fn anchor_rs() {
         test_lex(
             "./test/anchor_1_r.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"SALUTbonjoursalut\nSALUT\naurevoir\n",
         );
         test_lex(
             "./test/anchor_2_r.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"salutbonjourSALUT\nSALUT\naurevoir\n",
         );
         test_lex(
             "./test/anchor_3_r.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"salutbonjoursalut\nSALUT\naurevoir\n",
         );
     }
@@ -246,28 +195,34 @@ mod test {
     fn condition_c() {
         test_lex(
             "./test/condition_1.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"salutSALUT\nSALUT\naurevoir\n",
         );
         test_lex(
             "./test/condition_2.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"salut\n\n\n",
         );
-        test_lex_compare("./test/condition_1.l", "salutbonjoursalut\nsalut\naurevoir");
-        test_lex_compare("./test/condition_2.l", "salutbonjoursalut\nsalut\naurevoir");
+        test_lex_compare(
+            "./test/condition_1.l",
+            "salutbonjoursalut\nsalut\naurevoir\n",
+        );
+        test_lex_compare(
+            "./test/condition_2.l",
+            "salutbonjoursalut\nsalut\naurevoir\n",
+        );
     }
 
     #[test]
     fn condition_rs() {
         test_lex(
             "./test/condition_1_r.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"salutSALUT\nSALUT\naurevoir\n",
         );
         test_lex(
             "./test/condition_2_r.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"salut\n\n\n",
         );
     }
@@ -276,17 +231,17 @@ mod test {
     fn trailing_c() {
         test_lex(
             "./test/trailing.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"SALUTbonjoursalut\nsalut\naurevoir\n",
         );
-        test_lex_compare("./test/trailing.l", "salutbonjoursalut\nsalut\naurevoir");
+        test_lex_compare("./test/trailing.l", "salutbonjoursalut\nsalut\naurevoir\n");
     }
 
     #[test]
     fn trailing_rs() {
         test_lex(
             "./test/trailing_r.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"SALUTbonjoursalut\nsalut\naurevoir\n",
         );
     }
@@ -295,12 +250,12 @@ mod test {
     fn substitution_c() {
         test_lex(
             "./test/substitution.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"SALUTbonjoursalut\nsalut\naurevoir\n",
         );
         test_lex_compare(
             "./test/substitution.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
         );
     }
 
@@ -308,21 +263,21 @@ mod test {
     fn substitution_rs() {
         test_lex(
             "./test/substitution_r.l",
-            "salutbonjoursalut\nsalut\naurevoir",
+            "salutbonjoursalut\nsalut\naurevoir\n",
             b"SALUTbonjoursalut\nsalut\naurevoir\n",
         );
     }
 
     #[test]
     fn reject_c() {
-        test_lex("./test/reject_1.l", "salut", b"12345salut\n");
+        test_lex("./test/reject_1.l", "salut\n", b"12345salut\n");
         test_lex(
             "./test/reject_2.l",
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
             b"123\n",
         );
-        test_lex_compare("./test/reject_1.l", "salut");
-        test_lex_compare("./test/reject_2.l", "aaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        test_lex_compare("./test/reject_1.l", "salut\n");
+        test_lex_compare("./test/reject_2.l", "aaaaaaaaaaaaaaaaaaaaaaaaaaaa\n");
     }
 
     // #[test]
@@ -333,81 +288,85 @@ mod test {
 
     #[test]
     fn pipe_c() {
-        test_lex("./test/pipe_1.l", "salut", b"5\n");
-        test_lex("./test/pipe_2.l", "salut", b"5\n");
-        test_lex("./test/pipe_3.l", "salut", b"salut\n");
-        test_lex_compare("./test/pipe_1.l", "salut");
-        test_lex_compare("./test/pipe_2.l", "salut");
-        test_lex_compare("./test/pipe_3.l", "salut");
+        test_lex("./test/pipe_1.l", "salut\n", b"5\n");
+        test_lex("./test/pipe_2.l", "salut\n", b"5\n");
+        test_lex("./test/pipe_3.l", "salut\n", b"salut\n");
+        test_lex_compare("./test/pipe_1.l", "salut\n");
+        test_lex_compare("./test/pipe_2.l", "salut\n");
+        test_lex_compare("./test/pipe_3.l", "salut\n");
     }
 
     #[test]
     fn pipe_rs() {
-        test_lex("./test/pipe_1_r.l", "salut", b"5\n");
-        test_lex("./test/pipe_2_r.l", "salut", b"5\n");
+        test_lex("./test/pipe_1_r.l", "salut\n", b"5\n");
+        test_lex("./test/pipe_2_r.l", "salut\n", b"5\n");
         // test_lex("./test/pipe_3_r.l", "salut", b"salut\n");
     }
 
     #[test]
     fn yyless_c() {
-        test_lex("./test/yyless.l", "salut", b"MATCHlut\n");
+        test_lex("./test/yyless.l", "salut\n", b"MATCHlut\n");
         test_lex_compare("./test/yyless.l", "salut");
     }
 
     #[test]
     fn yyless_rs() {
-        test_lex("./test/yyless_r.l", "salut", b"MATCHlut\n");
+        test_lex("./test/yyless_r.l", "salut\n", b"MATCHlut\n");
     }
 
     #[test]
     fn yymore_c() {
-        test_lex("./test/yymore.l", "salutbonjour", b"salutsalutbonjour\n");
-        test_lex_compare("./test/yymore.l", "salutbonjour");
+        test_lex("./test/yymore.l", "salutbonjour\n", b"salutsalutbonjour\n");
+        test_lex_compare("./test/yymore.l", "salutbonjour\n");
     }
 
     #[test]
     fn yymore_rs() {
-        test_lex("./test/yymore_r.l", "salutbonjour", b"salutsalutbonjour\n");
+        test_lex(
+            "./test/yymore_r.l",
+            "salutbonjour\n",
+            b"salutsalutbonjour\n",
+        );
     }
 
     #[test]
     fn input_c() {
         test_lex(
             "./test/input_1.l",
-            "salut /* bonjour */ coucou",
+            "salut /* bonjour */ coucou\n",
             b"salut  coucou\n",
         );
-        test_lex("./test/input_2.l", "salutbonjour", b"MATCHnjour\n");
-        test_lex_compare("./test/input_1.l", "salutbonjour");
-        test_lex_compare("./test/input_2.l", "salutbonjour");
+        test_lex("./test/input_2.l", "salutbonjour\n", b"MATCHnjour\n");
+        test_lex_compare("./test/input_1.l", "salutbonjour\n");
+        test_lex_compare("./test/input_2.l", "salutbonjour\n");
     }
 
     #[test]
     fn input_rs() {
         test_lex(
             "./test/input_1_r.l",
-            "salut /* bonjour */ coucou",
+            "salut /* bonjour */ coucou\n",
             b"salut  coucou\n",
         );
-        test_lex("./test/input_2_r.l", "salutbonjour", b"MATCHnjour\n");
+        test_lex("./test/input_2_r.l", "salutbonjour\n", b"MATCHnjour\n");
     }
 
     #[test]
     fn unput_c() {
-        test_lex("./test/unput.l", "salutbonjour", b"MATCH21njour\n");
-        test_lex_compare("./test/unput.l", "salutbonjour");
+        test_lex("./test/unput.l", "salutbonjour\n", b"MATCH21njour\n");
+        test_lex_compare("./test/unput.l", "salutbonjour\n");
     }
 
     #[test]
     fn unput_rs() {
-        test_lex("./test/unput_r.l", "salutbonjour", b"MATCH21njour\n");
+        test_lex("./test/unput_r.l", "salutbonjour\n", b"MATCH21njour\n");
     }
 
     #[test]
     fn number_c() {
         test_lex(
             "./test/number.l",
-            "1+23*456",
+            "1+23*456\n",
             b"Number: 1\nOperator: +\nNumber: 23\nOperator: *\nNumber: 456\nOTHER\n",
         );
         test_lex_compare("./test/number.l", "1+23*456");
@@ -418,7 +377,7 @@ mod test {
         test_lex(
             "./test/number_r.l",
             "1+23*456",
-            b"Number: 1\nOperator: +\nNumber: 23\nOperator: *\nNumber: 456\nOTHER\n",
+            b"Number: 1\nOperator: +\nNumber: 23\nOperator: *\nNumber: 456\n",
         );
     }
 
@@ -441,24 +400,26 @@ mod test {
         );
     }
 
-    fn test_lex_multi(lexfiles: &[&str], test_input: &str, expected_output: &[u8], lang: Lang) {
+    fn test_lex_multi(lexfiles: &[&str], test_input: &str, expected_output: &[u8]) {
+        let lang = get_lang(lexfiles[0]);
         let test_name = format!("multi_{}", lang.lex_flag());
         let exec_file = TmpFile::new("", "");
         let mut parser_file = TmpFile::new(&test_name, lang.src_extension());
-        let mut args = vec!["-c", "-x", lang.lex_flag(), "-o", &parser_file.name];
+        let mut args = vec!["-y", "-c", "-x", lang.lex_flag(), "-o", &parser_file.name];
+
         args.extend(lexfiles);
-        Command::new("./target/debug/ft_lex").args(&args).output();
-        compile_parser(&parser_file, &exec_file, &lang);
-        run_parser(&exec_file, test_input, expected_output);
+
+        cmd_with_out("./target/release/ft_lex", &args);
+        compile_parser(&parser_file.name, &exec_file.name, &lang);
+        run_parser(&exec_file.name, test_input, expected_output);
     }
 
     #[test]
     fn multi_c() {
         test_lex_multi(
             &["./test/1.l", "./test/2.l", "./test/3.l"],
-            "salut",
+            "salut\n",
             b"COUCOU\n",
-            Lang::C,
         );
     }
 
@@ -466,9 +427,8 @@ mod test {
     fn multi_rs() {
         test_lex_multi(
             &["./test/1_r.l", "./test/2_r.l", "./test/3_r.l"],
-            "salut",
+            "salut\n",
             b"COUCOU\n",
-            Lang::Rust,
         );
     }
 

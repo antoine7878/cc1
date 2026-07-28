@@ -42,7 +42,18 @@ impl Generator for RSGenerator {
     }
 
     fn dump_tokens(&self, tokens: &[String]) -> String {
-        tokens.join(", ")
+        let mut ret = "#[allow(non_camel_case_types, mixed_script_confusables)]
+            #[derive(Debug, Clone, PartialEq)]
+            pub enum YYToken {"
+            .to_string();
+        ret += &tokens
+            .iter()
+            .map(|tok| format!("{},\n", tok))
+            .collect::<Vec<_>>()
+            .join("");
+        ret += "yyeof\n}\n\n";
+        ret += "pub trait YYLexer {\nfn yylex(&mut self) -> YYToken;\n}\n";
+        ret
     }
 }
 impl RSGenerator {

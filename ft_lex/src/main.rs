@@ -11,7 +11,6 @@ mod utils;
 
 use crate::args::Args;
 use crate::front::LexParser;
-use crate::generator::Lang;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = SystemTime::now().duration_since(UNIX_EPOCH)?;
@@ -24,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let parser = LexParser::new(&args.i)?;
     let mut lex = parser.run(args.c)?;
-    lex.run(&args.o, args.x)?;
+    lex.run(&args)?;
 
     let end = SystemTime::now().duration_since(UNIX_EPOCH)?;
     if args.v && !args.n {

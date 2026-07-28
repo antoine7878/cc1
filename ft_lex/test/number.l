@@ -12,10 +12,9 @@
 
 
 int main(int argc, char *argv[]) {
-    (void)argc;
-    (void)argv;
     int tok;
 
+    yyin = fmemopen(argv[1], strlen(argv[1]), "r");
     while ((tok = yylex()) != 0) {
         switch (tok) {
             case OPERATOR:

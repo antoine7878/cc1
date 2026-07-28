@@ -11,3 +11,9 @@
 [[:blank:]]     // ignore whitespaces
 
 .               printf("Invalid character: %c\n", *yytext);
+%% 
+int main(int argc, char **argv) {
+    yyin = fmemopen(argv[1], strlen(argv[1]), "r");
+    while (yylex()) ;
+}
+

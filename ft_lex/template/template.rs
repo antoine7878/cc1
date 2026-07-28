@@ -1,5 +1,8 @@
+#![allow(unused_braces, mixed_script_confusables, unused)]
 use std::io::{Read, stdin};
 use std::str::from_utf8;
+
+/* CODE_BEFORE */
 
 /* DEFINES */
 const READ_LEN: usize = 4096;
@@ -11,13 +14,15 @@ enum LexerState {
     Eof,
 }
 
+/* TOKENS */
+
 #[derive(Debug)]
 struct AcceptData {
     state: usize,
     buf_pos: usize,
 }
 
-pub struct YYLex<R: Read> {
+pub struct YYLex<R: Read, C> {
     state: LexerState,
     action: isize,
     current_state: usize,
@@ -36,11 +41,25 @@ pub struct YYLex<R: Read> {
     pub yytext: String,
     pub line_no: isize,
     pub col_no: isize,
+    pub ctx: C,
 }
 
 #[allow(unused)]
-impl<R: Read> YYLex<R> {
-    pub fn new<F>(yyin: R, yycontinue: F) -> Self
+impl Default for YYLex<std::io::Stdin, u32> {
+    fn default() -> Self {
+        Self::new(stdin(), || None, 1)
+    }
+}
+
+impl<R: Read> YYLex<R, u32> {
+    pub fn with_reader(yyin: R) -> YYLex<R, u32> {
+        Self::new(yyin, || None, 1)
+    }
+}
+
+#[allow(unused)]
+impl<R: Read, C> YYLex<R, C> {
+    pub fn new<F>(yyin: R, yycontinue: F, ctx: C) -> Self
     where
         F: FnMut() -> Option<R> + 'static,
     {
@@ -62,26 +81,10 @@ impl<R: Read> YYLex<R> {
             yytext: String::new(),
             line_no: 0,
             col_no: 0,
+            ctx,
         }
     }
-}
 
-#[allow(unused)]
-impl<R: Read> YYLex<R> {
-    pub fn with_reader(yyin: R) -> Self {
-        Self::new(yyin, || None)
-    }
-}
-
-#[allow(unused)]
-impl Default for YYLex<std::io::Stdin> {
-    fn default() -> Self {
-        Self::new(stdin(), || None)
-    }
-}
-
-#[allow(dead_code)]
-impl<R: Read> YYLex<R> {
     /* TABLES */
 
     /* REMOVE */
@@ -197,10 +200,7 @@ impl<R: Read> YYLex<R> {
             .to_string();
         self.count();
     }
-}
 
-#[allow(unused)]
-impl<R: Read> YYLex<R> {
     pub fn yymore(&mut self) {
         self.more = true;
     }
@@ -304,9 +304,7 @@ impl<R: Read> YYLex<R> {
         self.run_position = std::cmp::min(self.stack_top().buf_pos + 1, self.buffer.len());
         self.build_yytext();
     }
-}
 
-impl<R: Read> YYLexer for YYLex<R> {
     fn yylex(&mut self) -> YYToken {
         loop {
             if self.prepare_run().is_none() {
@@ -326,7 +324,6 @@ impl<R: Read> YYLexer for YYLex<R> {
 /* MAIN */
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut lexer = YYLex::default();
-
-    while let Some(_token) = lexer.next() {}
+    while lexer.yylex() != YYToken::yyeof {}
     Ok(())
 }

@@ -12,16 +12,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut i = 0;
 
-    let mut lexer = YYLex::new(File::open("./test/empty.l").unwrap(), stdout(), move || {
+    let mut lexer = YYLex::new(File::open("./test/empty.l").unwrap(), move || {
         if i < 3 {
             i += 1;
             Some(File::open("./test/empty.l").unwrap())
         } else {
             None
         }
-    });
+    }, 1);
 
-    while let Some(_token) = lexer.next() {}
+    while lexer.yylex() != YYToken::yyeof {}
 
     Ok(())
 }

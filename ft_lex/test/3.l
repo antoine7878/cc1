@@ -1,12 +1,6 @@
-int main(int argc, char *argv[]) {
-	(void)argc;
-	(void)argv;
-
-	yyin = fopen(argv[1], "r");
-	while (yylex() != 0)
-		;
-
-	return 0;
+int main(int argc, char **argv) {
+    yyin = fmemopen(argv[1], strlen(argv[1]), "r");
+    while (yylex()) ;
 }
 
 int yywrap(void) { return 2; }
