@@ -9,7 +9,6 @@ use std::io::Read;
 pub struct Yacc<R: Read> {
     state_stack: Vec<usize>,
     value_stack: Vec<YYToken>,
-    default_prod_table: Vec<YYToken>,
     lookahead: Option<YYToken>,
     lookahead_id: usize,
     act: isize,
@@ -96,12 +95,7 @@ impl<R: Read> Yacc<R> {
         }
         /* DEBUGGING */
         for token in self.value_stack[1..].iter().rev() {
-            yylog!(
-                self,
-                "Cleanup: popping {} {:?}",
-                Self::token_class(token.index()),
-                token
-            );
+            yylog!(self, "Cleanup: popping {:?}", token);
         }
         /* DEBUGGING */
         self.ret
@@ -124,7 +118,7 @@ impl<R: Read> Yacc<R> {
             self.state_stack.pop();
             let val = self.value_stack.pop().unwrap();
             /* DEBUGGING */
-            yylog!(self, "Error: popping {} {:?}", Self::token_class(val.index()), val);
+            yylog!(self, "Error: popping {:?}", val);
             yylog!(self, "Stack now {:?}", self.state_stack);
             /* DEBUGGING */
         }
@@ -175,15 +169,15 @@ impl<R: Read> Yacc<R> {
         self.lookahead = None;
     }
 
-    /* DEBUGGING */
-    fn token_class(token_id: usize) -> &'static str {
-        if Self::YY_TERMINAL_TABLE[token_id] {
-            "nterm"
-        } else {
-            "token"
-        }
-    }
-    /* DEBUGGING */
+    /* /* DEBUGGING */ */
+    /* fn token_class(token: &Option<YYToken>) -> &'static str { */
+    /*     if token == &Some(YYToken::Empty) { */
+    /*         return "nterm"; */
+    /*     } */
+    /*     let id = token.as_ref().unwrap().index(); */
+    /*     if Self::YY_TERMINAL_TABLE[id] { "nterm" } else { "token" } */
+    /* } */
+    /* /* DEBUGGING */ */
 
     fn push_statcks(&mut self, state: usize, value: YYToken) {
         self.state_stack.push(state);
@@ -224,12 +218,11 @@ impl<R: Read> Yacc<R> {
         yylog!(
             self,
             "Shifting token {:?}",
-            self.lookahead.clone().unwrap_or(YYToken::yyeof)
+            self.lookahead.as_ref().unwrap_or(&YYToken::yyeof)
         );
         /* DEBUGGING */
-        self.push_statcks(-self.act as usize, self.lookahead.clone().unwrap_or(YYToken::yyeof));
-
-        self.lookahead = None;
+        let token = self.lookahead.take().unwrap_or(YYToken::yyeof);
+        self.push_statcks(-self.act as usize, token);
     }
 
     fn reduce(&mut self) {
@@ -259,31 +252,34 @@ impl<R: Read> Yacc<R> {
     #[allow(unused_braces, clippy::let_and_return)]
     fn action(&mut self) -> YYToken {
         let idx = self.value_stack.len() - Self::YY_RLEN_TABLE[self.act as usize];
-        let values = self.value_stack.drain(idx..).collect::<Vec<YYToken>>().clone();
-        let _a = self.state_stack.drain(idx..).collect::<Vec<_>>().clone();
 
         /* DEBUGGING */
         for (i, tok) in values.iter().enumerate().rev() {
-            yylog!(
-                self,
-                "   ${} = {} {:?}",
-                i + 1,
-                Self::token_class(self.lookahead_id),
-                tok
-            );
+            yylog!(self, "   ${} = {:?}", i + 1, tok);
         }
         /* DEBUGGING */
 
         let ret = match Self::YY_ACTION_TABLE[self.act as usize] {
             /* ACTIONS */
-            -1 => self.default_prod_table[self.act as usize].clone(),
+            -1 => YYToken::Empty,
             _ => unreachable!(),
         };
+        let ret = self.do_action(idx);
+        self.value_stack.truncate(idx);
+        self.state_stack.truncate(idx);
 
         /* DEBUGGING */
-        yylog!(self, "-> $$ = {} {:?}", Self::token_class(self.lookahead_id), ret);
+        yylog!(self, "-> $$ = {:?}", ret);
         /* DEBUGGING */
         ret
+    }
+
+    fn do_action(&mut self, idx: usize) -> YYToken {
+        match Self::YY_ACTION_TABLE[self.act as usize] {
+            /* ACTIONS */
+            -1 => YYToken::Empty,
+            _ => unreachable!(),
+        }
     }
 }
 

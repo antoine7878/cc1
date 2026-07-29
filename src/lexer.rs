@@ -45,8 +45,9 @@ pub struct YYLex<R: Read> {
 
     pub yyin: R,
     pub yytext: String,
-    pub line_no: isize,
-    pub col_no: isize,
+    pub yystart: (usize, usize),
+    pub yyend: (usize, usize),
+    pub pos: (usize, usize),
     pub ctx: Context,
 }
 
@@ -74,8 +75,9 @@ impl<R: Read> YYLex<R> {
             yycontinue: Box::new(yycontinue),
             yyin,
             yytext: String::new(),
-            line_no: 1,
-            col_no: 1,
+            yystart: (1, 1),
+            yyend: (1, 1),
+            pos: (1, 1),
             ctx,
         }
     }
@@ -455,8 +457,7 @@ const YY_RULE_COUNT: usize = 92;
     }
 
     fn reject(&mut self) {
-        let next_action = Self::YY_NEXT_ACCEPT
-            [self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
+        let next_action = Self::YY_NEXT_ACCEPT[self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
         self.action = if next_action >= 0 {
             next_action
         } else {
@@ -476,9 +477,7 @@ const YY_RULE_COUNT: usize = 92;
     }
 
     fn shift_all_positions(&mut self, offset: usize) {
-        self.accept_stack
-            .iter_mut()
-            .for_each(|s| s.buf_pos -= offset);
+        self.accept_stack.iter_mut().for_each(|s| s.buf_pos -= offset);
         self.run_position -= offset;
         self.trailing_end_pos = self.trailing_end_pos.saturating_sub(offset);
         self.buffer_position -= offset;
@@ -541,12 +540,12 @@ const YY_RULE_COUNT: usize = 92;
             return;
         }
         if c == b'\n' {
-            self.line_no += 1;
-            self.col_no = 1;
+            self.pos.0 += 1;
+            self.pos.1 = 1;
         } else if c == b'\t' {
-            self.col_no += 4 - (self.col_no % 4);
+            self.pos.1 += 4 - (self.pos.1 % 4);
         } else {
-            self.col_no += 1;
+            self.pos.1 += 1;
         }
     }
 
@@ -568,6 +567,7 @@ const YY_RULE_COUNT: usize = 92;
         self.run_position -= self.yytext.len() - n;
         self.uncounted += self.yytext.len() - n;
         self.build_yytext();
+        self.yyend = self.pos;
     }
 
     pub fn input(&mut self) -> u8 {
@@ -577,10 +577,7 @@ const YY_RULE_COUNT: usize = 92;
         if self.run_position >= self.buffer.len() {
             return 0;
         }
-        let ret = *self
-            .buffer
-            .get(self.run_position)
-            .expect("run_position out of bounds");
+        let ret = *self.buffer.get(self.run_position).expect("run_position out of bounds");
         self.run_position += 1;
         self.count_c(ret);
         ret
@@ -643,10 +640,8 @@ const YY_RULE_COUNT: usize = 92;
                 break;
             }
 
-            let char_class: usize =
-                Self::YY_CHAR_EQ[self.buffer[self.run_position] as usize] as usize;
-            self.current_state =
-                Self::YY_BASE[self.current_state * Self::YY_CLASS_COUNT + char_class] as usize;
+            let char_class: usize = Self::YY_CHAR_EQ[self.buffer[self.run_position] as usize] as usize;
+            self.current_state = Self::YY_BASE[self.current_state * Self::YY_CLASS_COUNT + char_class] as usize;
             if self.current_state == 0 {
                 break;
             }
@@ -662,7 +657,10 @@ const YY_RULE_COUNT: usize = 92;
             self.stack_top_mut().buf_pos = self.trailing_end_pos;
         }
         self.run_position = std::cmp::min(self.stack_top().buf_pos + 1, self.buffer.len());
+        self.yystart = self.pos;
         self.build_yytext();
+        self.count_yytext();
+        self.yyend = self.pos;
     }
 
     pub fn yylex(&mut self) -> YYToken {
@@ -1043,7 +1041,6 @@ const YY_RULE_COUNT: usize = 92;
                 -1 => print!("{}", self.yytext),
                 _ => panic!("wrong action\n"),
             };
-            self.count_yytext();
             ret
         }
     }

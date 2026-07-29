@@ -1,16 +1,42 @@
-use std::fmt::Display;
+use std::error;
+use std::fmt::{self, Display};
+use std::io;
 use std::io::Read;
 
 use crate::color::{RED, RESET};
 use crate::parser::Yacc;
 
-// pub fn yyerror<D: Display>(msg: D) {
-//     eprintln!("{RED}{msg}{RESET}");
-// }
-
 pub fn yyerror<D: Display, R: Read>(msg: D, yacc: &Yacc<R>) {
     eprintln!(
         "filename.c:{}:{}: {RED}{msg}{RESET}",
-        yacc.lexer.line_no, yacc.lexer.col_no
+        yacc.lexer.pos.0, yacc.lexer.pos.1
     );
+}
+
+#[derive(Debug)]
+pub enum CCError {
+    Io(io::Error),
+    SyntaxError(String, usize, usize, String),
+}
+
+impl error::Error for CCError {}
+
+impl From<io::Error> for CCError {
+    fn from(e: io::Error) -> Self {
+        CCError::Io(e)
+    }
+}
+
+impl Display for CCError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            CCError::Io(e) => write!(f, "IO error: {e}"),
+            CCError::SyntaxError(file, line, col, msg) => write!(f, "Error {file}:{line}:{col}: {msg}"),
+        }
+    }
+}
+impl CCError {
+    pub fn error<T: Display, R>(file_name: String, line_no: usize, col_no: usize, msg: T) -> Result<R, Self> {
+        Err(Self::SyntaxError(file_name, line_no, col_no, msg.to_string()))
+    }
 }

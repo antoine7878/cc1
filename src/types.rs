@@ -9,6 +9,7 @@ use crate::tag::{EnumId, StructId, UnionId};
 pub enum Type {
     Void,
     Char,
+    Short,
     Int,
     Long,
     LongLong,
@@ -39,9 +40,8 @@ pub enum Type {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Qualifiers {
-    CONST,
-    VOLATILE,
-    RESTRICT,
+    Const,
+    Volatile,
 }
 
 pub type TypeId = ArenaId<Type>;
@@ -56,6 +56,9 @@ impl TypeArena {
         self.alloc(Type::Char)
     }
 
+    pub fn short(&mut self) -> TypeId {
+        self.alloc(Type::Short)
+    }
     pub fn int(&mut self) -> TypeId {
         self.alloc(Type::Int)
     }

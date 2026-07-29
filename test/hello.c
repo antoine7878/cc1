@@ -1,6 +1,3 @@
-#include <stdio.h>
-
-int main() {
-	printf("Hello world!\n");
+int main(int argc, char **argv, char **envp) {
 	return 0;
 }

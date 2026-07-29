@@ -1,6 +1,8 @@
 %no_main
 
 %{
+use crate::types::{Qualifiers, TypeId};
+use crate::tag::{EnumId, StructId, UnionId};
 use crate::lexer::YYLex;
 use crate::error::yyerror;
 %}
@@ -20,6 +22,8 @@ use crate::error::yyerror;
 
 %token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR GOTO CONTINUE BREAK RETURN
 
+%type<Qualifiers> type_qualifier
+%type<TypeId> type_specifier struct_or_union_specifier enum_specifier
 
 %%
 
@@ -193,18 +197,18 @@ storage_class_specifier
 	;
 
 type_specifier
-	: VOID
-	| CHAR
-	| SHORT
-	| INT
-	| LONG
-	| FLOAT
-	| DOUBLE
-	| SIGNED
-	| UNSIGNED
-	| struct_or_union_specifier
-	| enum_specifier
-	| TYPE_NAME
+	: VOID                          { self.lexer.ctx.arenas.type.void() }
+	| CHAR                          { TypeArena::char() }
+	| SHORT                         { TypeArena::short() }
+	| INT                           { TypeArena::int() }
+	| LONG                          { TypeArena::long() }
+	| FLOAT                         { TypeArena::float() }
+	| DOUBLE                        { TypeArena::double() }
+	| SIGNED                        { TypeArena::char() }
+	| UNSIGNED                      { TypeArena::char() }
+	| struct_or_union_specifier     { $1 }
+	| enum_specifier                { $1 }
+	| TYPE_NAME                     { }
 	;
 
 struct_or_union_specifier
@@ -246,9 +250,9 @@ struct_declarator
 	;
 
 enum_specifier
-	: ENUM '{' enumerator_list '}'
-	| ENUM IDENTIFIER '{' enumerator_list '}'
-	| ENUM IDENTIFIER
+	: ENUM '{' enumerator_list '}'              {}
+	| ENUM IDENTIFIER '{' enumerator_list '}'   {}
+	| ENUM IDENTIFIER                           {}
 	;
 
 enumerator_list
@@ -262,8 +266,8 @@ enumerator
 	;
 
 type_qualifier
-	: CONST
-	| VOLATILE
+	: CONST { Qualifiers::Const }
+	| VOLATILE { Qualifiers::Volatile }
 	;
 
 declarator

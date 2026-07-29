@@ -27,6 +27,10 @@ rvalue
 
 %%
 
+pub fn yyerror<D: fmt::Display, R: Read>(msg: D, yacc: &Yacc<R>) {
+    eprintln!("{}", msg);
+}
+
 fn main() {
     use std::env;
     use std::io::Cursor;

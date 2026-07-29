@@ -1,0 +1,8 @@
+TranslationUnitDecl 0xa02c7e008 <<invalid sloc>> <invalid sloc>
+`-FunctionDecl 0xa02d25b88 <test/hello.c:1:1, line:3:1> line:1:5 main 'int (int, char **, char **)'
+  |-ParmVarDecl 0xa02d25960 <col:10, col:14> col:14 argc 'int'
+  |-ParmVarDecl 0xa02d25a18 <col:20, col:27> col:27 argv 'char **'
+  |-ParmVarDecl 0xa02d25a98 <col:33, col:40> col:40 envp 'char **'
+  `-CompoundStmt 0xa02d25cc0 <col:46, line:3:1>
+    `-ReturnStmt 0xa02d25cb0 <line:2:2, col:9>
+      `-IntegerLiteral 0xa02d25c90 <col:9> 'int' 0
