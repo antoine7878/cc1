@@ -129,6 +129,6 @@ fn check_type(yytext: String) -> YYToken {
 // pseudo code --- this is what it should check
 //
 //	if (yytext == type_name)
-	    // return YYToken::TYPE_NAME;
+//	     return YYToken::TYPE_NAME;
 	YYToken::IDENTIFIER(yytext)
 }

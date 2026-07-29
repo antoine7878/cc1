@@ -1,22 +1,21 @@
-#[derive(Debug)]
-pub struct Context {
-    num_count: u32,
-    op_count: u32,
+use crate::symbol::{NameArena, SymbolTable};
+use crate::tag::{EnumArena, StructArena, VariantArena};
+use crate::types::TypeArena;
+
+#[derive(Debug, Default)]
+pub struct Arenas {
+    pub symbols: SymbolTable,
+    pub names: NameArena,
+    pub types: TypeArena,
+    pub structs: StructArena,
+    pub enums: EnumArena,
+    pub unions: EnumArena,
+    pub variants: VariantArena,
 }
 
-impl Context {
-    pub fn new() -> Self {
-        Self {
-            num_count: 0,
-            op_count: 0,
-        }
-    }
-
-    pub fn increment_op(&mut self) {
-        self.op_count += 1;
-    }
-
-    pub fn increment_num(&mut self) {
-        self.num_count += 1;
-    }
+#[derive(Debug, Default)]
+#[allow(unused)]
+pub struct Context {
+    symbols: SymbolTable,
+    arenas: Arenas,
 }

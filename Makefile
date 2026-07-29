@@ -34,7 +34,7 @@ $(PARSER): $(FT_YACC) $(YACC_FILE)
 # ----- test --------------------
 
 test: $(NAME)
-	cat test/ping.c | ./$(NAME)
+	cat test/test.c | ./$(NAME)
 
 
 clean:
