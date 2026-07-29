@@ -1,11 +1,20 @@
-mod c_tab;
-mod lex_yy;
+pub mod color;
+pub mod context;
+pub mod error;
+pub mod lexer;
+pub mod parser;
 
-pub use c_tab::{YYToken, Yacc};
-pub use lex_yy::YYLex;
+use context::Context;
+use lexer::YYLex;
+use parser::Yacc;
+
+use std::io::stdin;
 
 fn main() {
-    let lexer = YYLex::default();
+    // let args: Vec<String> = env::args().collect();
+    // let reader = Cursor::new(args[1].clone());
+    let lexer = YYLex::new(stdin(), || None, Context::new());
     let mut yacc = Yacc::new(lexer);
+    yacc.yydebug = true;
     yacc.yyparse();
 }

@@ -117,7 +117,7 @@ impl<R: Read> Yacc<R> {
     }
 
     fn unwind(&mut self) {
-        yyerror("syntax error");
+        yyerror("syntax error", self);
         while let Some(i) = self.state_stack.last()
             && Self::YY_GOTO_TABLE[*i][Self::YY_ERROR_TOKEN_ID] == 0
         {
@@ -287,11 +287,11 @@ impl<R: Read> Yacc<R> {
     }
 }
 
-pub fn yyerror<D: fmt::Display>(msg: D) {
+/* MAIN */
+pub fn yyerror<D: fmt::Display, R: Read>(msg: D, yacc: &Yacc<R>) {
     eprintln!("{}", msg);
 }
 
-/* MAIN */
 fn main() {
     use std::process::exit;
 

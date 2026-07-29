@@ -98,7 +98,11 @@ impl Args {
         Ok(())
     }
 
-    fn parse_value<T: TryFrom<String>>(&mut self, it: &mut Chars, opt: char) -> Result<T, ArgError> {
+    fn parse_value<T: TryFrom<String>>(
+        &mut self,
+        it: &mut Chars,
+        opt: char,
+    ) -> Result<T, ArgError> {
         let mut str_value = it.collect::<String>();
         if str_value.is_empty() {
             str_value = self.argv.next().ok_or(ArgError::MissingValue(opt))?
@@ -132,6 +136,10 @@ impl Args {
 
 impl fmt::Display for Args {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.c { write!(f, "-c") } else { write!(f, "{{}}") }
+        if self.c {
+            write!(f, "-c")
+        } else {
+            write!(f, "{{}}")
+        }
     }
 }

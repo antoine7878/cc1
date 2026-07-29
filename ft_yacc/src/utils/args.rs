@@ -35,6 +35,8 @@ impl fmt::Display for ArgError {
 pub struct Args {
     /// positional arguments
     pub mandatory: Vec<String>,
+    /// Override outfile, rust only
+    pub o: Option<String>,
     /// file_prefix
     pub b: Option<String>,
     /// sym_prefix
@@ -61,6 +63,7 @@ impl Default for Args {
         Self {
             mandatory: vec![],
             b: None,
+            o: None,
             p: "yy".to_string(),
             d: false,
             l: false,
@@ -101,6 +104,7 @@ impl Args {
             't' => self.t = true,
             'v' => self.v = true,
             'g' => self.g = true,
+            'o' => self.o = self.parse_value(it, 'o')?,
             'b' => self.b = self.parse_value(it, 'b')?,
             'p' => self.p = self.parse_value(it, 'p')?,
             'x' => self.x = self.parse_value(it, 'x')?,
@@ -137,11 +141,17 @@ impl Args {
         if self.x == Lang::Rust && self.d {
             return Err(ArgError::Process("cannot produce header file in rust".to_string()));
         }
+        if self.x == Lang::C && self.o.is_some() {
+            return Err(ArgError::Process("cannot use '-o' in c".to_string()));
+        }
         Ok(self)
     }
 
     pub fn get_src_file_name(&self) -> String {
-        format!("{}{}", self.b.as_ref().unwrap(), self.x.tab_extention())
+        match &self.o {
+            Some(name) => name.clone(),
+            None => format!("{}{}", self.b.as_ref().unwrap(), self.x.tab_extention()),
+        }
     }
     pub fn get_hdr_file_name(&self) -> String {
         format!("{}.tab.h", self.b.as_ref().unwrap())

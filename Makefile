@@ -20,23 +20,21 @@ $(NAME): $(LEXER) $(PARSER)
 $(FT_LEX):
 	$(MAKE) -C ft_lex
 
-lexer: $(LEXER)
 $(LEXER): $(FT_LEX) $(LEX_FILE)
-	$(FT_LEX) -cx rust $(LEX_FILE) -o $(LEXER)
+	$(FT_LEX) -cx rust $(LEX_FILE) -o src/lexer.rs
 
 # ----- ft_yacc --------------------
 
 $(FT_YACC):
 	$(MAKE) -C ft_yacc
 
-parser: $(PARSER)
 $(PARSER): $(FT_YACC) $(YACC_FILE)
-	$(FT_YACC) -x rust $(YACC_FILE) -b src/c -v
+	$(FT_YACC) -x rust $(YACC_FILE) -o src/parser.rs -t
 
 # ----- test --------------------
 
 test: $(NAME)
-	echo ";" | ./$(NAME)
+	cat test/ping.c | ./$(NAME)
 
 
 clean:
@@ -47,4 +45,4 @@ clean:
 
 re: clean all
 
-.PHONY: all clean re test lexer parser
+.PHONY: all clean re test lexer parser $(FT_LEX) $(FT_YACC)

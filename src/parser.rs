@@ -1,6 +1,9 @@
 #![allow(unused_braces, mixed_script_confusables, unused)]
-
 use std::fmt;
+use std::io::Read;
+
+use crate::lexer::YYLex;
+use crate::error::yyerror;
 
 #[allow(non_camel_case_types, mixed_script_confusables)]
             #[derive(Debug, Clone, PartialEq)]
@@ -8,9 +11,9 @@ use std::fmt;
 yyeof,
 error,
 accept,
-IDENTIFIER,
+IDENTIFIER(String),
+STRING_LITERAL(String),
 CONSTANT,
-STRING_LITERAL,
 SIZEOF,
 PTR_OP,
 INC_OP,
@@ -137,9 +140,9 @@ impl YYToken {
 YYToken::yyeof => 0,
 YYToken::error => 1,
 YYToken::accept => 2,
-YYToken::IDENTIFIER => 3,
-YYToken::CONSTANT => 4,
-YYToken::STRING_LITERAL => 5,
+YYToken::IDENTIFIER(_) => 3,
+YYToken::STRING_LITERAL(_) => 4,
+YYToken::CONSTANT => 5,
 YYToken::SIZEOF => 6,
 YYToken::PTR_OP => 7,
 YYToken::INC_OP => 8,
@@ -286,8 +289,16 @@ _ => unreachable!()
                     }
                 }
             }
+impl From<YYToken> for String {
+                fn from(token: YYToken) -> String {
+                    match token {
+YYToken::IDENTIFIER(s)|YYToken::STRING_LITERAL(s) => s,
+                    _ => panic!("wrong type"),
+                    }
+                }
+            }
 
-pub struct Yacc<T: Iterator<Item = YYToken>> {
+pub struct Yacc<R: Read> {
     state_stack: Vec<usize>,
     value_stack: Vec<YYToken>,
     default_prod_table: Vec<YYToken>,
@@ -297,13 +308,22 @@ pub struct Yacc<T: Iterator<Item = YYToken>> {
     pub yydebug: bool,
     continue_parse: bool,
     is_recovering: bool,
-    lexer: T,
+    pub lexer: YYLex<R>,
     ret: i32,
     token_since_error: usize,
 }
 
+/* DEBUGGING */
+macro_rules! yylog {
+    ($self:expr, $($arg:tt)*) => {
+        if $self.yydebug {
+            eprintln!($($arg)*);
+        }
+    };
+}
+/* DEBUGGING */
 
-impl<T: Iterator<Item = YYToken>> Yacc<T> {
+impl<R: Read> Yacc<R> {
 
 const YY_ERROR_TOKEN_ID: usize = 1;
 const YY_EOF_TOKEN_ID: usize = 0;
@@ -383,8 +403,8 @@ const YY_GOTO_TABLE: [[isize; 148]; 349] =[[0,0,0,-2,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-3,-4,-5,-6,-7,-8,-9,-10,-11,-12,-13,-14,-15,-16,-17,-18,-19,-20,-21,-22,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-129,-53,0,0,-27,-28,-29,0,0,0,-31,-32,-33,-54,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-157,0,0,0,0,0,0,0,0,0,],
 [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,86,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-72,0,0,0,86,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
 [0,0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,2,0,0,2,0,2,0,0,0,0,2,2,2,2,0,0,0,2,2,0,0,0,2,2,0,0,0,2,0,2,0,0,0,2,-158,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
-[0,0,0,0,0,0,0,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,3,0,3,3,0,3,0,3,0,0,0,0,3,3,3,3,0,0,0,3,3,0,0,0,3,3,0,0,0,3,0,3,0,0,0,3,3,0,3,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
 [0,0,0,0,0,0,0,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,0,4,0,4,4,0,4,0,4,0,0,0,0,4,4,4,4,0,0,0,4,4,0,0,0,4,4,0,0,0,4,0,4,0,0,0,4,4,0,4,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
+[0,0,0,0,0,0,0,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,3,0,3,3,0,3,0,3,0,0,0,0,3,3,3,3,0,0,0,3,3,0,0,0,3,3,0,0,0,3,0,3,0,0,0,3,3,0,3,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
 [0,0,0,-144,-77,-78,-79,0,-80,-81,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-93,-159,0,0,-96,0,0,0,0,0,0,-160,-99,0,0,-101,-102,-103,-104,-105,-106,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
 [0,0,0,-144,-77,-78,-79,0,-80,-81,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-93,-161,0,0,-96,0,0,0,0,0,0,-162,-99,0,0,-101,-102,-103,-104,-105,-106,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
 [0,0,0,-144,-77,-78,-79,0,-80,-81,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-93,-161,0,0,-96,0,0,0,0,0,0,-163,-99,0,0,-101,-102,-103,-104,-105,-106,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,],
@@ -660,13 +680,13 @@ const YY_GOTO_TABLE: [[isize; 148]; 349] =[[0,0,0,-2,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 const YY_RLEN_TABLE: [usize; 212] = [1,1,1,1,3,1,4,3,4,3,3,2,2,1,3,1,2,2,2,2,4,1,1,1,1,1,1,1,4,1,3,3,3,1,3,3,1,3,3,1,3,3,3,3,1,3,3,1,3,1,3,1,3,1,3,1,3,1,5,1,3,1,1,1,1,1,1,1,1,1,1,1,1,3,1,2,3,1,2,1,2,1,2,1,3,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,5,4,2,1,1,1,2,3,2,1,2,1,1,3,1,2,3,4,5,2,1,3,1,3,1,1,2,1,1,3,4,3,4,4,3,1,2,2,3,1,2,1,3,1,3,2,2,1,1,3,1,2,1,1,2,3,2,3,3,4,2,3,3,4,1,3,4,1,3,1,1,1,1,1,1,3,4,3,2,3,3,4,1,2,1,2,1,2,5,7,5,5,7,6,7,3,2,2,2,3,1,2,1,1,4,3,3,2,];
 const YY_PRODUCT_TABLE: [usize; 212] = [2,61,61,61,61,65,65,65,65,65,65,65,65,68,68,72,72,72,72,72,72,73,73,73,73,73,73,74,74,82,82,82,82,85,85,85,86,86,86,87,87,87,87,87,90,90,90,91,91,92,92,94,94,96,96,97,97,98,98,70,70,101,101,101,101,101,101,101,101,101,101,101,63,63,103,104,104,105,105,105,105,105,105,107,107,111,111,108,108,108,108,108,109,109,109,109,109,109,109,109,109,109,109,109,114,114,114,116,116,118,118,120,121,121,121,121,122,122,123,123,123,115,115,115,124,124,125,125,110,110,112,112,127,127,127,127,127,127,127,126,126,126,126,130,130,128,128,131,131,132,132,132,129,129,75,75,133,133,133,134,134,134,134,134,134,134,134,134,113,113,113,135,135,136,136,136,136,136,136,137,137,137,138,138,138,138,144,144,143,143,139,139,140,140,140,141,141,141,141,142,142,142,142,142,145,145,146,146,147,147,147,147,];
 const YY_ACTION_TABLE: [isize; 212] = [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,];
-const YY_DEFAULT_ACT: [isize; 349] = [0,133,104,88,89,90,91,92,94,95,96,97,100,101,98,99,129,130,93,108,109,0,0,0,208,0,0,0,0,0,102,103,0,0,0,0,205,207,0,0,0,144,142,0,76,0,84,0,79,81,83,187,0,0,212,0,0,0,0,0,0,206,0,0,0,125,134,145,143,0,77,0,210,0,0,0,3,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,73,0,0,30,22,23,24,25,26,27,0,0,0,0,0,0,0,0,0,0,60,191,183,189,174,175,176,177,178,179,0,0,188,211,0,0,0,0,110,0,153,139,0,0,0,0,148,2,136,28,75,0,0,0,0,122,85,169,87,0,209,0,0,20,0,17,18,0,0,0,0,0,0,0,0,201,202,0,203,0,0,0,0,192,0,12,13,0,0,0,63,64,65,66,67,68,69,70,71,72,0,62,19,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,184,190,185,0,0,113,115,106,111,0,0,0,117,0,0,150,0,151,0,137,138,0,0,135,123,128,126,172,0,180,0,0,182,0,0,0,0,0,200,204,5,0,0,0,156,74,11,8,0,14,0,10,61,31,32,33,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,186,105,120,0,0,112,165,0,0,161,0,0,0,0,154,147,149,0,170,21,181,0,0,0,0,0,29,9,0,7,0,121,118,166,160,162,167,0,163,0,173,171,0,195,196,0,0,0,15,59,168,164,0,0,0,198,194,197,199,];
-const YY_DEFAULT_REDUCE_ACT: [isize; 349] = [0,133,104,88,89,90,91,92,94,95,96,97,100,101,98,99,129,130,93,108,109,0,0,140,208,0,78,80,82,0,102,103,0,0,132,0,205,207,124,0,0,144,142,141,76,0,84,86,79,81,83,187,0,0,212,0,107,0,131,0,0,206,0,127,0,125,134,145,143,0,77,0,210,0,86,2,3,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,16,73,28,0,30,22,23,24,25,26,27,34,37,40,45,48,50,52,54,56,58,60,191,183,189,174,175,176,177,178,179,0,0,188,211,0,114,116,0,110,0,153,139,152,0,0,146,148,2,136,28,75,0,0,0,0,122,85,169,87,0,209,0,0,20,0,17,18,0,0,0,0,0,0,0,0,201,202,0,203,0,0,155,0,192,0,12,13,0,0,0,63,64,65,66,67,68,69,70,71,72,0,62,19,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,184,190,185,0,0,113,115,106,111,0,119,0,117,0,0,150,157,151,158,137,138,0,0,135,123,128,126,172,0,180,0,0,182,0,0,0,0,0,200,204,5,0,0,157,156,74,11,8,0,14,0,10,61,31,32,33,35,36,38,39,43,44,41,42,46,47,49,51,53,55,57,0,186,105,120,0,0,112,165,0,0,161,0,159,0,0,154,147,149,0,170,21,181,0,0,0,0,0,29,9,0,7,0,121,118,166,160,162,167,0,163,0,173,171,193,195,196,0,0,0,15,59,168,164,0,0,0,198,194,197,199,];
-const YY_PRODUCTION_LINE: [usize; 212] = [0,22,23,24,25,29,30,31,32,33,34,35,36,40,41,45,46,47,48,49,50,54,55,56,57,58,59,63,64,68,69,70,71,75,76,77,81,82,83,87,88,89,90,91,95,96,97,101,102,106,107,111,112,116,117,121,122,126,127,131,132,136,137,138,139,140,141,142,143,144,145,146,150,151,155,159,160,164,165,166,167,168,169,173,174,178,179,183,184,185,186,187,191,192,193,194,195,196,197,198,199,200,201,202,206,207,208,212,213,217,218,222,226,227,228,229,233,234,238,239,240,244,245,246,250,251,255,256,260,261,265,266,270,271,272,273,274,275,276,280,281,282,283,287,288,293,294,298,299,303,304,305,309,310,314,315,319,320,321,325,326,327,328,329,330,331,332,333,337,338,339,343,344,348,349,350,351,352,353,357,358,359,363,364,365,366,370,371,375,376,380,381,385,386,387,391,392,393,394,398,399,400,401,402,406,407,411,412,416,417,418,419,];
+const YY_DEFAULT_ACT: [isize; 349] = [0,133,104,88,89,90,91,92,94,95,96,97,100,101,98,99,129,130,93,108,109,0,0,0,208,0,0,0,0,0,102,103,0,0,0,0,205,207,0,0,0,144,142,0,76,0,84,0,79,81,83,187,0,0,212,0,0,0,0,0,0,206,0,0,0,125,134,145,143,0,77,0,210,0,0,0,4,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,0,73,0,0,30,22,23,24,25,26,27,0,0,0,0,0,0,0,0,0,0,60,191,183,189,174,175,176,177,178,179,0,0,188,211,0,0,0,0,110,0,153,139,0,0,0,0,148,2,136,28,75,0,0,0,0,122,85,169,87,0,209,0,0,20,0,17,18,0,0,0,0,0,0,0,0,201,202,0,203,0,0,0,0,192,0,12,13,0,0,0,63,64,65,66,67,68,69,70,71,72,0,62,19,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,184,190,185,0,0,113,115,106,111,0,0,0,117,0,0,150,0,151,0,137,138,0,0,135,123,128,126,172,0,180,0,0,182,0,0,0,0,0,200,204,5,0,0,0,156,74,11,8,0,14,0,10,61,31,32,33,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,186,105,120,0,0,112,165,0,0,161,0,0,0,0,154,147,149,0,170,21,181,0,0,0,0,0,29,9,0,7,0,121,118,166,160,162,167,0,163,0,173,171,0,195,196,0,0,0,15,59,168,164,0,0,0,198,194,197,199,];
+const YY_DEFAULT_REDUCE_ACT: [isize; 349] = [0,133,104,88,89,90,91,92,94,95,96,97,100,101,98,99,129,130,93,108,109,0,0,140,208,0,78,80,82,0,102,103,0,0,132,0,205,207,124,0,0,144,142,141,76,0,84,86,79,81,83,187,0,0,212,0,107,0,131,0,0,206,0,127,0,125,134,145,143,0,77,0,210,0,86,2,4,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,6,0,0,16,73,28,0,30,22,23,24,25,26,27,34,37,40,45,48,50,52,54,56,58,60,191,183,189,174,175,176,177,178,179,0,0,188,211,0,114,116,0,110,0,153,139,152,0,0,146,148,2,136,28,75,0,0,0,0,122,85,169,87,0,209,0,0,20,0,17,18,0,0,0,0,0,0,0,0,201,202,0,203,0,0,155,0,192,0,12,13,0,0,0,63,64,65,66,67,68,69,70,71,72,0,62,19,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,184,190,185,0,0,113,115,106,111,0,119,0,117,0,0,150,157,151,158,137,138,0,0,135,123,128,126,172,0,180,0,0,182,0,0,0,0,0,200,204,5,0,0,157,156,74,11,8,0,14,0,10,61,31,32,33,35,36,38,39,43,44,41,42,46,47,49,51,53,55,57,0,186,105,120,0,0,112,165,0,0,161,0,159,0,0,154,147,149,0,170,21,181,0,0,0,0,0,29,9,0,7,0,121,118,166,160,162,167,0,163,0,173,171,193,195,196,0,0,0,15,59,168,164,0,0,0,198,194,197,199,];
+const YY_PRODUCTION_LINE: [usize; 212] = [0,28,29,30,31,35,36,37,38,39,40,41,42,46,47,51,52,53,54,55,56,60,61,62,63,64,65,69,70,74,75,76,77,81,82,83,87,88,89,93,94,95,96,97,101,102,103,107,108,112,113,117,118,122,123,127,128,132,133,137,138,142,143,144,145,146,147,148,149,150,151,152,156,157,161,165,166,170,171,172,173,174,175,179,180,184,185,189,190,191,192,193,197,198,199,200,201,202,203,204,205,206,207,208,212,213,214,218,219,223,224,228,232,233,234,235,239,240,244,245,246,250,251,252,256,257,261,262,266,267,271,272,276,277,278,279,280,281,282,286,287,288,289,293,294,299,300,304,305,309,310,311,315,316,320,321,325,326,327,331,332,333,334,335,336,337,338,339,343,344,345,349,350,354,355,356,357,358,359,363,364,365,369,370,371,372,376,377,381,382,386,387,391,392,393,397,398,399,400,404,405,406,407,408,412,413,417,418,422,423,424,425,];
 const YY_TERMINAL_TABLE: [bool; 148] = [false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,false,true,false,true,false,false,true,false,true,false,true,true,true,true,false,false,false,false,false,false,true,false,false,true,true,true,false,false,true,true,true,false,true,false,true,true,true,false,false,true,false,true,true,true,false,true,true,true,true,true,true,true,true,true,true,false,true,false,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,];
 
-    pub fn new(lexer: T) -> Yacc<T> {
-        Yacc {
+    pub fn new(lexer: YYLex<R>) -> Self {
+        Self {
             state_stack: Vec::new(),
             value_stack: Vec::new(),
             lookahead: None,
@@ -676,7 +696,7 @@ const YY_TERMINAL_TABLE: [bool; 148] = [false,false,false,false,false,false,fals
             continue_parse: true,
             is_recovering: false,
             ret: 0,
-            lexer: lexer.into_iter(),
+            lexer: lexer,
             token_since_error: 0,
 default_prod_table: vec![YYToken::accept,YYToken::primary_expression,YYToken::primary_expression,YYToken::primary_expression,YYToken::primary_expression,YYToken::postfix_expression,YYToken::postfix_expression,YYToken::postfix_expression,YYToken::postfix_expression,YYToken::postfix_expression,YYToken::postfix_expression,YYToken::postfix_expression,YYToken::postfix_expression,YYToken::argument_expression_list,YYToken::argument_expression_list,YYToken::unary_expression,YYToken::unary_expression,YYToken::unary_expression,YYToken::unary_expression,YYToken::unary_expression,YYToken::unary_expression,YYToken::unary_operator,YYToken::unary_operator,YYToken::unary_operator,YYToken::unary_operator,YYToken::unary_operator,YYToken::unary_operator,YYToken::cast_expression,YYToken::cast_expression,YYToken::multiplicative_expression,YYToken::multiplicative_expression,YYToken::multiplicative_expression,YYToken::multiplicative_expression,YYToken::additive_expression,YYToken::additive_expression,YYToken::additive_expression,YYToken::shift_expression,YYToken::shift_expression,YYToken::shift_expression,YYToken::relational_expression,YYToken::relational_expression,YYToken::relational_expression,YYToken::relational_expression,YYToken::relational_expression,YYToken::equality_expression,YYToken::equality_expression,YYToken::equality_expression,YYToken::and_expression,YYToken::and_expression,YYToken::exclusive_or_expression,YYToken::exclusive_or_expression,YYToken::inclusive_or_expression,YYToken::inclusive_or_expression,YYToken::logical_and_expression,YYToken::logical_and_expression,YYToken::logical_or_expression,YYToken::logical_or_expression,YYToken::conditional_expression,YYToken::conditional_expression,YYToken::assignment_expression,YYToken::assignment_expression,YYToken::assignment_operator,YYToken::assignment_operator,YYToken::assignment_operator,YYToken::assignment_operator,YYToken::assignment_operator,YYToken::assignment_operator,YYToken::assignment_operator,YYToken::assignment_operator,YYToken::assignment_operator,YYToken::assignment_operator,YYToken::assignment_operator,YYToken::expression,YYToken::expression,YYToken::constant_expression,YYToken::declaration,YYToken::declaration,YYToken::declaration_specifiers,YYToken::declaration_specifiers,YYToken::declaration_specifiers,YYToken::declaration_specifiers,YYToken::declaration_specifiers,YYToken::declaration_specifiers,YYToken::init_declarator_list,YYToken::init_declarator_list,YYToken::init_declarator,YYToken::init_declarator,YYToken::storage_class_specifier,YYToken::storage_class_specifier,YYToken::storage_class_specifier,YYToken::storage_class_specifier,YYToken::storage_class_specifier,YYToken::type_specifier,YYToken::type_specifier,YYToken::type_specifier,YYToken::type_specifier,YYToken::type_specifier,YYToken::type_specifier,YYToken::type_specifier,YYToken::type_specifier,YYToken::type_specifier,YYToken::type_specifier,YYToken::type_specifier,YYToken::type_specifier,YYToken::struct_or_union_specifier,YYToken::struct_or_union_specifier,YYToken::struct_or_union_specifier,YYToken::struct_or_union,YYToken::struct_or_union,YYToken::struct_declaration_list,YYToken::struct_declaration_list,YYToken::struct_declaration,YYToken::specifier_qualifier_list,YYToken::specifier_qualifier_list,YYToken::specifier_qualifier_list,YYToken::specifier_qualifier_list,YYToken::struct_declarator_list,YYToken::struct_declarator_list,YYToken::struct_declarator,YYToken::struct_declarator,YYToken::struct_declarator,YYToken::enum_specifier,YYToken::enum_specifier,YYToken::enum_specifier,YYToken::enumerator_list,YYToken::enumerator_list,YYToken::enumerator,YYToken::enumerator,YYToken::type_qualifier,YYToken::type_qualifier,YYToken::declarator,YYToken::declarator,YYToken::direct_declarator,YYToken::direct_declarator,YYToken::direct_declarator,YYToken::direct_declarator,YYToken::direct_declarator,YYToken::direct_declarator,YYToken::direct_declarator,YYToken::pointer,YYToken::pointer,YYToken::pointer,YYToken::pointer,YYToken::type_qualifier_list,YYToken::type_qualifier_list,YYToken::parameter_type_list,YYToken::parameter_type_list,YYToken::parameter_list,YYToken::parameter_list,YYToken::parameter_declaration,YYToken::parameter_declaration,YYToken::parameter_declaration,YYToken::identifier_list,YYToken::identifier_list,YYToken::type_name,YYToken::type_name,YYToken::abstract_declarator,YYToken::abstract_declarator,YYToken::abstract_declarator,YYToken::direct_abstract_declarator,YYToken::direct_abstract_declarator,YYToken::direct_abstract_declarator,YYToken::direct_abstract_declarator,YYToken::direct_abstract_declarator,YYToken::direct_abstract_declarator,YYToken::direct_abstract_declarator,YYToken::direct_abstract_declarator,YYToken::direct_abstract_declarator,YYToken::initializer,YYToken::initializer,YYToken::initializer,YYToken::initializer_list,YYToken::initializer_list,YYToken::statement,YYToken::statement,YYToken::statement,YYToken::statement,YYToken::statement,YYToken::statement,YYToken::labeled_statement,YYToken::labeled_statement,YYToken::labeled_statement,YYToken::compound_statement,YYToken::compound_statement,YYToken::compound_statement,YYToken::compound_statement,YYToken::declaration_list,YYToken::declaration_list,YYToken::statement_list,YYToken::statement_list,YYToken::expression_statement,YYToken::expression_statement,YYToken::selection_statement,YYToken::selection_statement,YYToken::selection_statement,YYToken::iteration_statement,YYToken::iteration_statement,YYToken::iteration_statement,YYToken::iteration_statement,YYToken::jump_statement,YYToken::jump_statement,YYToken::jump_statement,YYToken::jump_statement,YYToken::jump_statement,YYToken::translation_unit,YYToken::translation_unit,YYToken::external_declaration,YYToken::external_declaration,YYToken::function_definition,YYToken::function_definition,YYToken::function_definition,YYToken::function_definition,],
         }
@@ -699,6 +719,9 @@ default_prod_table: vec![YYToken::accept,YYToken::primary_expression,YYToken::pr
     }
 
     pub fn yyparse(&mut self) -> i32 {
+        /* DEBUGGING */
+        yylog!(self, "Starting parse");
+        /* DEBUGGING */
 
         self.push_statcks(0, YYToken::yyeof);
         self.read_token();
@@ -713,6 +736,16 @@ default_prod_table: vec![YYToken::accept,YYToken::primary_expression,YYToken::pr
                 _ => self.error(),
             }
         }
+        /* DEBUGGING */
+        for token in self.value_stack[1..].iter().rev() {
+            yylog!(
+                self,
+                "Cleanup: popping {} {:?}",
+                Self::token_class(token.index()),
+                token
+            );
+        }
+        /* DEBUGGING */
         self.ret
     }
 
@@ -726,12 +759,16 @@ default_prod_table: vec![YYToken::accept,YYToken::primary_expression,YYToken::pr
     }
 
     fn unwind(&mut self) {
-        yyerror("syntax error");
+        yyerror("syntax error", self);
         while let Some(i) = self.state_stack.last()
             && Self::YY_GOTO_TABLE[*i][Self::YY_ERROR_TOKEN_ID] == 0
         {
             self.state_stack.pop();
             let val = self.value_stack.pop().unwrap();
+            /* DEBUGGING */
+            yylog!(self, "Error: popping {} {:?}", Self::token_class(val.index()), val);
+            yylog!(self, "Stack now {:?}", self.state_stack);
+            /* DEBUGGING */
         }
 
         let Some(i) = self.state_stack.last() else {
@@ -740,6 +777,9 @@ default_prod_table: vec![YYToken::accept,YYToken::primary_expression,YYToken::pr
         };
         self.is_recovering = true;
         let act = Self::YY_GOTO_TABLE[*i][Self::YY_ERROR_TOKEN_ID] + 1;
+        /* DEBUGGING */
+        yylog!(self, "Shifting token {:?}", YYToken::error);
+        /* DEBUGGING */
         self.push_statcks((-act) as usize, YYToken::error);
         self.token_since_error = 0;
 
@@ -777,15 +817,36 @@ default_prod_table: vec![YYToken::accept,YYToken::primary_expression,YYToken::pr
         self.lookahead = None;
     }
 
+    /* DEBUGGING */
+    fn token_class(token_id: usize) -> &'static str {
+        if Self::YY_TERMINAL_TABLE[token_id] {
+            "nterm"
+        } else {
+            "token"
+        }
+    }
+    /* DEBUGGING */
 
     fn push_statcks(&mut self, state: usize, value: YYToken) {
         self.state_stack.push(state);
         self.value_stack.push(value);
+        /* DEBUGGING */
+        yylog!(self, "Entering state {}", state);
+        yylog!(self, "Stack now {:?}", self.state_stack)
+        /* DEBUGGING */
     }
 
     fn read_token(&mut self) {
-        self.lookahead = self.lexer.next();
-        self.lookahead_id = self.lookahead.as_ref().unwrap().index();
+        let c = self.lexer.yylex();
+        self.lookahead_id = c.index();
+        self.lookahead = Some(c);
+        /* DEBUGGING */
+        yylog!(self, "Reading a token");
+        match &self.lookahead {
+            None => yylog!(self, "Now at end of input."),
+            Some(l) => yylog!(self, "Next token is token {:?}", l),
+        }
+        /* DEBUGGING */
     }
 
     fn shift(&mut self) {
@@ -801,6 +862,13 @@ default_prod_table: vec![YYToken::accept,YYToken::primary_expression,YYToken::pr
             self.read_token();
         }
 
+        /* DEBUGGING */
+        yylog!(
+            self,
+            "Shifting token {:?}",
+            self.lookahead.clone().unwrap_or(YYToken::yyeof)
+        );
+        /* DEBUGGING */
         self.push_statcks(-self.act as usize, self.lookahead.clone().unwrap_or(YYToken::yyeof));
 
         self.lookahead = None;
@@ -809,6 +877,14 @@ default_prod_table: vec![YYToken::accept,YYToken::primary_expression,YYToken::pr
     fn reduce(&mut self) {
         self.act -= 1;
 
+        /* DEBUGGING */
+        yylog!(
+            self,
+            "Reducing stack by rule {} (line {}):",
+            self.act,
+            Self::YY_PRODUCTION_LINE[self.act as usize]
+        );
+        /* DEBUGGING */
         let len = Self::YY_RLEN_TABLE[self.act as usize];
         let product = Self::YY_PRODUCT_TABLE[self.act as usize];
 
@@ -828,18 +904,28 @@ default_prod_table: vec![YYToken::accept,YYToken::primary_expression,YYToken::pr
         let values = self.value_stack.drain(idx..).collect::<Vec<YYToken>>().clone();
         let _a = self.state_stack.drain(idx..).collect::<Vec<_>>().clone();
 
+        /* DEBUGGING */
+        for (i, tok) in values.iter().enumerate().rev() {
+            yylog!(
+                self,
+                "   ${} = {} {:?}",
+                i + 1,
+                Self::token_class(self.lookahead_id),
+                tok
+            );
+        }
+        /* DEBUGGING */
 
         let ret = match Self::YY_ACTION_TABLE[self.act as usize] {
             -1 => self.default_prod_table[self.act as usize].clone(),
             _ => unreachable!(),
         };
 
+        /* DEBUGGING */
+        yylog!(self, "-> $$ = {} {:?}", Self::token_class(self.lookahead_id), ret);
+        /* DEBUGGING */
         ret
     }
-}
-
-pub fn yyerror<D: fmt::Display>(msg: D) {
-    eprintln!("{}", msg);
 }
 
 

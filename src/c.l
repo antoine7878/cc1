@@ -1,7 +1,8 @@
 %no_main
 
 %{
-use crate::YYToken;
+use crate::parser::YYToken;
+use crate::context::Context;
 %}
 
 D			[0-9]
@@ -13,6 +14,8 @@ IS			(u|U|l|L)*
 
 %%
 
+#.*                         {}
+"//".*                      {}
 "/*"			            { comment(self); }
 "auto"			            { return(YYToken::AUTO); }
 "break"			            { return(YYToken::BREAK); }
@@ -46,7 +49,7 @@ IS			(u|U|l|L)*
 "void"			            { return(YYToken::VOID); }
 "volatile"		            { return(YYToken::VOLATILE); }
 "while"			            { return(YYToken::WHILE); }
-{L}({L}|{D})*		        { return(check_type(&self.yytext)); }
+{L}({L}|{D})*		        { return(check_type(self.yytext.clone())); }
 0[xX]{H}+{IS}?		        { return(YYToken::CONSTANT); }
 0{D}+{IS}?		            { return(YYToken::CONSTANT); }
 {D}+{IS}?		            { return(YYToken::CONSTANT); }
@@ -54,7 +57,7 @@ L?'(\\.|[^\\'])+'	        { return(YYToken::CONSTANT); }
 {D}+{E}{FS}?		        { return(YYToken::CONSTANT); }
 {D}*"."{D}+({E})?{FS}?	    { return(YYToken::CONSTANT); }
 {D}+"."{D}*({E})?{FS}?	    { return(YYToken::CONSTANT); }
-L?\"(\\.|[^\\"])*\"	        { return(YYToken::STRING_LITERAL); }
+L?\"(\\.|[^\\"])*\"	        { return(YYToken::STRING_LITERAL(self.yytext.clone())); }
 "..."			            { return(YYToken::ELLIPSIS); }
 ">>="			            { return(YYToken::RIGHT_ASSIGN); }
 "<<="			            { return(YYToken::LEFT_ASSIGN); }
@@ -77,74 +80,55 @@ L?\"(\\.|[^\\"])*\"	        { return(YYToken::STRING_LITERAL); }
 ">="			            { return(YYToken::GE_OP); }
 "=="			            { return(YYToken::EQ_OP); }
 "!="			            { return(YYToken::NE_OP); }
+
 ";"			                { return(YYToken::Char(';')); }
-
-
 ","			                { return(YYToken::Char(',')); }
 ":"			                { return(YYToken::Char(':')); }
 "="			                { return(YYToken::Char('=')); }
 "("			                { return(YYToken::Char('(')); }
 ")"			                { return(YYToken::Char(')')); }
-("["|"<:")		            { return(YYToken::Char('[')); }
-("]"|":>")		            { return(YYToken::Char(']')); }
+("["|"<:"|"??(")            { return(YYToken::Char('[')); }
+("]"|":>"|"??)")            { return(YYToken::Char(']')); }
 "."			                { return(YYToken::Char('.')); }
 "&"			                { return(YYToken::Char('&')); }
 "!"			                { return(YYToken::Char('!')); }
-"~"			                { return(YYToken::Char('~')); }
+("~"|"??-")	                { return(YYToken::Char('~')); }
 "-"			                { return(YYToken::Char('-')); }
 "+"			                { return(YYToken::Char('+')); }
 "*"			                { return(YYToken::Char('*')); }
 "/"			                { return(YYToken::Char('/')); }
 "%"			                { return(YYToken::Char('%')); }
 "<"			                { return(YYToken::Char('<')); }
-">"			                { return(YYToken::Char('>')); }
+(">"|"??'")	                { return(YYToken::Char('>')); }
 "^"			                { return(YYToken::Char('^')); }
-"|"			                { return(YYToken::Char('|')); }
+("|"|"??!")	                { return(YYToken::Char('|')); }
 "?"			                { return(YYToken::Char('?')); }
-
-("["|"<%")		            { return(YYToken::Char('{')); }
-("]"|"%>")		            { return(YYToken::Char('}')); }
-
+("{"|"<%"|"??<")            { return(YYToken::Char('{')); }
+("}"|"%>")|"??>"            { return(YYToken::Char('}')); }
 [ \t\v\n\f]		            { }
 .			                { /* ignore bad characters */ }
 
 %%
 
-fn comment<T: Read>(lex: &mut YYLex<T>)
-{
-    let mut c = lex.input();
-    loop {
-        while c != b'*' && c != 0 {
-            c = lex.input();
-        }
-
-        let c1 = lex.input();
-        if c1 != b'/' && c != 0 {
-            lex.unput(c1);
-        }
-        break
-    }
-}
-
 fn comment<T: Read>(lex: &mut YYLex<T>) {
     let mut c = lex.input();
-
     while c != b'*' && c != 0 {
         c = lex.input();
         if c == b'*' {
-            while c == '*' {
+            while c == b'*' {
                 c = lex.input();
             }
-            if c == b'/' || c == 0
+            if c == b'/' || c == 0 {
                 return;
+            }
         }
     }
 }
 
-fn check_type(_yytext: &str) -> YYToken {
+fn check_type(yytext: String) -> YYToken {
 // pseudo code --- this is what it should check
 //
 //	if (yytext == type_name)
-//	    return YYToken::TYPE_NAME;
-	YYToken::IDENTIFIER
+	    // return YYToken::TYPE_NAME;
+	YYToken::IDENTIFIER(yytext)
 }

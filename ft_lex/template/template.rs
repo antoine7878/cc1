@@ -85,8 +85,8 @@ impl<R: Read> YYLex<R> {
             yycontinue: Box::new(yycontinue),
             yyin,
             yytext: String::new(),
-            line_no: 0,
-            col_no: 0,
+            line_no: 1,
+            col_no: 1,
             ctx,
         }
     }
@@ -111,7 +111,8 @@ impl<R: Read> YYLex<R> {
     }
 
     fn reject(&mut self) {
-        let next_action = Self::YY_NEXT_ACCEPT[self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
+        let next_action = Self::YY_NEXT_ACCEPT
+            [self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
         self.action = if next_action >= 0 {
             next_action
         } else {
@@ -131,7 +132,9 @@ impl<R: Read> YYLex<R> {
     }
 
     fn shift_all_positions(&mut self, offset: usize) {
-        self.accept_stack.iter_mut().for_each(|s| s.buf_pos -= offset);
+        self.accept_stack
+            .iter_mut()
+            .for_each(|s| s.buf_pos -= offset);
         self.run_position -= offset;
         self.trailing_end_pos = self.trailing_end_pos.saturating_sub(offset);
         self.buffer_position -= offset;
@@ -195,7 +198,7 @@ impl<R: Read> YYLex<R> {
         }
         if c == b'\n' {
             self.line_no += 1;
-            self.col_no = 0;
+            self.col_no = 1;
         } else if c == b'\t' {
             self.col_no += 4 - (self.col_no % 4);
         } else {
@@ -211,7 +214,6 @@ impl<R: Read> YYLex<R> {
         self.yytext = from_utf8(&self.buffer[self.buffer_position..self.run_position])
             .unwrap()
             .to_string();
-        self.count_yytext();
     }
 
     pub fn yymore(&mut self) {
@@ -231,7 +233,10 @@ impl<R: Read> YYLex<R> {
         if self.run_position >= self.buffer.len() {
             return 0;
         }
-        let ret = *self.buffer.get(self.run_position).expect("run_position out of bounds");
+        let ret = *self
+            .buffer
+            .get(self.run_position)
+            .expect("run_position out of bounds");
         self.run_position += 1;
         self.count_c(ret);
         ret
@@ -294,8 +299,10 @@ impl<R: Read> YYLex<R> {
                 break;
             }
 
-            let char_class: usize = Self::YY_CHAR_EQ[self.buffer[self.run_position] as usize] as usize;
-            self.current_state = Self::YY_BASE[self.current_state * Self::YY_CLASS_COUNT + char_class] as usize;
+            let char_class: usize =
+                Self::YY_CHAR_EQ[self.buffer[self.run_position] as usize] as usize;
+            self.current_state =
+                Self::YY_BASE[self.current_state * Self::YY_CLASS_COUNT + char_class] as usize;
             if self.current_state == 0 {
                 break;
             }
@@ -321,11 +328,13 @@ impl<R: Read> YYLex<R> {
             }
             self.run_dfa();
             self.prepare_action();
-            match self.action {
+            let ret = match self.action {
                 /* ACTIONS */
                 -1 => print!("{}", self.yytext),
                 _ => panic!("wrong action\n"),
-            }
+            };
+            self.count_yytext();
+            ret
         }
     }
 

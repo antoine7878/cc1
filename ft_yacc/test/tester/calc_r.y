@@ -1,5 +1,6 @@
 %no_main
-%start prog %type<f32> rvalue
+%start prog
+%type<f32> rvalue
 %token<f32> Number
 %left '\n'
 %left '+' '-'
@@ -31,7 +32,7 @@ rvalue
 
 fn main() {
     use std::env;
-    use std::io::{Cursor, Read};
+    use std::io::Cursor;
 
     let args: Vec<String> = env::args().collect();
     let mut reader = Cursor::new(args[1].clone());
