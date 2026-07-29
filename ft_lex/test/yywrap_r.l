@@ -1,4 +1,6 @@
 %no_main
+%no_context
+%no_yacc
 
 %%
 
@@ -19,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             None
         }
-    }, 1);
+    }, Context{});
 
     while lexer.yylex() != YYToken::yyeof {}
 

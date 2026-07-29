@@ -313,10 +313,8 @@ impl<R: Read> YYLex<R> {
         self.run_position = std::cmp::min(self.stack_top().buf_pos + 1, self.buffer.len());
         self.build_yytext();
     }
-}
 
-impl<R: Read> YYLexer for YYLex<R> {
-    fn yylex(&mut self) -> YYToken {
+    pub fn yylex(&mut self) -> YYToken {
         loop {
             if self.prepare_run().is_none() {
                 return YYToken::yyeof;
@@ -331,11 +329,10 @@ impl<R: Read> YYLexer for YYLex<R> {
         }
     }
 
-    fn ctx(&mut self) -> &mut Context {
+    pub fn ctx(&mut self) -> &mut Context {
         &mut self.ctx
     }
 }
-
 /* MAIN */
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut lexer = YYLex::default();

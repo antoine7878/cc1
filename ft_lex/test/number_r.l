@@ -1,6 +1,6 @@
 %no_main
-%no_yacc
 %no_context
+%no_yacc
 %tokens Operator(char) Number(i32)
 
 %%
@@ -27,5 +27,4 @@ fn main() {
             _ => (),
         }
     }
-    println!("final: {:?}", lexer.ctx);
 }

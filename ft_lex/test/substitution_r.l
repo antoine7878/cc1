@@ -1,4 +1,6 @@
 %no_main
+%no_context
+%no_yacc
 
 SALUT salut
 BONJOUR bonjour

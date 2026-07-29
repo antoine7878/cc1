@@ -42,10 +42,10 @@ impl Generator for RSGenerator {
             .collect::<Vec<_>>()
             .join("");
         ret += "yyeof\n}\n\n";
-        ret += "pub trait YYLexer {\nfn yylex(&mut self) -> YYToken;\nfn ctx(&mut self) -> &mut Context;\n}\n";
         ret
     }
 }
+
 impl RSGenerator {
     pub fn new() -> RSGenerator {
         RSGenerator {}

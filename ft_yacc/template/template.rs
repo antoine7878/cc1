@@ -1,16 +1,12 @@
 #![allow(unused_braces, mixed_script_confusables, unused)]
+use std::fmt;
+use std::io::Read;
 
 /* CODE_BEFORE */
-use std::fmt;
 
 /* TOKENS */
 
-pub trait YYLexer {
-    fn yylex(&mut self) -> YYToken;
-    fn ctx(&mut self) -> &mut Context;
-}
-
-pub struct Yacc<T: YYLexer> {
+pub struct Yacc<R: Read> {
     state_stack: Vec<usize>,
     value_stack: Vec<YYToken>,
     default_prod_table: Vec<YYToken>,
@@ -20,7 +16,7 @@ pub struct Yacc<T: YYLexer> {
     pub yydebug: bool,
     continue_parse: bool,
     is_recovering: bool,
-    pub lexer: T,
+    pub lexer: YYLex<R>,
     ret: i32,
     token_since_error: usize,
 }
@@ -35,7 +31,7 @@ macro_rules! yylog {
 }
 /* DEBUGGING */
 
-impl<T: YYLexer> Yacc<T> {
+impl<R: Read> Yacc<R> {
     /* REMOVE */
     const YY_EOF_TOKEN_ID: usize = 2;
     const YY_ERROR_TOKEN_ID: usize = 3;
@@ -47,8 +43,8 @@ impl<T: YYLexer> Yacc<T> {
     /* TABLES */
     /* DEBUGGING_TABLES */
 
-    pub fn new(lexer: T) -> Yacc<T> {
-        Yacc {
+    pub fn new(lexer: YYLex<R>) -> Self {
+        Self {
             state_stack: Vec::new(),
             value_stack: Vec::new(),
             lookahead: None,

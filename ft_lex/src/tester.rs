@@ -36,7 +36,7 @@ mod test {
     impl Drop for TmpFile {
         fn drop(&mut self) {
             let path = Path::new(&self.name);
-            // let _ = remove_file(path);
+            let _ = remove_file(path);
         }
     }
 
@@ -367,7 +367,7 @@ mod test {
         let test_name = format!("multi_{}", lang.lex_flag());
         let exec_file = TmpFile::new("", "");
         let mut parser_file = TmpFile::new(&test_name, lang.src_extension());
-        let mut args = vec!["-y", "-c", "-x", lang.lex_flag(), "-o", &parser_file.name];
+        let mut args = vec!["-c", "-x", lang.lex_flag(), "-o", &parser_file.name];
 
         args.extend(lexfiles);
 

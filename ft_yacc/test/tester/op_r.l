@@ -1,5 +1,6 @@
+%no_context
 %no_main
-    use crate::{YYToken, YYLexer};
+    use crate::YYToken;
 
 %%
 
