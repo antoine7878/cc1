@@ -12,7 +12,6 @@ pub enum Type {
     Short,
     Int,
     Long,
-    LongLong,
     Signed,
     Unsigned,
 
@@ -67,10 +66,6 @@ impl TypeArena {
 
     pub fn long(&mut self) -> TypeId {
         self.alloc(Type::Long)
-    }
-
-    pub fn longlong(&mut self) -> TypeId {
-        self.alloc(Type::LongLong)
     }
 
     pub fn signed(&mut self) -> TypeId {

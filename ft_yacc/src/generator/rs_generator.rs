@@ -163,7 +163,7 @@ impl RSGenerator {
                 YaccError::error(&parser.yacc.file, pos.line_no, "invalid stack position")?
             };
             let Some(utype) = pos.utype.as_ref().or(parser.yacc.tokens[*token_id].utype.as_ref()) else {
-                YaccError::error(&parser.yacc.file, pos.line_no, "invalid stack position")?
+                YaccError::error(&parser.yacc.file, pos.line_no, format!("missing type for ${}", num))?
             };
             match &production.mid_context {
                 Some(ctx) => writeln!(

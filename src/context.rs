@@ -19,13 +19,3 @@ pub struct Context {
     pub symbols: SymbolTable,
     pub arenas: Arenas,
 }
-
-impl Context {
-    pub fn truc(&mut self, tag: TagKind, name: Option<NameId>, fields: Vec<Field>, complete: bool) -> usize {
-        match tag {
-            TagKind::Struct => self.arenas.structs.add(name, fields, complete).into(),
-            TagKind::Enum => self.arenas.unions.add(name, fields, complete).into(),
-            _ => unreachable!(),
-        }
-    }
-}

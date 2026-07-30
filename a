@@ -1,8 +1,0 @@
-`-FunctionDecl 0xbdcd619a8 <test/hello.c:1:1, line:4:1> line:1:5 main 'int ()'
-  `-CompoundStmt 0xbdcd61b98 <col:12, line:4:1>
-    |-DeclStmt 0xbdcd61b50 <line:2:2, col:20>
-    | `-VarDecl 0xbdcd61ab0 <col:2, col:19> col:15 a 'unsigned int' cinit
-    |   `-ImplicitCastExpr 0xbdcd61b38 <col:19> 'unsigned int' <IntegralCast>
-    |     `-IntegerLiteral 0xbdcd61b18 <col:19> 'int' 1
-    `-ReturnStmt 0xbdcd61b88 <line:3:2, col:9>
-      `-IntegerLiteral 0xbdcd61b68 <col:9> 'int' 0

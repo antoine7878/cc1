@@ -7,6 +7,12 @@ use crate::types::TypeId;
 pub type NameId = ArenaId<String>;
 pub type NameArena = Arena<NameId, String>;
 
+impl NameArena {
+    pub fn add(&mut self, name: String) -> NameId {
+        self.alloc(name)
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct SymbolTable {
     scopes: Vec<Scope>,
@@ -14,15 +20,24 @@ pub struct SymbolTable {
 
 impl SymbolTable {
     pub fn get_ordinary(&self, name: &str, arenas: &Arenas) -> Option<&SymbolData> {
-        self.scopes.iter().rev().find_map(|s| s.get_ordinary(name, arenas))
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|s| s.get_ordinary(name, arenas))
     }
 
     pub fn get_tag(&self, kind: TagKind, name: &str, arenas: &Arenas) -> Option<&SymbolData> {
-        self.scopes.iter().rev().find_map(|s| s.get_tag(kind, name, arenas))
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|s| s.get_tag(kind, name, arenas))
     }
 
     pub fn get_label(&self, name: &str, arenas: &Arenas) -> Option<&SymbolData> {
-        self.scopes.iter().rev().find_map(|s| s.get_label(name, arenas))
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|s| s.get_label(name, arenas))
     }
 }
 

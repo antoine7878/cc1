@@ -34,12 +34,13 @@ $(PARSER): $(FT_YACC) $(YACC_FILE)
 # ----- test --------------------
 
 test: $(NAME)
-	cat test/test.c | ./$(NAME)
+	cat test/hello.c | ./$(NAME)
 
 ast:
-	clang  -Xclang -ast-dump test/hello.c | sed $'s/\e\[[0-9;]*m//g' > a
+	clang -Xclang -ast-dump test/hello.c | sed "s/\e\[[0-9;]*m//g" > a
 
-
+gcc:
+	gcc -std=iso9899:1990 -pedantic-errors test/hello.c
 
 clean:
 	cargo clean

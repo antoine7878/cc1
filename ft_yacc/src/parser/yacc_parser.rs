@@ -212,7 +212,8 @@ impl YaccParser {
                         self.it.take_char();
                         return Ok(());
                     }
-                    _ => unreachable!(),
+                    Some(c) => self.it.error(format!("unexpected char in recipe: '{}'", c))?,
+                    None => self.it.error("unexpected oef in recipe")?,
                 }
             }
         }

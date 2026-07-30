@@ -7,6 +7,11 @@ pub struct Field {
     pub name: NameId,
     pub ty: TypeId,
 }
+impl Field {
+    pub fn new(name: NameId, ty: TypeId) -> Field {
+        Field { name, ty }
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Struct {
@@ -19,7 +24,11 @@ pub type StructArena = Arena<StructId, Struct>;
 
 impl StructArena {
     pub fn add(&mut self, name: Option<NameId>, fields: Vec<Field>, complete: bool) -> StructId {
-        self.alloc(Struct { name, fields, complete })
+        self.alloc(Struct {
+            name,
+            fields,
+            complete,
+        })
     }
 }
 
@@ -34,7 +43,11 @@ pub type UnionArena = Arena<UnionId, Union>;
 
 impl UnionArena {
     pub fn add(&mut self, name: Option<NameId>, fields: Vec<Field>, complete: bool) -> UnionId {
-        self.alloc(Union { name, fields, complete })
+        self.alloc(Union {
+            name,
+            fields,
+            complete,
+        })
     }
 }
 
@@ -48,7 +61,12 @@ pub type EnumId = ArenaId<Enum>;
 pub type EnumArena = Arena<EnumId, Enum>;
 
 impl EnumArena {
-    pub fn add(&mut self, name: Option<NameId>, variants: Vec<VariantId>, complete: bool) -> EnumId {
+    pub fn add(
+        &mut self,
+        name: Option<NameId>,
+        variants: Vec<VariantId>,
+        complete: bool,
+    ) -> EnumId {
         self.alloc(Enum {
             name,
             variants,

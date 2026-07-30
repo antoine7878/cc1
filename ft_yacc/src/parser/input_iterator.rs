@@ -67,11 +67,22 @@ impl InputItertor {
         s
     }
 
+    pub fn take_word(&mut self) -> String {
+        let s = self.take_while(|c| !c.is_whitespace());
+        self.skip_whitespace();
+        s
+    }
+
     pub fn take_utype(&mut self) -> Result<Option<String>, YaccError> {
         let s = if let Some('<') = self.peek() {
             self.next();
-            let utype = self.take_name();
-            self.expect('>')?;
+            let mut utype = self.take_word();
+            if !utype.is_empty()
+                && let Some(c) = utype.pop()
+                && c != '>'
+            {
+                self.error("missing '>'")?;
+            }
             Ok(Some(utype))
         } else {
             Ok(None)
