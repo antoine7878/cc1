@@ -36,6 +36,10 @@ $(PARSER): $(FT_YACC) $(YACC_FILE)
 test: $(NAME)
 	cat test/test.c | ./$(NAME)
 
+ast:
+	clang  -Xclang -ast-dump test/hello.c | sed $'s/\e\[[0-9;]*m//g' > a
+
+
 
 clean:
 	cargo clean

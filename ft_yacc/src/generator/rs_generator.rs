@@ -173,7 +173,7 @@ impl RSGenerator {
                 )?,
                 None => writeln!(
                     w,
-                    "let __yy{num} = {utype}::from(std::mem::replace(&mut self.value_stack[idx + {}], YYToken::error));",
+                    "let __yy{num} = {utype}::from(std::mem::replace(&mut self.value_stack[idx + {}], YYToken::Emtpy));",
                     num - 1
                 )?,
             }

@@ -18,7 +18,7 @@ pub type StructId = ArenaId<Struct>;
 pub type StructArena = Arena<StructId, Struct>;
 
 impl StructArena {
-    pub fn struct_(&mut self, name: Option<NameId>, fields: Vec<Field>, complete: bool) -> StructId {
+    pub fn add(&mut self, name: Option<NameId>, fields: Vec<Field>, complete: bool) -> StructId {
         self.alloc(Struct { name, fields, complete })
     }
 }
@@ -33,7 +33,7 @@ pub type UnionId = ArenaId<Union>;
 pub type UnionArena = Arena<UnionId, Union>;
 
 impl UnionArena {
-    pub fn union_(&mut self, name: Option<NameId>, fields: Vec<Field>, complete: bool) -> UnionId {
+    pub fn add(&mut self, name: Option<NameId>, fields: Vec<Field>, complete: bool) -> UnionId {
         self.alloc(Union { name, fields, complete })
     }
 }
@@ -48,7 +48,7 @@ pub type EnumId = ArenaId<Enum>;
 pub type EnumArena = Arena<EnumId, Enum>;
 
 impl EnumArena {
-    pub fn union_(&mut self, name: Option<NameId>, variants: Vec<VariantId>, complete: bool) -> EnumId {
+    pub fn add(&mut self, name: Option<NameId>, variants: Vec<VariantId>, complete: bool) -> EnumId {
         self.alloc(Enum {
             name,
             variants,
@@ -66,7 +66,7 @@ pub type VariantId = ArenaId<Variant>;
 pub type VariantArena = Arena<VariantId, Variant>;
 
 impl VariantArena {
-    pub fn variant(&mut self, name: NameId, value: i64) -> VariantId {
+    pub fn add(&mut self, name: NameId, value: i64) -> VariantId {
         self.alloc(Variant { name, value })
     }
 }

@@ -23,7 +23,7 @@ use crate::error::yyerror;
 %token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR GOTO CONTINUE BREAK RETURN
 
 %type<Qualifiers> type_qualifier
-%type<TypeId> type_specifier struct_or_union_specifier enum_specifier
+%type<TypeId> type_specifier
 
 %%
 
@@ -197,29 +197,38 @@ storage_class_specifier
 	;
 
 type_specifier
-	: VOID                          { self.lexer.ctx.arenas.type.void() }
-	| CHAR                          { TypeArena::char() }
-	| SHORT                         { TypeArena::short() }
-	| INT                           { TypeArena::int() }
-	| LONG                          { TypeArena::long() }
-	| FLOAT                         { TypeArena::float() }
-	| DOUBLE                        { TypeArena::double() }
-	| SIGNED                        { TypeArena::char() }
-	| UNSIGNED                      { TypeArena::char() }
-	| struct_or_union_specifier     { $1 }
-	| enum_specifier                { $1 }
-	| TYPE_NAME                     { }
+	: VOID              { self.lexer.ctx.arenas.types.void() }
+	| CHAR              { self.lexer.ctx.arenas.types.char() }
+	| SHORT             { self.lexer.ctx.arenas.types.short() }
+	| INT               { self.lexer.ctx.arenas.types.int() }
+	| LONG              { self.lexer.ctx.arenas.types.long() }
+	| FLOAT             { self.lexer.ctx.arenas.types.float() }
+	| DOUBLE            { self.lexer.ctx.arenas.types.double() }
+	| SIGNED            { self.lexer.ctx.arenas.types.signed() }
+	| UNSIGNED          { self.lexer.ctx.arenas.types.unsigned() }
+	| struct_specifier  { $1 }
+	| union_specifier   { self.lexer.ctx.arenas.types.char() }
+	| enum_specifier    { self.lexer.ctx.arenas.types.char() }
+	| TYPE_NAME         { self.lexer.ctx.arenas.types.char() }
 	;
 
-struct_or_union_specifier
-	: struct_or_union IDENTIFIER '{' struct_declaration_list '}'
-	| struct_or_union '{' struct_declaration_list '}'
-	| struct_or_union IDENTIFIER
+struct_specifier
+	: STRUCT IDENTIFIER '{' struct_declaration_list '}' { self.lexer.ctx.arenas.structs($2, $4, false) }
+	| STRUCT '{' struct_declaration_list '}'            { self.lexer.ctx.arenas.structs(None, $3, false) }
+	| STRUCT IDENTIFIER                                 { self.lexer.ctx.arenas.structs($2, Vec::new(), false) }
 	;
 
-struct_or_union
-	: STRUCT
-	| UNION
+union_specifier
+	: STRUCT IDENTIFIER '{' struct_declaration_list '}' { self.lexer.ctx.arenas.structs($2, $4, false) }
+	| STRUCT '{' struct_declaration_list '}'            { self.lexer.ctx.arenas.structs(None, $3, false) }
+	| STRUCT IDENTIFIER                                 { self.lexer.ctx.arenas.structs($2, Vec::new(), false) }
+	;
+
+
+union_specifier
+	: UNION IDENTIFIER '{' struct_declaration_list '}'
+	| UNION '{' struct_declaration_list '}'
+	| UNION IDENTIFIER
 	;
 
 struct_declaration_list
