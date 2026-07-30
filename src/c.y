@@ -14,10 +14,9 @@ use crate::error::yyerror;
 %token TYPEDEF EXTERN STATIC AUTO REGISTER
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID
 %token STRUCT UNION ENUM ELLIPSIS
-%token POST_INC_OP POST_DEC_OP
+%token 
 
 %token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR GOTO CONTINUE BREAK RETURN
-
 
 %left ','
 %right '=' SUB_ASSIGN LEFT_ASSIGN RIGHT_ASSIGN AND_ASSIGN MUL_ASSIGN
@@ -33,9 +32,8 @@ use crate::error::yyerror;
 %left LEFT_OP RIGHT_OP
 %left '+' '-'
 %left '*' '/' '%'
-%right '!' '~' INC_OP DEC_OP SIZEOF PREC_UNARY
+%right '!' '~' INC_OP DEC_OP POST_INC_OP POST_DEC_OP SIZEOF PREC_UNARY
 %nonassoc '(' '[' '.' PTR_OP
-
 
 %type<NodeId> expression constant_expression
 %type<TypeId> type_name
@@ -59,55 +57,50 @@ expression /* NodeId */
     | SIZEOF '(' expression ')'                     { self.nodes().sizeof_expr($3) }
     | SIZEOF '(' type_name ')'                      { self.nodes().sizeof_type($3) }
     | '(' type_name ')' expression %prec PREC_UNARY { self.nodes().cast($2, $4) }
-    | expression INC_OP %prec PREC_UNARY            { self.nodes().unary(YYToken::POST_INC_OP, $1) }
-    | expression DEC_OP %prec PREC_UNARY            { self.nodes().unary(YYToken::POST_DEC_OP, $1) }
-    | unary_op expression %prec PREC_UNARY          { self.nodes().unary($1, $2) }
-    | expression binary_op expression               { self.nodes().binary($1, $2, $3) }
+
+    | expression INC_OP                             { self.nodes().unary(YYToken::POST_INC_OP, $1) }
+    | expression DEC_OP                             { self.nodes().unary(YYToken::POST_DEC_OP, $1) }
+    | INC_OP expression                             { self.nodes().unary($1, $2) }
+    | DEC_OP expression                             { self.nodes().unary($1, $2) }
+    | '&' expression %prec PREC_UNARY               { self.nodes().unary($1, $2) }
+    | '*' expression %prec PREC_UNARY               { self.nodes().unary($1, $2) }
+    | '+' expression %prec PREC_UNARY               { self.nodes().unary($1, $2) }
+    | '-' expression %prec PREC_UNARY               { self.nodes().unary($1, $2) }
+    | '~' expression                                { self.nodes().unary($1, $2) }
+    | '!' expression                                { self.nodes().unary($1, $2) }
+
+    | expression '+' expression                     { self.nodes().binary($1, $2, $3) }
+    | expression '-' expression                     { self.nodes().binary($1, $2, $3) }
+    | expression '*' expression                     { self.nodes().binary($1, $2, $3) }
+    | expression '/' expression                     { self.nodes().binary($1, $2, $3) }
+    | expression '%' expression                     { self.nodes().binary($1, $2, $3) }
+    | expression LEFT_OP expression                 { self.nodes().binary($1, $2, $3) }
+    | expression RIGHT_OP expression                { self.nodes().binary($1, $2, $3) }
+    | expression '<' expression                     { self.nodes().binary($1, $2, $3) }
+    | expression '>' expression                     { self.nodes().binary($1, $2, $3) }
+    | expression LE_OP expression                   { self.nodes().binary($1, $2, $3) }
+    | expression GE_OP expression                   { self.nodes().binary($1, $2, $3) }
+	| expression EQ_OP expression                   { self.nodes().binary($1, $2, $3) }
+	| expression NE_OP expression                   { self.nodes().binary($1, $2, $3) }
+	| expression '&' expression                     { self.nodes().binary($1, $2, $3) }
+	| expression '^' expression                     { self.nodes().binary($1, $2, $3) }
+	| expression '|' expression                     { self.nodes().binary($1, $2, $3) }
+	| expression AND_OP expression                  { self.nodes().binary($1, $2, $3) }
+	| expression OR_OP expression                   { self.nodes().binary($1, $2, $3) }
+	| expression '=' expression                     { self.nodes().binary($1, $2, $3) }
+	| expression MUL_ASSIGN expression              { self.nodes().binary($1, $2, $3) }
+	| expression DIV_ASSIGN expression              { self.nodes().binary($1, $2, $3) }
+	| expression MOD_ASSIGN expression              { self.nodes().binary($1, $2, $3) }
+	| expression ADD_ASSIGN expression              { self.nodes().binary($1, $2, $3) }
+	| expression SUB_ASSIGN expression              { self.nodes().binary($1, $2, $3) }
+	| expression LEFT_ASSIGN expression             { self.nodes().binary($1, $2, $3) }
+	| expression RIGHT_ASSIGN expression            { self.nodes().binary($1, $2, $3) }
+	| expression AND_ASSIGN expression              { self.nodes().binary($1, $2, $3) }
+	| expression XOR_ASSIGN expression              { self.nodes().binary($1, $2, $3) }
+	| expression OR_ASSIGN expression               { self.nodes().binary($1, $2, $3) }
+    | expression ',' expression                     { self.nodes().binary($1, $2, $3) }
+
     | expression '?' expression ':' expression      { self.nodes().ternary($1, $3, $5) }
-    ;
-
-unary_op
-    : INC_OP
-    | DEC_OP
-    | '&'
-    | '*'
-    | '+'
-    | '-'
-    | '~'
-    | '!'
-    ;
-
-binary_op
-    :  '+'
-    |  '-'
-    |  '*'
-    |  '/'
-    |  '%'
-    |  LEFT_OP
-    |  RIGHT_OP
-    |  '<'
-    |  '>'
-    |  LE_OP
-    |  GE_OP
-	|  EQ_OP
-	|  NE_OP
-	|  '&'
-	|  '^'
-	|  '|'
-	|  AND_OP
-	|  OR_OP
-	|  '='
-	|  MUL_ASSIGN
-	|  DIV_ASSIGN
-	|  MOD_ASSIGN
-	|  ADD_ASSIGN
-	|  SUB_ASSIGN
-	|  LEFT_ASSIGN
-	|  RIGHT_ASSIGN
-	|  AND_ASSIGN
-	|  XOR_ASSIGN
-	|  OR_ASSIGN
-    |  ','
     ;
 
 type_name

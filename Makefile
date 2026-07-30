@@ -29,7 +29,7 @@ $(FT_YACC):
 	$(MAKE) -C ft_yacc
 
 $(PARSER): $(FT_YACC) $(YACC_FILE)
-	$(FT_YACC) -x rust $(YACC_FILE) -o src/parser.rs -t
+	$(FT_YACC) -x rust $(YACC_FILE) -o src/parser.rs
 
 # ----- test --------------------
 
