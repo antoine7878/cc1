@@ -3,8 +3,9 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ArenaId<T>(u32, PhantomData<T>);
+#[repr(transparent)]
+#[derive(PartialEq, Eq, Hash)]
+pub struct ArenaId<T>(u32, PhantomData<fn() -> T>);
 
 impl<T> From<ArenaId<T>> for usize {
     fn from(value: ArenaId<T>) -> usize {
@@ -12,17 +13,29 @@ impl<T> From<ArenaId<T>> for usize {
     }
 }
 
-impl<T> Copy for ArenaId<T> {}
-
 impl<T> Clone for ArenaId<T> {
     fn clone(&self) -> Self {
         *self
     }
 }
+impl<T> Copy for ArenaId<T> {}
 
 impl<T> From<usize> for ArenaId<T> {
     fn from(value: usize) -> ArenaId<T> {
         Self(value as u32, PhantomData)
+    }
+}
+impl<T> Debug for ArenaId<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}Id({})",
+            std::any::type_name::<T>()
+                .rsplit("::")
+                .next()
+                .unwrap_or("?"),
+            self.0
+        )
     }
 }
 

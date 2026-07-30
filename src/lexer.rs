@@ -1,9 +1,11 @@
 #![allow(unused_braces, mixed_script_confusables, unused)]
 use std::io::{Read, stdin};
+use std::mem::take;
 use std::str::from_utf8;
 
+use crate::symbol::NameId;
 use crate::parser::YYToken;
-use crate::context::Context;
+use crate::context::{Context, ContextAccess};
 
 #[allow(unused)]
 const INITIAL: usize = 0;
@@ -457,7 +459,8 @@ const YY_RULE_COUNT: usize = 92;
     }
 
     fn reject(&mut self) {
-        let next_action = Self::YY_NEXT_ACCEPT[self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
+        let next_action = Self::YY_NEXT_ACCEPT
+            [self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
         self.action = if next_action >= 0 {
             next_action
         } else {
@@ -477,7 +480,9 @@ const YY_RULE_COUNT: usize = 92;
     }
 
     fn shift_all_positions(&mut self, offset: usize) {
-        self.accept_stack.iter_mut().for_each(|s| s.buf_pos -= offset);
+        self.accept_stack
+            .iter_mut()
+            .for_each(|s| s.buf_pos -= offset);
         self.run_position -= offset;
         self.trailing_end_pos = self.trailing_end_pos.saturating_sub(offset);
         self.buffer_position -= offset;
@@ -577,7 +582,10 @@ const YY_RULE_COUNT: usize = 92;
         if self.run_position >= self.buffer.len() {
             return 0;
         }
-        let ret = *self.buffer.get(self.run_position).expect("run_position out of bounds");
+        let ret = *self
+            .buffer
+            .get(self.run_position)
+            .expect("run_position out of bounds");
         self.run_position += 1;
         self.count_c(ret);
         ret
@@ -640,8 +648,10 @@ const YY_RULE_COUNT: usize = 92;
                 break;
             }
 
-            let char_class: usize = Self::YY_CHAR_EQ[self.buffer[self.run_position] as usize] as usize;
-            self.current_state = Self::YY_BASE[self.current_state * Self::YY_CLASS_COUNT + char_class] as usize;
+            let char_class: usize =
+                Self::YY_CHAR_EQ[self.buffer[self.run_position] as usize] as usize;
+            self.current_state =
+                Self::YY_BASE[self.current_state * Self::YY_CLASS_COUNT + char_class] as usize;
             if self.current_state == 0 {
                 break;
             }
@@ -684,351 +694,351 @@ const YY_RULE_COUNT: usize = 92;
 },
 
 3 => {
-{ return(YYToken::AUTO); }
+{ return YYToken::AUTO; }
 },
 
 4 => {
-{ return(YYToken::BREAK); }
+{ return YYToken::BREAK; }
 },
 
 5 => {
-{ return(YYToken::CASE); }
+{ return YYToken::CASE; }
 },
 
 6 => {
-{ return(YYToken::CHAR); }
+{ return YYToken::CHAR; }
 },
 
 7 => {
-{ return(YYToken::CONST); }
+{ return YYToken::CONST; }
 },
 
 8 => {
-{ return(YYToken::CONTINUE); }
+{ return YYToken::CONTINUE; }
 },
 
 9 => {
-{ return(YYToken::DEFAULT); }
+{ return YYToken::DEFAULT; }
 },
 
 10 => {
-{ return(YYToken::DO); }
+{ return YYToken::DO; }
 },
 
 11 => {
-{ return(YYToken::DOUBLE); }
+{ return YYToken::DOUBLE; }
 },
 
 12 => {
-{ return(YYToken::ELSE); }
+{ return YYToken::ELSE; }
 },
 
 13 => {
-{ return(YYToken::ENUM); }
+{ return YYToken::ENUM; }
 },
 
 14 => {
-{ return(YYToken::EXTERN); }
+{ return YYToken::EXTERN; }
 },
 
 15 => {
-{ return(YYToken::FLOAT); }
+{ return YYToken::FLOAT; }
 },
 
 16 => {
-{ return(YYToken::FOR); }
+{ return YYToken::FOR; }
 },
 
 17 => {
-{ return(YYToken::GOTO); }
+{ return YYToken::GOTO; }
 },
 
 18 => {
-{ return(YYToken::IF); }
+{ return YYToken::IF; }
 },
 
 19 => {
-{ return(YYToken::INT); }
+{ return YYToken::INT; }
 },
 
 20 => {
-{ return(YYToken::LONG); }
+{ return YYToken::LONG; }
 },
 
 21 => {
-{ return(YYToken::REGISTER); }
+{ return YYToken::REGISTER; }
 },
 
 22 => {
-{ return(YYToken::RETURN); }
+{ return YYToken::RETURN; }
 },
 
 23 => {
-{ return(YYToken::SHORT); }
+{ return YYToken::SHORT; }
 },
 
 24 => {
-{ return(YYToken::SIGNED); }
+{ return YYToken::SIGNED; }
 },
 
 25 => {
-{ return(YYToken::SIZEOF); }
+{ return YYToken::SIZEOF; }
 },
 
 26 => {
-{ return(YYToken::STATIC); }
+{ return YYToken::STATIC; }
 },
 
 27 => {
-{ return(YYToken::STRUCT); }
+{ return YYToken::STRUCT; }
 },
 
 28 => {
-{ return(YYToken::SWITCH); }
+{ return YYToken::SWITCH; }
 },
 
 29 => {
-{ return(YYToken::TYPEDEF); }
+{ return YYToken::TYPEDEF; }
 },
 
 30 => {
-{ return(YYToken::UNION); }
+{ return YYToken::UNION; }
 },
 
 31 => {
-{ return(YYToken::UNSIGNED); }
+{ return YYToken::UNSIGNED; }
 },
 
 32 => {
-{ return(YYToken::VOID); }
+{ return YYToken::VOID; }
 },
 
 33 => {
-{ return(YYToken::VOLATILE); }
+{ return YYToken::VOLATILE; }
 },
 
 34 => {
-{ return(YYToken::WHILE); }
+{ return YYToken::WHILE; }
 },
 
 35 => {
-{ return(check_type(self.yytext.clone())); }
+{ return check_type(alloc_name(self)); }
 },
 
 36 => {
-{ return(YYToken::CONSTANT); }
+{ return YYToken::CONSTANT(alloc_name(self)); }
 },
 
 37 => {
-{ return(YYToken::CONSTANT); }
+{ return YYToken::CONSTANT(alloc_name(self)); }
 },
 
 38 => {
-{ return(YYToken::CONSTANT); }
+{ return YYToken::CONSTANT(alloc_name(self)); }
 },
 
 39 => {
-{ return(YYToken::CONSTANT); }
+{ return YYToken::CONSTANT(alloc_name(self)); }
 },
 
 40 => {
-{ return(YYToken::CONSTANT); }
+{ return YYToken::CONSTANT(alloc_name(self)); }
 },
 
 41 => {
-{ return(YYToken::CONSTANT); }
+{ return YYToken::CONSTANT(alloc_name(self)); }
 },
 
 42 => {
-{ return(YYToken::CONSTANT); }
+{ return YYToken::CONSTANT(alloc_name(self)); }
 },
 
 43 => {
-{ return(YYToken::STRING_LITERAL(self.yytext.clone())); }
+{ return YYToken::STRING_LITERAL(alloc_name(self)); }
 },
 
 44 => {
-{ return(YYToken::ELLIPSIS); }
+{ return YYToken::ELLIPSIS; }
 },
 
 45 => {
-{ return(YYToken::RIGHT_ASSIGN); }
+{ return YYToken::RIGHT_ASSIGN; }
 },
 
 46 => {
-{ return(YYToken::LEFT_ASSIGN); }
+{ return YYToken::LEFT_ASSIGN; }
 },
 
 47 => {
-{ return(YYToken::ADD_ASSIGN); }
+{ return YYToken::ADD_ASSIGN; }
 },
 
 48 => {
-{ return(YYToken::SUB_ASSIGN); }
+{ return YYToken::SUB_ASSIGN; }
 },
 
 49 => {
-{ return(YYToken::MUL_ASSIGN); }
+{ return YYToken::MUL_ASSIGN; }
 },
 
 50 => {
-{ return(YYToken::DIV_ASSIGN); }
+{ return YYToken::DIV_ASSIGN; }
 },
 
 51 => {
-{ return(YYToken::MOD_ASSIGN); }
+{ return YYToken::MOD_ASSIGN; }
 },
 
 52 => {
-{ return(YYToken::AND_ASSIGN); }
+{ return YYToken::AND_ASSIGN; }
 },
 
 53 => {
-{ return(YYToken::XOR_ASSIGN); }
+{ return YYToken::XOR_ASSIGN; }
 },
 
 54 => {
-{ return(YYToken::OR_ASSIGN); }
+{ return YYToken::OR_ASSIGN; }
 },
 
 55 => {
-{ return(YYToken::RIGHT_OP); }
+{ return YYToken::RIGHT_OP; }
 },
 
 56 => {
-{ return(YYToken::LEFT_OP); }
+{ return YYToken::LEFT_OP; }
 },
 
 57 => {
-{ return(YYToken::INC_OP); }
+{ return YYToken::INC_OP; }
 },
 
 58 => {
-{ return(YYToken::DEC_OP); }
+{ return YYToken::DEC_OP; }
 },
 
 59 => {
-{ return(YYToken::PTR_OP); }
+{ return YYToken::PTR_OP; }
 },
 
 60 => {
-{ return(YYToken::AND_OP); }
+{ return YYToken::AND_OP; }
 },
 
 61 => {
-{ return(YYToken::OR_OP); }
+{ return YYToken::OR_OP; }
 },
 
 62 => {
-{ return(YYToken::LE_OP); }
+{ return YYToken::LE_OP; }
 },
 
 63 => {
-{ return(YYToken::GE_OP); }
+{ return YYToken::GE_OP; }
 },
 
 64 => {
-{ return(YYToken::EQ_OP); }
+{ return YYToken::EQ_OP; }
 },
 
 65 => {
-{ return(YYToken::NE_OP); }
+{ return YYToken::NE_OP; }
 },
 
 66 => {
-{ return(YYToken::Char(';')); }
+{ return YYToken::Char(';'); }
 },
 
 67 => {
-{ return(YYToken::Char(',')); }
+{ return YYToken::Char(','); }
 },
 
 68 => {
-{ return(YYToken::Char(':')); }
+{ return YYToken::Char(':'); }
 },
 
 69 => {
-{ return(YYToken::Char('=')); }
+{ return YYToken::Char('='); }
 },
 
 70 => {
-{ return(YYToken::Char('(')); }
+{ return YYToken::Char('('); }
 },
 
 71 => {
-{ return(YYToken::Char(')')); }
+{ return YYToken::Char(')'); }
 },
 
 72 => {
-{ return(YYToken::Char('[')); }
+{ return YYToken::Char('['); }
 },
 
 73 => {
-{ return(YYToken::Char(']')); }
+{ return YYToken::Char(']'); }
 },
 
 74 => {
-{ return(YYToken::Char('.')); }
+{ return YYToken::Char('.'); }
 },
 
 75 => {
-{ return(YYToken::Char('&')); }
+{ return YYToken::Char('&'); }
 },
 
 76 => {
-{ return(YYToken::Char('!')); }
+{ return YYToken::Char('!'); }
 },
 
 77 => {
-{ return(YYToken::Char('~')); }
+{ return YYToken::Char('~'); }
 },
 
 78 => {
-{ return(YYToken::Char('-')); }
+{ return YYToken::Char('-'); }
 },
 
 79 => {
-{ return(YYToken::Char('+')); }
+{ return YYToken::Char('+'); }
 },
 
 80 => {
-{ return(YYToken::Char('*')); }
+{ return YYToken::Char('*'); }
 },
 
 81 => {
-{ return(YYToken::Char('/')); }
+{ return YYToken::Char('/'); }
 },
 
 82 => {
-{ return(YYToken::Char('%')); }
+{ return YYToken::Char('%'); }
 },
 
 83 => {
-{ return(YYToken::Char('<')); }
+{ return YYToken::Char('<'); }
 },
 
 84 => {
-{ return(YYToken::Char('>')); }
+{ return YYToken::Char('>'); }
 },
 
 85 => {
-{ return(YYToken::Char('^')); }
+{ return YYToken::Char('^'); }
 },
 
 86 => {
-{ return(YYToken::Char('|')); }
+{ return YYToken::Char('|'); }
 },
 
 87 => {
-{ return(YYToken::Char('?')); }
+{ return YYToken::Char('?'); }
 },
 
 88 => {
-{ return(YYToken::Char('{')); }
+{ return YYToken::Char('{'); }
 },
 
 89 => {
-{ return(YYToken::Char('}')); }
+{ return YYToken::Char('}'); }
 },
 
 90 => {
@@ -1045,8 +1055,8 @@ const YY_RULE_COUNT: usize = 92;
         }
     }
 
-    pub fn ctx(&mut self) -> &mut Context {
-        &mut self.ctx
+    pub fn take_yytext(&mut self) -> String {
+        take(&mut self.yytext)
     }
 }
 fn comment<T: Read>(lex: &mut YYLex<T>) {
@@ -1063,10 +1073,14 @@ fn comment<T: Read>(lex: &mut YYLex<T>) {
         }
     }
 }
-fn check_type(yytext: String) -> YYToken {
+fn check_type(name_id: NameId) -> YYToken {
 // pseudo code --- this is what it should check
 //
 //	if (yytext == type_name)
 //	     return YYToken::TYPE_NAME;
-	YYToken::IDENTIFIER(yytext)
+	YYToken::IDENTIFIER(name_id)
+}
+fn alloc_name<R: Read>(lex: &mut YYLex<R>) -> NameId {
+    let name = lex.take_yytext();
+    lex.names().add(name)
 }

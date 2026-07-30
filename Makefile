@@ -34,7 +34,7 @@ $(PARSER): $(FT_YACC) $(YACC_FILE)
 # ----- test --------------------
 
 test: $(NAME)
-	cat test/hello.c | ./$(NAME)
+	cat test/test | ./$(NAME)
 
 ast:
 	clang -Xclang -ast-dump test/hello.c | sed "s/\e\[[0-9;]*m//g" > a

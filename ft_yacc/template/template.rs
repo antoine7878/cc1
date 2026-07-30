@@ -53,7 +53,7 @@ impl<R: Read> Yacc<R> {
             continue_parse: true,
             is_recovering: false,
             ret: 0,
-            lexer: lexer,
+            lexer,
             token_since_error: 0,
             /* DEFINES */
         }
@@ -272,7 +272,7 @@ impl<R: Read> Yacc<R> {
     fn do_action(&mut self, idx: usize) -> YYToken {
         match Self::YY_ACTION_TABLE[self.act as usize] {
             /* ACTIONS */
-            -1 => YYToken::Empty,
+            -1 => std::mem::replace(&mut self.value_stack[idx], YYToken::Empty),
             _ => unreachable!(),
         }
     }

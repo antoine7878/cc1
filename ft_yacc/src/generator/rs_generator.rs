@@ -3,13 +3,12 @@ use std::io::{self, Write};
 
 use crate::generator::Generator;
 use crate::generator::dumper::Dumper;
-use crate::models::{Action, ActionId, Production, ProductionId, TokenData, Yacc};
+use crate::models::{Action, ActionId, Production, TokenData, Yacc};
 use crate::parser::LALRParser;
 use crate::utils::{Args, YaccError, str_of_escape};
 
 pub struct RSGenerator;
 
-#[rustfmt::skip]
 impl Generator for RSGenerator {
     fn dump_code_before(&self, w: &mut Dumper, yacc: &Yacc, _: bool) -> Result<(), YaccError> {
         for (_, code) in &yacc.code_before {
@@ -47,19 +46,12 @@ impl Generator for RSGenerator {
         unimplemented!()
     }
 
-    fn dump_actions(&self, w: &mut Dumper, parser: &LALRParser, _: bool) -> Result<(), YaccError>{
-        for (i, frag_id) in parser
-            .yacc
-            .productions
-            .iter()
-            .enumerate()
-            .filter_map(|(i, p)| p.action.map(|f| (i, f)))
-        {
-            self.action(w, parser, i, frag_id)?;
+    fn dump_actions(&self, w: &mut Dumper, parser: &LALRParser, _: bool) -> Result<(), YaccError> {
+        for prod in parser.yacc.productions.iter() {
+            self.action(w, parser, prod)?;
         }
         Ok(())
     }
-
 
     fn dump_defines(&self, _: &mut Dumper, _: &LALRParser, _: &Args) -> Result<(), YaccError> {
         Ok(())
@@ -126,32 +118,28 @@ impl RSGenerator {
         Ok(())
     }
 
-    fn action(
-        &self,
-        w: &mut Dumper,
-        parser: &LALRParser,
-        production_id: ProductionId,
-        frag_id: ActionId,
-    ) -> Result<(), YaccError> {
-        let production = &parser.yacc.productions[production_id];
+    fn action(&self, w: &mut Dumper, parser: &LALRParser, production: &Production) -> Result<(), YaccError> {
+        let action_id = production.action;
         let prod = &parser.yacc.tokens[production.product];
-        match &prod.utype {
-            Some(_) => {
-                writeln!(w, "{} => YYToken::{}({{", frag_id, prod.name,)?;
+        match (action_id, &prod.utype) {
+            (Some(action_id), Some(_)) => {
+                writeln!(w, "{} => YYToken::{}({{", action_id, prod.name,)?;
                 self.dump_bindings(w, parser, production)?;
-                self.dump_action(w, parser, frag_id, production_id)?;
+                self.dump_action(w, parser, action_id, production)?;
                 writeln!(w, "}}),")?;
             }
-            None => {
-                writeln!(w, "{} => {{", frag_id,)?;
+            (Some(action_id), None) => {
+                writeln!(w, "{} => {{", action_id,)?;
                 self.dump_bindings(w, parser, production)?;
-                self.dump_action(w, parser, frag_id, production_id)?;
-                writeln!(w, ";\nYYToken::{}}}", prod.name)?;
+                self.dump_action(w, parser, action_id, production)?;
+                writeln!(w, "}}")?;
             }
+            _ => (), // (None, _) => writeln!(w, "self.value_stack.last_mut().replace(YYToken::Empty)")?,
         };
         Ok(())
     }
 
+    #[rustfmt::skip]
     fn dump_bindings(&self, w: &mut Dumper, parser: &LALRParser, production: &Production) -> Result<(), YaccError> {
         let ctx = production.mid_context.as_ref().unwrap_or(&production.recipe);
         let mut seen = BTreeSet::new();
@@ -162,20 +150,15 @@ impl RSGenerator {
             let Some(token_id) = usize::try_from(num - 1).ok().and_then(|i| ctx.get(i)) else {
                 YaccError::error(&parser.yacc.file, pos.line_no, "invalid stack position")?
             };
-            let Some(utype) = pos.utype.as_ref().or(parser.yacc.tokens[*token_id].utype.as_ref()) else {
-                YaccError::error(&parser.yacc.file, pos.line_no, format!("missing type for ${}", num))?
-            };
-            match &production.mid_context {
-                Some(ctx) => writeln!(
-                    w,
-                    "let __yy{num} = {utype}::from(self.value_stack[self.value_stack.len() - {}].clone());",
-                    ctx.len() as isize + 1 - num
-                )?,
-                None => writeln!(
-                    w,
-                    "let __yy{num} = {utype}::from(std::mem::replace(&mut self.value_stack[idx + {}], YYToken::Emtpy));",
-                    num - 1
-                )?,
+            let utype = pos.utype.as_ref().or(parser.yacc.tokens[*token_id].utype.as_ref());
+            match (utype, &production.mid_context, num) {
+                (Some(utype), Some(ctx), num) if num == ctx.len() as isize + 1 => writeln!( w, "let __yy{num} = {utype}::from(self.value_stack[self.value_stack.len()].clone());")?,
+                (Some(utype), Some(ctx), num) => writeln!( w, "let __yy{num} = {utype}::from(self.value_stack[self.value_stack.len() - {}].clone());", ctx.len() as isize + 1 - num)?,
+                (Some(utype), None, num) if num == 1 => writeln!( w, "let __yy{num} = {utype}::from(std::mem::replace(&mut self.value_stack[idx], YYToken::Empty));")?,
+                (Some(utype), None, num) => writeln!( w, "let __yy{num} = {utype}::from(std::mem::replace(&mut self.value_stack[idx + {}], YYToken::Empty));", num - 1)?,
+                (None, None, num) if num == 1=> writeln!( w, "let __yy{num} = std::mem::replace(&mut self.value_stack[idx], YYToken::Empty);")?,
+                (None, None, num) => writeln!( w, "let __yy{num} = std::mem::replace(&mut self.value_stack[idx + {}], YYToken::Empty);", num - 1)?,
+                (None, Some(_), _) => panic!("what is going on here ?"),
             }
         }
         Ok(())
@@ -186,9 +169,8 @@ impl RSGenerator {
         w: &mut Dumper,
         parser: &LALRParser,
         action_id: ActionId,
-        production_id: ProductionId,
+        production: &Production,
     ) -> Result<(), YaccError> {
-        let production = &parser.yacc.productions[production_id];
         let mut positions = production.stack_positons.iter().peekable();
         for (i, c) in parser.yacc.actions[action_id].char_indices() {
             if let Some(pos) = positions.peek()

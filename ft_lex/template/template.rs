@@ -1,5 +1,6 @@
 #![allow(unused_braces, mixed_script_confusables, unused)]
 use std::io::{Read, stdin};
+use std::mem::take;
 use std::str::from_utf8;
 
 /* CODE_BEFORE */
@@ -113,7 +114,8 @@ impl<R: Read> YYLex<R> {
     }
 
     fn reject(&mut self) {
-        let next_action = Self::YY_NEXT_ACCEPT[self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
+        let next_action = Self::YY_NEXT_ACCEPT
+            [self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
         self.action = if next_action >= 0 {
             next_action
         } else {
@@ -133,7 +135,9 @@ impl<R: Read> YYLex<R> {
     }
 
     fn shift_all_positions(&mut self, offset: usize) {
-        self.accept_stack.iter_mut().for_each(|s| s.buf_pos -= offset);
+        self.accept_stack
+            .iter_mut()
+            .for_each(|s| s.buf_pos -= offset);
         self.run_position -= offset;
         self.trailing_end_pos = self.trailing_end_pos.saturating_sub(offset);
         self.buffer_position -= offset;
@@ -233,7 +237,10 @@ impl<R: Read> YYLex<R> {
         if self.run_position >= self.buffer.len() {
             return 0;
         }
-        let ret = *self.buffer.get(self.run_position).expect("run_position out of bounds");
+        let ret = *self
+            .buffer
+            .get(self.run_position)
+            .expect("run_position out of bounds");
         self.run_position += 1;
         self.count_c(ret);
         ret
@@ -296,8 +303,10 @@ impl<R: Read> YYLex<R> {
                 break;
             }
 
-            let char_class: usize = Self::YY_CHAR_EQ[self.buffer[self.run_position] as usize] as usize;
-            self.current_state = Self::YY_BASE[self.current_state * Self::YY_CLASS_COUNT + char_class] as usize;
+            let char_class: usize =
+                Self::YY_CHAR_EQ[self.buffer[self.run_position] as usize] as usize;
+            self.current_state =
+                Self::YY_BASE[self.current_state * Self::YY_CLASS_COUNT + char_class] as usize;
             if self.current_state == 0 {
                 break;
             }
@@ -335,8 +344,8 @@ impl<R: Read> YYLex<R> {
         }
     }
 
-    pub fn ctx(&mut self) -> &mut Context {
-        &mut self.ctx
+    pub fn take_yytext(&mut self) -> String {
+        take(&mut self.yytext)
     }
 }
 /* MAIN */

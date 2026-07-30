@@ -318,8 +318,10 @@ impl YaccParser {
         line_no: usize,
     ) -> Result<usize, YaccError> {
         let len = self.yacc.tokens.len();
+        let is_char = name.starts_with("Char");
         let value = value.unwrap_or_else(|| {
-            if name.starts_with("Char") {
+            if is_char {
+                //utype.insert("char".to_string());
                 TokenData::get_char_value(&name) as usize
             } else {
                 self.token_count += 1;
