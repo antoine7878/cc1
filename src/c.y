@@ -3,7 +3,7 @@
 %{
 use crate::context::ContextAccess;
 use crate::ast::NodeId;
-use crate::symbol::NameId;
+use crate::symbol::{NameId, StorageKind};
 use crate::types::{Qualifiers, TypeId};
 use crate::tag::{EnumId, StructId, UnionId, Field};
 use crate::lexer::YYLex;
@@ -14,8 +14,6 @@ use crate::error::yyerror;
 %token TYPEDEF EXTERN STATIC AUTO REGISTER
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID
 %token STRUCT UNION ENUM ELLIPSIS
-%token 
-
 %token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR GOTO CONTINUE BREAK RETURN
 
 %left ','
@@ -37,6 +35,18 @@ use crate::error::yyerror;
 
 %type<NodeId> expression constant_expression
 %type<TypeId> type_name
+%type<StorageKind> storage_class_specifier
+
+/*
+%type<Qualifiers> type_qualifier
+%type<Vec<Qualifiers>> specifier_qualifier_list
+%type<TypeId> type_specifier
+%type<Vec<Field>> struct_declaration_list
+%type<Vec<Field>> struct_declaration
+%type<Vec<TypeId>> struct_declarator_list
+%type<NameId> struct_declarator
+%type<StructId> struct_specifier
+*/
 
 %%
 
@@ -57,7 +67,6 @@ expression /* NodeId */
     | SIZEOF '(' expression ')'                     { self.nodes().sizeof_expr($3) }
     | SIZEOF '(' type_name ')'                      { self.nodes().sizeof_type($3) }
     | '(' type_name ')' expression %prec PREC_UNARY { self.nodes().cast($2, $4) }
-
     | expression INC_OP                             { self.nodes().unary(YYToken::POST_INC_OP, $1) }
     | expression DEC_OP                             { self.nodes().unary(YYToken::POST_DEC_OP, $1) }
     | INC_OP expression                             { self.nodes().unary($1, $2) }
@@ -68,7 +77,6 @@ expression /* NodeId */
     | '-' expression %prec PREC_UNARY               { self.nodes().unary($1, $2) }
     | '~' expression                                { self.nodes().unary($1, $2) }
     | '!' expression                                { self.nodes().unary($1, $2) }
-
     | expression '+' expression                     { self.nodes().binary($1, $2, $3) }
     | expression '-' expression                     { self.nodes().binary($1, $2, $3) }
     | expression '*' expression                     { self.nodes().binary($1, $2, $3) }
@@ -103,56 +111,47 @@ expression /* NodeId */
     | expression '?' expression ':' expression      { self.nodes().ternary($1, $3, $5) }
     ;
 
+declaration /* */
+	: declaration_specifiers ';'
+	| declaration_specifiers init_declarator_list ';'
+	;
+
+
+declaration_specifiers /* */
+	: storage_class_specifier
+	| storage_class_specifier declaration_specifiers
+	| type_specifier
+	| type_specifier declaration_specifiers
+	| type_qualifier
+	| type_qualifier declaration_specifiers
+	;
+
+
+init_declarator_list /* */
+	: init_declarator | init_declarator_list ',' init_declarator
+	;
+
+init_declarator /* */
+	: declarator
+	| declarator '=' initializer
+	;
+
+storage_class_specifier /* StorageKind TODO: check actual storage for TYPEDEF */
+	: TYPEDEF       { StorageKind::Auto  }
+	| EXTERN        { StorageKind::Extern }
+	| STATIC        { StorageKind::Static }
+	| AUTO          { StorageKind::Auto }
+	| REGISTER      { StorageKind::Register }
+
 type_name
     :
 	;
 
+
 %%
 
+;
 
-/*
-%type<Qualifiers> type_qualifier
-%type<Vec<Qualifiers>> specifier_qualifier_list
-%type<TypeId> type_specifier
-%type<Vec<Field>> struct_declaration_list
-%type<Vec<Field>> struct_declaration
-%type<Vec<TypeId>> struct_declarator_list
-%type<NameId> struct_declarator
-%type<StructId> struct_specifier
-*/
-
-// declaration /* */
-// 	: declaration_specifiers ';'
-// 	| declaration_specifiers init_declarator_list ';'
-// 	;
-//
-// declaration_specifiers /* */
-// 	: storage_class_specifier
-// 	| storage_class_specifier declaration_specifiers
-// 	| type_specifier
-// 	| type_specifier declaration_specifiers
-// 	| type_qualifier
-// 	| type_qualifier declaration_specifiers
-// 	;
-//
-// init_declarator_list /* */
-// 	: init_declarator
-// 	| init_declarator_list ',' init_declarator
-// 	;
-//
-// init_declarator /* */
-// 	: declarator
-// 	| declarator '=' initializer
-// 	;
-//
-// storage_class_specifier /* */
-// 	: TYPEDEF
-// 	| EXTERN
-// 	| STATIC
-// 	| AUTO
-// 	| REGISTER
-// 	;
-//
 // type_specifier /* TypeId */
 // 	: VOID              { self.lexer.ctx.arenas.types.void() }
 // 	| CHAR              { self.lexer.ctx.arenas.types.char() }
@@ -168,13 +167,13 @@ type_name
 // 	| enum_specifier    { self.lexer.ctx.arenas.types.char() }
 // 	| TYPE_NAME         { self.lexer.ctx.arenas.types.char() }
 // 	;
-//
+
 // struct_specifier /* StructId */
 // 	: STRUCT IDENTIFIER '{' struct_declaration_list '}'     { self.lexer.ctx.arenas.structs($2, $4, false) }
 // 	| STRUCT '{' struct_declaration_list '}'                { self.lexer.ctx.arenas.structs(None, $3, false) }
 // 	| STRUCT IDENTIFIER                                     { self.lexer.ctx.arenas.structs($2, Vec::new(), false) }
 // 	;
-//
+
 // union_specifier /* UnionId */
 // 	: STRUCT IDENTIFIER '{' struct_declaration_list '}'     { self.lexer.ctx.arenas.structs($2, $4, false) }
 // 	| STRUCT '{' struct_declaration_list '}'                { self.lexer.ctx.arenas.structs(None, $3, false) }
@@ -303,7 +302,7 @@ type_name
 // 	;
 //
 // initializer /* */
-// 	: assignment_expression
+// 	: expression
 // 	| '{' initializer_list '}'
 // 	| '{' initializer_list ',' '}'
 // 	;
