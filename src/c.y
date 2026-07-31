@@ -36,6 +36,7 @@ use crate::error::yyerror;
 %type<NodeId> expression constant_expression
 %type<TypeId> type_name
 %type<StorageKind> storage_class_specifier
+%type<TypeId> type_specifier
 
 /*
 %type<Qualifiers> type_qualifier
@@ -111,13 +112,13 @@ expression /* NodeId */
     | expression '?' expression ':' expression      { self.nodes().ternary($1, $3, $5) }
     ;
 
-declaration /* */
+declaration /* Declaration */
 	: declaration_specifiers ';'
 	| declaration_specifiers init_declarator_list ';'
 	;
 
 
-declaration_specifiers /* */
+declaration_specifiers /* TypeId */
 	: storage_class_specifier
 	| storage_class_specifier declaration_specifiers
 	| type_specifier
@@ -128,45 +129,49 @@ declaration_specifiers /* */
 
 
 init_declarator_list /* */
-	: init_declarator | init_declarator_list ',' init_declarator
+	: init_declarator
+    | init_declarator_list ',' init_declarator
 	;
 
 init_declarator /* */
-	: declarator
-	| declarator '=' initializer
+	: declarator { }
+	| declarator '=' initializer { }
 	;
 
-storage_class_specifier /* StorageKind TODO: check actual storage for TYPEDEF */
-	: TYPEDEF       { StorageKind::Auto  }
-	| EXTERN        { StorageKind::Extern }
-	| STATIC        { StorageKind::Static }
-	| AUTO          { StorageKind::Auto }
-	| REGISTER      { StorageKind::Register }
+storage_class_specifier /* StorageKind */
+	: TYPEDEF           { StorageKind::Typedef  }
+	| EXTERN            { StorageKind::Extern }
+	| STATIC            { StorageKind::Static }
+	| AUTO              { StorageKind::Auto }
+	| REGISTER          { StorageKind::Register }
+    ;
 
 type_name
     :
 	;
 
+type_qualifier  /* Qualifiers */
+	: CONST             { Qualifiers::Const }
+	| VOLATILE          { Qualifiers::Volatile }
+	;
+
+type_specifier /* TypeId */
+	: VOID              { self.types().void() }
+	| CHAR              { self.types().char() }
+	| SHORT             { self.types().short() }
+	| INT               { self.types().int() }
+	| LONG              { self.types().long() }
+	| FLOAT             { self.types().float() }
+	| DOUBLE            { self.types().double() }
+	| SIGNED            { self.types().signed() }
+	| UNSIGNED          { self.types().unsigned() }
+	| struct_specifier  { 42.into() }
+	| union_specifier   { 42.into() }
+	| enum_specifier    { 42.into() }
+	| TYPE_NAME         { 42.into() }
+	;
 
 %%
-
-;
-
-// type_specifier /* TypeId */
-// 	: VOID              { self.lexer.ctx.arenas.types.void() }
-// 	| CHAR              { self.lexer.ctx.arenas.types.char() }
-// 	| SHORT             { self.lexer.ctx.arenas.types.short() }
-// 	| INT               { self.lexer.ctx.arenas.types.int() }
-// 	| LONG              { self.lexer.ctx.arenas.types.long() }
-// 	| FLOAT             { self.lexer.ctx.arenas.types.float() }
-// 	| DOUBLE            { self.lexer.ctx.arenas.types.double() }
-// 	| SIGNED            { self.lexer.ctx.arenas.types.signed() }
-// 	| UNSIGNED          { self.lexer.ctx.arenas.types.unsigned() }
-// 	| struct_specifier  { $1 }
-// 	| union_specifier   { self.lexer.ctx.arenas.types.char() }
-// 	| enum_specifier    { self.lexer.ctx.arenas.types.char() }
-// 	| TYPE_NAME         { self.lexer.ctx.arenas.types.char() }
-// 	;
 
 // struct_specifier /* StructId */
 // 	: STRUCT IDENTIFIER '{' struct_declaration_list '}'     { self.lexer.ctx.arenas.structs($2, $4, false) }
@@ -223,10 +228,7 @@ type_name
 // 	| IDENTIFIER '=' constant_expression
 // 	;
 //
-// type_qualifier  /* Qualifiers */
-// 	: CONST { Qualifiers::Const }
-// 	| VOLATILE { Qualifiers::Volatile }
-// 	;
+
 //
 // declarator /* TypeId */
 // 	: pointer direct_declarator                     { self.lexer.ctx.types.pointer($2) }

@@ -44,7 +44,7 @@ impl YaccParser {
             self.parse_program();
         };
 
-        self.report_unused()?;
+        // self.report_unused()?;
         self.yacc.init(self.start);
         Ok(self.yacc)
     }

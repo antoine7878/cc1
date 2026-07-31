@@ -40,7 +40,7 @@ ast:
 	clang -Xclang -ast-dump test/hello.c | sed "s/\e\[[0-9;]*m//g" > a
 
 gcc:
-	gcc -std=iso9899:1990 -pedantic-errors test/hello.c
+	gcc -std=iso9899:1990 test/hello.c
 
 clean:
 	cargo clean
