@@ -1,38 +1,50 @@
 use std::io::{Write, stdout};
 
 use crate::ast::expression::ExpressionNode;
-use crate::ast::{Expression, Name, TypeNode};
+use crate::ast::{Expression, TypeNode};
 use crate::context::Context;
+
+const MID: &str = "├── ";
+const LAST: &str = "└── ";
+const VERT: &str = "│   ";
+const PAD: &str = "    ";
 
 impl Context {
     pub fn print_ast(&mut self, node: &ExpressionNode) -> std::io::Result<()> {
-        self.print_expression(&mut stdout(), &mut "".to_string(), node)
+        let w = &mut stdout();
+        let expr = self.arenas.expressions.get(node.id);
+        writeln!(w, "{expr} {}{}", node.span, self.inline_name(expr))?;
+        self.print_children(w, "", node)
     }
 
-    pub fn print_expression<W: Write>(
+    fn print_expression<W: Write>(
         &self,
         w: &mut W,
-        prefix: &mut String,
+        prefix: &str,
         node: &ExpressionNode,
+        is_last: bool,
     ) -> std::io::Result<()> {
         let expr = self.arenas.expressions.get(node.id);
-        writeln!(w, "{prefix}{expr} {}", node.span)?;
-        self.print_expression2(w, prefix, node)?;
-        Ok(())
+        let (branch, extend) = if is_last { (LAST, PAD) } else { (MID, VERT) };
+        writeln!(w, "{prefix}{branch}{expr} {}{}", node.span, self.inline_name(expr))?;
+        self.print_children(w, &format!("{prefix}{extend}"), node)
     }
-    pub fn print_expression2<W: Write>(
-        &self,
-        w: &mut W,
-        prefix: &mut String,
-        node: &ExpressionNode,
-    ) -> std::io::Result<()> {
-        let expr = self.arenas.expressions.get(node.id);
-        write!(w, "{}", prefix)?;
-        prefix.push_str("  ");
+
+    fn inline_name(&self, expr: &Expression) -> String {
         match expr {
-            Expression::Constant(name) | Expression::Identifier(name) | Expression::StringLiteral(name) => {
-                self.print_name(w, name)?;
-            }
+            Expression::Constant(name)
+            | Expression::Identifier(name)
+            | Expression::StringLiteral(name)
+            | Expression::DotAcces(_, name)
+            | Expression::PtrAcces(_, name) => format!(" {}", self.arenas.names.get(name.id)),
+            _ => String::new(),
+        }
+    }
+
+    fn print_children<W: Write>(&self, w: &mut W, prefix: &str, node: &ExpressionNode) -> std::io::Result<()> {
+        let expr = self.arenas.expressions.get(node.id);
+        match expr {
+            Expression::Constant(_) | Expression::Identifier(_) | Expression::StringLiteral(_) => {}
             Expression::PostInc(id)
             | Expression::PostDec(id)
             | Expression::PreInc(id)
@@ -42,88 +54,71 @@ impl Context {
             | Expression::Plus(id)
             | Expression::Minus(id)
             | Expression::BitNot(id)
-            | Expression::Not(id) => self.print_expression(w, prefix, id)?,
-            Expression::Add(rhs, lhs)
-            | Expression::Sub(rhs, lhs)
-            | Expression::Mul(rhs, lhs)
-            | Expression::Div(rhs, lhs)
-            | Expression::Mod(rhs, lhs)
-            | Expression::Right(rhs, lhs)
-            | Expression::Left(rhs, lhs)
-            | Expression::Greater(rhs, lhs)
-            | Expression::Lower(rhs, lhs)
-            | Expression::GreaterEq(rhs, lhs)
-            | Expression::LowerEq(rhs, lhs)
-            | Expression::Eq(rhs, lhs)
-            | Expression::Neq(rhs, lhs)
-            | Expression::BitAnd(rhs, lhs)
-            | Expression::BitOr(rhs, lhs)
-            | Expression::BitXor(rhs, lhs)
-            | Expression::And(rhs, lhs)
-            | Expression::Or(rhs, lhs)
-            | Expression::Assign(rhs, lhs)
-            | Expression::MulAssign(rhs, lhs)
-            | Expression::DivAssign(rhs, lhs)
-            | Expression::ModAssign(rhs, lhs)
-            | Expression::AddAssign(rhs, lhs)
-            | Expression::SubAssign(rhs, lhs)
-            | Expression::LeftAssign(rhs, lhs)
-            | Expression::RightAssign(rhs, lhs)
-            | Expression::AndAssign(rhs, lhs)
-            | Expression::XorAssign(rhs, lhs)
-            | Expression::OrAssign(rhs, lhs)
-            | Expression::List(rhs, lhs)
-            | Expression::ArrayAcces(rhs, lhs)
-            | Expression::FunctionCall(rhs, Some(lhs)) => self.print_binop(w, prefix, rhs, lhs)?,
-            Expression::FunctionCall(fun, None) => self.print_expression(w, prefix, fun)?,
-            Expression::DotAcces(tag, name) => self.print_access(w, prefix, tag, name)?,
-            Expression::PtrAcces(tag, name) => self.print_access(w, prefix, tag, name)?,
-            Expression::SizeofExpr(node) => self.print_expression(w, prefix, node)?,
-            Expression::SizeofType(type_id) => self.print_type(w, type_id)?,
-            Expression::ConstantExpression(node) => self.print_expression(w, prefix, node)?,
-            Expression::Ternary(cond, rhs, lhs) => {
-                self.print_expression(w, prefix, cond)?;
-                self.print_expression(w, prefix, rhs)?;
-                self.print_expression(w, prefix, lhs)?;
+            | Expression::Not(id) => self.print_expression(w, prefix, id, true)?,
+            Expression::Add(lhs, rhs)
+            | Expression::Sub(lhs, rhs)
+            | Expression::Mul(lhs, rhs)
+            | Expression::Div(lhs, rhs)
+            | Expression::Mod(lhs, rhs)
+            | Expression::Right(lhs, rhs)
+            | Expression::Left(lhs, rhs)
+            | Expression::Greater(lhs, rhs)
+            | Expression::Lower(lhs, rhs)
+            | Expression::GreaterEq(lhs, rhs)
+            | Expression::LowerEq(lhs, rhs)
+            | Expression::Eq(lhs, rhs)
+            | Expression::Neq(lhs, rhs)
+            | Expression::BitAnd(lhs, rhs)
+            | Expression::BitOr(lhs, rhs)
+            | Expression::BitXor(lhs, rhs)
+            | Expression::And(lhs, rhs)
+            | Expression::Or(lhs, rhs)
+            | Expression::Assign(lhs, rhs)
+            | Expression::MulAssign(lhs, rhs)
+            | Expression::DivAssign(lhs, rhs)
+            | Expression::ModAssign(lhs, rhs)
+            | Expression::AddAssign(lhs, rhs)
+            | Expression::SubAssign(lhs, rhs)
+            | Expression::LeftAssign(lhs, rhs)
+            | Expression::RightAssign(lhs, rhs)
+            | Expression::AndAssign(lhs, rhs)
+            | Expression::XorAssign(lhs, rhs)
+            | Expression::OrAssign(lhs, rhs)
+            | Expression::List(lhs, rhs)
+            | Expression::ArrayAcces(lhs, rhs) => self.print_binop(w, prefix, lhs, rhs)?,
+            Expression::FunctionCall(fun, Some(args)) => self.print_binop(w, prefix, fun, args)?,
+            Expression::FunctionCall(fun, None) => self.print_expression(w, prefix, fun, true)?,
+            Expression::DotAcces(tag, _) => self.print_expression(w, prefix, tag, true)?,
+            Expression::PtrAcces(tag, _) => self.print_expression(w, prefix, tag, true)?,
+            Expression::SizeofExpr(node) => self.print_expression(w, prefix, node, true)?,
+            Expression::SizeofType(type_id) => self.print_type(w, prefix, type_id, true)?,
+            Expression::ConstantExpression(node) => self.print_expression(w, prefix, node, true)?,
+            Expression::Ternary(cond, then, otherwise) => {
+                self.print_expression(w, prefix, cond, false)?;
+                self.print_expression(w, prefix, then, false)?;
+                self.print_expression(w, prefix, otherwise, true)?;
             }
             Expression::Cast(type_id, node) => {
-                self.print_type(w, type_id)?;
-                self.print_expression(w, prefix, node)?;
+                self.print_type(w, prefix, type_id, false)?;
+                self.print_expression(w, prefix, node, true)?;
             }
         }
-        prefix.pop();
-        prefix.pop();
-        // writeln!(w)?;
         Ok(())
     }
 
     fn print_binop<W: Write>(
         &self,
         w: &mut W,
-        prefix: &mut String,
+        prefix: &str,
         lhs: &ExpressionNode,
         rhs: &ExpressionNode,
     ) -> std::io::Result<()> {
-        self.print_expression(w, prefix, rhs)?;
-        self.print_expression(w, prefix, lhs)
+        self.print_expression(w, prefix, lhs, false)?;
+        self.print_expression(w, prefix, rhs, true)
     }
 
-    fn print_access<W: Write>(
-        &self,
-        w: &mut W,
-        prefix: &mut String,
-        tag: &ExpressionNode,
-        name: &Name,
-    ) -> std::io::Result<()> {
-        self.print_expression(w, prefix, tag)?;
-        self.print_name(w, name)
-    }
-
-    fn print_name<W: Write>(&self, w: &mut W, name: &Name) -> std::io::Result<()> {
-        writeln!(w, "{} {}", name.span, self.arenas.names.get(name.id))
-    }
-
-    fn print_type<R: Write>(&self, w: &mut R, _: &TypeNode) -> std::io::Result<()> {
-        write!(w, "Type")
+    fn print_type<W: Write>(&self, w: &mut W, prefix: &str, _: &TypeNode, is_last: bool) -> std::io::Result<()> {
+        let branch = if is_last { LAST } else { MID };
+        writeln!(w, "{prefix}{branch}Type")
     }
 }
