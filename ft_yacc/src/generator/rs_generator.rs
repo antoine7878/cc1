@@ -107,14 +107,22 @@ impl RSGenerator {
     }
 
     fn token_convertions(&self, w: &mut Dumper, tokens: &[TokenData]) -> Result<(), YaccError> {
-        let types: BTreeSet<&String> = tokens
-            .iter()
-            .filter(|t| !t.is_char())
-            .filter_map(|t| t.utype.as_ref())
-            .collect();
+        writeln!(w, "#[allow(non_snake_case, mixed_script_confusables)]")?;
+        writeln!(w, "impl YYToken {{")?;
+        let types = tokens.iter().filter(|t| !t.is_char() && t.utype.is_some());
         for t in types {
-            self.convertion(w, tokens, t)?;
+            let name = &t.name;
+            let t = t.utype.as_ref().unwrap();
+            writeln!(
+                w,
+                "fn into_{name} (self) -> {t} {{ match self {{
+                        YYToken::{name}(s) => s,
+                        _ => panic!(\"wrong type\")
+                    }}
+                }}\n"
+            )?;
         }
+        writeln!(w, "}}")?;
         Ok(())
     }
 
@@ -134,7 +142,8 @@ impl RSGenerator {
                 self.dump_action(w, parser, action_id, production)?;
                 writeln!(w, "}}")?;
             }
-            _ => (), // (None, _) => writeln!(w, "self.value_stack.last_mut().replace(YYToken::Empty)")?,
+            // (None, _) => writeln!(w, "self.value_stack.last_mut().replace(YYToken::Empty)")?,
+            _ => (),
         };
         Ok(())
     }
@@ -150,12 +159,14 @@ impl RSGenerator {
             let Some(token_id) = usize::try_from(num - 1).ok().and_then(|i| ctx.get(i)) else {
                 YaccError::error(&parser.yacc.file, pos.line_no, "invalid stack position")?
             };
-            let utype = pos.utype.as_ref().or(parser.yacc.tokens[*token_id].utype.as_ref());
+            let token = &parser.yacc.tokens[*token_id];
+            let utype = pos.utype.as_ref().or(token.utype.as_ref());
+            let name= &token.name;
             match (utype, &production.mid_context, num) {
-                (Some(utype), Some(ctx), num) if num == ctx.len() as isize + 1 => writeln!( w, "let __yy{num} = {utype}::from(self.value_stack[self.value_stack.len()].clone());")?,
-                (Some(utype), Some(ctx), num) => writeln!( w, "let __yy{num} = {utype}::from(self.value_stack[self.value_stack.len() - {}].clone());", ctx.len() as isize + 1 - num)?,
-                (Some(utype), None, num) if num == 1 => writeln!( w, "let __yy{num} = {utype}::from(std::mem::replace(&mut self.value_stack[idx], YYToken::Empty));")?,
-                (Some(utype), None, num) => writeln!( w, "let __yy{num} = {utype}::from(std::mem::replace(&mut self.value_stack[idx + {}], YYToken::Empty));", num - 1)?,
+                (Some(utype), Some(ctx), num) if num == ctx.len() as isize + 1 => writeln!( w, "let __yy{num} = self.value_stack[self.value_stack.len()].clone().into_{name}();")?,
+                (Some(_), Some(ctx), num) => writeln!( w, "let __yy{num} = self.value_stack[self.value_stack.len() - {}].clone().into_{name}();", ctx.len() as isize + 1 - num)?,
+                (Some(utype), None, num) if num == 1 => writeln!( w, "let __yy{num} = std::mem::replace(&mut self.value_stack[idx], YYToken::Empty).into_{name}();")?,
+                (Some(_), None, num) => writeln!( w, "let __yy{num} = std::mem::replace(&mut self.value_stack[idx + {}], YYToken::Empty).into_{name}();", num - 1)?,
                 (None, None, num) if num == 1=> writeln!( w, "let __yy{num} = std::mem::replace(&mut self.value_stack[idx], YYToken::Empty);")?,
                 (None, None, num) => writeln!( w, "let __yy{num} = std::mem::replace(&mut self.value_stack[idx + {}], YYToken::Empty);", num - 1)?,
                 (None, Some(_), _) => panic!("what is going on here ?"),
@@ -199,34 +210,6 @@ impl RSGenerator {
             }
         }
         writeln!(w, " => {},", i)?;
-        Ok(())
-    }
-
-    fn convertion(&self, w: &mut Dumper, tokens: &[TokenData], utype: &str) -> Result<(), YaccError> {
-        writeln!(
-            w,
-            "impl From<YYToken> for {} {{
-                fn from(token: YYToken) -> {} {{
-                    match token {{",
-            utype, utype
-        )?;
-        let mut it = tokens
-            .iter()
-            .filter_map(|t| t.utype.as_ref().filter(|t| t == &utype).map(|_| &t.name));
-        if let Some(name) = it.next() {
-            write!(w, "YYToken::{}(s)", name)?;
-        }
-        for name in it {
-            write!(w, "|YYToken::{}(s)", name)?;
-        }
-        writeln!(
-            w,
-            " => s,
-                    _ => panic!(\"wrong type\"),
-                    }}
-                }}
-            }}",
-        )?;
         Ok(())
     }
 

@@ -9,7 +9,7 @@ use crate::parser::Yacc;
 pub fn yyerror<D: Display, R: Read>(msg: D, yacc: &Yacc<R>) {
     eprintln!(
         "filename.c:{}:{}: {RED}{msg}{RESET}",
-        yacc.lexer.pos.0, yacc.lexer.pos.1
+        yacc.lexer.pos.line, yacc.lexer.pos.col
     );
 }
 

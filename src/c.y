@@ -2,15 +2,12 @@
 
 %{
 use crate::context::ContextAccess;
-use crate::ast::NodeId;
-use crate::symbol::{NameId, StorageKind};
-use crate::types::{Qualifiers, TypeId};
-use crate::tag::{EnumId, StructId, UnionId, Field};
-use crate::lexer::YYLex;
+use crate::ast::{Qualifier, TypeNode, ExpressionNode, Name, DeclarationSpecifier};
+use crate::parser::YYLex;
 use crate::error::yyerror;
 %}
 
-%token<NameId> IDENTIFIER STRING_LITERAL CONSTANT
+%token<Name> IDENTIFIER STRING_LITERAL CONSTANT
 %token TYPEDEF EXTERN STATIC AUTO REGISTER
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID
 %token STRUCT UNION ENUM ELLIPSIS
@@ -33,14 +30,16 @@ use crate::error::yyerror;
 %right '!' '~' INC_OP DEC_OP POST_INC_OP POST_DEC_OP SIZEOF PREC_UNARY
 %nonassoc '(' '[' '.' PTR_OP
 
-%type<NodeId> expression constant_expression
-%type<TypeId> type_name
-%type<StorageKind> storage_class_specifier
-%type<TypeId> type_specifier
-
+%type<ExpressionNode> expression constant_expression
+%type<TypeNode> type_name
 /*
-%type<Qualifiers> type_qualifier
-%type<Vec<Qualifiers>> specifier_qualifier_list
+%type<Storage> storage_class_specifier
+%type<TypeId> type_specifier
+%type<Qualifier> type_qualifier
+%type<Vec<Initializer>> initializer initializer_list
+%type<Initializer> init_declarator_list
+%type<DeclarationSpecifier> declaration_specifiers
+%type<Vec<Qualifier>> specifier_qualifier_list
 %type<TypeId> type_specifier
 %type<Vec<Field>> struct_declaration_list
 %type<Vec<Field>> struct_declaration
@@ -51,127 +50,139 @@ use crate::error::yyerror;
 
 %%
 
-constant_expression /* NodeId */
-    : expression { self.nodes().constant_expression($1) }
+unit
+    : constant_expression { self.lexer.ctx.print_ast(&$1); YYToken::unit }
     ;
 
-expression /* NodeId */
-    : IDENTIFIER                                    { self.nodes().identifier($1) }
-    | CONSTANT                                      { self.nodes().constant($1)}
-    | STRING_LITERAL                                { self.nodes().string_literal($1) }
-    | '(' expression ')'                            { $2 }
-    | expression '[' expression ']'                 { self.nodes().binary($1, $2, $3) }
-    | expression '(' ')'                            { self.nodes().function_call($1, None) }
-    | expression '(' expression ')'                 { self.nodes().function_call($1, Some($3)) }
-    | expression '.' IDENTIFIER                     { self.nodes().access($1, $2, $3) }
-    | expression PTR_OP IDENTIFIER                  { self.nodes().access($1, $2, $3) }
-    | SIZEOF '(' expression ')'                     { self.nodes().sizeof_expr($3) }
-    | SIZEOF '(' type_name ')'                      { self.nodes().sizeof_type($3) }
-    | '(' type_name ')' expression %prec PREC_UNARY { self.nodes().cast($2, $4) }
-    | expression INC_OP                             { self.nodes().unary(YYToken::POST_INC_OP, $1) }
-    | expression DEC_OP                             { self.nodes().unary(YYToken::POST_DEC_OP, $1) }
-    | INC_OP expression                             { self.nodes().unary($1, $2) }
-    | DEC_OP expression                             { self.nodes().unary($1, $2) }
-    | '&' expression %prec PREC_UNARY               { self.nodes().unary($1, $2) }
-    | '*' expression %prec PREC_UNARY               { self.nodes().unary($1, $2) }
-    | '+' expression %prec PREC_UNARY               { self.nodes().unary($1, $2) }
-    | '-' expression %prec PREC_UNARY               { self.nodes().unary($1, $2) }
-    | '~' expression                                { self.nodes().unary($1, $2) }
-    | '!' expression                                { self.nodes().unary($1, $2) }
-    | expression '+' expression                     { self.nodes().binary($1, $2, $3) }
-    | expression '-' expression                     { self.nodes().binary($1, $2, $3) }
-    | expression '*' expression                     { self.nodes().binary($1, $2, $3) }
-    | expression '/' expression                     { self.nodes().binary($1, $2, $3) }
-    | expression '%' expression                     { self.nodes().binary($1, $2, $3) }
-    | expression LEFT_OP expression                 { self.nodes().binary($1, $2, $3) }
-    | expression RIGHT_OP expression                { self.nodes().binary($1, $2, $3) }
-    | expression '<' expression                     { self.nodes().binary($1, $2, $3) }
-    | expression '>' expression                     { self.nodes().binary($1, $2, $3) }
-    | expression LE_OP expression                   { self.nodes().binary($1, $2, $3) }
-    | expression GE_OP expression                   { self.nodes().binary($1, $2, $3) }
-	| expression EQ_OP expression                   { self.nodes().binary($1, $2, $3) }
-	| expression NE_OP expression                   { self.nodes().binary($1, $2, $3) }
-	| expression '&' expression                     { self.nodes().binary($1, $2, $3) }
-	| expression '^' expression                     { self.nodes().binary($1, $2, $3) }
-	| expression '|' expression                     { self.nodes().binary($1, $2, $3) }
-	| expression AND_OP expression                  { self.nodes().binary($1, $2, $3) }
-	| expression OR_OP expression                   { self.nodes().binary($1, $2, $3) }
-	| expression '=' expression                     { self.nodes().binary($1, $2, $3) }
-	| expression MUL_ASSIGN expression              { self.nodes().binary($1, $2, $3) }
-	| expression DIV_ASSIGN expression              { self.nodes().binary($1, $2, $3) }
-	| expression MOD_ASSIGN expression              { self.nodes().binary($1, $2, $3) }
-	| expression ADD_ASSIGN expression              { self.nodes().binary($1, $2, $3) }
-	| expression SUB_ASSIGN expression              { self.nodes().binary($1, $2, $3) }
-	| expression LEFT_ASSIGN expression             { self.nodes().binary($1, $2, $3) }
-	| expression RIGHT_ASSIGN expression            { self.nodes().binary($1, $2, $3) }
-	| expression AND_ASSIGN expression              { self.nodes().binary($1, $2, $3) }
-	| expression XOR_ASSIGN expression              { self.nodes().binary($1, $2, $3) }
-	| expression OR_ASSIGN expression               { self.nodes().binary($1, $2, $3) }
-    | expression ',' expression                     { self.nodes().binary($1, $2, $3) }
-
-    | expression '?' expression ':' expression      { self.nodes().ternary($1, $3, $5) }
+constant_expression /* ExpressionId */
+    : expression { let s = self.span; self.expressions().constant_expression($1, s) }
     ;
 
-declaration /* Declaration */
-	: declaration_specifiers ';'
-	| declaration_specifiers init_declarator_list ';'
-	;
-
-
-declaration_specifiers /* TypeId */
-	: storage_class_specifier
-	| storage_class_specifier declaration_specifiers
-	| type_specifier
-	| type_specifier declaration_specifiers
-	| type_qualifier
-	| type_qualifier declaration_specifiers
-	;
-
-
-init_declarator_list /* */
-	: init_declarator
-    | init_declarator_list ',' init_declarator
-	;
-
-init_declarator /* */
-	: declarator { }
-	| declarator '=' initializer { }
-	;
-
-storage_class_specifier /* StorageKind */
-	: TYPEDEF           { StorageKind::Typedef  }
-	| EXTERN            { StorageKind::Extern }
-	| STATIC            { StorageKind::Static }
-	| AUTO              { StorageKind::Auto }
-	| REGISTER          { StorageKind::Register }
+expression /* ExpressionId */
+    : '(' expression ')'                            { $2 }
+    | IDENTIFIER                                    { let s = self.span; self.expressions().identifier($1, s) }
+    | CONSTANT                                      { let s = self.span; self.expressions().constant($1, s)}
+    | STRING_LITERAL                                { let s = self.span; self.expressions().string_literal($1, s) }
+    | expression '[' expression ']'                 { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+    | expression '(' ')'                            { let s = self.span; self.expressions().function_call($1, None, s) }
+    | expression '(' expression ')'                 { let s = self.span; self.expressions().function_call($1, Some($3), s) }
+    | expression '.' IDENTIFIER                     { let s = self.span; self.expressions().access($1, $2, $3, s) }
+    | expression PTR_OP IDENTIFIER                  { let s = self.span; self.expressions().access($1, $2, $3, s) }
+    | SIZEOF '(' expression ')'                     { let s = self.span; self.expressions().sizeof_expr($3, s) }
+    | SIZEOF '(' type_name ')'                      { let s = self.span; self.expressions().sizeof_type($3, s) }
+    | '(' type_name ')' expression %prec PREC_UNARY { let s = self.span; self.expressions().cast($2, $4, s) }
+    | expression INC_OP                             { let s = self.span; self.expressions().unary(YYToken::POST_INC_OP, $1, s) }
+    | expression DEC_OP                             { let s = self.span; self.expressions().unary(YYToken::POST_DEC_OP, $1, s) }
+    | INC_OP expression                             { let s = self.span; self.expressions().unary($1, $2, s) }
+    | DEC_OP expression                             { let s = self.span; self.expressions().unary($1, $2, s) }
+    | '&' expression %prec PREC_UNARY               { let s = self.span; self.expressions().unary($1, $2, s) }
+    | '*' expression %prec PREC_UNARY               { let s = self.span; self.expressions().unary($1, $2, s) }
+    | '+' expression %prec PREC_UNARY               { let s = self.span; self.expressions().unary($1, $2, s) }
+    | '-' expression %prec PREC_UNARY               { let s = self.span; self.expressions().unary($1, $2, s) }
+    | '~' expression                                { let s = self.span; self.expressions().unary($1, $2, s) }
+    | '!' expression                                { let s = self.span; self.expressions().unary($1, $2, s) }
+    | expression '+' expression                     { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+    | expression '-' expression                     { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+    | expression '*' expression                     { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+    | expression '/' expression                     { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+    | expression '%' expression                     { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+    | expression LEFT_OP expression                 { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+    | expression RIGHT_OP expression                { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+    | expression '<' expression                     { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+    | expression '>' expression                     { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+    | expression LE_OP expression                   { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+    | expression GE_OP expression                   { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression EQ_OP expression                   { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression NE_OP expression                   { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression '&' expression                     { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression '^' expression                     { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression '|' expression                     { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression AND_OP expression                  { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression OR_OP expression                   { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression '=' expression                     { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression MUL_ASSIGN expression              { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression DIV_ASSIGN expression              { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression MOD_ASSIGN expression              { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression ADD_ASSIGN expression              { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression SUB_ASSIGN expression              { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression LEFT_ASSIGN expression             { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression RIGHT_ASSIGN expression            { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression AND_ASSIGN expression              { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression XOR_ASSIGN expression              { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+	| expression OR_ASSIGN expression               { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+    | expression ',' expression                     { let s = self.span; self.expressions().binary($1, $2, $3, s) }
+    | expression '?' expression ':' expression      { let s = self.span; self.expressions().ternary($1, $3, $5, s) }
     ;
-
-type_name
-    :
-	;
-
-type_qualifier  /* Qualifiers */
-	: CONST             { Qualifiers::Const }
-	| VOLATILE          { Qualifiers::Volatile }
-	;
-
-type_specifier /* TypeId */
-	: VOID              { self.types().void() }
-	| CHAR              { self.types().char() }
-	| SHORT             { self.types().short() }
-	| INT               { self.types().int() }
-	| LONG              { self.types().long() }
-	| FLOAT             { self.types().float() }
-	| DOUBLE            { self.types().double() }
-	| SIGNED            { self.types().signed() }
-	| UNSIGNED          { self.types().unsigned() }
-	| struct_specifier  { 42.into() }
-	| union_specifier   { 42.into() }
-	| enum_specifier    { 42.into() }
-	| TYPE_NAME         { 42.into() }
-	;
 
 %%
+// declaration /* Declaration */
+// 	: declaration_specifiers ';'
+// 	| declaration_specifiers init_declarator_list ';'
+// 	;
+//
+// declaration_specifiers /* Vec<DeclarationSpecifier> */
+// 	: storage_class_specifier                           { vec![DeclarationSpecifier::Storage($1)] }
+// 	| storage_class_specifier declaration_specifiers    { $1.push($2); $1 }
+// 	| type_specifier                                    { vec![DeclarationSpecifier::Qualifier($1)] }
+// 	| type_specifier declaration_specifiers             { $1.push($2); $1 }
+// 	| type_qualifier                                    { vec![DeclarationSpecifier::Type($1)] }
+// 	| type_qualifier declaration_specifiers             { $1.push($2); $1 }
+// 	;
+//
+//
+// init_declarator_list /* Vec<(NameId, Option<ExpressionId>)> */
+// 	: init_declarator                           { vec![$1] }
+//     | init_declarator_list ',' init_declarator  { $1.push($3); $1 }
+// 	;
+//
+// init_declarator /* (NameId, Option<ExpressionId>) */
+// 	: declarator { ($1, None) }
+// 	| declarator '=' initializer { ($1, Some($3)) }
+// 	;
+//
+// storage_class_specifier /* Storage*/
+// 	: TYPEDEF           { Storage::Typedef  }
+// 	| EXTERN            { Storage::Extern }
+// 	| STATIC            { Storage::Static }
+// 	| AUTO              { Storage::Auto }
+// 	| REGISTER          { Storage::Register }
+//     ;
+//
+// type_name
+//     :
+// 	;
+//
+// type_qualifier  /* Qualifier */
+// 	: CONST             { Qualifier::Const }
+// 	| VOLATILE          { Qualifier::Volatile }
+// 	;
+//
+// type_specifier /* TypeId */
+// 	: VOID              { self.types().void() }
+// 	| CHAR              { self.types().char() }
+// 	| SHORT             { self.types().short() }
+// 	| INT               { self.types().int() }
+// 	| LONG              { self.types().long() }
+// 	| FLOAT             { self.types().float() }
+// 	| DOUBLE            { self.types().double() }
+// 	| SIGNED            { self.types().signed() }
+// 	| UNSIGNED          { self.types().unsigned() }
+// 	| struct_specifier  { 42.into() }
+// 	| union_specifier   { 42.into() }
+// 	| enum_specifier    { 42.into() }
+// 	| TYPE_NAME         { 42.into() }
+// 	;
+//
+// initializer /* Vec<ExpressionId> */
+// 	: expression                        { vec![$1] }
+// 	| '{' initializer_list '}'          { $2 }
+// 	| '{' initializer_list ',' '}'      { $2 }
+// 	;
+//
+// initializer_list /* Vec<ExpressionId> */
+// 	: initializer                       { vec![$1] }
+//     | initializer_list ',' initializer  { $1.push($3); $1 }
+// 	;
 
 // struct_specifier /* StructId */
 // 	: STRUCT IDENTIFIER '{' struct_declaration_list '}'     { self.lexer.ctx.arenas.structs($2, $4, false) }
@@ -303,16 +314,7 @@ type_specifier /* TypeId */
 // 	| direct_abstract_declarator '(' parameter_type_list ')'
 // 	;
 //
-// initializer /* */
-// 	: expression
-// 	| '{' initializer_list '}'
-// 	| '{' initializer_list ',' '}'
-// 	;
-//
-// initializer_list /* */
-// 	: initializer
-// 	| initializer_list ',' initializer
-// 	;
+
 //
 // statement /* */
 // 	: labeled_statement

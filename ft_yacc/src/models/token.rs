@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::utils::{YaccError, str_of_double_escape, str_of_escape};
 
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy, PartialOrd, Ord)]
 pub enum TokenKind {
     Left,
     Right,
@@ -25,7 +25,7 @@ impl TryFrom<&str> for TokenKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TokenData {
     pub kind: TokenKind,
     pub name: String,

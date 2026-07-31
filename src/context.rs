@@ -1,21 +1,17 @@
+use crate::ast::{EnumArena, ExpressionArena, StringArena, StructArena};
+use crate::ast::{SymbolTable, TypeArena, UnionArena, VariantArena};
+use crate::parser::{YYLex, Yacc};
 use std::io::Read;
-
-use crate::ast::NodeArena;
-use crate::lexer::YYLex;
-use crate::parser::Yacc;
-use crate::symbol::{NameArena, SymbolTable};
-use crate::tag::{EnumArena, StructArena, UnionArena, VariantArena};
-use crate::types::TypeArena;
 
 #[derive(Debug, Default)]
 pub struct Arenas {
-    pub names: NameArena,
+    pub names: StringArena,
     pub types: TypeArena,
     pub structs: StructArena,
     pub enums: EnumArena,
     pub unions: UnionArena,
     pub variants: VariantArena,
-    pub nodes: NodeArena,
+    pub expressions: ExpressionArena,
 }
 
 #[derive(Debug, Default)]
@@ -26,7 +22,7 @@ pub struct Context {
 
 pub trait ContextAccess {
     fn ctx(&mut self) -> &mut Context;
-    fn names(&mut self) -> &mut NameArena {
+    fn names(&mut self) -> &mut StringArena {
         &mut self.ctx().arenas.names
     }
 
@@ -50,8 +46,8 @@ pub trait ContextAccess {
         &mut self.ctx().arenas.variants
     }
 
-    fn nodes(&mut self) -> &mut NodeArena {
-        &mut self.ctx().arenas.nodes
+    fn expressions(&mut self) -> &mut ExpressionArena {
+        &mut self.ctx().arenas.expressions
     }
 }
 

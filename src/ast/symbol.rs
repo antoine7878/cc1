@@ -1,17 +1,7 @@
 use std::collections::HashMap;
 
-use crate::arena::{Arena, ArenaId};
+use crate::ast::{Qualifier, StringId, TagKind, TypeId};
 use crate::context::Arenas;
-use crate::types::TypeId;
-
-pub type NameId = ArenaId<String>;
-pub type NameArena = Arena<NameId, String>;
-
-impl NameArena {
-    pub fn add(&mut self, name: String) -> NameId {
-        self.alloc(name)
-    }
-}
 
 #[derive(Debug, Default)]
 pub struct SymbolTable {
@@ -34,9 +24,9 @@ impl SymbolTable {
 
 #[derive(Debug, Default)]
 pub struct Scope {
-    ordinaries: HashMap<NameId, SymbolData>,
-    tags: HashMap<(TagKind, NameId), SymbolData>,
-    labels: HashMap<NameId, SymbolData>,
+    ordinaries: HashMap<StringId, SymbolData>,
+    tags: HashMap<(TagKind, StringId), SymbolData>,
+    labels: HashMap<StringId, SymbolData>,
 }
 
 impl Scope {
@@ -48,7 +38,6 @@ impl Scope {
         let id = *arenas.names.canonical.get(name)?;
         self.tags.get(&(kind, id))
     }
-
     pub fn get_label(&self, name: &str, arenas: &Arenas) -> Option<&SymbolData> {
         self.labels.get(arenas.names.canonical.get(name)?)
     }
@@ -56,11 +45,10 @@ impl Scope {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct SymbolData {
-    pub name: NameId,
+    pub name: StringId,
     pub ty: TypeId,
+    pub storage: Storage,
     pub kind: SymbolKind,
-    pub storage: StorageKind,
-    pub linkage: LinkageKind,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -71,7 +59,7 @@ pub enum SymbolKind {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum StorageKind {
+pub enum Storage {
     Auto,
     Static,
     Extern,
@@ -80,22 +68,15 @@ pub enum StorageKind {
     ThreadLocal,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum LinkageKind {
-    External,
-    Internal,
-    None,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum TagKind {
-    Struct,
-    Union,
-    Enum,
-}
-
 #[derive(Debug, Eq, PartialEq)]
 pub struct Label {
-    pub name: NameId,
+    pub name: StringId,
     pub defined: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub enum DeclarationSpecifier {
+    Type(TypeId),
+    Qualifier(Qualifier),
+    Storage(Storage),
 }

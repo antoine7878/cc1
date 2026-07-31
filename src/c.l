@@ -1,7 +1,9 @@
 %no_main
 
 %{
-use crate::symbol::NameId;
+use std::fmt;
+
+use crate::ast::Name;
 use crate::parser::YYToken;
 use crate::context::{Context, ContextAccess};
 %}
@@ -125,7 +127,7 @@ fn comment<T: Read>(lex: &mut YYLex<T>) {
     }
 }
 
-fn check_type(name_id: NameId) -> YYToken {
+fn check_type(name_id: Name) -> YYToken {
 // pseudo code --- this is what it should check
 //
 //	if (yytext == type_name)
@@ -133,7 +135,17 @@ fn check_type(name_id: NameId) -> YYToken {
 	YYToken::IDENTIFIER(name_id)
 }
 
-fn alloc_name<R: Read>(lex: &mut YYLex<R>) -> NameId {
+fn alloc_name<R: Read>(lex: &mut YYLex<R>) -> Name {
+    let span = lex.span;
     let name = lex.take_yytext();
-    lex.names().add(name)
+    lex.names().name(name, span)
+}
+
+impl fmt::Display for Span {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match (self.start.line == self.end.line && self.start.col == self.end.col) {
+            false => write!(f, "<{}:{}, {}:{}>", self.start.line, self.start.col, self.end.line, self.end.col),
+            true => write!(f, "<{}:{}>", self.start.line, self.start.col),
+        }
+    }
 }

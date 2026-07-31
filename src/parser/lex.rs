@@ -3,7 +3,8 @@ use std::io::{Read, stdin};
 use std::mem::take;
 use std::str::from_utf8;
 
-use crate::symbol::NameId;
+use std::fmt;
+use crate::ast::Name;
 use crate::parser::YYToken;
 use crate::context::{Context, ContextAccess};
 
@@ -22,6 +23,24 @@ enum LexerState {
 }
 
 /* TOKENS */
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Default)]
+pub struct Position {
+    pub line: usize,
+    pub col: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Default)]
+pub struct Span {
+    pub start: Position,
+    pub end: Position,
+}
+
+impl Span {
+    pub fn new(start: Position, end: Position) -> Span {
+        Span { start, end }
+    }
+}
 
 #[derive(Debug)]
 struct AcceptData {
@@ -47,9 +66,8 @@ pub struct YYLex<R: Read> {
 
     pub yyin: R,
     pub yytext: String,
-    pub yystart: (usize, usize),
-    pub yyend: (usize, usize),
-    pub pos: (usize, usize),
+    pub span: Span,
+    pub pos: Position,
     pub ctx: Context,
 }
 
@@ -77,13 +95,11 @@ impl<R: Read> YYLex<R> {
             yycontinue: Box::new(yycontinue),
             yyin,
             yytext: String::new(),
-            yystart: (1, 1),
-            yyend: (1, 1),
-            pos: (1, 1),
+            span: Span::default(),
+            pos: Position { line: 1, col: 1 },
             ctx,
         }
     }
-
 const YY_CHAR_EQ: [isize; 256] = [
 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 4, 5, 0, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 20, 21, 22, 23, 24, 0, 25, 25, 25, 25, 26, 27, 28, 28, 28, 28, 28, 29, 28, 28, 28, 28, 28, 28, 28, 28, 30, 28, 28, 31, 28, 28, 32, 33, 34, 35, 28, 0, 36, 37, 38, 39, 40, 41, 42, 43, 44, 28, 45, 46, 47, 48, 49, 50, 28, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 0, 
 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -459,8 +475,7 @@ const YY_RULE_COUNT: usize = 92;
     }
 
     fn reject(&mut self) {
-        let next_action = Self::YY_NEXT_ACCEPT
-            [self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
+        let next_action = Self::YY_NEXT_ACCEPT[self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
         self.action = if next_action >= 0 {
             next_action
         } else {
@@ -480,9 +495,7 @@ const YY_RULE_COUNT: usize = 92;
     }
 
     fn shift_all_positions(&mut self, offset: usize) {
-        self.accept_stack
-            .iter_mut()
-            .for_each(|s| s.buf_pos -= offset);
+        self.accept_stack.iter_mut().for_each(|s| s.buf_pos -= offset);
         self.run_position -= offset;
         self.trailing_end_pos = self.trailing_end_pos.saturating_sub(offset);
         self.buffer_position -= offset;
@@ -545,19 +558,26 @@ const YY_RULE_COUNT: usize = 92;
             return;
         }
         if c == b'\n' {
-            self.pos.0 += 1;
-            self.pos.1 = 1;
+            self.pos.line += 1;
+            self.pos.col = 1;
         } else if c == b'\t' {
-            self.pos.1 += 4 - (self.pos.1 % 4);
+            self.pos.col += 4 - (self.pos.col % 4);
         } else {
-            self.pos.1 += 1;
+            self.pos.col += 1;
         }
     }
 
     fn count_yytext(&mut self) {
-        self.yytext.clone().bytes().for_each(|c| self.count_c(c))
+        let c = self.yytext.clone();
+        let mut it = c.bytes().peekable();
+        self.span.start = self.pos;
+        while let Some(c) = it.next() {
+            if it.peek().is_none() {
+                self.span.end = self.pos;
+            }
+            self.count_c(c);
+        }
     }
-
     fn build_yytext(&mut self) {
         self.yytext = from_utf8(&self.buffer[self.buffer_position..self.run_position])
             .unwrap()
@@ -572,7 +592,7 @@ const YY_RULE_COUNT: usize = 92;
         self.run_position -= self.yytext.len() - n;
         self.uncounted += self.yytext.len() - n;
         self.build_yytext();
-        self.yyend = self.pos;
+        self.span.end = self.pos;
     }
 
     pub fn input(&mut self) -> u8 {
@@ -582,10 +602,7 @@ const YY_RULE_COUNT: usize = 92;
         if self.run_position >= self.buffer.len() {
             return 0;
         }
-        let ret = *self
-            .buffer
-            .get(self.run_position)
-            .expect("run_position out of bounds");
+        let ret = *self.buffer.get(self.run_position).expect("run_position out of bounds");
         self.run_position += 1;
         self.count_c(ret);
         ret
@@ -648,10 +665,8 @@ const YY_RULE_COUNT: usize = 92;
                 break;
             }
 
-            let char_class: usize =
-                Self::YY_CHAR_EQ[self.buffer[self.run_position] as usize] as usize;
-            self.current_state =
-                Self::YY_BASE[self.current_state * Self::YY_CLASS_COUNT + char_class] as usize;
+            let char_class: usize = Self::YY_CHAR_EQ[self.buffer[self.run_position] as usize] as usize;
+            self.current_state = Self::YY_BASE[self.current_state * Self::YY_CLASS_COUNT + char_class] as usize;
             if self.current_state == 0 {
                 break;
             }
@@ -667,10 +682,8 @@ const YY_RULE_COUNT: usize = 92;
             self.stack_top_mut().buf_pos = self.trailing_end_pos;
         }
         self.run_position = std::cmp::min(self.stack_top().buf_pos + 1, self.buffer.len());
-        self.yystart = self.pos;
         self.build_yytext();
         self.count_yytext();
-        self.yyend = self.pos;
     }
 
     pub fn yylex(&mut self) -> YYToken {
@@ -1073,14 +1086,23 @@ fn comment<T: Read>(lex: &mut YYLex<T>) {
         }
     }
 }
-fn check_type(name_id: NameId) -> YYToken {
+fn check_type(name_id: Name) -> YYToken {
 // pseudo code --- this is what it should check
 //
 //	if (yytext == type_name)
 //	     return YYToken::TYPE_NAME;
 	YYToken::IDENTIFIER(name_id)
 }
-fn alloc_name<R: Read>(lex: &mut YYLex<R>) -> NameId {
+fn alloc_name<R: Read>(lex: &mut YYLex<R>) -> Name {
+    let span = lex.span;
     let name = lex.take_yytext();
-    lex.names().add(name)
+    lex.names().name(name, span)
+}
+impl fmt::Display for Span {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match (self.start.line == self.end.line && self.start.col == self.end.col) {
+            false => write!(f, "<{}:{}, {}:{}>", self.start.line, self.start.col, self.end.line, self.end.col),
+            true => write!(f, "<{}:{}>", self.start.line, self.start.col),
+        }
+    }
 }

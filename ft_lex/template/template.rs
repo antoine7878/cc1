@@ -17,6 +17,24 @@ enum LexerState {
 
 /* TOKENS */
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Default)]
+pub struct Position {
+    pub line: usize,
+    pub col: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Default)]
+pub struct Span {
+    pub start: Position,
+    pub end: Position,
+}
+
+impl Span {
+    pub fn new(start: Position, end: Position) -> Span {
+        Span { start, end }
+    }
+}
+
 #[derive(Debug)]
 struct AcceptData {
     state: usize,
@@ -41,9 +59,8 @@ pub struct YYLex<R: Read> {
 
     pub yyin: R,
     pub yytext: String,
-    pub yystart: (usize, usize),
-    pub yyend: (usize, usize),
-    pub pos: (usize, usize),
+    pub span: Span,
+    pub pos: Position,
     pub ctx: Context,
 }
 
@@ -87,13 +104,11 @@ impl<R: Read> YYLex<R> {
             yycontinue: Box::new(yycontinue),
             yyin,
             yytext: String::new(),
-            yystart: (1, 1),
-            yyend: (1, 1),
-            pos: (1, 1),
+            span: Span::default(),
+            pos: Position { line: 1, col: 1 },
             ctx,
         }
     }
-
     /* TABLES */
 
     /* REMOVE */
@@ -114,8 +129,7 @@ impl<R: Read> YYLex<R> {
     }
 
     fn reject(&mut self) {
-        let next_action = Self::YY_NEXT_ACCEPT
-            [self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
+        let next_action = Self::YY_NEXT_ACCEPT[self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
         self.action = if next_action >= 0 {
             next_action
         } else {
@@ -135,9 +149,7 @@ impl<R: Read> YYLex<R> {
     }
 
     fn shift_all_positions(&mut self, offset: usize) {
-        self.accept_stack
-            .iter_mut()
-            .for_each(|s| s.buf_pos -= offset);
+        self.accept_stack.iter_mut().for_each(|s| s.buf_pos -= offset);
         self.run_position -= offset;
         self.trailing_end_pos = self.trailing_end_pos.saturating_sub(offset);
         self.buffer_position -= offset;
@@ -200,19 +212,26 @@ impl<R: Read> YYLex<R> {
             return;
         }
         if c == b'\n' {
-            self.pos.0 += 1;
-            self.pos.1 = 1;
+            self.pos.line += 1;
+            self.pos.col = 1;
         } else if c == b'\t' {
-            self.pos.1 += 4 - (self.pos.1 % 4);
+            self.pos.col += 4 - (self.pos.col % 4);
         } else {
-            self.pos.1 += 1;
+            self.pos.col += 1;
         }
     }
 
     fn count_yytext(&mut self) {
-        self.yytext.clone().bytes().for_each(|c| self.count_c(c))
+        let c = self.yytext.clone();
+        let mut it = c.bytes().peekable();
+        self.span.start = self.pos;
+        while let Some(c) = it.next() {
+            if it.peek().is_none() {
+                self.span.end = self.pos;
+            }
+            self.count_c(c);
+        }
     }
-
     fn build_yytext(&mut self) {
         self.yytext = from_utf8(&self.buffer[self.buffer_position..self.run_position])
             .unwrap()
@@ -227,7 +246,7 @@ impl<R: Read> YYLex<R> {
         self.run_position -= self.yytext.len() - n;
         self.uncounted += self.yytext.len() - n;
         self.build_yytext();
-        self.yyend = self.pos;
+        self.span.end = self.pos;
     }
 
     pub fn input(&mut self) -> u8 {
@@ -237,10 +256,7 @@ impl<R: Read> YYLex<R> {
         if self.run_position >= self.buffer.len() {
             return 0;
         }
-        let ret = *self
-            .buffer
-            .get(self.run_position)
-            .expect("run_position out of bounds");
+        let ret = *self.buffer.get(self.run_position).expect("run_position out of bounds");
         self.run_position += 1;
         self.count_c(ret);
         ret
@@ -303,10 +319,8 @@ impl<R: Read> YYLex<R> {
                 break;
             }
 
-            let char_class: usize =
-                Self::YY_CHAR_EQ[self.buffer[self.run_position] as usize] as usize;
-            self.current_state =
-                Self::YY_BASE[self.current_state * Self::YY_CLASS_COUNT + char_class] as usize;
+            let char_class: usize = Self::YY_CHAR_EQ[self.buffer[self.run_position] as usize] as usize;
+            self.current_state = Self::YY_BASE[self.current_state * Self::YY_CLASS_COUNT + char_class] as usize;
             if self.current_state == 0 {
                 break;
             }
@@ -322,10 +336,8 @@ impl<R: Read> YYLex<R> {
             self.stack_top_mut().buf_pos = self.trailing_end_pos;
         }
         self.run_position = std::cmp::min(self.stack_top().buf_pos + 1, self.buffer.len());
-        self.yystart = self.pos;
         self.build_yytext();
         self.count_yytext();
-        self.yyend = self.pos;
     }
 
     pub fn yylex(&mut self) -> YYToken {

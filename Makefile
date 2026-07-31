@@ -21,7 +21,7 @@ $(FT_LEX):
 	$(MAKE) -C ft_lex
 
 $(LEXER): $(FT_LEX) $(LEX_FILE)
-	$(FT_LEX) -cx rust $(LEX_FILE) -o src/lexer.rs
+	$(FT_LEX) -cx rust $(LEX_FILE) -o src/parser/lex.rs
 
 # ----- ft_yacc --------------------
 
@@ -29,7 +29,7 @@ $(FT_YACC):
 	$(MAKE) -C ft_yacc
 
 $(PARSER): $(FT_YACC) $(YACC_FILE)
-	$(FT_YACC) -x rust $(YACC_FILE) -o src/parser.rs
+	$(FT_YACC) -x rust $(YACC_FILE) -o src/parser/yacc.rs
 
 # ----- test --------------------
 
@@ -37,10 +37,10 @@ test: $(NAME)
 	cat test/test | ./$(NAME)
 
 ast:
-	clang -Xclang -ast-dump test/hello.c | sed "s/\e\[[0-9;]*m//g" > a
+	clang -std=iso9899:1990 -Xclang -ast-dump test/hello.c
 
-gcc:
-	gcc -std=iso9899:1990 test/hello.c
+c:
+	clang -std=iso9899:1990 test/hello.c
 
 clean:
 	cargo clean

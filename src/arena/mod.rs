@@ -3,6 +3,14 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
+#[macro_export]
+macro_rules! define_arena {
+    ($ty:ident, $arena:ident, $id:ident) => {
+        pub type $id = ArenaId<$ty>;
+        pub type $arena = Arena<$id, $ty>;
+    };
+}
+
 #[repr(transparent)]
 #[derive(PartialEq, Eq, Hash)]
 pub struct ArenaId<T>(u32, PhantomData<fn() -> T>);
@@ -30,10 +38,7 @@ impl<T> Debug for ArenaId<T> {
         write!(
             f,
             "{}Id({})",
-            std::any::type_name::<T>()
-                .rsplit("::")
-                .next()
-                .unwrap_or("?"),
+            std::any::type_name::<T>().rsplit("::").next().unwrap_or("?"),
             self.0
         )
     }
