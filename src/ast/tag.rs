@@ -1,6 +1,7 @@
 use crate::arena::{Arena, ArenaId};
 use crate::ast::{StringId, TypeId};
 use crate::define_arena;
+use crate::parser::Span;
 
 define_arena!(Struct, StructArena, StructId);
 define_arena!(Union, UnionArena, UnionId);
@@ -9,12 +10,13 @@ define_arena!(Variant, VariantArena, VariantId);
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Field {
+    pub span: Span,
     pub name: StringId,
     pub ty: TypeId,
 }
 impl Field {
-    pub fn new(name: StringId, ty: TypeId) -> Field {
-        Field { name, ty }
+    pub fn new(name: StringId, ty: TypeId, span: Span) -> Field {
+        Field { name, ty, span }
     }
 }
 

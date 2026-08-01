@@ -1,10 +1,6 @@
 static const long int b;
 
-int f() {
-	return 1;
-}
-
-void main() {
-	-1 + f();
-	&f;
+int main() {
+	auto const volatile const int a;
+	return 0;
 }

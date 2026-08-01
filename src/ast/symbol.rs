@@ -73,10 +73,3 @@ pub struct Label {
     pub name: StringId,
     pub defined: bool,
 }
-
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub enum DeclarationSpecifier {
-    Type(TypeId),
-    Qualifier(Qualifier),
-    Storage(Storage),
-}
