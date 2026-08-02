@@ -2,14 +2,15 @@ use std::io::{Write, stdout};
 
 use crate::ast::{
     DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, Expression, ExpressionNode, FunctionParameters,
-    FunctionParametersNode, InitDeclaratorNode, Initializer, InitializerNode, ParameterDeclaration, Type, TypeSpecifier,
+    FunctionParametersNode, InitDeclaratorNode, Initializer, InitializerNode, Name, ParameterDeclaration, Type, TypeSpecifier,
 };
 use crate::context::Context;
+use crate::parser::Span;
 
-const MID: &str = "├── ";
-const LAST: &str = "└── ";
-const VERT: &str = "│   ";
-const PAD: &str = "    ";
+const MID: &str = "|-";
+const LAST: &str = "`-";
+const VERT: &str = "| ";
+const PAD: &str = "  ";
 
 fn branch(is_last: bool) -> (&'static str, &'static str) {
     if is_last { (LAST, PAD) } else { (MID, VERT) }
@@ -18,36 +19,94 @@ fn branch(is_last: bool) -> (&'static str, &'static str) {
 impl Context {
     pub fn print_ast(&mut self, node: &DeclarationNode) -> std::io::Result<()> {
         let w = &mut stdout();
-        writeln!(w, "Declaration {}", node.span)?;
-        let total = node.specifiers.len() + node.init_declarators.len();
-        let mut i = 0;
-        for spec in &node.specifiers {
-            i += 1;
-            self.print_specifier(w, "", spec, i == total)?;
-        }
-        for init_decl in &node.init_declarators {
-            i += 1;
-            self.print_init_declarator(w, "", init_decl, i == total)?;
+        for (i, init_decl) in node.init_declarators.iter().enumerate() {
+            let span = if i == 0 { &node.span } else { &init_decl.span };
+            self.print_decl(w, node, init_decl, span)?;
         }
         Ok(())
     }
 
-    fn print_specifier<W: Write>(
+    fn print_decl<W: Write>(
+        &self,
+        w: &mut W,
+        node: &DeclarationNode,
+        init_decl: &InitDeclaratorNode,
+        span: &Span,
+    ) -> std::io::Result<()> {
+        let (ty_specs, storage) = self.split_specifiers(&node.specifiers);
+        let name = self.declarator_name(&init_decl.declarator);
+        let name_loc = name.as_ref().map(|n| format!(" {}", n.span)).unwrap_or_default();
+        let name_str = name.map(|n| format!(" {}", self.arenas.names.get(n.id))).unwrap_or_default();
+        let storage = if storage.is_empty() { storage } else { format!(" {storage}") };
+        if let Declarator::Function { params, .. } = self.arenas.declarators.get(init_decl.declarator.id) {
+            let ty = format!("{} ({})", ty_specs, self.clang_params(params));
+            writeln!(w, "FunctionDecl {span}{name_loc}{name_str} '{ty}'{storage}")?;
+            match &params.param {
+                FunctionParameters::ParameterTypeList(params) | FunctionParameters::Variadic(params) => {
+                    for (i, param) in params.iter().enumerate() {
+                        self.print_parm(w, "", param, i + 1 == params.len())?;
+                    }
+                }
+                FunctionParameters::OldStyle(names) => {
+                    for (i, name) in names.iter().enumerate() {
+                        let (b, _) = branch(i + 1 == names.len());
+                        writeln!(w, "{b}ParmVarDecl {} {} {}", name.span, name.span, self.arenas.names.get(name.id))?;
+                    }
+                }
+                FunctionParameters::Empty => {}
+            }
+        } else {
+            let ty = self.clang_type(&ty_specs, &init_decl.declarator);
+            writeln!(w, "VarDecl {span}{name_loc}{name_str} '{ty}'{storage}")?;
+            if let Some(init) = &init_decl.initializer {
+                self.print_initializer(w, "", init, true)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn print_parm<W: Write>(
         &self,
         w: &mut W,
         prefix: &str,
-        spec: &DeclarationSpecifier,
+        param: &ParameterDeclaration,
         is_last: bool,
     ) -> std::io::Result<()> {
-        let (branch, _) = branch(is_last);
-        writeln!(w, "{prefix}{branch}{}", self.format_specifier(spec))
+        let (b, _) = branch(is_last);
+        let (ty_specs, _) = self.split_specifiers(&param.specifiers);
+        let ty = self.clang_type(&ty_specs, &param.declarator);
+        let name = self.declarator_name(&param.declarator);
+        let name_loc = name.as_ref().map(|n| format!(" {}", n.span)).unwrap_or_default();
+        let name_str = name.map(|n| format!(" {}", self.arenas.names.get(n.id))).unwrap_or_default();
+        writeln!(w, "{prefix}{b}ParmVarDecl {}{name_loc}{name_str} '{ty}'", param.span)
     }
 
-    fn format_specifier(&self, spec: &DeclarationSpecifier) -> String {
+    fn declarator_name(&self, node: &DeclaratorNode) -> Option<Name> {
+        match self.arenas.declarators.get(node.id) {
+            Declarator::Ident(name) => Some(name.clone()),
+            Declarator::Pointer { inner: Some(inner), .. } => self.declarator_name(inner),
+            Declarator::Array { declarator, .. } | Declarator::Function { declarator, .. } => self.declarator_name(declarator),
+            _ => None,
+        }
+    }
+
+    fn split_specifiers(&self, specs: &[DeclarationSpecifier]) -> (String, String) {
+        let mut ty = Vec::new();
+        let mut storage = Vec::new();
+        for spec in specs.iter().rev() {
+            match spec {
+                DeclarationSpecifier::Storage(s) => storage.push(format!("{s}")),
+                _ => ty.push(self.format_specifier_atom(spec)),
+            }
+        }
+        (ty.join(" "), storage.join(" "))
+    }
+
+    fn format_specifier_atom(&self, spec: &DeclarationSpecifier) -> String {
         match spec {
-            DeclarationSpecifier::Type(ty) => format!("Type {}", self.format_type_specifier(ty)),
-            DeclarationSpecifier::Qualifier(qualifier) => format!("Qualifier {qualifier}"),
-            DeclarationSpecifier::Storage(storage) => format!("Storage {storage}"),
+            DeclarationSpecifier::Type(ty) => self.format_type_specifier(ty),
+            DeclarationSpecifier::Qualifier(qualifier) => format!("{qualifier}"),
+            DeclarationSpecifier::Storage(storage) => format!("{storage}"),
         }
     }
 
@@ -61,73 +120,58 @@ impl Context {
         }
     }
 
-    fn print_init_declarator<W: Write>(
-        &self,
-        w: &mut W,
-        prefix: &str,
-        node: &InitDeclaratorNode,
-        is_last: bool,
-    ) -> std::io::Result<()> {
-        let (branch, extend) = branch(is_last);
-        writeln!(w, "{prefix}{branch}InitDeclarator {}", node.span)?;
-        let prefix = &format!("{prefix}{extend}");
-        match &node.initializer {
-            Some(init) => {
-                self.print_declarator(w, prefix, &node.declarator, false)?;
-                self.print_initializer(w, prefix, init, true)
-            }
-            None => self.print_declarator(w, prefix, &node.declarator, true),
-        }
-    }
-
-    fn print_declarator<W: Write>(
-        &self,
-        w: &mut W,
-        prefix: &str,
-        node: &DeclaratorNode,
-        is_last: bool,
-    ) -> std::io::Result<()> {
-        let declarator = self.arenas.declarators.get(node.id);
-        let (branch, extend) = branch(is_last);
-        writeln!(w, "{prefix}{branch}{declarator} {}{}", node.span, self.inline_declarator(declarator))?;
-        self.print_declarator_children(w, &format!("{prefix}{extend}"), node)
-    }
-
-    fn inline_declarator(&self, declarator: &Declarator) -> String {
-        match declarator {
-            Declarator::Ident(name) => format!(" {}", self.arenas.names.get(name.id)),
-            Declarator::Pointer { qualifiers, .. } => qualifiers.iter().map(|q| format!(" {q}")).collect(),
-            _ => String::new(),
-        }
-    }
-
-    fn print_declarator_children<W: Write>(
-        &self,
-        w: &mut W,
-        prefix: &str,
-        node: &DeclaratorNode,
-    ) -> std::io::Result<()> {
-        let declarator = self.arenas.declarators.get(node.id);
-        match declarator {
-            Declarator::Ident(_) | Declarator::Abstract => {}
-            Declarator::Pointer { inner, .. } => {
-                if let Some(inner) = inner {
-                    self.print_declarator(w, prefix, inner, true)?;
+    fn clang_type(&self, base: &str, node: &DeclaratorNode) -> String {
+        match self.arenas.declarators.get(node.id) {
+            Declarator::Ident(_) | Declarator::Abstract => base.to_string(),
+            Declarator::Pointer { qualifiers, inner } => {
+                let mut s = base.to_string();
+                if !s.is_empty() && !s.ends_with('*') {
+                    s.push(' ');
+                }
+                s.push('*');
+                s.push_str(&qualifiers.iter().map(|q| format!("{q}")).collect::<Vec<_>>().join(" "));
+                match inner {
+                    Some(inner) => self.clang_type(&s, inner),
+                    None => s,
                 }
             }
-            Declarator::Array { declarator, size } => match size {
-                Some(size) => {
-                    self.print_declarator(w, prefix, declarator, false)?;
-                    self.print_expression(w, prefix, size, true)?;
-                }
-                None => self.print_declarator(w, prefix, declarator, true)?,
-            },
+            Declarator::Array { declarator, size } => {
+                let size = size.as_ref().map(|s| self.format_expression(s)).unwrap_or_default();
+                format!("{}[{size}]", self.clang_type(base, declarator))
+            }
             Declarator::Function { declarator, params } => {
-                self.print_declarator(w, prefix, declarator, false)?;
-                self.print_parameters(w, prefix, params, true)?;
+                format!("{} ({})", self.clang_type(base, declarator), self.clang_params(params))
             }
         }
-        Ok(())
+    }
+
+    fn clang_params(&self, node: &FunctionParametersNode) -> String {
+        match &node.param {
+            FunctionParameters::Empty | FunctionParameters::OldStyle(_) => String::new(),
+            FunctionParameters::ParameterTypeList(params) => params
+                .iter()
+                .map(|p| {
+                    let (ty_specs, _) = self.split_specifiers(&p.specifiers);
+                    self.clang_type(&ty_specs, &p.declarator)
+                })
+                .collect::<Vec<_>>()
+                .join(", "),
+            FunctionParameters::Variadic(params) => {
+                let mut s = params
+                    .iter()
+                    .map(|p| {
+                        let (ty_specs, _) = self.split_specifiers(&p.specifiers);
+                        self.clang_type(&ty_specs, &p.declarator)
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                if !s.is_empty() {
+                    s.push_str(", ");
+                }
+                s.push_str("...");
+                s
+            }
+        }
     }
 
     fn print_initializer<W: Write>(
@@ -137,61 +181,18 @@ impl Context {
         node: &InitializerNode,
         is_last: bool,
     ) -> std::io::Result<()> {
-        let (branch, extend) = branch(is_last);
-        writeln!(w, "{prefix}{branch}{} {}", node.init, node.span)?;
-        let prefix = &format!("{prefix}{extend}");
         match &node.init {
-            Initializer::Single(expr) => self.print_expression(w, prefix, expr, true)?,
+            Initializer::Single(expr) => self.print_expression(w, prefix, expr, is_last),
             Initializer::List(list) => {
+                let (branch, extend) = branch(is_last);
+                writeln!(w, "{prefix}{branch}InitListExpr {}", node.span)?;
+                let prefix = &format!("{prefix}{extend}");
                 for (i, item) in list.iter().enumerate() {
                     self.print_initializer(w, prefix, item, i + 1 == list.len())?;
                 }
+                Ok(())
             }
         }
-        Ok(())
-    }
-
-    fn print_parameters<W: Write>(
-        &self,
-        w: &mut W,
-        prefix: &str,
-        node: &FunctionParametersNode,
-        is_last: bool,
-    ) -> std::io::Result<()> {
-        let (branch, extend) = branch(is_last);
-        writeln!(w, "{prefix}{branch}{} {}", node.param, node.span)?;
-        let prefix = &format!("{prefix}{extend}");
-        match &node.param {
-            FunctionParameters::Empty => {}
-            FunctionParameters::OldStyle(names) => {
-                for (i, name) in names.iter().enumerate() {
-                    let b = if i + 1 == names.len() { LAST } else { MID };
-                    writeln!(w, "{prefix}{b}{} {}", name.span, self.arenas.names.get(name.id))?;
-                }
-            }
-            FunctionParameters::ParameterTypeList(params) | FunctionParameters::Variadic(params) => {
-                for (i, param) in params.iter().enumerate() {
-                    self.print_parameter(w, prefix, param, i + 1 == params.len())?;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn print_parameter<W: Write>(
-        &self,
-        w: &mut W,
-        prefix: &str,
-        node: &ParameterDeclaration,
-        is_last: bool,
-    ) -> std::io::Result<()> {
-        let (branch, extend) = branch(is_last);
-        writeln!(w, "{prefix}{branch}Parameter {}", node.span)?;
-        let prefix = &format!("{prefix}{extend}");
-        for spec in &node.specifiers {
-            self.print_specifier(w, prefix, spec, false)?;
-        }
-        self.print_declarator(w, prefix, &node.declarator, true)
     }
 
     fn print_expression<W: Write>(
@@ -300,12 +301,101 @@ impl Context {
     }
 
     fn print_type<W: Write>(&self, w: &mut W, prefix: &str, ty: &Type, is_last: bool) -> std::io::Result<()> {
-        let (branch, extend) = branch(is_last);
-        writeln!(w, "{prefix}{branch}Type")?;
-        let prefix = &format!("{prefix}{extend}");
-        for spec in &ty.specifiers {
-            writeln!(w, "{prefix}{MID}{}", self.format_type_specifier(spec))?;
-        }
-        self.print_declarator(w, prefix, &ty.declarator, true)
+        let (branch, _) = branch(is_last);
+        writeln!(w, "{prefix}{branch}Type {}", self.format_type(ty))
     }
+
+    fn format_type(&self, ty: &Type) -> String {
+        let specs = ty
+            .specifiers
+            .iter()
+            .rev()
+            .map(|spec| self.format_type_specifier(spec))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let declarator = self.clang_type("", &ty.declarator);
+        if declarator.is_empty() { specs } else { format!("{specs} {declarator}") }
+    }
+
+    fn format_expression(&self, node: &ExpressionNode) -> String {
+        let expr = self.arenas.expressions.get(node.id);
+        if let Some((lhs, op, rhs)) = binary_parts(expr) {
+            return format!("{} {op} {}", self.format_expression(lhs), self.format_expression(rhs));
+        }
+        match expr {
+            Expression::Constant(name) | Expression::Identifier(name) | Expression::StringLiteral(name) => {
+                self.arenas.names.get(name.id).to_string()
+            }
+            Expression::ConstantExpression(inner) => self.format_expression(inner),
+            Expression::PostInc(e) => format!("{}++", self.format_expression(e)),
+            Expression::PostDec(e) => format!("{}--", self.format_expression(e)),
+            Expression::PreInc(e) => format!("++{}", self.format_expression(e)),
+            Expression::PreDec(e) => format!("--{}", self.format_expression(e)),
+            Expression::Addr(e) => format!("&{}", self.format_expression(e)),
+            Expression::Deref(e) => format!("*{}", self.format_expression(e)),
+            Expression::Plus(e) => format!("+{}", self.format_expression(e)),
+            Expression::Minus(e) => format!("-{}", self.format_expression(e)),
+            Expression::BitNot(e) => format!("~{}", self.format_expression(e)),
+            Expression::Not(e) => format!("!{}", self.format_expression(e)),
+            Expression::Ternary(cond, then, otherwise) => format!(
+                "{} ? {} : {}",
+                self.format_expression(cond),
+                self.format_expression(then),
+                self.format_expression(otherwise)
+            ),
+            Expression::ArrayAcces(array, index) => {
+                format!("{}[{}]", self.format_expression(array), self.format_expression(index))
+            }
+            Expression::FunctionCall(fun, args) => {
+                let args = args.as_ref().map(|a| self.format_expression(a)).unwrap_or_default();
+                format!("{}({args})", self.format_expression(fun))
+            }
+            Expression::DotAcces(tag, name) => format!("{}.{}", self.format_expression(tag), self.arenas.names.get(name.id)),
+            Expression::PtrAcces(tag, name) => {
+                format!("{}->{}", self.format_expression(tag), self.arenas.names.get(name.id))
+            }
+            Expression::SizeofExpr(e) => format!("sizeof({})", self.format_expression(e)),
+            Expression::SizeofType(ty) => format!("sizeof({})", self.format_type(ty)),
+            Expression::Cast(ty, e) => format!("({}){}", self.format_type(ty), self.format_expression(e)),
+            _ => format!("{expr}"),
+        }
+    }
+}
+
+fn binary_parts(expr: &Expression) -> Option<(&ExpressionNode, &'static str, &ExpressionNode)> {
+    use Expression::*;
+    let (lhs, op, rhs) = match expr {
+        Add(l, r) => (l, "+", r),
+        Sub(l, r) => (l, "-", r),
+        Mul(l, r) => (l, "*", r),
+        Div(l, r) => (l, "/", r),
+        Mod(l, r) => (l, "%", r),
+        Right(l, r) => (l, ">>", r),
+        Left(l, r) => (l, "<<", r),
+        Greater(l, r) => (l, ">", r),
+        Lower(l, r) => (l, "<", r),
+        GreaterEq(l, r) => (l, ">=", r),
+        LowerEq(l, r) => (l, "<=", r),
+        Eq(l, r) => (l, "==", r),
+        Neq(l, r) => (l, "!=", r),
+        BitAnd(l, r) => (l, "&", r),
+        BitOr(l, r) => (l, "|", r),
+        BitXor(l, r) => (l, "^", r),
+        And(l, r) => (l, "&&", r),
+        Or(l, r) => (l, "||", r),
+        Assign(l, r) => (l, "=", r),
+        MulAssign(l, r) => (l, "*=", r),
+        DivAssign(l, r) => (l, "/=", r),
+        ModAssign(l, r) => (l, "%=", r),
+        AddAssign(l, r) => (l, "+=", r),
+        SubAssign(l, r) => (l, "-=", r),
+        LeftAssign(l, r) => (l, "<<=", r),
+        RightAssign(l, r) => (l, ">>=", r),
+        AndAssign(l, r) => (l, "&=", r),
+        XorAssign(l, r) => (l, "^=", r),
+        OrAssign(l, r) => (l, "|=", r),
+        List(l, r) => (l, ",", r),
+        _ => return None,
+    };
+    Some((lhs, op, rhs))
 }

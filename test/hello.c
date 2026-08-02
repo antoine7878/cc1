@@ -1,11 +1,3 @@
-
-int main(void) {
-	void *f(void);
-	int (*k)[];
-	void *(*a)(void) = f;
-	return 0;
-}
-
-void *f(void) {
+int main(int argv, char **argc) {
 	return 0;
 }
