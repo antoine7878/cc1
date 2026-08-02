@@ -1,10 +1,12 @@
+use std::fmt::Display;
+
 use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name};
 use crate::parser::Span;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct FunctionParametersNode {
-    span: Span,
-    param: FunctionParameters,
+    pub span: Span,
+    pub param: FunctionParameters,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -47,7 +49,7 @@ impl FunctionParametersNode {
     pub fn variadic(params: Vec<ParameterDeclaration>, span: Span) -> FunctionParametersNode {
         FunctionParametersNode {
             span,
-            param: FunctionParameters::ParameterTypeList(params),
+            param: FunctionParameters::Variadic(params),
         }
     }
 }
@@ -59,5 +61,17 @@ impl ParameterDeclaration {
             declarator,
             span,
         }
+    }
+}
+
+impl Display for FunctionParameters {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            FunctionParameters::Empty => "Empty",
+            FunctionParameters::OldStyle(_) => "OldStyle",
+            FunctionParameters::ParameterTypeList(_) => "Parameters",
+            FunctionParameters::Variadic(_) => "Variadic",
+        };
+        write!(f, "{}", s)
     }
 }

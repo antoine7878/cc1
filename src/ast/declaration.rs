@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::arena::{Arena, ArenaId};
 use crate::ast::{DeclarationSpecifier, ExpressionNode, FunctionParametersNode, Name, Qualifier};
 use crate::define_arena;
@@ -32,8 +34,8 @@ pub struct InitDeclaratorNode {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct DeclaratorNode {
-    span: Span,
-    id: DeclaratorId,
+    pub span: Span,
+    pub id: DeclaratorId,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -56,8 +58,8 @@ pub enum Declarator {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct InitializerNode {
-    span: Span,
-    init: Initializer,
+    pub span: Span,
+    pub init: Initializer,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -146,5 +148,28 @@ impl DeclaratorArena {
 impl InitializerNode {
     pub fn new(init: Initializer, span: Span) -> Self {
         Self { init, span }
+    }
+}
+
+impl Display for Declarator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Declarator::Ident(_) => "Ident",
+            Declarator::Abstract => "Abstract",
+            Declarator::Pointer { .. } => "Pointer",
+            Declarator::Array { .. } => "Array",
+            Declarator::Function { .. } => "Function",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+impl Display for Initializer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Initializer::Single(_) => "Single",
+            Initializer::List(_) => "List",
+        };
+        write!(f, "{}", s)
     }
 }

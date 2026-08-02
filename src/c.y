@@ -93,7 +93,7 @@ macro_rules! push {
 %%
 
 unit
-    : decalration                               { self.lexer.ctx.print_ast(&$1); YYToken::unit }
+    : declaration                               { self.lexer.ctx.print_ast(&$1); YYToken::unit }
     ;
 
 constant_expression /* ExpressionId */
