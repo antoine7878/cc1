@@ -1,6 +1,7 @@
-use crate::ast::{DeclaratorArena, UnionArena, VariantArena};
+use crate::ast::tag::StructDeclaration;
+use crate::ast::{DeclaratorArena, Name, Tag, TypeSpecifier, UnionArena, VariantArena};
 use crate::ast::{EnumArena, ExpressionArena, StringArena, StructArena};
-use crate::parser::YYLex;
+use crate::parser::{Span, YYLex};
 use std::io::Read;
 
 #[derive(Debug, Default)]
@@ -19,6 +20,22 @@ pub struct Arenas {
 pub struct Context {
     // pub symbols: SymbolTable,
     pub arenas: Arenas,
+}
+
+impl Context {
+    pub fn struct_or_union(
+        &mut self,
+        tag: Tag,
+        name: Option<Name>,
+        fields: Vec<StructDeclaration>,
+        span: Span,
+    ) -> TypeSpecifier {
+        match tag {
+            Tag::Struct => TypeSpecifier::Struct(self.arenas.structs.add(name, fields, span)),
+            Tag::Union => TypeSpecifier::Union(self.arenas.unions.add(name, fields, span)),
+            _ => unimplemented!(),
+        }
+    }
 }
 
 pub trait ContextAccess {
