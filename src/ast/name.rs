@@ -11,7 +11,7 @@ pub struct Name {
 }
 
 impl StringArena {
-    pub fn name(&mut self, name: String, span: Span) -> Name {
+    pub fn add(&mut self, name: String, span: Span) -> Name {
         Name {
             id: self.alloc(name),
             span,

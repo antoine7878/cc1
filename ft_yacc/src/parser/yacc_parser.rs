@@ -49,6 +49,7 @@ impl YaccParser {
         Ok(self.yacc)
     }
 
+    #[allow(unused)]
     fn report_unused(&mut self) -> Result<(), YaccError> {
         for (_, t) in self
             .yacc
@@ -137,7 +138,7 @@ impl YaccParser {
         let Ok(kind) = TokenKind::try_from(token_type) else {
             self.it.error(format!("invalid type: {}", token_type))?
         };
-        let utype = self.it.take_utype()?;
+        let utype = self.it.take_utype();
         if utype.is_some() {
             self.yacc.has_utype = true;
         }

@@ -67,25 +67,30 @@ impl InputItertor {
         s
     }
 
-    pub fn take_word(&mut self) -> String {
-        let s = self.take_while(|c| !c.is_whitespace());
-        self.skip_whitespace();
-        s
+    pub fn take_word_carret(&mut self) -> String {
+        let mut carret_count = 1;
+        let mut ret = String::new();
+        while let Some(c) = self.peek() {
+            match c {
+                '<' => carret_count += 1,
+                '>' => carret_count -= 1,
+                _ => (),
+            }
+            self.next();
+            if carret_count == 0 {
+                break;
+            }
+            ret.push(c);
+        }
+        ret
     }
 
-    pub fn take_utype(&mut self) -> Result<Option<String>, YaccError> {
+    pub fn take_utype(&mut self) -> Option<String> {
         let s = if let Some('<') = self.peek() {
             self.next();
-            let mut utype = self.take_word();
-            if !utype.is_empty()
-                && let Some(c) = utype.pop()
-                && c != '>'
-            {
-                self.error("missing '>'")?;
-            }
-            Ok(Some(utype))
+            Some(self.take_word_carret())
         } else {
-            Ok(None)
+            None
         };
         self.skip_whitespace();
         s
@@ -226,7 +231,7 @@ impl InputItertor {
     }
 
     fn get_stack_position(&mut self, pos: usize) -> Result<StackPosition, YaccError> {
-        let utype = self.take_utype()?;
+        let utype = self.take_utype();
         match self.peek() {
             Some(d) if d.is_numeric() => {
                 let num: isize = self.take_number();

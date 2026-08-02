@@ -37,10 +37,10 @@ test: $(NAME)
 	cat test/test | ./$(NAME)
 
 ast:
-	clang -std=iso9899:1990 -Xclang -ast-dump test/hello.c
+	clang -std=iso9899:1990 -pedantic -Xclang -ast-dump test/hello.c
 
 c:
-	clang -std=iso9899:1990 test/hello.c
+	clang -std=iso9899:1990 -pedantic test/hello.c
 
 clean:
 	cargo clean

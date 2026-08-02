@@ -83,6 +83,10 @@ where
         id
     }
 
+    pub fn get_mut(&mut self, id: Id) -> &mut Val {
+        &mut self.data[id.into()]
+    }
+
     pub fn get(&self, id: Id) -> &Val {
         &self.data[id.into()]
     }

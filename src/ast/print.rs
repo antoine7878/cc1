@@ -1,7 +1,7 @@
 use std::io::{Write, stdout};
 
 use crate::ast::expression::ExpressionNode;
-use crate::ast::{Expression, TypeNode};
+use crate::ast::{Expression, Type};
 use crate::context::Context;
 
 const MID: &str = "├── ";
@@ -117,7 +117,7 @@ impl Context {
         self.print_expression(w, prefix, rhs, true)
     }
 
-    fn print_type<W: Write>(&self, w: &mut W, prefix: &str, _: &TypeNode, is_last: bool) -> std::io::Result<()> {
+    fn print_type<W: Write>(&self, w: &mut W, prefix: &str, _: &Type, is_last: bool) -> std::io::Result<()> {
         let branch = if is_last { LAST } else { MID };
         writeln!(w, "{prefix}{branch}Type")
     }

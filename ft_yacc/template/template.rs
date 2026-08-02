@@ -118,7 +118,7 @@ impl<R: Read> Yacc<R> {
 
     fn unwind(&mut self) {
         yyerror("syntax error", self);
-        let start = self.span_stack[self.state_stack.len() - 1].start;
+        let start = self.span_stack.last().cloned().unwrap_or_default().start;
         while let Some(i) = self.state_stack.last()
             && Self::YY_GOTO_TABLE[*i][Self::YY_ERROR_TOKEN_ID] == 0
         {
@@ -130,7 +130,7 @@ impl<R: Read> Yacc<R> {
             yylog!(self, "Stack now {:?}", self.state_stack);
             /* DEBUGGING */
         }
-        let end = self.span_stack[self.state_stack.len() - 1].end;
+        let end = self.span_stack.last().cloned().unwrap_or_default().end;
 
         let Some(i) = self.state_stack.last() else {
             self.yyabort();

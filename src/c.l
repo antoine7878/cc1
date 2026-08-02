@@ -138,7 +138,7 @@ fn check_type(name_id: Name) -> YYToken {
 fn alloc_name<R: Read>(lex: &mut YYLex<R>) -> Name {
     let span = lex.span;
     let name = lex.take_yytext();
-    lex.names().name(name, span)
+    lex.names().add(name, span)
 }
 
 impl fmt::Display for Span {

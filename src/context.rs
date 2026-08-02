@@ -1,22 +1,23 @@
+use crate::ast::{DeclaratorArena, UnionArena, VariantArena};
 use crate::ast::{EnumArena, ExpressionArena, StringArena, StructArena};
-use crate::ast::{SymbolTable, TypeArena, UnionArena, VariantArena};
-use crate::parser::{YYLex, Yacc};
+use crate::parser::YYLex;
 use std::io::Read;
 
 #[derive(Debug, Default)]
 pub struct Arenas {
     pub names: StringArena,
-    pub types: TypeArena,
+    // pub types: TypeArena,
     pub structs: StructArena,
     pub enums: EnumArena,
     pub unions: UnionArena,
     pub variants: VariantArena,
     pub expressions: ExpressionArena,
+    pub declarators: DeclaratorArena,
 }
 
 #[derive(Debug, Default)]
 pub struct Context {
-    pub symbols: SymbolTable,
+    // pub symbols: SymbolTable,
     pub arenas: Arenas,
 }
 
@@ -24,10 +25,6 @@ pub trait ContextAccess {
     fn ctx(&mut self) -> &mut Context;
     fn names(&mut self) -> &mut StringArena {
         &mut self.ctx().arenas.names
-    }
-
-    fn types(&mut self) -> &mut TypeArena {
-        &mut self.ctx().arenas.types
     }
 
     fn structs(&mut self) -> &mut StructArena {
@@ -57,8 +54,8 @@ impl<R: Read> ContextAccess for YYLex<R> {
     }
 }
 
-impl<R: Read> ContextAccess for Yacc<R> {
-    fn ctx(&mut self) -> &mut Context {
-        &mut self.lexer.ctx
-    }
-}
+// impl<R: Read> ContextAccess for Yacc<R> {
+//     fn ctx(&mut self) -> &mut Context {
+//         &mut self.lexer.ctx
+//     }
+// }

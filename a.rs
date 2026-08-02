@@ -37,7 +37,7 @@ pub struct InitDeclarator {
 
 // Declarator – handles named and abstract declarators
 pub enum Declarator {
-    Ident(String),                    // name (empty string => abstract)
+    Ident(String), // name (empty string => abstract)
     Pointer(Box<Declarator>),
     Array {
         declarator: Box<Declarator>,
@@ -228,9 +228,9 @@ pub enum Expression {
 }
 
 pub enum Constant {
-    Integer(String),  // raw token, e.g. "42", "0x1A"
-    Float(String),    // raw token, e.g. "3.14", "1e-5"
-    Character(u32),   // code point value (e.g. 'A' → 65)
+    Integer(String), // raw token, e.g. "42", "0x1A"
+    Float(String),   // raw token, e.g. "3.14", "1e-5"
+    Character(u32),  // code point value (e.g. 'A' → 65)
 }
 
 // ==================================================================
@@ -265,7 +265,7 @@ pub enum Statement {
         condition: Expression,
     },
     For {
-        init: Option<Expression>,       // C89 allows only an expression here
+        init: Option<Expression>, // C89 allows only an expression here
         condition: Option<Expression>,
         iteration: Option<Expression>,
         body: Box<Statement>,
@@ -287,7 +287,7 @@ pub enum Label {
 }
 
 pub struct CompoundStatement {
-    pub decls: Vec<Declaration>,   // C89: all declarations must precede statements
+    pub decls: Vec<Declaration>, // C89: all declarations must precede statements
     pub stmts: Vec<Statement>,
 }
 

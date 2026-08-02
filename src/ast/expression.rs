@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use crate::arena::{Arena, ArenaId};
-use crate::ast::{Name, TypeNode};
+use crate::ast::{DeclaratorNode, Name, TypeSpecifier};
 use crate::define_arena;
 use crate::parser::{Span, YYToken};
 
@@ -82,10 +82,16 @@ pub enum Expression {
 
     // sizeof
     SizeofExpr(ExpressionNode),
-    SizeofType(TypeNode),
+    SizeofType(Type),
 
     // Cast
-    Cast(TypeNode, ExpressionNode),
+    Cast(Type, ExpressionNode),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Type {
+    pub specifiers: Vec<TypeSpecifier>,
+    pub declarator: DeclaratorNode,
 }
 
 impl ExpressionArena {
@@ -122,11 +128,11 @@ impl ExpressionArena {
         Self::add(self.alloc(Expression::SizeofExpr(node_node)), span)
     }
 
-    pub fn sizeof_type(&mut self, type_node: TypeNode, span: Span) -> ExpressionNode {
+    pub fn sizeof_type(&mut self, type_node: Type, span: Span) -> ExpressionNode {
         Self::add(self.alloc(Expression::SizeofType(type_node)), span)
     }
 
-    pub fn cast(&mut self, type_node: TypeNode, node_id: ExpressionNode, span: Span) -> ExpressionNode {
+    pub fn cast(&mut self, type_node: Type, node_id: ExpressionNode, span: Span) -> ExpressionNode {
         Self::add(self.alloc(Expression::Cast(type_node, node_id)), span)
     }
 

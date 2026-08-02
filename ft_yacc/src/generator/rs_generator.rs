@@ -160,15 +160,16 @@ impl RSGenerator {
                 YaccError::error(&parser.yacc.file, pos.line_no, "invalid stack position")?
             };
             let token = &parser.yacc.tokens[*token_id];
-            let utype = pos.utype.as_ref().or(token.utype.as_ref());
+            let utype = &token.utype;
+            let spec = pos.utype.clone().unwrap_or_default();
             let name= &token.name;
             match (utype, &production.mid_context, num) {
-                (Some(utype), Some(ctx), num) if num == ctx.len() as isize + 1 => writeln!( w, "let __yy{num} = self.value_stack[self.value_stack.len()].clone().into_{name}();")?,
-                (Some(_), Some(ctx), num) => writeln!( w, "let __yy{num} = self.value_stack[self.value_stack.len() - {}].clone().into_{name}();", ctx.len() as isize + 1 - num)?,
-                (Some(utype), None, num) if num == 1 => writeln!( w, "let __yy{num} = std::mem::replace(&mut self.value_stack[idx], YYToken::Empty).into_{name}();")?,
-                (Some(_), None, num) => writeln!( w, "let __yy{num} = std::mem::replace(&mut self.value_stack[idx + {}], YYToken::Empty).into_{name}();", num - 1)?,
-                (None, None, num) if num == 1=> writeln!( w, "let __yy{num} = std::mem::replace(&mut self.value_stack[idx], YYToken::Empty);")?,
-                (None, None, num) => writeln!( w, "let __yy{num} = std::mem::replace(&mut self.value_stack[idx + {}], YYToken::Empty);", num - 1)?,
+                (Some(utype), Some(ctx), num) if num == ctx.len() as isize + 1 => writeln!( w, "let {spec} __yy{num} = self.value_stack[self.value_stack.len()].clone().into_{name}();")?,
+                (Some(_), Some(ctx), num) => writeln!( w, "let {spec} __yy{num} = self.value_stack[self.value_stack.len() - {}].clone().into_{name}();", ctx.len() as isize + 1 - num)?,
+                (Some(utype), None, num) if num == 1 => writeln!( w, "let {spec} __yy{num} = std::mem::replace(&mut self.value_stack[idx], YYToken::Empty).into_{name}();")?,
+                (Some(_), None, num) => writeln!( w, "let {spec} __yy{num} = std::mem::replace(&mut self.value_stack[idx + {}], YYToken::Empty).into_{name}();", num - 1)?,
+                (None, None, num) if num == 1=> writeln!( w, "let {spec} __yy{num} = std::mem::replace(&mut self.value_stack[idx], YYToken::Empty);")?,
+                (None, None, num) => writeln!( w, "let {spec} __yy{num} = std::mem::replace(&mut self.value_stack[idx + {}], YYToken::Empty);", num - 1)?,
                 (None, Some(_), _) => panic!("what is going on here ?"),
             }
         }

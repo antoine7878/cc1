@@ -1,20 +1,40 @@
 %no_main
 %{
-use crate::context::ContextAccess;
-use crate::ast::{Qualifier, TypeNode, ExpressionNode, Name, DeclarationSpecifier, Initializer, Field};
-use crate::ast::{DeclarationNode,InitDeclaratorNode, DeclaratorNode, InitializerNode, Storage};
+use crate::ast::{Qualifier, Type, ExpressionNode, Name, DeclarationSpecifier, Initializer, TypeSpecifier, ParameterDeclaration};
+use crate::ast::{DeclarationNode, InitDeclaratorNode, DeclaratorNode, InitializerNode, Storage, FunctionParametersNode};
 use crate::parser::YYLex;
 use crate::error::yyerror;
 
-macro_rules! node {
-    ($self:expr, $factory:ident, $method:ident $(, $arg:expr)* $(,)?) => {{
-        let span = $self.span;
-        $self.$factory().$method($($arg,)* span)
+macro_rules! node{
+    ($self:expr, $factory:ident, $method:ident $(, $arg:expr)*) => {{
+        $self.lexer.ctx.arenas.$factory.$method($($arg,)*)
     }};
 }
+
+macro_rules! node_span {
+    ($self:expr, $factory:ident, $method:ident $(, $arg:expr)* $(,)?) => {{
+        let span = $self.span;
+        $self.lexer.ctx.arenas.$factory.$method($($arg,)* span)
+    }};
+}
+
+macro_rules! with_span {
+    ($self:expr, $func:path $(, $arg:expr)* $(,)?) => {{
+        let span = $self.span;
+        $func($($arg,)* span)
+    }};
+}
+
+macro_rules! push {
+    ($vec:expr, $elem:expr) => {{
+        $vec.push($elem);
+        $vec
+    }};
+}
+
 %}
 
-%token<Name> IDENTIFIER STRING_LITERAL CONSTANT
+%token<Name> IDENTIFIER STRING_LITERAL CONSTANT TYPE_NAME
 %token TYPEDEF EXTERN STATIC AUTO REGISTER
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID
 %token STRUCT UNION ENUM ELLIPSIS
@@ -22,7 +42,7 @@ macro_rules! node {
 
 %left ','
 %right '=' SUB_ASSIGN LEFT_ASSIGN RIGHT_ASSIGN AND_ASSIGN MUL_ASSIGN
-      DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN XOR_ASSIGN OR_ASSIGN TYPE_NAME
+      DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN XOR_ASSIGN OR_ASSIGN
 %right '?' ':'
 %left OR_OP
 %left AND_OP
@@ -38,27 +58,33 @@ macro_rules! node {
 %nonassoc '(' '[' '.' PTR_OP
 
 %type<ExpressionNode> expression constant_expression
+%type<Type> type_name
 
 %type<DeclarationNode> declaration
+
+%type<TypeSpecifier> type_specifier
+%type<Storage> storage_class_specifier
+%type<Qualifier> type_qualifier
+%type<Vec<Qualifier>> type_qualifier_list
 %type<Vec<DeclarationSpecifier>> declaration_specifiers
-%type<>
 
-%type<InitDeclaratorNode> declarator_list
-    %type<Vec<InitDeclaratorNode>> init_declarator_list
-        %type<Storage> storage_class_specifier
-        %type<TypeNode> type_name type_specifier
-        %type<Qualifier> type_qualifier
-    %type<InitializerNode> initializer
-        %type<Vec<InitializerNode>> initializer_list
+%type<InitDeclaratorNode> declarator_list init_declarator
+%type<Vec<InitDeclaratorNode>> init_declarator_list
 
-%type<DeclaratorNode> declarator
+%type<InitializerNode> initializer
+%type<Vec<InitializerNode>> initializer_list
 
 
-%type<Vec<Qualifier>> specifier_qualifier_list
+%type<DeclaratorNode> declarator direct_declarator pointer direct_abstract_declarator abstract_declarator
+
+%type<Vec<Name>> identifier_list
+%type<FunctionParametersNode> parameter_type_list
+%type<Vec<ParameterDeclaration>> parameter_list
+%type<ParameterDeclaration> parameter_declaration
+
+%type<Vec<DeclarationSpecifier>> specifier_qualifier_list
 
 /*
-%type<Vec<Field>> struct_declaration_list
-%type<Vec<Field>> struct_declaration
 %type<Vec<TypeId>> struct_declarator_list
 %type<NameId> struct_declarator
 %type<StructId> struct_specifier
@@ -67,140 +93,216 @@ macro_rules! node {
 %%
 
 unit
-    : constant_expression { self.lexer.ctx.print_ast(&$1); YYToken::unit }
+    : decalration                               { self.lexer.ctx.print_ast(&$1); YYToken::unit }
     ;
 
 constant_expression /* ExpressionId */
-    : expression { node!(self, expressions, constant_expression, $1) }
+    : expression                                        { node_span!(self, expressions, constant_expression, $1) }
     ;
 
 expression /* ExpressionId */
-    : '(' expression ')'                            { $2 }
-    | IDENTIFIER                                    { node!(self, expressions, identifier, $1) }
-    | CONSTANT                                      { node!(self, expressions, constant,$1)}
-    | STRING_LITERAL                                { node!(self, expressions, string_literal,$1) }
-    | expression '[' expression ']'                 { node!(self, expressions, binary, $1, $2, $3) }
-    | expression '(' ')'                            { node!(self, expressions, function_call, $1, None) }
-    | expression '(' expression ')'                 { node!(self, expressions, function_call, $1, Some($3)) }
-    | expression '.' IDENTIFIER                     { node!(self, expressions, access, $1, $2, $3) }
-    | expression PTR_OP IDENTIFIER                  { node!(self, expressions, access, $1, $2, $3) }
-    | SIZEOF '(' expression ')'                     { node!(self, expressions, sizeof_expr, $3) }
-    | SIZEOF '(' type_name ')'                      { node!(self, expressions, sizeof_type, $3) }
-    | '(' type_name ')' expression %prec PREC_UNARY { node!(self, expressions, cast, $2, $4) }
-    | expression INC_OP                             { node!(self, expressions, unary, YYToken::POST_INC_OP, $1) }
-    | expression DEC_OP                             { node!(self, expressions, unary, YYToken::POST_DEC_OP, $1) }
-    | INC_OP expression                             { node!(self, expressions, unary, $1, $2) }
-    | DEC_OP expression                             { node!(self, expressions, unary, $1, $2) }
-    | '&' expression %prec PREC_UNARY               { node!(self, expressions, unary, $1, $2) }
-    | '*' expression %prec PREC_UNARY               { node!(self, expressions, unary, $1, $2) }
-    | '+' expression %prec PREC_UNARY               { node!(self, expressions, unary, $1, $2) }
-    | '-' expression %prec PREC_UNARY               { node!(self, expressions, unary, $1, $2) }
-    | '~' expression                                { node!(self, expressions, unary, $1, $2) }
-    | '!' expression                                { node!(self, expressions, unary, $1, $2) }
-    | expression '+' expression                     { node!(self, expressions, binary, $1, $2, $3) }
-    | expression '-' expression                     { node!(self, expressions, binary, $1, $2, $3) }
-    | expression '*' expression                     { node!(self, expressions, binary, $1, $2, $3) }
-    | expression '/' expression                     { node!(self, expressions, binary, $1, $2, $3) }
-    | expression '%' expression                     { node!(self, expressions, binary, $1, $2, $3) }
-    | expression LEFT_OP expression                 { node!(self, expressions, binary, $1, $2, $3) }
-    | expression RIGHT_OP expression                { node!(self, expressions, binary, $1, $2, $3) }
-    | expression '<' expression                     { node!(self, expressions, binary, $1, $2, $3) }
-    | expression '>' expression                     { node!(self, expressions, binary, $1, $2, $3) }
-    | expression LE_OP expression                   { node!(self, expressions, binary, $1, $2, $3) }
-    | expression GE_OP expression                   { node!(self, expressions, binary, $1, $2, $3) }
-	| expression EQ_OP expression                   { node!(self, expressions, binary, $1, $2, $3) }
-	| expression NE_OP expression                   { node!(self, expressions, binary, $1, $2, $3) }
-	| expression '&' expression                     { node!(self, expressions, binary, $1, $2, $3) }
-	| expression '^' expression                     { node!(self, expressions, binary, $1, $2, $3) }
-	| expression '|' expression                     { node!(self, expressions, binary, $1, $2, $3) }
-	| expression AND_OP expression                  { node!(self, expressions, binary, $1, $2, $3) }
-	| expression OR_OP expression                   { node!(self, expressions, binary, $1, $2, $3) }
-	| expression '=' expression                     { node!(self, expressions, binary, $1, $2, $3) }
-	| expression MUL_ASSIGN expression              { node!(self, expressions, binary, $1, $2, $3) }
-	| expression DIV_ASSIGN expression              { node!(self, expressions, binary, $1, $2, $3) }
-	| expression MOD_ASSIGN expression              { node!(self, expressions, binary, $1, $2, $3) }
-	| expression ADD_ASSIGN expression              { node!(self, expressions, binary, $1, $2, $3) }
-	| expression SUB_ASSIGN expression              { node!(self, expressions, binary, $1, $2, $3) }
-	| expression LEFT_ASSIGN expression             { node!(self, expressions, binary, $1, $2, $3) }
-	| expression RIGHT_ASSIGN expression            { node!(self, expressions, binary, $1, $2, $3) }
-	| expression AND_ASSIGN expression              { node!(self, expressions, binary, $1, $2, $3) }
-	| expression XOR_ASSIGN expression              { node!(self, expressions, binary, $1, $2, $3) }
-	| expression OR_ASSIGN expression               { node!(self, expressions, binary, $1, $2, $3) }
-    | expression ',' expression                     { node!(self, expressions, binary, $1, $2, $3) }
-    | expression '?' expression ':' expression      { node!(self, expressions, ternary, $1, $3, $5) }
+    : '(' expression ')'                                { $2 }
+    | IDENTIFIER                                        { node_span!(self, expressions, identifier, $1) }
+    | CONSTANT                                          { node_span!(self, expressions, constant,$1)}
+    | STRING_LITERAL                                    { node_span!(self, expressions, string_literal,$1) }
+    | expression '[' expression ']'                     { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression '(' ')'                                { node_span!(self, expressions, function_call, $1, None) }
+    | expression '(' expression ')'                     { node_span!(self, expressions, function_call, $1, Some($3)) }
+    | expression '.' IDENTIFIER                         { node_span!(self, expressions, access, $1, $2, $3) }
+    | expression PTR_OP IDENTIFIER                      { node_span!(self, expressions, access, $1, $2, $3) }
+    | SIZEOF '(' expression ')'                         { node_span!(self, expressions, sizeof_expr, $3) }
+    | SIZEOF '(' type_name ')'                          { node_span!(self, expressions, sizeof_type, $3) }
+    | '(' type_name ')' expression %prec PREC_UNARY     { node_span!(self, expressions, cast, $2, $4) }
+    | expression INC_OP                                 { node_span!(self, expressions, unary, YYToken::POST_INC_OP, $1) }
+    | expression DEC_OP                                 { node_span!(self, expressions, unary, YYToken::POST_DEC_OP, $1) }
+    | INC_OP expression                                 { node_span!(self, expressions, unary, $1, $2) }
+    | DEC_OP expression                                 { node_span!(self, expressions, unary, $1, $2) }
+    | '&' expression %prec PREC_UNARY                   { node_span!(self, expressions, unary, $1, $2) }
+    | '*' expression %prec PREC_UNARY                   { node_span!(self, expressions, unary, $1, $2) }
+    | '+' expression %prec PREC_UNARY                   { node_span!(self, expressions, unary, $1, $2) }
+    | '-' expression %prec PREC_UNARY                   { node_span!(self, expressions, unary, $1, $2) }
+    | '~' expression                                    { node_span!(self, expressions, unary, $1, $2) }
+    | '!' expression                                    { node_span!(self, expressions, unary, $1, $2) }
+    | expression '+' expression                         { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression '-' expression                         { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression '*' expression                         { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression '/' expression                         { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression '%' expression                         { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression LEFT_OP expression                     { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression RIGHT_OP expression                    { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression '<' expression                         { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression '>' expression                         { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression LE_OP expression                       { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression GE_OP expression                       { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression EQ_OP expression                       { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression NE_OP expression                       { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression '&' expression                         { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression '^' expression                         { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression '|' expression                         { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression AND_OP expression                      { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression OR_OP expression                       { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression '=' expression                         { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression MUL_ASSIGN expression                  { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression DIV_ASSIGN expression                  { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression MOD_ASSIGN expression                  { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression ADD_ASSIGN expression                  { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression SUB_ASSIGN expression                  { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression LEFT_ASSIGN expression                 { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression RIGHT_ASSIGN expression                { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression AND_ASSIGN expression                  { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression XOR_ASSIGN expression                  { node_span!(self, expressions, binary, $1, $2, $3) }
+	| expression OR_ASSIGN expression                   { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression ',' expression                         { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression '?' expression ':' expression          { node_span!(self, expressions, ternary, $1, $3, $5) }
     ;
 
-type_name
-    :
+declaration /* Declaration */
+	: declaration_specifiers ';'                        { with_span!(self, DeclarationNode::new, $1, vec![]) }
+	| declaration_specifiers init_declarator_list ';'   { with_span!(self, DeclarationNode::new, $1, $2) }
 	;
+
+declaration_specifiers /* Vec<DeclarationSpecifier> */
+	: storage_class_specifier                           { vec![DeclarationSpecifier::Storage($1)] }
+	| storage_class_specifier declaration_specifiers    { push!($<mut>2, DeclarationSpecifier::Storage($1)) }
+	| type_specifier                                    { vec![DeclarationSpecifier::Type($1)] }
+	| type_specifier declaration_specifiers             { push!($<mut>2, DeclarationSpecifier::Type($1)) }
+	| type_qualifier                                    { vec![DeclarationSpecifier::Qualifier($1)] }
+	| type_qualifier declaration_specifiers             { push!($<mut>2, DeclarationSpecifier::Qualifier($1)) }
+	;
+
+init_declarator_list /* Vec<InitDeclaratorNode> */
+	: init_declarator                                   { vec![$1] }
+    | init_declarator_list ',' init_declarator          { push!($<mut>1, $3) }
+	;
+
+init_declarator /* InitDeclaratorNode */
+	: declarator                                        { with_span!(self, InitDeclaratorNode::new, $1, None) }
+	| declarator '=' initializer                        { with_span!(self, InitDeclaratorNode::new, $1, Some($3)) }
+	;
+
+storage_class_specifier /* Storage*/
+	: TYPEDEF                                           { Storage::Typedef  }
+	| EXTERN                                            { Storage::Extern }
+	| STATIC                                            { Storage::Static }
+	| AUTO                                              { Storage::Auto }
+	| REGISTER                                          { Storage::Register }
+    ;
+
+type_qualifier  /* Qualifier */
+	: CONST                                             { Qualifier::Const }
+	| VOLATILE                                          { Qualifier::Volatile }
+	;
+
+type_specifier /* TypeSpecifier */
+	: VOID                                              { TypeSpecifier::Void }
+	| CHAR                                              { TypeSpecifier::Char }
+	| SHORT                                             { TypeSpecifier::Short }
+	| INT                                               { TypeSpecifier::Int }
+	| LONG                                              { TypeSpecifier::Long }
+	| FLOAT                                             { TypeSpecifier::Float }
+	| DOUBLE                                            { TypeSpecifier::Double }
+	| SIGNED                                            { TypeSpecifier::Signed }
+	| UNSIGNED                                          { TypeSpecifier::Unsigned }
+	| struct_specifier                                  { TypeSpecifier::Struct(42.into()) }
+	| union_specifier                                   { TypeSpecifier::Union(42.into()) }
+	| enum_specifier                                    { TypeSpecifier::Enum(42.into()) }
+	| TYPE_NAME                                         { TypeSpecifier::TypedefName($1) }
+	;
+
+initializer /* InitializerNode */
+	: expression                                        { with_span!(self, InitializerNode::new, Initializer::Single($1)) }
+	| '{' initializer_list '}'                          { with_span!(self, InitializerNode::new, Initializer::List($2)) }
+	| '{' initializer_list ',' '}'                      { with_span!(self, InitializerNode::new, Initializer::List($2)) }
+	;
+
+initializer_list /* Vec<Initializer> */
+	: initializer                                       { vec![$1] }
+    | initializer_list ',' initializer                  { push!($<mut>1, $3) }
+	;
+
+declarator /* DeclaratorNode */
+	: pointer direct_declarator                         { node_span!(self, declarators, with_pointer, $1, $2) }
+	| direct_declarator                                 { $1 }
+	;
+
+direct_declarator /* DeclaratorNode */
+	: IDENTIFIER                                        { node_span!(self, declarators, ident, $1) }
+	| '(' declarator ')'                                { $2 }
+	| direct_declarator '[' constant_expression ']'     { node_span!(self, declarators, array, $1, Some($3)) }
+	| direct_declarator '[' ']'                         { node_span!(self, declarators, array, $1, None) }
+	| direct_declarator '(' parameter_type_list ')'     { node_span!(self, declarators, function, $1, $3) }
+	| direct_declarator '(' identifier_list ')'         { let a = with_span!(self, FunctionParametersNode::old_style, $3); node_span!(self, declarators, function, $1, a) }
+	| direct_declarator '(' ')'                         { let a = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, $1, a) }
+	;
+
+pointer /* Declarator::Pointer */
+	: '*'                                               { node_span!(self, declarators, pointer, vec![], None)     }
+	| '*' type_qualifier_list                           { node_span!(self, declarators, pointer, $2,     None)     }
+	| '*' pointer                                       { node_span!(self, declarators, pointer, vec![], Some($2)) }
+	| '*' type_qualifier_list pointer                   { node_span!(self, declarators, pointer, $2,     Some($3)) }
+	;
+
+type_qualifier_list /* Vec<Qualifier> */
+	: type_qualifier                                    { vec![$1] }
+	| type_qualifier_list type_qualifier                { push!($<mut>1, $2) }
+	;
+
+parameter_type_list /* FunctionParametersNode */
+	: parameter_list                                    { with_span!(self, FunctionParametersNode::param_style, $1) }
+	| parameter_list ',' ELLIPSIS                       { with_span!(self, FunctionParametersNode::variadic, $1) }
+	;
+
+parameter_list /* Vec<ParameterDeclaration> */
+	: parameter_declaration                             { vec![$1] }
+	| parameter_list ',' parameter_declaration          { push!($<mut>1, $3) }
+    ;
+
+parameter_declaration /* ParameterDeclaration */
+/* pub fn new(specifiers: Vec<DeclarationSpecifier>, declarator: DeclaratorNode, span: Span) -> ParameterDeclaration; */
+	: declaration_specifiers declarator                 { with_span!(self, ParameterDeclaration::new, $1, $2) }
+	| declaration_specifiers abstract_declarator        { with_span!(self, ParameterDeclaration::new, $1, $2) }
+	| declaration_specifiers                            { let a = node_span!(self, declarators, abstrct); with_span!(self, ParameterDeclaration::new, $1, a) }
+	;
+
+identifier_list /* Vec<Name> */
+	: IDENTIFIER                                        { vec![$1] }
+	| identifier_list ',' IDENTIFIER                    { push!($<mut>1, $3) }
+	;
+
+type_name /* Type? */
+	: specifier_qualifier_list
+	| specifier_qualifier_list abstract_declarator
+	;
+
+specifier_qualifier_list /* Vec<DeclarationSpecifier> */
+	: type_specifier specifier_qualifier_list           { push!($<mut>2, DeclarationSpecifier::Type($1)) }
+	| type_specifier                                    { vec![DeclarationSpecifier::Type($1)] }
+	| type_qualifier specifier_qualifier_list           { push!($<mut>2, DeclarationSpecifier::Qualifier($1)) }
+	| type_qualifier                                    { vec![DeclarationSpecifier::Qualifier($1)] }
+	;
+
+abstract_declarator /* DeclaratorNode */
+	: pointer                                           { let a = node_span!(self, declarators, abstrct); node_span!(self, declarators, with_pointer, $1, a) }
+	| direct_abstract_declarator                        { $1 }
+	| pointer direct_abstract_declarator                { node_span!(self, declarators, with_pointer, $1, $2) }
+	;
+
+direct_abstract_declarator /* DeclaratorNode */
+	: '(' abstract_declarator ')'                            { $2 }
+	| '[' ']'                                                { let a = node_span!(self, declarators, abstrct); node_span!(self, declarators, array, a, None) }
+	| '[' constant_expression ']'                            { let a = node_span!(self, declarators, abstrct); node_span!(self, declarators, array, a, Some($2)) }
+	| direct_abstract_declarator '[' ']'                     { node_span!(self, declarators, array, $1, None) }
+	| direct_abstract_declarator '[' constant_expression ']' { node_span!(self, declarators, array, $1, Some($3)) }
+	| '(' ')'                                                { let a = node_span!(self, declarators, abstrct); let b = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, a, b) }
+	| '(' parameter_type_list ')'                            { let a = node_span!(self, declarators, abstrct); node_span!(self, declarators, function, a, $2) }
+	| direct_abstract_declarator '(' ')'                     { let a = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, $1, a) }
+	| direct_abstract_declarator '(' parameter_type_list ')' { node_span!(self, declarators, function, $1, $3) }
+	;
+
 %%
-// declaration /* Declaration */
-// 	: declaration_specifiers ';'
-// 	| declaration_specifiers init_declarator_list ';'
-// 	;
-//
-// declaration_specifiers /* Vec<DeclarationSpecifier> */
-// 	: storage_class_specifier                           { vec![DeclarationSpecifier::Storage($1)] }
-// 	| storage_class_specifier declaration_specifiers    { $1.push($2); $1 }
-// 	| type_specifier                                    { vec![DeclarationSpecifier::Qualifier($1)] }
-// 	| type_specifier declaration_specifiers             { $1.push($2); $1 }
-// 	| type_qualifier                                    { vec![DeclarationSpecifier::Type($1)] }
-// 	| type_qualifier declaration_specifiers             { $1.push($2); $1 }
-// 	;
-//
-// init_declarator_list /* Vec<Declarator> */
-// 	: init_declarator                           { vec![$1] }
-//     | init_declarator_list ',' init_declarator  { $1.push($3); $1 }
-// 	;
-//
-// init_declarator /* InitDeclaratorNode */
-// 	: declarator { let s = self.span(); InitDeclaratorNode::new($1, None, s) }
-// 	| declarator '=' initializer { les s = self.span(); InitDeclaratorNode::new($1, Some($3), s) }
-// 	;
-//
-// storage_class_specifier /* Storage*/
-// 	: TYPEDEF           { Storage::Typedef  }
-// 	| EXTERN            { Storage::Extern }
-// 	| STATIC            { Storage::Static }
-// 	| AUTO              { Storage::Auto }
-// 	| REGISTER          { Storage::Register }
-//     ;
-//
-// type_qualifier  /* Qualifier */
-// 	: CONST             { Qualifier::Const }
-// 	| VOLATILE          { Qualifier::Volatile }
-// 	;
-//
-// type_specifier /* TypeId */
-// 	: VOID              { self.types().void() }
-// 	| CHAR              { self.types().char() }
-// 	| SHORT             { self.types().short() }
-// 	| INT               { self.types().int() }
-// 	| LONG              { self.types().long() }
-// 	| FLOAT             { self.types().float() }
-// 	| DOUBLE            { self.types().double() }
-// 	| SIGNED            { self.types().signed() }
-// 	| UNSIGNED          { self.types().unsigned() }
-// 	| struct_specifier  { 42.into() }
-// 	| union_specifier   { 42.into() }
-// 	| enum_specifier    { 42.into() }
-// 	| TYPE_NAME         { 42.into() }
-// 	;
-//
-// initializer /* InitializerNode */
-// 	: expression                        { let s = self.span(); InitializerNode::new(Initializer::Single($1), span) }
-// 	| '{' initializer_list '}'          { let s = self.span(); InitializerNode::new(Initializer::List($2), span) }
-// 	| '{' initializer_list ',' '}'      { let s = self.span(); InitializerNode::new(Initializer::List($2), span) }
-// 	;
-//
-// initializer_list /* Vec<InitializerNode> */
-// 	: initializer                       { vec![$1] }
-//     | initializer_list ',' initializer  { $1.push($3); $1 }
-// 	;
 
 // struct_specifier /* StructId */
-// 	: STRUCT IDENTIFIER '{' struct_declaration_list '}'     { self.lexer.ctx.arenas.structs($2, $4, false) }
-// 	| STRUCT '{' struct_declaration_list '}'                { self.lexer.ctx.arenas.structs(None, $3, false) }
+// 	: STRUCT IDENTIFIER '{' struct_declaration_list '}'     { self.lexer.ctx.arenas.structs($2, $4, false) } | STRUCT '{' struct_declaration_list '}'                { self.lexer.ctx.arenas.structs(None, $3, false) }
 // 	| STRUCT IDENTIFIER                                     { self.lexer.ctx.arenas.structs($2, Vec::new(), false) }
 // 	;
 
@@ -210,22 +312,16 @@ type_name
 // 	| STRUCT IDENTIFIER                                     { self.lexer.ctx.arenas.structs($2, Vec::new(), false) }
 // 	;
 //
-// struct_declaration_list /* Vec<Field> */
+// struct_declaration_list /*  */
 // 	: struct_declaration                                    { vec![$1] }
 // 	| struct_declaration_list struct_declaration            { $1.extend($2); $1 }
 // 	;
 //
-// struct_declaration /* vec<Field> */
-// 	: specifier_qualifier_list struct_declarator_list ';'   { $2.map(|f| Field::new($1.clone(), f)).collect::<Vec<_>>() }
+// struct_declaration /*  */
+// 	: specifier_qualifier_list struct_declarator_list ';'   {  }
 // 	;
 //
-// specifier_qualifier_list /* Vec<Qualifiers> */
-// 	: type_specifier specifier_qualifier_list
-// 	| type_specifier
-// 	| type_qualifier specifier_qualifier_list
-// 	| type_qualifier
-// 	;
-//
+
 // struct_declarator_list /* Vec<TypeId> */
 // 	: struct_declarator                                     { vec![$1] }
 // 	| struct_declarator_list ',' struct_declarator          { $1.push($3); $1 }
@@ -251,81 +347,6 @@ type_name
 // enumerator /* VariantId */
 // 	: IDENTIFIER
 // 	| IDENTIFIER '=' constant_expression
-// 	;
-//
-
-//
-// declarator /* TypeId */
-// 	: pointer direct_declarator                     { self.lexer.ctx.types.pointer($2) }
-// 	| direct_declarator                             { $1 }
-// 	;
-//
-//
-// direct_declarator /* TypeId */
-// 	: IDENTIFIER                                    { self.lexer.ctx.types.void($1) }
-// 	| '(' declarator ')'                            { $2 }
-// 	| direct_declarator '[' constant_expression ']' {  }
-// 	| direct_declarator '[' ']'                     {  }
-// 	| direct_declarator '(' parameter_type_list ')' {  }
-// 	| direct_declarator '(' identifier_list ')'     {  }
-// 	| direct_declarator '(' ')'                     {  }
-// 	;
-//
-// pointer /* */
-// 	: '*'
-// 	| '*' type_qualifier_list
-// 	| '*' pointer
-// 	| '*' type_qualifier_list pointer
-// 	;
-//
-// type_qualifier_list /* */
-// 	: type_qualifier
-// 	| type_qualifier_list type_qualifier
-// 	;
-//
-//
-// parameter_type_list /* */
-// 	: parameter_list
-// 	| parameter_list ',' ELLIPSIS
-// 	;
-//
-// parameter_list /* */
-// 	: parameter_declaration
-// 	| parameter_list ',' parameter_declaration
-// 	;
-//
-// parameter_declaration /* */
-// 	: declaration_specifiers declarator
-// 	| declaration_specifiers abstract_declarator
-// 	| declaration_specifiers
-// 	;
-//
-// identifier_list /* */
-// 	: IDENTIFIER
-// 	| identifier_list ',' IDENTIFIER
-// 	;
-//
-// type_name /* */
-// 	: specifier_qualifier_list
-// 	| specifier_qualifier_list abstract_declarator
-// 	;
-//
-// abstract_declarator /* */
-// 	: pointer
-// 	| direct_abstract_declarator
-// 	| pointer direct_abstract_declarator
-// 	;
-//
-// direct_abstract_declarator /* */
-// 	: '(' abstract_declarator ')'
-// 	| '[' ']'
-// 	| '[' constant_expression ']'
-// 	| direct_abstract_declarator '[' ']'
-// 	| direct_abstract_declarator '[' constant_expression ']'
-// 	| '(' ')'
-// 	| '(' parameter_type_list ')'
-// 	| direct_abstract_declarator '(' ')'
-// 	| direct_abstract_declarator '(' parameter_type_list ')'
 // 	;
 //
 
