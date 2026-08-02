@@ -2,7 +2,8 @@ use std::io::{Write, stdout};
 
 use crate::ast::{
     DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, Expression, ExpressionNode, FunctionParameters,
-    FunctionParametersNode, InitDeclaratorNode, Initializer, InitializerNode, Name, ParameterDeclaration, Type, TypeSpecifier,
+    FunctionParametersNode, InitDeclaratorNode, Initializer, InitializerNode, Name, ParameterDeclaration, Type,
+    TypeSpecifier,
 };
 use crate::context::Context;
 use crate::parser::Span;
@@ -36,8 +37,14 @@ impl Context {
         let (ty_specs, storage) = self.split_specifiers(&node.specifiers);
         let name = self.declarator_name(&init_decl.declarator);
         let name_loc = name.as_ref().map(|n| format!(" {}", n.span)).unwrap_or_default();
-        let name_str = name.map(|n| format!(" {}", self.arenas.names.get(n.id))).unwrap_or_default();
-        let storage = if storage.is_empty() { storage } else { format!(" {storage}") };
+        let name_str = name
+            .map(|n| format!(" {}", self.arenas.names.get(n.id)))
+            .unwrap_or_default();
+        let storage = if storage.is_empty() {
+            storage
+        } else {
+            format!(" {storage}")
+        };
         if let Declarator::Function { params, .. } = self.arenas.declarators.get(init_decl.declarator.id) {
             let ty = format!("{} ({})", ty_specs, self.clang_params(params));
             writeln!(w, "FunctionDecl {span}{name_loc}{name_str} '{ty}'{storage}")?;
@@ -50,7 +57,13 @@ impl Context {
                 FunctionParameters::OldStyle(names) => {
                     for (i, name) in names.iter().enumerate() {
                         let (b, _) = branch(i + 1 == names.len());
-                        writeln!(w, "{b}ParmVarDecl {} {} {}", name.span, name.span, self.arenas.names.get(name.id))?;
+                        writeln!(
+                            w,
+                            "{b}ParmVarDecl {} {} {}",
+                            name.span,
+                            name.span,
+                            self.arenas.names.get(name.id)
+                        )?;
                     }
                 }
                 FunctionParameters::Empty => {}
@@ -77,7 +90,9 @@ impl Context {
         let ty = self.clang_type(&ty_specs, &param.declarator);
         let name = self.declarator_name(&param.declarator);
         let name_loc = name.as_ref().map(|n| format!(" {}", n.span)).unwrap_or_default();
-        let name_str = name.map(|n| format!(" {}", self.arenas.names.get(n.id))).unwrap_or_default();
+        let name_str = name
+            .map(|n| format!(" {}", self.arenas.names.get(n.id)))
+            .unwrap_or_default();
         writeln!(w, "{prefix}{b}ParmVarDecl {}{name_loc}{name_str} '{ty}'", param.span)
     }
 
@@ -85,7 +100,9 @@ impl Context {
         match self.arenas.declarators.get(node.id) {
             Declarator::Ident(name) => Some(name.clone()),
             Declarator::Pointer { inner: Some(inner), .. } => self.declarator_name(inner),
-            Declarator::Array { declarator, .. } | Declarator::Function { declarator, .. } => self.declarator_name(declarator),
+            Declarator::Array { declarator, .. } | Declarator::Function { declarator, .. } => {
+                self.declarator_name(declarator)
+            }
             _ => None,
         }
     }
@@ -314,7 +331,11 @@ impl Context {
             .collect::<Vec<_>>()
             .join(" ");
         let declarator = self.clang_type("", &ty.declarator);
-        if declarator.is_empty() { specs } else { format!("{specs} {declarator}") }
+        if declarator.is_empty() {
+            specs
+        } else {
+            format!("{specs} {declarator}")
+        }
     }
 
     fn format_expression(&self, node: &ExpressionNode) -> String {
@@ -350,7 +371,9 @@ impl Context {
                 let args = args.as_ref().map(|a| self.format_expression(a)).unwrap_or_default();
                 format!("{}({args})", self.format_expression(fun))
             }
-            Expression::DotAcces(tag, name) => format!("{}.{}", self.format_expression(tag), self.arenas.names.get(name.id)),
+            Expression::DotAcces(tag, name) => {
+                format!("{}.{}", self.format_expression(tag), self.arenas.names.get(name.id))
+            }
             Expression::PtrAcces(tag, name) => {
                 format!("{}->{}", self.format_expression(tag), self.arenas.names.get(name.id))
             }

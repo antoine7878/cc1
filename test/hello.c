@@ -1,3 +1,4 @@
-int main(int argv, char **argc) {
+int main(int argc, char **argv) {
+	int a[argc++] = 1 + 1;
 	return 0;
 }

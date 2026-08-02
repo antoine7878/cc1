@@ -1,1 +1,1 @@
-int main(int argc, char **argv);
+int a[i++]  = 1 + 1;
