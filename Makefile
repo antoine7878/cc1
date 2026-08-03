@@ -34,7 +34,7 @@ $(PARSER): $(FT_YACC) $(YACC_FILE)
 # ----- test --------------------
 
 test: $(NAME)
-	cat test/test | ./$(NAME)
+	cat test/hello.c | ./$(NAME)
 
 ast:
 	clang -std=iso9899:1990 -pedantic -Xclang -ast-dump test/hello.c
