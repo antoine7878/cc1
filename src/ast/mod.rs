@@ -14,7 +14,9 @@ pub use declaration::{DeclaratorNode, InitDeclaratorNode, Initializer, Initializ
 pub use expression::{Expression, ExpressionArena, ExpressionId, ExpressionNode, Type};
 pub use function::{FunctionParameters, FunctionParametersNode, ParameterDeclaration};
 pub use name::{Name, StringArena, StringId};
-pub use statement::{LabeledNode, StatementNode};
+pub use statement::{CompoundStatementNode, ExpressionStatementNode};
+pub use statement::{IterationStatementNode, JumpStatement, Labeled, LabeledStatementNode, StatementArena};
+pub use statement::{JumpStatementNode, SelectionStatementNode, StatementNode};
 pub use tag::{EnumArena, EnumId, StructArena, StructDeclaration, StructDeclarator, StructId};
 pub use tag::{Tag, UnionArena, UnionId, VariantArena, VariantId};
 pub use type_specifier::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier};

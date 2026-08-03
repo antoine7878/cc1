@@ -2,7 +2,8 @@
 %{
 use crate::ast::{Qualifier, Type, ExpressionNode, Name, DeclarationSpecifier, Initializer, TypeSpecifier, ParameterDeclaration};
 use crate::ast::{DeclarationNode, InitDeclaratorNode, DeclaratorNode, InitializerNode, Storage, FunctionParametersNode, Tag};
-use crate::ast::{StructDeclaration, StructDeclarator, VariantId, EnumId, LabeledNode, StatementNode};
+use crate::ast::{StructDeclaration, StructDeclarator, VariantId, EnumId, LabeledStatementNode, StatementNode, Labeled, CompoundStatementNode};
+use crate::ast::{ExpressionStatementNode, SelectionStatementNode, IterationStatementNode, JumpStatementNode, JumpStatement};
 
 use crate::parser::YYLex;
 use crate::error::yyerror;
@@ -63,6 +64,7 @@ macro_rules! push {
 %type<Type> type_name
 
 %type<DeclarationNode> declaration
+%type<Vec<DeclarationNode>> declaration_list
 
 %type<TypeSpecifier> type_specifier struct_or_union_specifier
 %type<Storage> storage_class_specifier
@@ -95,8 +97,16 @@ macro_rules! push {
 %type<Vec<VariantId>> enumerator_list
 %type<VariantId> enumerator
 
-%type<LabeledNode> labeled_statement
 %type<StatementNode> statement
+%type<Vec<StatementNode>> statement_list
+
+%type<LabeledStatementNode> labeled_statement
+%type<CompoundStatementNode> compound_statement
+%type<ExpressionStatementNode> expression_statement
+%type<SelectionStatementNode> selection_statement
+%type<IterationStatementNode> iteration_statement
+%type<JumpStatementNode> jump_statement
+
 
 %%
 
@@ -164,7 +174,7 @@ expression /* ExpressionId */
     | expression '?' expression ':' expression                      { node_span!(self, expressions, ternary, $1, $3, $5) }
     ;
 
-declaration /* Declaration */
+declaration /* DeclarationNode */
 	: declaration_specifiers ';'                                    { with_span!(self, DeclarationNode::new, $1, vec![]) }
 	| declaration_specifiers init_declarator_list ';'               { with_span!(self, DeclarationNode::new, $1, $2) }
 	;
@@ -353,75 +363,74 @@ enumerator /* VariantId */
 	;
 
 statement /* StatementNode */
-	: labeled_statement
-	| compound_statement
-	| expression_statement
-	| selection_statement
-	| iteration_statement
-	| jump_statement
+	: labeled_statement                                             { node_span!(self, statements, labeled, $1) }
+	| compound_statement                                            { node_span!(self, statements, compund, $1)}
+	| expression_statement                                          { node_span!(self, statements, expression, $1) }
+	| selection_statement                                           { node_span!(self, statements, selection, $1) }
+	| iteration_statement                                           { node_span!(self, statements, iteration, $1) }
+	| jump_statement                                                { node_span!(self, statements, jump, $1) }
 	;
 
-labeled_statement /* LabeledNode */
-	: IDENTIFIER ':' statement
-	| CASE constant_expression ':' statement
-	| DEFAULT ':' statement
+labeled_statement /* LabeledStatementNode */
+	: IDENTIFIER ':' statement                                      { with_span!(self, LabeledStatementNode::identifier, $1, $3) }
+	| CASE constant_expression ':' statement                        { with_span!(self, LabeledStatementNode::case, $2, $4) }
+	| DEFAULT ':' statement                                         { with_span!(self, LabeledStatementNode::default, $3) }
+	;
+
+compound_statement /* CompoundStatementNode */
+	: '{' '}'                                                       { with_span!(self, CompoundStatementNode::new, vec![], vec![]) }
+	| '{' statement_list '}'                                        { with_span!(self, CompoundStatementNode::new, vec![], $2) }
+	| '{' declaration_list '}'                                      { with_span!(self, CompoundStatementNode::new, $2, vec![]) }
+	| '{' declaration_list statement_list '}'                       { with_span!(self, CompoundStatementNode::new, $2, $3) }
+	;
+
+declaration_list /* Vec<DeclarationNode> */
+	: declaration                                                   { vec![$1] }
+	| declaration_list declaration                                  { push!($<mut>1, $2)}
+	;
+
+statement_list /* Vec<StatementNode> */
+	: statement                                                     { vec![$1] }
+	| statement_list statement                                      { push!($<mut>1, $2)}
+	;
+
+expression_statement /* ExpressionStatementNode */
+	: ';'                                                           { with_span!(self, ExpressionStatementNode::new, None) }
+	| expression ';'                                                { with_span!(self, ExpressionStatementNode::new, Some($1)) }
+	;
+
+selection_statement /* SelectionStatementNode */
+	: IF '(' expression ')' statement                               { with_span!(self, SelectionStatementNode::new_if, $3, $5, None) }
+	| IF '(' expression ')' statement ELSE statement                { with_span!(self, SelectionStatementNode::new_if, $3, $5, Some($7))  }
+	| SWITCH '(' expression ')' statement                           { with_span!(self, SelectionStatementNode::switch, $3, $5) } ;
+
+iteration_statement /* IterationStatementNode */
+	: WHILE '(' expression ')' statement                            { with_span!(self, IterationStatementNode::new_while, $3, $5) }
+	| DO statement WHILE '(' expression ')' ';'                     { with_span!(self, IterationStatementNode::new_do, $2, $5) }
+	| FOR '(' expression_statement expression_statement ')' statement               { with_span!(self, IterationStatementNode::new_for, $3, $4, None, $6) }
+	| FOR '(' expression_statement expression_statement expression ')' statement    { with_span!(self, IterationStatementNode::new_for, $3, $4, Some($5), $7) }
+	;
+
+jump_statement /* JumpStatementNode */
+	: GOTO IDENTIFIER ';'                                           { with_span!(self, JumpStatementNode::new, JumpStatement::Goto) }
+	| CONTINUE ';'                                                  { with_span!(self, JumpStatementNode::new, JumpStatement::Continue) }
+	| BREAK ';'                                                     { with_span!(self, JumpStatementNode::new, JumpStatement::Break) }
+	| RETURN ';'                                                    { with_span!(self, JumpStatementNode::new_return, None) }
+    | RETURN expression ';'                                         { with_span!(self, JumpStatementNode::new_return, Some($2)) }
 	;
 
 %%
 
-// compound_statement /* */
-// 	: '{' '}'
-// 	| '{' statement_list '}'
-// 	| '{' declaration_list '}'
-// 	| '{' declaration_list statement_list '}'
-// 	;
-//
-// declaration_list /* */
-// 	: declaration
-// 	| declaration_list declaration
-// 	;
-//
-// statement_list /* */
-// 	: statement
-// 	| statement_list statement
-// 	;
-//
-// expression_statement /* */
-// 	: ';'
-// 	| expression ';'
-// 	;
-//
-// selection_statement /* */
-// 	: IF '(' expression ')' statement
-// 	| IF '(' expression ')' statement ELSE statement
-// 	| SWITCH '(' expression ')' statement
-// 	;
-//
-// iteration_statement /* */
-// 	: WHILE '(' expression ')' statement
-// 	| DO statement WHILE '(' expression ')' ';'
-// 	| FOR '(' expression_statement expression_statement ')' statement
-// 	| FOR '(' expression_statement expression_statement expression ')' statement
-// 	;
-//
-// jump_statement /* */
-// 	: GOTO IDENTIFIER ';'
-// 	| CONTINUE ';'
-// 	| BREAK ';'
-// 	| RETURN ';'
-// 	| RETURN expression ';'
-// 	;
-//
 // translation_unit /* */
 // 	: external_declaration
 // 	| translation_unit external_declaration
 // 	;
-//
+
 // external_declaration /* */
 // 	: function_definition
 // 	| declaration
 // 	;
-//
+
 // function_definition /* */
 // 	: declaration_specifiers declarator declaration_list compound_statement
 // 	| declaration_specifiers declarator compound_statement

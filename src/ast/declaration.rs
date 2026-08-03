@@ -7,17 +7,6 @@ use crate::parser::Span;
 
 define_arena!(Declarator, DeclaratorArena, DeclaratorId);
 
-// #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-// pub struct ExternalDeclarationNode {
-//     span: Span,
-// }
-//
-// #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-// pub enum ExternalDeclaration {
-//     Function(Function),
-//     Declaration(Declaration),
-// }
-
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct DeclarationNode {
     pub span: Span,

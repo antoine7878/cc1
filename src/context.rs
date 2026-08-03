@@ -1,19 +1,18 @@
-use crate::ast::tag::StructDeclaration;
-use crate::ast::{DeclaratorArena, Name, Tag, TypeSpecifier, UnionArena, VariantArena};
-use crate::ast::{EnumArena, ExpressionArena, StringArena, StructArena};
+use crate::ast::{DeclaratorArena, Name, StructDeclaration, Tag, TypeSpecifier, UnionArena, VariantArena};
+use crate::ast::{EnumArena, ExpressionArena, StatementArena, StringArena, StructArena};
 use crate::parser::{Span, YYLex};
 use std::io::Read;
 
 #[derive(Debug, Default)]
 pub struct Arenas {
     pub names: StringArena,
-    // pub types: TypeArena,
     pub structs: StructArena,
     pub enums: EnumArena,
     pub unions: UnionArena,
     pub variants: VariantArena,
     pub expressions: ExpressionArena,
     pub declarators: DeclaratorArena,
+    pub statements: StatementArena,
 }
 
 #[derive(Debug, Default)]
