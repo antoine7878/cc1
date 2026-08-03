@@ -49,8 +49,8 @@ pub struct ExpressionStatementNode {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct SelectionStatementNode {
-    span: Span,
-    stmt: SelectionStatement,
+    pub span: Span,
+    pub stmt: SelectionStatement,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -61,8 +61,8 @@ pub enum SelectionStatement {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct IterationStatementNode {
-    span: Span,
-    stmt: IterationStatement,
+    pub span: Span,
+    pub stmt: IterationStatement,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -79,8 +79,8 @@ pub enum IterationStatement {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct JumpStatementNode {
-    span: Span,
-    stmt: JumpStatement,
+    pub span: Span,
+    pub stmt: JumpStatement,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]

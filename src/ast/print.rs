@@ -1,9 +1,10 @@
 use std::io::{Write, stdout};
 
 use crate::ast::{
-    DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, Expression, ExpressionNode,
-    FunctionParameters, FunctionParametersNode, InitDeclaratorNode, Initializer, InitializerNode, Name, ParameterDeclaration,
-    StructDeclaration, StructDeclarator, Type, TypeSpecifier,
+    DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, Expression, ExpressionNode, ExpressionStatementNode,
+    FunctionParameters, FunctionParametersNode, InitDeclaratorNode, Initializer, InitializerNode, IterationStatement, JumpStatement,
+    Labeled, Name, ParameterDeclaration, SelectionStatement, Statement, StatementNode, StructDeclaration, StructDeclarator, Type,
+    TypeSpecifier,
 };
 use crate::context::Context;
 use crate::parser::Span;
@@ -24,26 +25,59 @@ fn has_type_specs(specs: &[DeclarationSpecifier]) -> bool {
 impl Context {
     pub fn print_ast(&mut self, node: &DeclarationNode) -> std::io::Result<()> {
         let w = &mut stdout();
-        let prefix = &mut String::new();
+        self.print_decl_parts(w, &mut String::new(), node, None)
+    }
+
+    pub fn print_statement(&mut self, node: &StatementNode) -> std::io::Result<()> {
+        let w = &mut stdout();
+        self.print_stmt(w, &mut String::new(), node, None)
+    }
+
+    fn print_decl_parts<W: Write>(
+        &self,
+        w: &mut W,
+        prefix: &mut String,
+        node: &DeclarationNode,
+        is_last: Option<bool>,
+    ) -> std::io::Result<()> {
+        let child = |i: usize, total: usize| is_last.map(|_| i == total);
+        let tags = node
+            .specifiers
+            .iter()
+            .filter(|s| {
+                matches!(
+                    s,
+                    DeclarationSpecifier::Type(TypeSpecifier::Struct(_) | TypeSpecifier::Union(_) | TypeSpecifier::Enum(_))
+                )
+            })
+            .count();
+        let total = tags + node.init_declarators.len();
+        let mut i = 0;
         for spec in node.specifiers.iter().rev() {
             if let DeclarationSpecifier::Type(ty) = spec {
                 match ty {
                     TypeSpecifier::Struct(id) => {
+                        i += 1;
                         let record = self.arenas.structs.get(*id);
-                        self.print_record(w, prefix, "struct", &record.span, &record.name, &record.fields)?;
+                        self.print_record(w, prefix, "struct", &record.span, &record.name, &record.fields, child(i, total))?;
                     }
                     TypeSpecifier::Union(id) => {
+                        i += 1;
                         let record = self.arenas.unions.get(*id);
-                        self.print_record(w, prefix, "union", &record.span, &record.name, &record.fields)?;
+                        self.print_record(w, prefix, "union", &record.span, &record.name, &record.fields, child(i, total))?;
                     }
-                    TypeSpecifier::Enum(id) => self.print_enum(w, prefix, id)?,
+                    TypeSpecifier::Enum(id) => {
+                        i += 1;
+                        self.print_enum(w, prefix, id, child(i, total))?;
+                    }
                     _ => {}
                 }
             }
         }
-        for (i, init_decl) in node.init_declarators.iter().enumerate() {
-            let span = if i == 0 { &node.span } else { &init_decl.span };
-            self.print_decl(w, prefix, node, init_decl, span)?;
+        for (j, init_decl) in node.init_declarators.iter().enumerate() {
+            i += 1;
+            let span = if j == 0 { &node.span } else { &init_decl.span };
+            self.print_decl(w, prefix, node, init_decl, span, child(i, total))?;
         }
         Ok(())
     }
@@ -56,8 +90,10 @@ impl Context {
         span: &Span,
         name: &Option<Name>,
         fields: &[StructDeclaration],
+        is_last: Option<bool>,
     ) -> std::io::Result<()> {
-        write!(w, "RecordDecl {span}")?;
+        let (b, extend) = is_last.map_or(("", ""), branch);
+        write!(w, "{prefix}{b}RecordDecl {span}")?;
         if let Some(name) = name {
             write!(w, " {}", name.span)?;
         }
@@ -69,6 +105,8 @@ impl Context {
             return writeln!(w);
         }
         writeln!(w, " definition")?;
+        let len = prefix.len();
+        prefix.push_str(extend);
         let total = fields.iter().map(|field| field.struct_declarators.len()).sum::<usize>();
         let mut i = 0;
         for field in fields {
@@ -78,6 +116,7 @@ impl Context {
                 self.print_field(w, prefix, field, declarator, span, i == total)?;
             }
         }
+        prefix.truncate(len);
         Ok(())
     }
 
@@ -101,19 +140,22 @@ impl Context {
         if let Some(bit_width) = &declarator.bit_width {
             let len = prefix.len();
             prefix.push_str(extend);
-            self.print_expression(w, prefix, bit_width, true)?;
+            self.print_expression(w, prefix, bit_width, Some(true))?;
             prefix.truncate(len);
         }
         Ok(())
     }
 
-    fn print_enum<W: Write>(&self, w: &mut W, prefix: &mut String, id: &EnumId) -> std::io::Result<()> {
+    fn print_enum<W: Write>(&self, w: &mut W, prefix: &mut String, id: &EnumId, is_last: Option<bool>) -> std::io::Result<()> {
+        let (b, extend) = is_last.map_or(("", ""), branch);
         let en = self.arenas.enums.get(*id);
-        write!(w, "EnumDecl {}", en.span)?;
+        write!(w, "{prefix}{b}EnumDecl {}", en.span)?;
         if let Some(name) = &en.name {
             write!(w, " {} {}", name.span, self.arenas.names.get(name.id))?;
         }
         writeln!(w)?;
+        let len = prefix.len();
+        prefix.push_str(extend);
         for (i, variant_id) in en.variants.iter().enumerate() {
             let (branch, extend) = branch(i + 1 == en.variants.len());
             let variant = self.arenas.variants.get(*variant_id);
@@ -127,10 +169,11 @@ impl Context {
             if let Some(value) = &variant.value {
                 let len = prefix.len();
                 prefix.push_str(extend);
-                self.print_expression(w, prefix, value, true)?;
+                self.print_expression(w, prefix, value, Some(true))?;
                 prefix.truncate(len);
             }
         }
+        prefix.truncate(len);
         Ok(())
     }
 
@@ -141,10 +184,12 @@ impl Context {
         node: &DeclarationNode,
         init_decl: &InitDeclaratorNode,
         span: &Span,
+        is_last: Option<bool>,
     ) -> std::io::Result<()> {
+        let (b, extend) = is_last.map_or(("", ""), branch);
         let name = self.declarator_name(&init_decl.declarator);
         if let Declarator::Function { params, .. } = self.arenas.declarators.get(init_decl.declarator.id) {
-            write!(w, "FunctionDecl {span}")?;
+            write!(w, "{prefix}{b}FunctionDecl {span}")?;
             self.write_name(w, &name)?;
             write!(w, " '")?;
             self.write_type_specifiers(w, &node.specifiers)?;
@@ -153,6 +198,8 @@ impl Context {
             write!(w, ")'")?;
             self.write_storage(w, &node.specifiers)?;
             writeln!(w)?;
+            let len = prefix.len();
+            prefix.push_str(extend);
             match &params.param {
                 FunctionParameters::ParameterTypeList(params) | FunctionParameters::Variadic(params) => {
                     for (i, param) in params.iter().enumerate() {
@@ -167,8 +214,9 @@ impl Context {
                 }
                 FunctionParameters::Empty => {}
             }
+            prefix.truncate(len);
         } else {
-            write!(w, "VarDecl {span}")?;
+            write!(w, "{prefix}{b}VarDecl {span}")?;
             self.write_name(w, &name)?;
             write!(w, " '")?;
             self.write_type_specifiers(w, &node.specifiers)?;
@@ -177,10 +225,190 @@ impl Context {
             self.write_storage(w, &node.specifiers)?;
             writeln!(w)?;
             if let Some(init) = &init_decl.initializer {
+                let len = prefix.len();
+                prefix.push_str(extend);
                 self.print_initializer(w, prefix, init, true)?;
+                prefix.truncate(len);
             }
         }
         Ok(())
+    }
+
+    fn print_stmt<W: Write>(
+        &self,
+        w: &mut W,
+        prefix: &mut String,
+        node: &StatementNode,
+        is_last: Option<bool>,
+    ) -> std::io::Result<()> {
+        let (b, extend) = is_last.map_or(("", ""), branch);
+        match self.arenas.statements.get(node.id) {
+            Statement::Labeled(labeled) => match &labeled.inner {
+                Labeled::Identifier(name, stmt) => {
+                    writeln!(w, "{prefix}{b}LabelStmt {} {} '{}'", labeled.span, name.span, self.arenas.names.get(name.id))?;
+                    let len = prefix.len();
+                    prefix.push_str(extend);
+                    let result = self.print_stmt(w, prefix, stmt, Some(true));
+                    prefix.truncate(len);
+                    result
+                }
+                Labeled::Case(expr, stmt) => {
+                    writeln!(w, "{prefix}{b}CaseStmt {}", labeled.span)?;
+                    let len = prefix.len();
+                    prefix.push_str(extend);
+                    let result = self
+                        .print_expression(w, prefix, expr, Some(false))
+                        .and_then(|()| self.print_stmt(w, prefix, stmt, Some(true)));
+                    prefix.truncate(len);
+                    result
+                }
+                Labeled::Default(stmt) => {
+                    writeln!(w, "{prefix}{b}DefaultStmt {}", labeled.span)?;
+                    let len = prefix.len();
+                    prefix.push_str(extend);
+                    let result = self.print_stmt(w, prefix, stmt, Some(true));
+                    prefix.truncate(len);
+                    result
+                }
+            },
+            Statement::Compound(compound) => {
+                writeln!(w, "{prefix}{b}CompoundStmt {}", compound.span)?;
+                let len = prefix.len();
+                prefix.push_str(extend);
+                let total = compound.declarations.len() + compound.statements.len();
+                let mut i = 0;
+                for declaration in &compound.declarations {
+                    i += 1;
+                    self.print_decl_stmt(w, prefix, declaration, Some(i == total))?;
+                }
+                for stmt in &compound.statements {
+                    i += 1;
+                    self.print_stmt(w, prefix, stmt, Some(i == total))?;
+                }
+                prefix.truncate(len);
+                Ok(())
+            }
+            Statement::Expression(expr_stmt) => match &expr_stmt.expr {
+                Some(expr) => self.print_expression(w, prefix, expr, is_last),
+                None => writeln!(w, "{prefix}{b}NullStmt {}", expr_stmt.span),
+            },
+            Statement::Selection(selection) => match &selection.stmt {
+                SelectionStatement::If(cond, then, otherwise) => {
+                    write!(w, "{prefix}{b}IfStmt {}", selection.span)?;
+                    if otherwise.is_some() {
+                        write!(w, " has_else")?;
+                    }
+                    writeln!(w)?;
+                    let len = prefix.len();
+                    prefix.push_str(extend);
+                    self.print_expression(w, prefix, cond, Some(false))?;
+                    self.print_stmt(w, prefix, then, Some(otherwise.is_some()))?;
+                    if let Some(otherwise) = otherwise {
+                        self.print_stmt(w, prefix, otherwise, Some(true))?;
+                    }
+                    prefix.truncate(len);
+                    Ok(())
+                }
+                SelectionStatement::Switch(cond, stmt) => {
+                    writeln!(w, "{prefix}{b}SwitchStmt {}", selection.span)?;
+                    let len = prefix.len();
+                    prefix.push_str(extend);
+                    let result = self
+                        .print_expression(w, prefix, cond, Some(false))
+                        .and_then(|()| self.print_stmt(w, prefix, stmt, Some(true)));
+                    prefix.truncate(len);
+                    result
+                }
+            },
+            Statement::Iteration(iteration) => match &iteration.stmt {
+                IterationStatement::While(cond, body) => {
+                    writeln!(w, "{prefix}{b}WhileStmt {}", iteration.span)?;
+                    let len = prefix.len();
+                    prefix.push_str(extend);
+                    let result = self
+                        .print_expression(w, prefix, cond, Some(false))
+                        .and_then(|()| self.print_stmt(w, prefix, body, Some(true)));
+                    prefix.truncate(len);
+                    result
+                }
+                IterationStatement::Do(body, cond) => {
+                    writeln!(w, "{prefix}{b}DoStmt {}", iteration.span)?;
+                    let len = prefix.len();
+                    prefix.push_str(extend);
+                    let result = self
+                        .print_stmt(w, prefix, body, Some(false))
+                        .and_then(|()| self.print_expression(w, prefix, cond, Some(true)));
+                    prefix.truncate(len);
+                    result
+                }
+                IterationStatement::For(init, cond, inc, body) => {
+                    writeln!(w, "{prefix}{b}ForStmt {}", iteration.span)?;
+                    let len = prefix.len();
+                    prefix.push_str(extend);
+                    let total = 3 + inc.is_some() as usize;
+                    let mut i = 0;
+                    i += 1;
+                    self.print_expr_stmt(w, prefix, init, i == total)?;
+                    i += 1;
+                    self.print_expr_stmt(w, prefix, cond, i == total)?;
+                    if let Some(inc) = inc {
+                        i += 1;
+                        self.print_expression(w, prefix, inc, Some(i == total))?;
+                    }
+                    i += 1;
+                    self.print_stmt(w, prefix, body, Some(i == total))?;
+                    prefix.truncate(len);
+                    Ok(())
+                }
+            },
+            Statement::Jump(jump) => match &jump.stmt {
+                JumpStatement::Goto => writeln!(w, "{prefix}{b}GotoStmt {}", jump.span),
+                JumpStatement::Continue => writeln!(w, "{prefix}{b}ContinueStmt {}", jump.span),
+                JumpStatement::Break => writeln!(w, "{prefix}{b}BreakStmt {}", jump.span),
+                JumpStatement::Return(expr) => {
+                    writeln!(w, "{prefix}{b}ReturnStmt {}", jump.span)?;
+                    if let Some(expr) = expr {
+                        let len = prefix.len();
+                        prefix.push_str(extend);
+                        self.print_expression(w, prefix, expr, Some(true))?;
+                        prefix.truncate(len);
+                    }
+                    Ok(())
+                }
+            },
+        }
+    }
+
+    fn print_expr_stmt<W: Write>(
+        &self,
+        w: &mut W,
+        prefix: &mut String,
+        node: &ExpressionStatementNode,
+        is_last: bool,
+    ) -> std::io::Result<()> {
+        match &node.expr {
+            Some(expr) => self.print_expression(w, prefix, expr, Some(is_last)),
+            None => {
+                let (b, _) = branch(is_last);
+                writeln!(w, "{prefix}{b}NullStmt {}", node.span)
+            }
+        }
+    }
+
+    fn print_decl_stmt<W: Write>(
+        &self,
+        w: &mut W,
+        prefix: &mut String,
+        node: &DeclarationNode,
+        is_last: Option<bool>,
+    ) -> std::io::Result<()> {
+        let (b, extend) = is_last.map_or(("", ""), branch);
+        writeln!(w, "{prefix}{b}DeclStmt {}", node.span)?;
+        let len = prefix.len();
+        prefix.push_str(extend);
+        let result = self.print_decl_parts(w, prefix, node, Some(true));
+        prefix.truncate(len);
+        result
     }
 
     fn write_name<W: Write>(&self, w: &mut W, name: &Option<Name>) -> std::io::Result<()> {
@@ -347,7 +575,7 @@ impl Context {
         is_last: bool,
     ) -> std::io::Result<()> {
         match &node.init {
-            Initializer::Single(expr) => self.print_expression(w, prefix, expr, is_last),
+            Initializer::Single(expr) => self.print_expression(w, prefix, expr, Some(is_last)),
             Initializer::List(list) => {
                 let (branch, extend) = branch(is_last);
                 writeln!(w, "{prefix}{branch}InitListExpr {}", node.span)?;
@@ -367,11 +595,11 @@ impl Context {
         w: &mut W,
         prefix: &mut String,
         node: &ExpressionNode,
-        is_last: bool,
+        is_last: Option<bool>,
     ) -> std::io::Result<()> {
         let expr = self.arenas.expressions.get(node.id);
-        let (branch, extend) = branch(is_last);
-        write!(w, "{prefix}{branch}{expr} {}", node.span)?;
+        let (b, extend) = is_last.map_or(("", ""), branch);
+        write!(w, "{prefix}{b}{expr} {}", node.span)?;
         self.write_inline_name(w, expr)?;
         writeln!(w)?;
         let len = prefix.len();
@@ -410,7 +638,7 @@ impl Context {
             | Expression::Plus(id)
             | Expression::Minus(id)
             | Expression::BitNot(id)
-            | Expression::Not(id) => self.print_expression(w, prefix, id, true)?,
+            | Expression::Not(id) => self.print_expression(w, prefix, id, Some(true))?,
             Expression::Add(lhs, rhs)
             | Expression::Sub(lhs, rhs)
             | Expression::Mul(lhs, rhs)
@@ -443,20 +671,20 @@ impl Context {
             | Expression::List(lhs, rhs)
             | Expression::ArrayAcces(lhs, rhs) => self.print_binop(w, prefix, lhs, rhs)?,
             Expression::FunctionCall(fun, Some(args)) => self.print_binop(w, prefix, fun, args)?,
-            Expression::FunctionCall(fun, None) => self.print_expression(w, prefix, fun, true)?,
-            Expression::DotAcces(tag, _) => self.print_expression(w, prefix, tag, true)?,
-            Expression::PtrAcces(tag, _) => self.print_expression(w, prefix, tag, true)?,
-            Expression::SizeofExpr(node) => self.print_expression(w, prefix, node, true)?,
+            Expression::FunctionCall(fun, None) => self.print_expression(w, prefix, fun, Some(true))?,
+            Expression::DotAcces(tag, _) => self.print_expression(w, prefix, tag, Some(true))?,
+            Expression::PtrAcces(tag, _) => self.print_expression(w, prefix, tag, Some(true))?,
+            Expression::SizeofExpr(node) => self.print_expression(w, prefix, node, Some(true))?,
             Expression::SizeofType(ty) => self.print_type(w, prefix, ty, true)?,
-            Expression::ConstantExpression(node) => self.print_expression(w, prefix, node, true)?,
+            Expression::ConstantExpression(node) => self.print_expression(w, prefix, node, Some(true))?,
             Expression::Ternary(cond, then, otherwise) => {
-                self.print_expression(w, prefix, cond, false)?;
-                self.print_expression(w, prefix, then, false)?;
-                self.print_expression(w, prefix, otherwise, true)?;
+                self.print_expression(w, prefix, cond, Some(false))?;
+                self.print_expression(w, prefix, then, Some(false))?;
+                self.print_expression(w, prefix, otherwise, Some(true))?;
             }
             Expression::Cast(ty, node) => {
                 self.print_type(w, prefix, ty, false)?;
-                self.print_expression(w, prefix, node, true)?;
+                self.print_expression(w, prefix, node, Some(true))?;
             }
         }
         Ok(())
@@ -469,8 +697,8 @@ impl Context {
         lhs: &ExpressionNode,
         rhs: &ExpressionNode,
     ) -> std::io::Result<()> {
-        self.print_expression(w, prefix, lhs, false)?;
-        self.print_expression(w, prefix, rhs, true)
+        self.print_expression(w, prefix, lhs, Some(false))?;
+        self.print_expression(w, prefix, rhs, Some(true))
     }
 
     fn print_type<W: Write>(&self, w: &mut W, prefix: &mut String, ty: &Type, is_last: bool) -> std::io::Result<()> {

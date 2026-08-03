@@ -41,7 +41,7 @@ macro_rules! push {
 %token TYPEDEF EXTERN STATIC AUTO REGISTER
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID
 %token STRUCT UNION ENUM ELLIPSIS
-%token CASE DEFAULT IF ELSE SWITCH WHILE DO FOR GOTO CONTINUE BREAK RETURN
+%token CASE DEFAULT IF SWITCH WHILE DO FOR GOTO CONTINUE BREAK RETURN
 
 %left ','
 %right '=' SUB_ASSIGN LEFT_ASSIGN RIGHT_ASSIGN AND_ASSIGN MUL_ASSIGN
@@ -59,6 +59,8 @@ macro_rules! push {
 %left '*' '/' '%'
 %right '!' '~' INC_OP DEC_OP POST_INC_OP POST_DEC_OP SIZEOF PREC_UNARY
 %nonassoc '(' '[' '.' PTR_OP
+%nonassoc PREC_THEN
+%nonassoc ELSE
 
 %type<ExpressionNode> expression constant_expression
 %type<Type> type_name
@@ -112,6 +114,7 @@ macro_rules! push {
 
 unit
     : declaration                                                   { self.lexer.ctx.print_ast(&$1); YYToken::unit }
+    | statement                                                     { self.lexer.ctx.print_statement(&$1); YYToken::unit }
     ;
 
 constant_expression /* ExpressionId */
@@ -400,7 +403,7 @@ expression_statement /* ExpressionStatementNode */
 	;
 
 selection_statement /* SelectionStatementNode */
-	: IF '(' expression ')' statement                               { with_span!(self, SelectionStatementNode::new_if, $3, $5, None) }
+	: IF '(' expression ')' statement %prec PREC_THEN                   { with_span!(self, SelectionStatementNode::new_if, $3, $5, None) }
 	| IF '(' expression ')' statement ELSE statement                { with_span!(self, SelectionStatementNode::new_if, $3, $5, Some($7))  }
 	| SWITCH '(' expression ')' statement                           { with_span!(self, SelectionStatementNode::switch, $3, $5) } ;
 
