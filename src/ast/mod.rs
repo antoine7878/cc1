@@ -21,4 +21,4 @@ pub use statement::{JumpStatementNode, SelectionStatement, SelectionStatementNod
 pub use tag::{EnumArena, EnumId, StructArena, StructDeclaration, StructDeclarator, StructId};
 pub use tag::{Tag, UnionArena, UnionId, VariantArena, VariantId};
 pub use type_specifier::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier};
-pub use unit::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode};
+pub use unit::{ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode};

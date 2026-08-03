@@ -5,8 +5,8 @@ use crate::{
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct TranslationUnitNode {
-    span: Span,
-    declarations: Vec<ExternalDeclarationNode>,
+    pub span: Span,
+    pub declarations: Vec<ExternalDeclarationNode>,
 }
 
 impl TranslationUnitNode {
@@ -17,8 +17,8 @@ impl TranslationUnitNode {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ExternalDeclarationNode {
-    span: Span,
-    decl: ExternalDeclaration,
+    pub span: Span,
+    pub decl: ExternalDeclaration,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -45,11 +45,11 @@ impl ExternalDeclarationNode {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct FunctionDefinitionNode {
-    span: Span,
-    specifiers: Vec<DeclarationSpecifier>,
-    declarator: DeclaratorNode,
-    declarations: Vec<DeclarationNode>,
-    coumpound: CompoundStatementNode,
+    pub span: Span,
+    pub specifiers: Vec<DeclarationSpecifier>,
+    pub declarator: DeclaratorNode,
+    pub declarations: Vec<DeclarationNode>,
+    pub coumpound: CompoundStatementNode,
 }
 
 impl FunctionDefinitionNode {

@@ -1,9 +1,10 @@
 use std::io::{Write, stdout};
 
 use crate::ast::{
-    DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, Expression, ExpressionNode, ExpressionStatementNode,
-    FunctionParameters, FunctionParametersNode, InitDeclaratorNode, Initializer, InitializerNode, IterationStatement, JumpStatement,
-    Labeled, Name, ParameterDeclaration, SelectionStatement, Statement, StatementNode, StructDeclaration, StructDeclarator, Type,
+    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, Expression, ExpressionNode,
+    ExpressionStatementNode, ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionNode, FunctionParameters,
+    FunctionParametersNode, InitDeclaratorNode, Initializer, InitializerNode, IterationStatement, JumpStatement, Labeled, Name,
+    ParameterDeclaration, SelectionStatement, Statement, StatementNode, StructDeclaration, StructDeclarator, TranslationUnitNode, Type,
     TypeSpecifier,
 };
 use crate::context::Context;
@@ -23,14 +24,61 @@ fn has_type_specs(specs: &[DeclarationSpecifier]) -> bool {
 }
 
 impl Context {
-    pub fn print_ast(&mut self, node: &DeclarationNode) -> std::io::Result<()> {
+    pub fn print_ast(&mut self, node: &TranslationUnitNode) -> std::io::Result<()> {
         let w = &mut stdout();
-        self.print_decl_parts(w, &mut String::new(), node, None)
+        writeln!(w, "TranslationUnitDecl {}", node.span)?;
+        let prefix = &mut String::new();
+        for (i, external) in node.declarations.iter().enumerate() {
+            self.print_external(w, prefix, external, Some(i + 1 == node.declarations.len()))?;
+        }
+        Ok(())
     }
 
     pub fn print_statement(&mut self, node: &StatementNode) -> std::io::Result<()> {
         let w = &mut stdout();
         self.print_stmt(w, &mut String::new(), node, None)
+    }
+
+    fn print_external<W: Write>(
+        &self,
+        w: &mut W,
+        prefix: &mut String,
+        node: &ExternalDeclarationNode,
+        is_last: Option<bool>,
+    ) -> std::io::Result<()> {
+        match &node.decl {
+            ExternalDeclaration::Declaration(declaration) => self.print_decl_parts(w, prefix, declaration, is_last),
+            ExternalDeclaration::Function(function) => self.print_function(w, prefix, function, is_last),
+        }
+    }
+
+    fn print_function<W: Write>(
+        &self,
+        w: &mut W,
+        prefix: &mut String,
+        node: &FunctionDefinitionNode,
+        is_last: Option<bool>,
+    ) -> std::io::Result<()> {
+        let (b, extend) = is_last.map_or(("", ""), branch);
+        let name = self.declarator_name(&node.declarator);
+        write!(w, "{prefix}{b}FunctionDecl {}", node.span)?;
+        self.write_name(w, &name)?;
+        write!(w, " '")?;
+        self.write_decl_type(w, &node.specifiers, &node.declarator)?;
+        write!(w, "'")?;
+        self.write_storage(w, &node.specifiers)?;
+        writeln!(w)?;
+        let len = prefix.len();
+        prefix.push_str(extend);
+        if let Declarator::Function { params, .. } = self.arenas.declarators.get(node.declarator.id) {
+            self.print_params_children(w, prefix, params, false)?;
+        }
+        for declaration in &node.declarations {
+            self.print_decl_stmt(w, prefix, declaration, Some(false))?;
+        }
+        self.print_compound(w, prefix, &node.coumpound, Some(true))?;
+        prefix.truncate(len);
+        Ok(())
     }
 
     fn print_decl_parts<W: Write>(
@@ -40,7 +88,7 @@ impl Context {
         node: &DeclarationNode,
         is_last: Option<bool>,
     ) -> std::io::Result<()> {
-        let child = |i: usize, total: usize| is_last.map(|_| i == total);
+        let child = |i: usize, total: usize| is_last.map(|last| last && i == total);
         let tags = node
             .specifiers
             .iter()
@@ -187,49 +235,63 @@ impl Context {
         is_last: Option<bool>,
     ) -> std::io::Result<()> {
         let (b, extend) = is_last.map_or(("", ""), branch);
+        let is_function = matches!(self.arenas.declarators.get(init_decl.declarator.id), Declarator::Function { .. });
+        let kind = if is_function { "FunctionDecl" } else { "VarDecl" };
+        write!(w, "{prefix}{b}{kind} {span}")?;
         let name = self.declarator_name(&init_decl.declarator);
+        self.write_name(w, &name)?;
+        write!(w, " '")?;
+        self.write_decl_type(w, &node.specifiers, &init_decl.declarator)?;
+        write!(w, "'")?;
+        self.write_storage(w, &node.specifiers)?;
+        writeln!(w)?;
+        let len = prefix.len();
+        prefix.push_str(extend);
         if let Declarator::Function { params, .. } = self.arenas.declarators.get(init_decl.declarator.id) {
-            write!(w, "{prefix}{b}FunctionDecl {span}")?;
-            self.write_name(w, &name)?;
-            write!(w, " '")?;
-            self.write_type_specifiers(w, &node.specifiers)?;
+            self.print_params_children(w, prefix, params, true)?;
+        } else if let Some(init) = &init_decl.initializer {
+            self.print_initializer(w, prefix, init, true)?;
+        }
+        prefix.truncate(len);
+        Ok(())
+    }
+
+    fn write_decl_type<W: Write>(
+        &self,
+        w: &mut W,
+        specs: &[DeclarationSpecifier],
+        declarator: &DeclaratorNode,
+    ) -> std::io::Result<()> {
+        self.write_type_specifiers(w, specs)?;
+        if let Declarator::Function { params, .. } = self.arenas.declarators.get(declarator.id) {
             write!(w, " (")?;
             self.write_clang_params(w, params)?;
-            write!(w, ")'")?;
-            self.write_storage(w, &node.specifiers)?;
-            writeln!(w)?;
-            let len = prefix.len();
-            prefix.push_str(extend);
-            match &params.param {
-                FunctionParameters::ParameterTypeList(params) | FunctionParameters::Variadic(params) => {
-                    for (i, param) in params.iter().enumerate() {
-                        self.print_parm(w, prefix, param, i + 1 == params.len())?;
-                    }
-                }
-                FunctionParameters::OldStyle(names) => {
-                    for (i, name) in names.iter().enumerate() {
-                        let (b, _) = branch(i + 1 == names.len());
-                        writeln!(w, "{prefix}{b}ParmVarDecl {} {} {}", name.span, name.span, self.arenas.names.get(name.id))?;
-                    }
-                }
-                FunctionParameters::Empty => {}
-            }
-            prefix.truncate(len);
+            write!(w, ")")
         } else {
-            write!(w, "{prefix}{b}VarDecl {span}")?;
-            self.write_name(w, &name)?;
-            write!(w, " '")?;
-            self.write_type_specifiers(w, &node.specifiers)?;
-            self.write_clang_declarator(w, &init_decl.declarator, has_type_specs(&node.specifiers))?;
-            write!(w, "'")?;
-            self.write_storage(w, &node.specifiers)?;
-            writeln!(w)?;
-            if let Some(init) = &init_decl.initializer {
-                let len = prefix.len();
-                prefix.push_str(extend);
-                self.print_initializer(w, prefix, init, true)?;
-                prefix.truncate(len);
+            self.write_clang_declarator(w, declarator, has_type_specs(specs))
+        }
+    }
+
+    fn print_params_children<W: Write>(
+        &self,
+        w: &mut W,
+        prefix: &mut String,
+        params: &FunctionParametersNode,
+        last_is_last: bool,
+    ) -> std::io::Result<()> {
+        match &params.param {
+            FunctionParameters::ParameterTypeList(params) | FunctionParameters::Variadic(params) => {
+                for (i, param) in params.iter().enumerate() {
+                    self.print_parm(w, prefix, param, i + 1 == params.len() && last_is_last)?;
+                }
             }
+            FunctionParameters::OldStyle(names) => {
+                for (i, name) in names.iter().enumerate() {
+                    let (b, _) = branch(i + 1 == names.len() && last_is_last);
+                    writeln!(w, "{prefix}{b}ParmVarDecl {} {} {}", name.span, name.span, self.arenas.names.get(name.id))?;
+                }
+            }
+            FunctionParameters::Empty => {}
         }
         Ok(())
     }
@@ -271,23 +333,7 @@ impl Context {
                     result
                 }
             },
-            Statement::Compound(compound) => {
-                writeln!(w, "{prefix}{b}CompoundStmt {}", compound.span)?;
-                let len = prefix.len();
-                prefix.push_str(extend);
-                let total = compound.declarations.len() + compound.statements.len();
-                let mut i = 0;
-                for declaration in &compound.declarations {
-                    i += 1;
-                    self.print_decl_stmt(w, prefix, declaration, Some(i == total))?;
-                }
-                for stmt in &compound.statements {
-                    i += 1;
-                    self.print_stmt(w, prefix, stmt, Some(i == total))?;
-                }
-                prefix.truncate(len);
-                Ok(())
-            }
+            Statement::Compound(compound) => self.print_compound(w, prefix, compound, is_last),
             Statement::Expression(expr_stmt) => match &expr_stmt.expr {
                 Some(expr) => self.print_expression(w, prefix, expr, is_last),
                 None => writeln!(w, "{prefix}{b}NullStmt {}", expr_stmt.span),
@@ -377,6 +423,31 @@ impl Context {
                 }
             },
         }
+    }
+
+    fn print_compound<W: Write>(
+        &self,
+        w: &mut W,
+        prefix: &mut String,
+        compound: &CompoundStatementNode,
+        is_last: Option<bool>,
+    ) -> std::io::Result<()> {
+        let (b, extend) = is_last.map_or(("", ""), branch);
+        writeln!(w, "{prefix}{b}CompoundStmt {}", compound.span)?;
+        let len = prefix.len();
+        prefix.push_str(extend);
+        let total = compound.declarations.len() + compound.statements.len();
+        let mut i = 0;
+        for declaration in &compound.declarations {
+            i += 1;
+            self.print_decl_stmt(w, prefix, declaration, Some(i == total))?;
+        }
+        for stmt in &compound.statements {
+            i += 1;
+            self.print_stmt(w, prefix, stmt, Some(i == total))?;
+        }
+        prefix.truncate(len);
+        Ok(())
     }
 
     fn print_expr_stmt<W: Write>(
