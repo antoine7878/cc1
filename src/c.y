@@ -4,6 +4,7 @@ use crate::ast::{Qualifier, Type, ExpressionNode, Name, DeclarationSpecifier, In
 use crate::ast::{DeclarationNode, InitDeclaratorNode, DeclaratorNode, InitializerNode, Storage, FunctionParametersNode, Tag};
 use crate::ast::{StructDeclaration, StructDeclarator, VariantId, EnumId, LabeledStatementNode, StatementNode, Labeled, CompoundStatementNode};
 use crate::ast::{ExpressionStatementNode, SelectionStatementNode, IterationStatementNode, JumpStatementNode, JumpStatement};
+use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode};
 
 use crate::parser::YYLex;
 use crate::error::yyerror;
@@ -109,6 +110,10 @@ macro_rules! push {
 %type<IterationStatementNode> iteration_statement
 %type<JumpStatementNode> jump_statement
 
+%type<FunctionDefinitionNode> function_definition
+%type<ExternalDeclarationNode> external_declaration
+%type<Vec<ExternalDeclarationNode>> external_declaration_list
+%type<TranslationUnitNode> translation_unit
 
 %%
 
@@ -422,21 +427,25 @@ jump_statement /* JumpStatementNode */
     | RETURN expression ';'                                         { with_span!(self, JumpStatementNode::new_return, Some($2)) }
 	;
 
+translation_unit /* TranslationUnitNode */
+	: external_declaration_list                                     { with_span!(self, TranslationUnitNode::new, $1) }
+	;
+
+external_declaration_list /* Vec<ExternalDeclarationNode> */
+	: external_declaration                                          { vec![$1] }
+	| external_declaration_list external_declaration                { push!($<mut>1, $2) }
+	;
+
+external_declaration /* ExternalDeclarationNode */
+	: function_definition                                           { with_span!(self, ExternalDeclarationNode::function, $1) }
+	| declaration                                                   { with_span!(self, ExternalDeclarationNode::declaration, $1) }
+	;
+
+function_definition /* FunctionDefinitionNode */
+	: declaration_specifiers declarator declaration_list compound_statement { with_span!(self, FunctionDefinitionNode::new, $1, $2, $3, $4) }
+	| declaration_specifiers declarator compound_statement                  { with_span!(self, FunctionDefinitionNode::new, $1, $2, vec![], $3) }
+	| declarator declaration_list compound_statement                        { with_span!(self, FunctionDefinitionNode::new, vec![], $1, $2, $3) }
+	| declarator compound_statement                                         { with_span!(self, FunctionDefinitionNode::new, vec![], $1, vec![], $2) }
+	;
+
 %%
-
-// translation_unit /* */
-// 	: external_declaration
-// 	| translation_unit external_declaration
-// 	;
-
-// external_declaration /* */
-// 	: function_definition
-// 	| declaration
-// 	;
-
-// function_definition /* */
-// 	: declaration_specifiers declarator declaration_list compound_statement
-// 	| declaration_specifiers declarator compound_statement
-// 	| declarator declaration_list compound_statement
-// 	| declarator compound_statement
-// 	;
