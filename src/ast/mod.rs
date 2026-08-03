@@ -4,6 +4,7 @@ pub mod function;
 pub mod name;
 pub mod node;
 pub mod print;
+pub mod statement;
 pub mod symbol;
 pub mod tag;
 pub mod type_specifier;
@@ -13,6 +14,7 @@ pub use declaration::{DeclaratorNode, InitDeclaratorNode, Initializer, Initializ
 pub use expression::{Expression, ExpressionArena, ExpressionId, ExpressionNode, Type};
 pub use function::{FunctionParameters, FunctionParametersNode, ParameterDeclaration};
 pub use name::{Name, StringArena, StringId};
+pub use statement::{LabeledNode, StatementNode};
 pub use tag::{EnumArena, EnumId, StructArena, StructDeclaration, StructDeclarator, StructId};
 pub use tag::{Tag, UnionArena, UnionId, VariantArena, VariantId};
 pub use type_specifier::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier};

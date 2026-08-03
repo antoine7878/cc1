@@ -2,7 +2,8 @@
 %{
 use crate::ast::{Qualifier, Type, ExpressionNode, Name, DeclarationSpecifier, Initializer, TypeSpecifier, ParameterDeclaration};
 use crate::ast::{DeclarationNode, InitDeclaratorNode, DeclaratorNode, InitializerNode, Storage, FunctionParametersNode, Tag};
-use crate::ast::{StructDeclaration, StructDeclarator, VariantId, EnumId};
+use crate::ast::{StructDeclaration, StructDeclarator, VariantId, EnumId, LabeledNode, StatementNode};
+
 use crate::parser::YYLex;
 use crate::error::yyerror;
 
@@ -93,6 +94,9 @@ macro_rules! push {
 %type<EnumId> enum_specifier
 %type<Vec<VariantId>> enumerator_list
 %type<VariantId> enumerator
+
+%type<LabeledNode> labeled_statement
+%type<StatementNode> statement
 
 %%
 
@@ -348,24 +352,23 @@ enumerator /* VariantId */
 	| IDENTIFIER '=' constant_expression                            { node_span!(self, variants, add, $1, Some($3)) }
 	;
 
+statement /* StatementNode */
+	: labeled_statement
+	| compound_statement
+	| expression_statement
+	| selection_statement
+	| iteration_statement
+	| jump_statement
+	;
+
+labeled_statement /* LabeledNode */
+	: IDENTIFIER ':' statement
+	| CASE constant_expression ':' statement
+	| DEFAULT ':' statement
+	;
+
 %%
 
-//
-// statement /* */
-// 	: labeled_statement
-// 	| compound_statement
-// 	| expression_statement
-// 	| selection_statement
-// 	| iteration_statement
-// 	| jump_statement
-// 	;
-//
-// labeled_statement /* */
-// 	: IDENTIFIER ':' statement
-// 	| CASE constant_expression ':' statement
-// 	| DEFAULT ':' statement
-// 	;
-//
 // compound_statement /* */
 // 	: '{' '}'
 // 	| '{' statement_list '}'
@@ -425,4 +428,3 @@ enumerator /* VariantId */
 // 	| declarator declaration_list compound_statement
 // 	| declarator compound_statement
 // 	;
-//
