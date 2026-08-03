@@ -81,6 +81,7 @@ impl<R: Read> Yacc<R> {
         }
         Self::YY_DEFAULT_REDUCE_ACT[state_id]
     }
+
     pub fn yyparse(&mut self) -> i32 {
         /* DEBUGGING */
         yylog!(self, "Starting parse");
@@ -179,16 +180,6 @@ impl<R: Read> Yacc<R> {
     pub fn yyclearin(&mut self) {
         self.lookahead = None;
     }
-
-    /* /* DEBUGGING */ */
-    /* fn token_class(token: &Option<YYToken>) -> &'static str { */
-    /*     if token == &Some(YYToken::Empty) { */
-    /*         return "nterm"; */
-    /*     } */
-    /*     let id = token.as_ref().unwrap().index(); */
-    /*     if Self::YY_TERMINAL_TABLE[id] { "nterm" } else { "token" } */
-    /* } */
-    /* /* DEBUGGING */ */
 
     fn push_statcks(&mut self, state: usize, value: YYToken, span: Span) {
         self.state_stack.push(state);

@@ -5,7 +5,6 @@ pub mod name;
 pub mod node;
 pub mod print;
 pub mod statement;
-pub mod symbol;
 pub mod tag;
 pub mod type_specifier;
 pub mod unit;

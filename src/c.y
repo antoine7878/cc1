@@ -106,16 +106,12 @@ macro_rules! push {
 %type<FunctionDefinitionNode> function_definition
 %type<ExternalDeclarationNode> external_declaration
 %type<Vec<ExternalDeclarationNode>> external_declaration_list
-%type<TranslationUnitNode> translation_unit
+%type<()> translation_unit
 
 %%
 
-print_node
-    : translation_unit                                                      { self.lexer.ctx.print_ast(&$1); YYToken::print_node }
-    ;
-
-translation_unit /* TranslationUnitNode */
-	: external_declaration_list                                             { with_span!(self, TranslationUnitNode::new, $1) }
+translation_unit /* (TranslationUnitNode) */
+	: external_declaration_list                                             { let ast = with_span!(self, TranslationUnitNode::new, $1); self.lexer.ctx.ast = ast; }
 	;
 
 external_declaration_list /* Vec<ExternalDeclarationNode> */

@@ -1,11 +1,11 @@
 use std::io::{Write, stdout};
 
 use crate::ast::{
-    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, Expression, ExpressionNode,
-    ExpressionStatementNode, ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionNode, FunctionParameters,
-    FunctionParametersNode, InitDeclaratorNode, Initializer, InitializerNode, IterationStatement, JumpStatement, Labeled, Name,
-    ParameterDeclaration, SelectionStatement, Statement, StatementNode, StructDeclaration, StructDeclarator, TranslationUnitNode, Type,
-    TypeSpecifier,
+    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, Expression,
+    ExpressionNode, ExpressionStatementNode, ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionNode,
+    FunctionParameters, FunctionParametersNode, InitDeclaratorNode, Initializer, InitializerNode, IterationStatement,
+    JumpStatement, Labeled, Name, ParameterDeclaration, SelectionStatement, Statement, StatementNode,
+    StructDeclaration, StructDeclarator, Type, TypeSpecifier,
 };
 use crate::context::Context;
 use crate::parser::Span;
@@ -24,8 +24,8 @@ fn has_type_specs(specs: &[DeclarationSpecifier]) -> bool {
 }
 
 impl Context {
-    pub fn print_ast(&mut self, node: &TranslationUnitNode) -> std::io::Result<()> {
-        let w = &mut stdout();
+    pub fn print_ast<W: Write>(&self, w: &mut W) -> std::io::Result<()> {
+        let node = &self.ast;
         writeln!(w, "TranslationUnitDecl {}", node.span)?;
         let prefix = &mut String::new();
         for (i, external) in node.declarations.iter().enumerate() {
@@ -34,7 +34,7 @@ impl Context {
         Ok(())
     }
 
-    pub fn print_statement(&mut self, node: &StatementNode) -> std::io::Result<()> {
+    pub fn print_statement(&self, node: &StatementNode) -> std::io::Result<()> {
         let w = &mut stdout();
         self.print_stmt(w, &mut String::new(), node, None)
     }
@@ -95,7 +95,9 @@ impl Context {
             .filter(|s| {
                 matches!(
                     s,
-                    DeclarationSpecifier::Type(TypeSpecifier::Struct(_) | TypeSpecifier::Union(_) | TypeSpecifier::Enum(_))
+                    DeclarationSpecifier::Type(
+                        TypeSpecifier::Struct(_) | TypeSpecifier::Union(_) | TypeSpecifier::Enum(_)
+                    )
                 )
             })
             .count();
@@ -107,12 +109,28 @@ impl Context {
                     TypeSpecifier::Struct(id) => {
                         i += 1;
                         let record = self.arenas.structs.get(*id);
-                        self.print_record(w, prefix, "struct", &record.span, &record.name, &record.fields, child(i, total))?;
+                        self.print_record(
+                            w,
+                            prefix,
+                            "struct",
+                            &record.span,
+                            &record.name,
+                            &record.fields,
+                            child(i, total),
+                        )?;
                     }
                     TypeSpecifier::Union(id) => {
                         i += 1;
                         let record = self.arenas.unions.get(*id);
-                        self.print_record(w, prefix, "union", &record.span, &record.name, &record.fields, child(i, total))?;
+                        self.print_record(
+                            w,
+                            prefix,
+                            "union",
+                            &record.span,
+                            &record.name,
+                            &record.fields,
+                            child(i, total),
+                        )?;
                     }
                     TypeSpecifier::Enum(id) => {
                         i += 1;
@@ -130,6 +148,7 @@ impl Context {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn print_record<W: Write>(
         &self,
         w: &mut W,
@@ -194,7 +213,13 @@ impl Context {
         Ok(())
     }
 
-    fn print_enum<W: Write>(&self, w: &mut W, prefix: &mut String, id: &EnumId, is_last: Option<bool>) -> std::io::Result<()> {
+    fn print_enum<W: Write>(
+        &self,
+        w: &mut W,
+        prefix: &mut String,
+        id: &EnumId,
+        is_last: Option<bool>,
+    ) -> std::io::Result<()> {
         let (b, extend) = is_last.map_or(("", ""), branch);
         let en = self.arenas.enums.get(*id);
         write!(w, "{prefix}{b}EnumDecl {}", en.span)?;
@@ -235,7 +260,10 @@ impl Context {
         is_last: Option<bool>,
     ) -> std::io::Result<()> {
         let (b, extend) = is_last.map_or(("", ""), branch);
-        let is_function = matches!(self.arenas.declarators.get(init_decl.declarator.id), Declarator::Function { .. });
+        let is_function = matches!(
+            self.arenas.declarators.get(init_decl.declarator.id),
+            Declarator::Function { .. }
+        );
         let kind = if is_function { "FunctionDecl" } else { "VarDecl" };
         write!(w, "{prefix}{b}{kind} {span}")?;
         let name = self.declarator_name(&init_decl.declarator);
@@ -288,7 +316,13 @@ impl Context {
             FunctionParameters::OldStyle(names) => {
                 for (i, name) in names.iter().enumerate() {
                     let (b, _) = branch(i + 1 == names.len() && last_is_last);
-                    writeln!(w, "{prefix}{b}ParmVarDecl {} {} {}", name.span, name.span, self.arenas.names.get(name.id))?;
+                    writeln!(
+                        w,
+                        "{prefix}{b}ParmVarDecl {} {} {}",
+                        name.span,
+                        name.span,
+                        self.arenas.names.get(name.id)
+                    )?;
                 }
             }
             FunctionParameters::Empty => {}
@@ -307,7 +341,13 @@ impl Context {
         match self.arenas.statements.get(node.id) {
             Statement::Labeled(labeled) => match &labeled.inner {
                 Labeled::Identifier(name, stmt) => {
-                    writeln!(w, "{prefix}{b}LabelStmt {} {} '{}'", labeled.span, name.span, self.arenas.names.get(name.id))?;
+                    writeln!(
+                        w,
+                        "{prefix}{b}LabelStmt {} {} '{}'",
+                        labeled.span,
+                        name.span,
+                        self.arenas.names.get(name.id)
+                    )?;
                     let len = prefix.len();
                     prefix.push_str(extend);
                     let result = self.print_stmt(w, prefix, stmt, Some(true));
@@ -510,7 +550,9 @@ impl Context {
         match self.arenas.declarators.get(node.id) {
             Declarator::Ident(name) => Some(name.clone()),
             Declarator::Pointer { inner: Some(inner), .. } => self.declarator_name(inner),
-            Declarator::Array { declarator, .. } | Declarator::Function { declarator, .. } => self.declarator_name(declarator),
+            Declarator::Array { declarator, .. } | Declarator::Function { declarator, .. } => {
+                self.declarator_name(declarator)
+            }
             _ => None,
         }
     }

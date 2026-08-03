@@ -5,7 +5,7 @@ use std::fmt;
 
 use crate::ast::Name;
 use crate::parser::YYToken;
-use crate::context::{Context, ContextAccess};
+use crate::context::Context;
 %}
 
 D			[0-9]
@@ -138,7 +138,7 @@ fn check_type(name_id: Name) -> YYToken {
 fn alloc_name<R: Read>(lex: &mut YYLex<R>) -> Name {
     let span = lex.span;
     let name = lex.take_yytext();
-    lex.names().add(name, span)
+    lex.ctx.arenas.names.add(name, span)
 }
 
 impl fmt::Display for Span {

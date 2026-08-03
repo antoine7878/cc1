@@ -1,7 +1,8 @@
-use crate::ast::{DeclaratorArena, Name, StructDeclaration, Tag, TypeSpecifier, UnionArena, VariantArena};
+use crate::ast::{
+    DeclaratorArena, Name, StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena,
+};
 use crate::ast::{EnumArena, ExpressionArena, StatementArena, StringArena, StructArena};
-use crate::parser::{Span, YYLex};
-use std::io::Read;
+use crate::parser::Span;
 
 #[derive(Debug, Default)]
 pub struct Arenas {
@@ -19,6 +20,7 @@ pub struct Arenas {
 pub struct Context {
     // pub symbols: SymbolTable,
     pub arenas: Arenas,
+    pub ast: TranslationUnitNode,
 }
 
 impl Context {
@@ -37,41 +39,35 @@ impl Context {
     }
 }
 
-pub trait ContextAccess {
-    fn ctx(&mut self) -> &mut Context;
-    fn names(&mut self) -> &mut StringArena {
-        &mut self.ctx().arenas.names
-    }
-
-    fn structs(&mut self) -> &mut StructArena {
-        &mut self.ctx().arenas.structs
-    }
-
-    fn enums(&mut self) -> &mut EnumArena {
-        &mut self.ctx().arenas.enums
-    }
-
-    fn unions(&mut self) -> &mut UnionArena {
-        &mut self.ctx().arenas.unions
-    }
-
-    fn variants(&mut self) -> &mut VariantArena {
-        &mut self.ctx().arenas.variants
-    }
-
-    fn expressions(&mut self) -> &mut ExpressionArena {
-        &mut self.ctx().arenas.expressions
-    }
-}
-
-impl<R: Read> ContextAccess for YYLex<R> {
-    fn ctx(&mut self) -> &mut Context {
-        &mut self.ctx
-    }
-}
-
-// impl<R: Read> ContextAccess for Yacc<R> {
+// pub trait ContextAccess {
+//     fn ctx(&mut self) -> &mut Context;
+//     fn names(&mut self) -> &mut StringArena {
+//         &mut self.ctx().arenas.names
+//     }
+//
+//     fn structs(&mut self) -> &mut StructArena {
+//         &mut self.ctx().arenas.structs
+//     }
+//
+//     fn enums(&mut self) -> &mut EnumArena {
+//         &mut self.ctx().arenas.enums
+//     }
+//
+//     fn unions(&mut self) -> &mut UnionArena {
+//         &mut self.ctx().arenas.unions
+//     }
+//
+//     fn variants(&mut self) -> &mut VariantArena {
+//         &mut self.ctx().arenas.variants
+//     }
+//
+//     fn expressions(&mut self) -> &mut ExpressionArena {
+//         &mut self.ctx().arenas.expressions
+//     }
+// }
+//
+// impl<R: Read> ContextAccess for YYLex<R> {
 //     fn ctx(&mut self) -> &mut Context {
-//         &mut self.lexer.ctx
+//         &mut self.ctx
 //     }
 // }

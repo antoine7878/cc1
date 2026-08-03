@@ -1,9 +1,7 @@
-use crate::{
-    ast::{CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode},
-    parser::Span,
-};
+use crate::ast::{CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode};
+use crate::parser::Span;
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Default)]
 pub struct TranslationUnitNode {
     pub span: Span,
     pub declarations: Vec<ExternalDeclarationNode>,
