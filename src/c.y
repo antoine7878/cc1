@@ -8,6 +8,7 @@ use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUni
 
 use crate::parser::YYLex;
 use crate::error::yyerror;
+use crate::context::Context;
 
 macro_rules! node{
     ($self:expr, $factory:ident, $method:ident $(, $arg:expr)*) => {{

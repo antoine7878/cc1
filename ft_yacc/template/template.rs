@@ -17,7 +17,6 @@ pub struct Yacc<R: Read> {
     act: isize,
     continue_parse: bool,
     is_recovering: bool,
-    ret: i32,
     token_since_error: usize,
     pub span: Span,
     pub yydebug: bool,
@@ -59,7 +58,6 @@ impl<R: Read> Yacc<R> {
             act: 0,
             continue_parse: true,
             is_recovering: false,
-            ret: 0,
             lexer,
             token_since_error: 0,
             /* DEFINES */
@@ -82,7 +80,7 @@ impl<R: Read> Yacc<R> {
         Self::YY_DEFAULT_REDUCE_ACT[state_id]
     }
 
-    pub fn yyparse(&mut self) -> i32 {
+    pub fn yyparse(mut self) -> Context {
         /* DEBUGGING */
         yylog!(self, "Starting parse");
         /* DEBUGGING */
@@ -105,7 +103,7 @@ impl<R: Read> Yacc<R> {
             yylog!(self, "Cleanup: popping {:?}", token);
         }
         /* DEBUGGING */
-        self.ret
+        self.lexer.ctx
     }
 
     fn error(&mut self) {
@@ -165,12 +163,10 @@ impl<R: Read> Yacc<R> {
 
     pub fn yyaccept(&mut self) {
         self.continue_parse = false;
-        self.ret = 0;
     }
 
     pub fn yyabort(&mut self) {
         self.continue_parse = false;
-        self.ret = 3;
     }
 
     pub fn yyrecovering(&mut self) -> bool {
