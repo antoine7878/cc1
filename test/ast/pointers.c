@@ -1,0 +1,11 @@
+int *p;
+int * const cp;
+const int *pc;
+int * volatile vp;
+int arr[10];
+int matrix[2][3];
+int *ptr_arr[5];
+int (*fp)(int);
+int (*fp2)(int, char);
+char *f(char *s);
+int a, b = 2, *c;

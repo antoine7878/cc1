@@ -1,0 +1,22 @@
+TranslationUnitDecl <1:1, 4:7>
+|-EnumDecl <1:1, 1:35> <1:6, 1:10> Color
+| |-EnumConstantDecl <1:14, 1:16> <1:14, 1:16> RED
+| |-EnumConstantDecl <1:19, 1:27> <1:19, 1:23> GREEN
+| | `-ConstantExpression <1:27>
+| |   `-IntegerLiteral <1:27> 5
+| `-EnumConstantDecl <1:30, 1:33> <1:30, 1:33> BLUE
+|-EnumDecl <2:1, 2:10> <2:6, 2:10> Color
+|-VarDecl <2:1, 2:13> <2:12> c 'enum Color'
+|-EnumDecl <3:1, 3:32>
+| |-EnumConstantDecl <3:8, 3:12> <3:8> A
+| | `-ConstantExpression <3:12>
+| |   `-IntegerLiteral <3:12> 1
+| |-EnumConstantDecl <3:15, 3:19> <3:15> B
+| | `-ConstantExpression <3:19>
+| |   `-IntegerLiteral <3:19> 2
+| `-EnumConstantDecl <3:22, 3:30> <3:22> C
+|   `-ConstantExpression <3:26, 3:30>
+|     `-Add <3:26, 3:30>
+|       |-Identifier <3:26> A
+|       `-Identifier <3:30> B
+`-EnumDecl <4:1, 4:6> <4:6> E

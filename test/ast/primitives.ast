@@ -1,0 +1,11 @@
+TranslationUnitDecl <1:1, 10:8>
+|-VarDecl <1:1, 1:6> <1:5> a 'int'
+|-VarDecl <2:1, 2:7> <2:6> b 'char'
+|-VarDecl <3:1, 3:7> <3:6> c 'long'
+|-VarDecl <4:1, 4:15> <4:14> d 'unsigned int'
+|-VarDecl <5:1, 5:8> <5:7> e 'float'
+|-VarDecl <6:1, 6:9> <6:8> f 'double'
+|-VarDecl <7:1, 7:8> <7:7> g 'short'
+|-VarDecl <8:1, 8:14> <8:13> h 'signed char'
+|-VarDecl <9:1, 9:12> <9:11> i 'long long'
+`-VarDecl <10:1, 10:8> <10:7> p 'void *'

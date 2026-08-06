@@ -1,0 +1,33 @@
+TranslationUnitDecl <1:1, 17:1>
+|-FunctionDecl <1:1, 3:1> <1:5, 1:7> add 'int (int, int)'
+| |-ParmVarDecl <1:9, 1:13> <1:13> a 'int'
+| |-ParmVarDecl <1:16, 1:20> <1:20> b 'int'
+| `-CompoundStmt <1:23, 3:1>
+|   `-ReturnStmt <2:5, 2:17>
+|     `-Add <2:12, 2:16>
+|       |-Identifier <2:12> a
+|       `-Identifier <2:16> b
+|-FunctionDecl <4:1, 6:1> <4:5, 4:8> main 'int (void)'
+| |-ParmVarDecl <4:10, 4:13> 'void'
+| `-CompoundStmt <4:16, 6:1>
+|   `-ReturnStmt <5:5, 5:13>
+|     `-IntegerLiteral <5:12> 0
+|-FunctionDecl <7:1, 12:1> <7:5, 7:13> old_style 'int ()'
+| |-ParmVarDecl <7:15> <7:15> a
+| |-ParmVarDecl <7:18> <7:18> b
+| |-DeclStmt <8:1, 8:6>
+| | `-VarDecl <8:1, 8:6> <8:5> a 'int'
+| |-DeclStmt <9:1, 9:6>
+| | `-VarDecl <9:1, 9:6> <9:5> b 'int'
+| `-CompoundStmt <10:1, 12:1>
+|   `-ReturnStmt <11:5, 11:17>
+|     `-Mul <11:12, 11:16>
+|       |-Identifier <11:12> a
+|       `-Identifier <11:16> b
+|-FunctionDecl <13:1, 15:1> <13:5, 13:12> variadic 'int (int, ...)'
+| |-ParmVarDecl <13:14, 13:18> <13:18> n 'int'
+| `-CompoundStmt <13:26, 15:1>
+|   `-ReturnStmt <14:5, 14:13>
+|     `-Identifier <14:12> n
+`-FunctionDecl <16:1, 17:1> <16:5, 16:14> empty_body 'int ()'
+  `-CompoundStmt <16:18, 17:1>

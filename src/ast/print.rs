@@ -828,7 +828,7 @@ impl Context {
                 write!(w, " ")?;
             }
             first = false;
-            self.write_type_specifier(w, spec)?;
+            self.write_specifier_atom(w, spec)?;
         }
         self.write_clang_declarator(w, &ty.declarator, !ty.specifiers.is_empty())
     }

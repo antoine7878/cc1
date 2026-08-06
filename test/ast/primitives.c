@@ -1,0 +1,10 @@
+int a;
+char b;
+long c;
+unsigned int d;
+float e;
+double f;
+short g;
+signed char h;
+long long i;
+void *p;

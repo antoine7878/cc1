@@ -1,0 +1,40 @@
+TranslationUnitDecl <1:1, 8:20>
+|-VarDecl <1:1, 1:10> <1:5> x 'int'
+| `-IntegerLiteral <1:9> 1
+|-VarDecl <2:1, 2:18> <2:5> y 'int'
+| `-Add <2:9, 2:17>
+|   |-IntegerLiteral <2:9> 1
+|   `-Mul <2:13, 2:17>
+|     |-IntegerLiteral <2:13> 2
+|     `-IntegerLiteral <2:17> 3
+|-VarDecl <3:1, 3:21> <3:5> z 'int[3]'
+| `-InitListExpr <3:12, 3:20>
+|   |-IntegerLiteral <3:13> 1
+|   |-IntegerLiteral <3:16> 2
+|   `-IntegerLiteral <3:19> 3
+|-VarDecl <4:1, 4:22> <4:5> w 'int[3]'
+| `-InitListExpr <4:12, 4:21>
+|   |-IntegerLiteral <4:13> 1
+|   |-IntegerLiteral <4:16> 2
+|   `-IntegerLiteral <4:19> 3
+|-RecordDecl <5:1, 5:26> <5:8> struct P definition
+| |-FieldDecl <5:12, 5:17> <5:16> a 'int'
+| `-FieldDecl <5:19, 5:24> <5:23> b 'int'
+|-VarDecl <5:1, 5:38> <5:28> s 'struct P'
+| `-InitListExpr <5:32, 5:37>
+|   |-IntegerLiteral <5:33> 1
+|   `-IntegerLiteral <5:36> 2
+|-VarDecl <6:1, 6:15> <6:5> u 'int'
+| `-, <6:10, 6:13>
+|   |-IntegerLiteral <6:10> 1
+|   `-IntegerLiteral <6:13> 2
+|-VarDecl <7:1, 7:38> <7:5, 7:10> nested 'int[2][2]'
+| `-InitListExpr <7:20, 7:37>
+|   |-InitListExpr <7:22, 7:27>
+|   | |-IntegerLiteral <7:23> 1
+|   | `-IntegerLiteral <7:26> 2
+|   `-InitListExpr <7:30, 7:35>
+|     |-IntegerLiteral <7:31> 3
+|     `-IntegerLiteral <7:34> 4
+`-VarDecl <8:1, 8:20> <8:7, 8:9> msg 'char *'
+  `-StringLiteral <8:13, 8:19> "hello"

@@ -305,9 +305,9 @@ identifier_list /* Vec<Name> */
 	| identifier_list ',' IDENTIFIER                                        { push!($<mut>1, $3) }
 	;
 
-type_name /* Type? */
-	: specifier_qualifier_list
-	| specifier_qualifier_list abstract_declarator
+type_name /* Type */
+	: specifier_qualifier_list                                      { Type { specifiers: $1, declarator: node_span!(self, declarators, abstrct) } }
+	| specifier_qualifier_list abstract_declarator                 { Type { specifiers: $1, declarator: $2 } }
 	;
 
 specifier_qualifier_list /* Vec<DeclarationSpecifier> */

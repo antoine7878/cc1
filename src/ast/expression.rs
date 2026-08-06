@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use crate::arena::{Arena, ArenaId};
-use crate::ast::{DeclaratorNode, Name, TypeSpecifier};
+use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name};
 use crate::define_arena;
 use crate::parser::{Span, YYToken};
 
@@ -90,7 +90,7 @@ pub enum Expression {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Type {
-    pub specifiers: Vec<TypeSpecifier>,
+    pub specifiers: Vec<DeclarationSpecifier>,
     pub declarator: DeclaratorNode,
 }
 
@@ -240,8 +240,8 @@ impl Display for Expression {
             Expression::LowerEq(_, _) => "<=",
             Expression::Eq(_, _) => "==",
             Expression::Neq(_, _) => "!=",
-            Expression::BitAnd(_, _) => "|",
-            Expression::BitOr(_, _) => "&",
+            Expression::BitAnd(_, _) => "&",
+            Expression::BitOr(_, _) => "|",
             Expression::BitXor(_, _) => "^",
             Expression::And(_, _) => "&&",
             Expression::Or(_, _) => "||",

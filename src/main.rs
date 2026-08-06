@@ -1,12 +1,5 @@
-pub mod arena;
-pub mod ast;
-pub mod color;
-pub mod context;
-pub mod error;
-pub mod parser;
-
-use context::Context;
-use parser::{YYLex, Yacc};
+use cc1::context::Context;
+use cc1::parser::{YYLex, Yacc};
 
 use std::io::{stdin, stdout};
 
