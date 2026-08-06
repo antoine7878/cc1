@@ -46,6 +46,7 @@ macro_rules! push {
 %token CASE DEFAULT IF SWITCH WHILE DO FOR GOTO CONTINUE BREAK RETURN
 
 %left ','
+%left PREC_NO_COMMA
 %right '=' SUB_ASSIGN LEFT_ASSIGN RIGHT_ASSIGN AND_ASSIGN MUL_ASSIGN
       DIV_ASSIGN MOD_ASSIGN ADD_ASSIGN XOR_ASSIGN OR_ASSIGN
 %right '?' ':'
@@ -134,7 +135,7 @@ function_definition /* FunctionDefinitionNode */
 
 
 constant_expression /* ExpressionId */
-    : expression                                                            { node_span!(self, expressions, constant_expression, $1) }
+    : expression %prec PREC_NO_COMMA                                        { node_span!(self, expressions, constant_expression, $1) }
     ;
 
 expression /* ExpressionId */
@@ -246,7 +247,7 @@ type_specifier /* TypeSpecifier */
 	;
 
 initializer /* InitializerNode */
-	: expression                                                            { with_span!(self, InitializerNode::new, Initializer::Single($1)) }
+	: expression %prec PREC_NO_COMMA                                        { with_span!(self, InitializerNode::new, Initializer::Single($1)) }
 	| '{' initializer_list '}'                                              { with_span!(self, InitializerNode::new, Initializer::List($2)) }
 	| '{' initializer_list ',' '}'                                          { with_span!(self, InitializerNode::new, Initializer::List($2)) }
 	;
