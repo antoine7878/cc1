@@ -1,7 +1,8 @@
-use crate::ast::{
-    DeclaratorArena, Name, StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena,
-};
-use crate::ast::{EnumArena, ExpressionArena, StatementArena, StringArena, StructArena};
+use std::collections::HashSet;
+
+use crate::ast::{DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorArena, DeclaratorNode, Name};
+use crate::ast::{EnumArena, ExpressionArena, StatementArena, Storage, StringArena, StringId, StructArena};
+use crate::ast::{StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena};
 use crate::parser::Span;
 
 #[derive(Debug, Default)]
@@ -18,7 +19,7 @@ pub struct Arenas {
 
 #[derive(Debug, Default)]
 pub struct Context {
-    // pub symbols: SymbolTable,
+    pub typedefs: HashSet<StringId>,
     pub arenas: Arenas,
     pub ast: TranslationUnitNode,
 }
@@ -34,40 +35,32 @@ impl Context {
         match tag {
             Tag::Struct => TypeSpecifier::Struct(self.arenas.structs.add(name, fields, span)),
             Tag::Union => TypeSpecifier::Union(self.arenas.unions.add(name, fields, span)),
-            _ => unimplemented!(),
+            Tag::Enum => panic!("only for structs and unions"),
+        }
+    }
+
+    pub fn add_symbol(&mut self, decl: &DeclarationNode) {
+        if !decl
+            .specifiers
+            .contains(&DeclarationSpecifier::Storage(Storage::Typedef))
+        {
+            return;
+        }
+        for init_decl in &decl.init_declarators {
+            let Some(name) = self.declartor_name(&init_decl.declarator) else {
+                continue;
+            };
+            self.typedefs.insert(name.id);
+        }
+    }
+
+    pub fn declartor_name(&self, decl: &DeclaratorNode) -> Option<&Name> {
+        match self.arenas.declarators.get(decl.id) {
+            Declarator::Ident(name) => Some(name),
+            Declarator::Pointer { inner: Some(d), .. } => self.declartor_name(d),
+            Declarator::Array { declarator, .. } => self.declartor_name(declarator),
+            Declarator::Function { declarator, .. } => self.declartor_name(declarator),
+            _ => None,
         }
     }
 }
-
-// pub trait ContextAccess {
-//     fn ctx(&mut self) -> &mut Context;
-//     fn names(&mut self) -> &mut StringArena {
-//         &mut self.ctx().arenas.names
-//     }
-//
-//     fn structs(&mut self) -> &mut StructArena {
-//         &mut self.ctx().arenas.structs
-//     }
-//
-//     fn enums(&mut self) -> &mut EnumArena {
-//         &mut self.ctx().arenas.enums
-//     }
-//
-//     fn unions(&mut self) -> &mut UnionArena {
-//         &mut self.ctx().arenas.unions
-//     }
-//
-//     fn variants(&mut self) -> &mut VariantArena {
-//         &mut self.ctx().arenas.variants
-//     }
-//
-//     fn expressions(&mut self) -> &mut ExpressionArena {
-//         &mut self.ctx().arenas.expressions
-//     }
-// }
-//
-// impl<R: Read> ContextAccess for YYLex<R> {
-//     fn ctx(&mut self) -> &mut Context {
-//         &mut self.ctx
-//     }
-// }

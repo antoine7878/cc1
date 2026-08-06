@@ -52,7 +52,7 @@ IS			(u|U|l|L)*
 "void"			            { return YYToken::VOID; }
 "volatile"		            { return YYToken::VOLATILE; }
 "while"			            { return YYToken::WHILE; }
-{L}({L}|{D})*		        { return check_type(alloc_name(self)); }
+{L}({L}|{D})*		        { let name = alloc_name(self); return check_type(self, name); }
 0[xX]{H}+{IS}?		        { return YYToken::CONSTANT(alloc_name(self)); }
 0{D}+{IS}?		            { return YYToken::CONSTANT(alloc_name(self)); }
 {D}+{IS}?		            { return YYToken::CONSTANT(alloc_name(self)); }
@@ -127,12 +127,11 @@ fn comment<T: Read>(lex: &mut YYLex<T>) {
     }
 }
 
-fn check_type(name_id: Name) -> YYToken {
-// pseudo code --- this is what it should check
-//
-//	if (yytext == type_name)
-//	     return YYToken::TYPE_NAME;
-	YYToken::IDENTIFIER(name_id)
+fn check_type<R: Read>(lex: &YYLex<R>, name: Name) -> YYToken {
+	if lex.ctx.typedefs.contains(&name.id) {
+	    return YYToken::TYPE_NAME(name);
+	}
+	YYToken::IDENTIFIER(name)
 }
 
 fn alloc_name<R: Read>(lex: &mut YYLex<R>) -> Name {

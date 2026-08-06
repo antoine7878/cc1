@@ -4,7 +4,6 @@ pub mod color;
 pub mod context;
 pub mod error;
 pub mod parser;
-pub mod symbol;
 
 use context::Context;
 use parser::{YYLex, Yacc};

@@ -194,8 +194,8 @@ expression /* ExpressionId */
     ;
 
 declaration /* DeclarationNode */
-	: declaration_specifiers ';'                                            { with_span!(self, DeclarationNode::new, $1, vec![]) }
-	| declaration_specifiers init_declarator_list ';'                       { with_span!(self, DeclarationNode::new, $1, $2) }
+	: declaration_specifiers ';'                                            { let node = with_span!(self, DeclarationNode::new, $1, vec![]); self.lexer.ctx.add_symbol(&node); node }
+	| declaration_specifiers init_declarator_list ';'                       { let node = with_span!(self, DeclarationNode::new, $1, $2); self.lexer.ctx.add_symbol(&node); node }
 	;
 
 declaration_specifiers /* Vec<DeclarationSpecifier> */
