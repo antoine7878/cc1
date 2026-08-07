@@ -37,6 +37,9 @@ test: $(NAME)
 	cat test/hello.c | ./$(NAME)
 	cargo test
 
+coverage:
+	cargo tarpaulin --exclude-files 'ft_lex/*' 'ft_yacc/*' 'src/parser/*' --out html --out json
+
 ast:
 	clang -std=iso9899:1990 -pedantic -Xclang -ast-dump test/hello.c
 
