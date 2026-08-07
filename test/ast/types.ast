@@ -1,0 +1,30 @@
+TranslationUnitDecl <1:1, 13:1>
+|-VarDecl <1:1, 1:22> <1:13, 1:17> arr_t 'int[10]' typedef
+|-FunctionDecl <2:1, 2:25> <2:13, 2:19> unary_t 'int (int)' typedef
+| `-ParmVarDecl <2:21, 2:23> 'int'
+|-VarDecl <3:1, 3:19> <3:14, 3:18> p_int 'int *' typedef
+`-FunctionDecl <5:1, 13:1> <5:5> g 'int (int)'
+  |-ParmVarDecl <5:7, 5:11> <5:11> n 'int'
+  `-CompoundStmt <5:14, 13:1>
+    |-DeclStmt <6:5, 6:19>
+    | `-FunctionDecl <6:5, 6:19> <6:11, 6:12> pf 'int (int)'
+    |   `-ParmVarDecl <6:15, 6:17> 'int'
+    |-DeclStmt <7:5, 7:28>
+    | `-VarDecl <7:5, 7:28> <7:26, 7:27> cv 'int *const volatile'
+    |-DeclStmt <8:5, 8:19>
+    | `-VarDecl <8:5, 8:19> <8:17, 8:18> hp 'int *const'
+    |-DeclStmt <9:5, 9:25>
+    | `-VarDecl <9:5, 9:25> <9:9> s 'int'
+    |   `-Cast <9:13, 9:24>
+    |     |-Type const int
+    |     `-Identifier <9:24> n
+    |-DeclStmt <10:5, 10:33>
+    | `-VarDecl <10:5, 10:33> <10:9> t 'int'
+    |   `-Sizeof <10:13, 10:32>
+    |     `-Type const char *
+    |-DeclStmt <11:5, 11:28>
+    | `-VarDecl <11:5, 11:28> <11:9> u 'int'
+    |   `-Sizeof <11:13, 11:27>
+    |     `-Type int[4]
+    `-ReturnStmt <12:5, 12:13>
+      `-Identifier <12:12> t

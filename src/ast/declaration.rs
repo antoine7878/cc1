@@ -162,3 +162,64 @@ impl Display for Initializer {
         write!(f, "{}", s)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::{ExpressionId, StringArena};
+
+    fn name(s: &str) -> Name {
+        let mut arena = StringArena::default();
+        arena.add(s.to_string(), Span::default())
+    }
+
+    fn declarator() -> DeclaratorNode {
+        DeclaratorNode {
+            id: DeclaratorId::from(0),
+            span: Span::default(),
+        }
+    }
+
+    #[test]
+    fn display_declarators() {
+        let d = declarator();
+        let cases = [
+            (Declarator::Ident(name("x")), "Ident"),
+            (Declarator::Abstract, "Abstract"),
+            (
+                Declarator::Pointer {
+                    qualifiers: vec![],
+                    inner: Some(d.clone()),
+                },
+                "Pointer",
+            ),
+            (
+                Declarator::Array {
+                    declarator: d.clone(),
+                    size: None,
+                },
+                "Array",
+            ),
+            (
+                Declarator::Function {
+                    declarator: d.clone(),
+                    params: FunctionParametersNode::empty(Span::default()),
+                },
+                "Function",
+            ),
+        ];
+        for (kind, expect) in cases {
+            assert_eq!(kind.to_string(), expect);
+        }
+    }
+
+    #[test]
+    fn display_initializers() {
+        let expr = ExpressionNode {
+            span: Span::default(),
+            id: ExpressionId::from(0),
+        };
+        assert_eq!(Initializer::Single(expr).to_string(), "Single");
+        assert_eq!(Initializer::List(vec![]).to_string(), "List");
+    }
+}

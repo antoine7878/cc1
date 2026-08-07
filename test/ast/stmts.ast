@@ -1,7 +1,7 @@
-TranslationUnitDecl <1:1, 40:1>
-`-FunctionDecl <1:1, 40:1> <1:5> f 'int (int)'
+TranslationUnitDecl <1:1, 42:1>
+`-FunctionDecl <1:1, 42:1> <1:5> f 'int (int)'
   |-ParmVarDecl <1:7, 1:11> <1:11> x 'int'
-  `-CompoundStmt <1:14, 40:1>
+  `-CompoundStmt <1:14, 42:1>
     |-DeclStmt <2:5, 2:10>
     | `-VarDecl <2:5, 2:10> <2:9> i 'int'
     |-IfStmt <3:5, 6:17> has_else
@@ -22,63 +22,65 @@ TranslationUnitDecl <1:1, 40:1>
     | |   `-IntegerLiteral <9:20> 3
     | | `-ReturnStmt <11:13, 11:21>
     | |   `-IntegerLiteral <11:20> 4
-    |-WhileStmt <12:5, 13:12>
+    |-WhileStmt <12:5, 15:5>
     | |-> <12:12, 12:16>
     | | |-Identifier <12:12> x
     | | `-IntegerLiteral <12:16> 0
-    | `-post -- <13:9, 13:11>
-    |   `-Identifier <13:9> x
-    |-DoStmt <14:5, 16:19>
-    | |-post ++ <15:9, 15:11>
-    | | `-Identifier <15:9> x
-    | `-< <16:12, 16:17>
-    |   |-Identifier <16:12> x
-    |   `-IntegerLiteral <16:16, 16:17> 10
-    |-ForStmt <17:5, 18:15>
-    | |-= <17:10, 17:14>
-    | | |-Identifier <17:10> i
-    | | `-IntegerLiteral <17:14> 0
-    | |-< <17:17, 17:22>
-    | | |-Identifier <17:17> i
-    | | `-IntegerLiteral <17:21, 17:22> 10
-    | |-post ++ <17:25, 17:27>
-    | | `-Identifier <17:25> i
-    | `-+= <18:9, 18:14>
-    |   |-Identifier <18:9> x
-    |   `-Identifier <18:14> i
-    |-ForStmt <19:5, 20:14>
-    | |-NullStmt <19:10>
-    | |-NullStmt <19:11>
-    | `-BreakStmt <20:9, 20:14>
-    |-ForStmt <21:5, 23:5>
-    | |-= <21:10, 21:14>
-    | | |-Identifier <21:10> i
-    | | `-IntegerLiteral <21:14> 0
-    | |-NullStmt <21:16>
-    | `-CompoundStmt <21:19, 23:5>
-    |   `-BreakStmt <22:9, 22:14>
-    |-SwitchStmt <24:5, 32:5>
-    | |-Identifier <24:13> x
-    | `-CompoundStmt <24:16, 32:5>
-    |   |-CaseStmt <25:5, 26:14>
-    |   | |-ConstantExpression <25:10>
-    |   | | `-IntegerLiteral <25:10> 1
-    |   | `-BreakStmt <26:9, 26:14>
-    |   |-CaseStmt <27:5, 29:17>
+    | `-CompoundStmt <12:19, 15:5>
+    |   |-post -- <13:9, 13:11>
+    |   | `-Identifier <13:9> x
+    |   `-ContinueStmt <14:9, 14:17>
+    |-DoStmt <16:5, 18:19>
+    | |-post ++ <17:9, 17:11>
+    | | `-Identifier <17:9> x
+    | `-< <18:12, 18:17>
+    |   |-Identifier <18:12> x
+    |   `-IntegerLiteral <18:16, 18:17> 10
+    |-ForStmt <19:5, 20:15>
+    | |-= <19:10, 19:14>
+    | | |-Identifier <19:10> i
+    | | `-IntegerLiteral <19:14> 0
+    | |-< <19:17, 19:22>
+    | | |-Identifier <19:17> i
+    | | `-IntegerLiteral <19:21, 19:22> 10
+    | |-post ++ <19:25, 19:27>
+    | | `-Identifier <19:25> i
+    | `-+= <20:9, 20:14>
+    |   |-Identifier <20:9> x
+    |   `-Identifier <20:14> i
+    |-ForStmt <21:5, 22:14>
+    | |-NullStmt <21:10>
+    | |-NullStmt <21:11>
+    | `-BreakStmt <22:9, 22:14>
+    |-ForStmt <23:5, 25:5>
+    | |-= <23:10, 23:14>
+    | | |-Identifier <23:10> i
+    | | `-IntegerLiteral <23:14> 0
+    | |-NullStmt <23:16>
+    | `-CompoundStmt <23:19, 25:5>
+    |   `-BreakStmt <24:9, 24:14>
+    |-SwitchStmt <26:5, 34:5>
+    | |-Identifier <26:13> x
+    | `-CompoundStmt <26:16, 34:5>
+    |   |-CaseStmt <27:5, 28:14>
     |   | |-ConstantExpression <27:10>
-    |   | | `-IntegerLiteral <27:10> 2
-    |   | `-CaseStmt <28:5, 29:17>
-    |   |   |-ConstantExpression <28:10>
-    |   |   | `-IntegerLiteral <28:10> 3
-    |   |   `-ReturnStmt <29:9, 29:17>
-    |   |     `-Identifier <29:16> x
-    |   `-DefaultStmt <30:5, 31:14>
-    |     `-BreakStmt <31:9, 31:14>
-    |-GotoStmt <33:5, 33:13>
-    |-NullStmt <34:5>
-    |-CompoundStmt <35:5, 36:5>
-    |-ReturnStmt <37:5, 37:13>
-    | `-IntegerLiteral <37:12> 0
-    `-LabelStmt <38:1, 39:13> <38:1, 38:3> 'end'
-      `-ReturnStmt <39:5, 39:13>
-        `-Identifier <39:12> x
+    |   | | `-IntegerLiteral <27:10> 1
+    |   | `-BreakStmt <28:9, 28:14>
+    |   |-CaseStmt <29:5, 31:17>
+    |   | |-ConstantExpression <29:10>
+    |   | | `-IntegerLiteral <29:10> 2
+    |   | `-CaseStmt <30:5, 31:17>
+    |   |   |-ConstantExpression <30:10>
+    |   |   | `-IntegerLiteral <30:10> 3
+    |   |   `-ReturnStmt <31:9, 31:17>
+    |   |     `-Identifier <31:16> x
+    |   `-DefaultStmt <32:5, 33:14>
+    |     `-BreakStmt <33:9, 33:14>
+    |-GotoStmt <35:5, 35:13>
+    |-NullStmt <36:5>
+    |-CompoundStmt <37:5, 38:5>
+    |-ReturnStmt <39:5, 39:13>
+    | `-IntegerLiteral <39:12> 0
+    `-LabelStmt <40:1, 41:13> <40:1, 40:3> 'end'
+      `-ReturnStmt <41:5, 41:13>
+        `-Identifier <41:12> x

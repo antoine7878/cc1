@@ -75,3 +75,22 @@ impl Display for FunctionParameters {
         write!(f, "{}", s)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_function_parameters() {
+        let span = Span::default();
+        let cases = [
+            (FunctionParametersNode::empty(span).param, "Empty"),
+            (FunctionParametersNode::old_style(vec![], span).param, "OldStyle"),
+            (FunctionParametersNode::param_style(vec![], span).param, "Parameters"),
+            (FunctionParametersNode::variadic(vec![], span).param, "Variadic"),
+        ];
+        for (kind, expect) in cases {
+            assert_eq!(kind.to_string(), expect);
+        }
+    }
+}

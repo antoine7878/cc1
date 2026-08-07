@@ -9,8 +9,10 @@ int f(int x) {
             return 3;
         else
             return 4;
-    while (x > 0)
+    while (x > 0) {
         x--;
+        continue;
+    }
     do
         x++;
     while (x < 10);

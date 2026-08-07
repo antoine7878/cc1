@@ -88,3 +88,32 @@ impl Display for Storage {
         write!(f, "{}", s)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_tag_type_specifiers() {
+        assert_eq!(TypeSpecifier::Struct(StructId::from(1)).to_string(), "struct");
+        assert_eq!(TypeSpecifier::Union(UnionId::from(2)).to_string(), "union");
+        assert_eq!(TypeSpecifier::Enum(EnumId::from(3)).to_string(), "enum");
+        assert_eq!(TypeSpecifier::Void.to_string(), "void");
+        assert_eq!(Qualifier::Const.to_string(), "const");
+        assert_eq!(Qualifier::Volatile.to_string(), "volatile");
+    }
+
+    #[test]
+    fn display_all_storage() {
+        for (s, expect) in [
+            (Storage::Auto, "auto"),
+            (Storage::Static, "static"),
+            (Storage::Extern, "extern"),
+            (Storage::Typedef, "typedef"),
+            (Storage::Register, "register"),
+            (Storage::ThreadLocal, "thread_local"),
+        ] {
+            assert_eq!(s.to_string(), expect);
+        }
+    }
+}

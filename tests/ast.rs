@@ -66,4 +66,6 @@ ast_test!(initializers, "../test/ast/initializers.c", "../test/ast/initializers.
 ast_test!(functions, "../test/ast/functions.c", "../test/ast/functions.ast");
 ast_test!(strings, "../test/ast/strings.c", "../test/ast/strings.ast");
 ast_test!(exprs, "../test/ast/exprs.c", "../test/ast/exprs.ast");
+ast_test!(operators, "../test/ast/operators.c", "../test/ast/operators.ast");
+ast_test!(types, "../test/ast/types.c", "../test/ast/types.ast");
 ast_test!(stmts, "../test/ast/stmts.c", "../test/ast/stmts.ast");
