@@ -1,0 +1,14 @@
+Scope construction
+Symbol table
+Name resolution
+Type resolution
+Expression typing
+Lvalue/rvalue analysis
+Implicit conversions
+Function checking
+Control-flow checking
+Constant expressions
+Struct/union/enum validation
+Initializers
+Translation unit validation
+Diagnostics polishing

@@ -37,7 +37,7 @@ test: $(NAME)
 	cat test/hello.c | ./$(NAME)
 	cargo test
 
-coverage:
+coverage: $(NAME)
 	cargo tarpaulin --exclude-files 'ft_lex/*' 'ft_yacc/*' 'src/parser/*' --out html --out json
 
 ast:
