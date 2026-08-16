@@ -1,8 +1,9 @@
-typedef int a, b, c;
-
-volatile const a p = 1 + 2 * 3 / 4;
+struct coucou {
+	int a;
+};
 
 // int main(int argc, char **argv) {
-// 	b qw = 1;
+// 	struct coucou r;
+// 	r.a = 1;
 // 	return 0;
 // }

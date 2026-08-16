@@ -41,6 +41,10 @@ impl<'a, W: Write> AstPrinter<'a, W> {
         result
     }
 
+    fn print_name(&mut self, name: &Name) -> io::Result<()> {
+        write!(self.w, "{}", self.ctx.arenas.names.get(name.id))
+    }
+
     pub fn print_ast(w: W, ctx: &'a Context) -> io::Result<()> {
         let mut printer = Self {
             prefix: String::new(),
@@ -100,28 +104,43 @@ impl<'a, W: Write> AstPrinter<'a, W> {
     fn print_declarator(&mut self, decl: &Declarator) -> io::Result<()> {
         match decl {
             Declarator::Ident(name) => self.print_name(name),
-            Declarator::Abstract => write!(self.w, "abstract"),
-            Declarator::Pointer { qualifiers, inner } => Ok(()),
-            Declarator::Array { declarator, size } => Ok(()),
-            Declarator::Function { declarator, params } => Ok(()),
+            Declarator::Abstract => writeln!(self.w, "arbstract"),
+            Declarator::Pointer { qualifiers, inner } => {
+                for spec in qualifiers {
+                    write!(self.w, " {}", spec)?;
+                }
+                if let Some(node) = inner {
+                    self.print_declarator_node(node, true)?;
+                }
+                Ok(())
+            }
+            Declarator::Array { declarator, size } => {
+                self.print_declarator_node(declarator, size.is_none())?;
+                if let Some(node) = size {
+                    self.print_expression_node(node, true)?;
+                }
+                Ok(())
+            }
+            Declarator::Function { declarator, params } => {
+                self.print_declarator_node(declarator, false)?;
+                unimplemented!()
+            }
         }
     }
 
-    fn print_name(&mut self, name: &Name) -> io::Result<()> {
-        write!(self.w, "{}", self.ctx.arenas.names.get(name.id))
-    }
-
     fn print_initializer_node(&mut self, node: &InitializerNode, is_last: bool) -> io::Result<()> {
-        self.print_node(node, is_last, |printer| {
-            printer.print_initializer(&node.init, false)?;
-            Ok(())
-        })
+        self.print_node(node, is_last, |printer| printer.print_initializer(&node.init, false))
     }
 
     fn print_initializer(&mut self, init: &Initializer, is_last: bool) -> io::Result<()> {
         match init {
             Initializer::Single(node) => self.print_expression_node(node, true),
-            Initializer::List(nodes) => write!(self.w, "List init"),
+            Initializer::List(nodes) => {
+                for (is_last, node) in nodes.iter().with_last() {
+                    self.print_initializer_node(node, is_last)?;
+                }
+                Ok(())
+            }
         }
     }
 
@@ -134,7 +153,20 @@ impl<'a, W: Write> AstPrinter<'a, W> {
     fn print_expression(&mut self, expr: &Expression) -> io::Result<()> {
         write!(self.w, "{} ", expr)?;
         match expr {
-            Expression::Constant(c) => self.print_name(c),
+            Expression::Identifier(c) | Expression::StringLiteral(c) | Expression::Constant(c) => self.print_name(c),
+            Expression::ConstantExpression(e)
+            | Expression::PostInc(e)
+            | Expression::PostDec(e)
+            | Expression::PreInc(e)
+            | Expression::PreDec(e)
+            | Expression::Addr(e)
+            | Expression::Deref(e)
+            | Expression::Plus(e)
+            | Expression::Minus(e)
+            | Expression::BitNot(e)
+            | Expression::Not(e)
+            | Expression::SizeofExpr(e)
+            | Expression::FunctionCall(e, None) => self.print_expression_node(e, true),
             Expression::Add(e1, e2)
             | Expression::Sub(e1, e2)
             | Expression::Mul(e1, e2)
@@ -164,12 +196,32 @@ impl<'a, W: Write> AstPrinter<'a, W> {
             | Expression::AndAssign(e1, e2)
             | Expression::OrAssign(e1, e2)
             | Expression::XorAssign(e1, e2)
+            | Expression::ArrayAcces(e1, e2)
+            | Expression::FunctionCall(e1, Some(e2))
             | Expression::List(e1, e2) => {
                 self.print_expression_node(e1, false)?;
                 self.print_expression_node(e2, true)
             }
-            _ => unimplemented!(),
+            Expression::Ternary(e1, e2, e3) => {
+                self.print_expression_node(e1, false)?;
+                self.print_expression_node(e2, false)?;
+                self.print_expression_node(e3, true)
+            }
+            Expression::DotAcces(tag, ident) | Expression::PtrAcces(tag, ident) => {
+                self.print_expression_node(tag, false)?;
+                write!(self.w, " ")?;
+                self.print_name(ident)
+            }
+            Expression::Cast(ty, e1) => {
+                self.print_type(ty, false)?;
+                self.print_expression_node(e1, true)
+            }
+            Expression::SizeofType(ty) => self.print_type(ty, true),
         }
+    }
+
+    fn print_type(&mut self, ty: &Type, is_last: bool) -> io::Result<()> {
+        write!(self.w, "type")
     }
 }
 
@@ -185,8 +237,7 @@ impl<'a, W: Write> AstPrinter<'a, W> {
 //     }
 //
 //     pub fn print_statement(&self, node: &StatementNode) -> std::io::Result<()> {
-//         let w = &mut stdout();
-//         self.print_stmt(w, &mut String::new(), node, None)
+//         let w = &mut stdout(); self.print_stmt(w, &mut String::new(), node, None)
 //     }
 //
 //
