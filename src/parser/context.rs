@@ -17,11 +17,21 @@ pub struct Arenas {
     pub statements: StatementArena,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Context {
-    pub typedefs: HashSet<StringId>,
+    pub typedefs: Vec<HashSet<StringId>>,
     pub arenas: Arenas,
     pub ast: TranslationUnitNode,
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Self {
+            typedefs: vec![HashSet::default()],
+            arenas: Arenas::default(),
+            ast: TranslationUnitNode::default(),
+        }
+    }
 }
 
 impl Context {
@@ -39,6 +49,14 @@ impl Context {
         }
     }
 
+    pub fn push_scope(&mut self) {
+        self.typedefs.push(HashSet::default());
+    }
+
+    pub fn pop_scope(&mut self) {
+        self.typedefs.pop();
+    }
+
     pub fn add_symbol(&mut self, decl: &DeclarationNode) {
         if !decl
             .specifiers
@@ -50,7 +68,8 @@ impl Context {
             let Some(name) = self.declartor_name(&init_decl.declarator) else {
                 continue;
             };
-            self.typedefs.insert(name.id);
+            let i = name.id;
+            self.typedefs.last_mut().map(|ts| ts.insert(i));
         }
     }
 
@@ -102,7 +121,7 @@ mod tests {
         let ident = name("mytype");
         let d = ctx.arenas.declarators.ident(ident.clone(), Span::default());
         ctx.add_symbol(&typedef_decl(d));
-        assert!(ctx.typedefs.contains(&ident.id));
+        assert!(ctx.typedefs.iter().any(|ty| ty.contains(&ident.id)));
     }
 
     #[test]
@@ -111,7 +130,7 @@ mod tests {
         let mut decl = typedef_decl(ctx.arenas.declarators.ident(name("x"), Span::default()));
         decl.specifiers = vec![DeclarationSpecifier::Type(TypeSpecifier::Int)];
         ctx.add_symbol(&decl);
-        assert!(ctx.typedefs.is_empty());
+        assert!(ctx.typedefs.last().unwrap().is_empty());
     }
 
     #[test]
@@ -119,7 +138,7 @@ mod tests {
         let mut ctx = Context::default();
         let abstract_decl = ctx.arenas.declarators.abstrct(Span::default());
         ctx.add_symbol(&typedef_decl(abstract_decl));
-        assert!(ctx.typedefs.is_empty());
+        assert!(ctx.typedefs.last().unwrap().is_empty());
     }
 
     #[test]

@@ -1,5 +1,7 @@
+mod context;
 mod lex;
 mod yacc;
 
-pub use lex::{Span, YYLex};
+pub use context::Context;
+pub use lex::{Position, Span, YYLex};
 pub use yacc::{YYToken, Yacc};

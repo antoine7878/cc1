@@ -1,14 +1,16 @@
-Scope construction
-Symbol table
-Name resolution
-Type resolution
-Expression typing
-Lvalue/rvalue analysis
-Implicit conversions
-Function checking
-Control-flow checking
-Constant expressions
-Struct/union/enum validation
-Initializers
-Translation unit validation
-Diagnostics polishing
+| Pass                               | Rules to check                                                                                                                                                             |
+| -----------------------------------| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Scope Construction              | Create scopes, register declarations, detect duplicate declarations in same scope, allow shadowing in inner scopes, maintain scope hierarchy                               |
+| 2. Name Resolution                 | Every identifier resolves to a declaration, undeclared identifiers, correct namespace (variables, typedefs, tags, labels), forward declarations                            |
+| 3. Type Resolution                 | Resolve typedefs, validate type specifiers, build pointer/array/function types, validate incomplete types, detect invalid type combinations                                |
+| 4. Declaration Validation          | Valid storage classes, linkage rules, qualifiers (`const`, `volatile`, ...), function redeclarations compatible, variable redeclarations compatible                        |
+| 5. Expression Analysis             | Determine expression type, operand compatibility, usual arithmetic conversions, integer promotions, pointer arithmetic, comparison compatibility, assignment compatibility |
+| 6. Value Category Analysis         | Identify lvalue/rvalue, modifiable lvalue checks, valid assignment targets, address-of (`&`) legality, dereference (`*`) legality                                          |
+| 7. Implicit Conversion Insertion   | Integer promotions, arithmetic conversions, array-to-pointer decay, function-to-pointer decay, lvalue-to-rvalue conversion, qualification conversions                      |
+| 8. Function Analysis               | Argument count, argument types, variadic rules, return type compatibility, recursive declarations, function definition matches prototype                                   |
+| 9. Control Flow Validation         | `break` inside loop/switch, `continue` inside loop, `return` type matches, duplicate labels, valid `goto` targets, `case/default` inside switch                            |
+| 10. Constant Expression Evaluation | Array sizes, enum values, case labels, static initializers, compile-time constant requirements                                                                             |
+| 11. Aggregate Validation           | Struct/union field uniqueness, complete field types, bit-field rules, flexible array member rules, enum constant uniqueness                                                |
+| 12. Initializer Analysis           | Scalar initialization, aggregate initialization, designated initializers, string-to-array initialization, initializer type compatibility                                   |
+| 13. Translation Unit Validation    | Exactly one definition (where required), tentative definitions, external/internal linkage, conflicting declarations across translation unit                                |
+| 14. Diagnostics                    | Collect all errors/warnings, continue after recoverable errors, attach source locations, mark invalid nodes to prevent cascaded errors                                     |

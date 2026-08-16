@@ -1,20 +1,18 @@
 use crate::arena::{Arena, ArenaId};
-use crate::define_arena;
+use crate::ast::Node;
 use crate::parser::Span;
+use crate::{ast_node, define_arena};
 
 define_arena!(String, StringArena, StringId);
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Name {
-    pub span: Span,
-    pub id: StringId,
+ast_node! {
+    pub struct Name {
+        pub id: StringId,
+    }
 }
 
 impl StringArena {
     pub fn add(&mut self, name: String, span: Span) -> Name {
-        Name {
-            id: self.alloc(name),
-            span,
-        }
+        Name::new(self.alloc(name), span)
     }
 }

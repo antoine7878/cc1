@@ -4,8 +4,7 @@
 use std::fmt;
 
 use crate::ast::Name;
-use crate::parser::YYToken;
-use crate::context::Context;
+use crate::parser::{YYToken, Context};
 %}
 
 D			[0-9]
@@ -128,9 +127,9 @@ fn comment<T: Read>(lex: &mut YYLex<T>) {
 }
 
 fn check_type<R: Read>(lex: &YYLex<R>, name: Name) -> YYToken {
-	if lex.ctx.typedefs.contains(&name.id) {
+	if lex.ctx.typedefs.iter().rev().any(|ty| ty.contains(&name.id)) {
 	    return YYToken::TYPE_NAME(name);
-	}
+    }
 	YYToken::IDENTIFIER(name)
 }
 

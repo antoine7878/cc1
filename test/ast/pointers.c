@@ -1,7 +1,8 @@
 int *p;
-int * const cp;
+int **pp;
+int *const cp;
 const int *pc;
-int * volatile vp;
+int *volatile vp;
 int arr[10];
 int matrix[2][3];
 int *ptr_arr[5];

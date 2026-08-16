@@ -1,16 +1,16 @@
 use std::fmt::Display;
 
 use crate::arena::{Arena, ArenaId};
-use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name};
-use crate::define_arena;
+use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name, Node};
 use crate::parser::{Span, YYToken};
+use crate::{ast_node, define_arena};
 
 define_arena!(Expression, ExpressionArena, ExpressionId);
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct ExpressionNode {
-    pub span: Span,
-    pub id: ExpressionId,
+ast_node! {
+    pub struct ExpressionNode {
+        pub id: ExpressionId,
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -96,7 +96,7 @@ pub struct Type {
 
 impl ExpressionArena {
     pub fn add(id: ExpressionId, span: Span) -> ExpressionNode {
-        ExpressionNode { id, span }
+        ExpressionNode::new(id, span)
     }
 
     pub fn identifier(&mut self, name: Name, span: Span) -> ExpressionNode {

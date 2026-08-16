@@ -3,8 +3,8 @@ use std::fmt::{self, Display};
 use std::io;
 use std::io::Read;
 
-use crate::color::{RED, RESET};
 use crate::parser::Yacc;
+use crate::utils::{RED, RESET};
 
 pub fn yyerror<D: Display, R: Read>(msg: D, yacc: &Yacc<R>) {
     eprintln!(

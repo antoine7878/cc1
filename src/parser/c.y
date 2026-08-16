@@ -6,9 +6,8 @@ use crate::ast::{StructDeclaration, StructDeclarator, VariantId, EnumId, Labeled
 use crate::ast::{ExpressionStatementNode, SelectionStatementNode, IterationStatementNode, JumpStatementNode, JumpStatement};
 use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode};
 
-use crate::parser::YYLex;
-use crate::error::yyerror;
-use crate::context::Context;
+use crate::parser::{YYLex, Context};
+use crate::utils::yyerror;
 
 macro_rules! node{
     ($self:expr, $factory:ident, $method:ident $(, $arg:expr)*) => {{
@@ -398,10 +397,10 @@ labeled_statement /* LabeledStatementNode */
 	;
 
 compound_statement /* CompoundStatementNode */
-	: '{' '}'                                                               { with_span!(self, CompoundStatementNode::new, vec![], vec![]) }
-	| '{' statement_list '}'                                                { with_span!(self, CompoundStatementNode::new, vec![], $2) }
-	| '{' declaration_list '}'                                              { with_span!(self, CompoundStatementNode::new, $2, vec![]) }
-	| '{' declaration_list statement_list '}'                               { with_span!(self, CompoundStatementNode::new, $2, $3) }
+	: '{' '}'                                                               { self.lexer.ctx.push_scope(); let node = with_span!(self, CompoundStatementNode::new, vec![], vec![]); self.lexer.ctx.pop_scope(); node }
+	| '{' statement_list '}'                                                { self.lexer.ctx.push_scope(); let node = with_span!(self, CompoundStatementNode::new, vec![], $2); self.lexer.ctx.pop_scope(); node }
+	| '{' declaration_list '}'                                              { self.lexer.ctx.push_scope(); let node = with_span!(self, CompoundStatementNode::new, $2, vec![]); self.lexer.ctx.pop_scope(); node }
+	| '{' declaration_list statement_list '}'                               { self.lexer.ctx.push_scope(); let node = with_span!(self, CompoundStatementNode::new, $2, $3); self.lexer.ctx.pop_scope(); node }
 	;
 
 declaration_list /* Vec<DeclarationNode> */

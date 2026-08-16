@@ -1,12 +1,12 @@
 NAME = target/debug/cc1
 
 FT_LEX = ft_lex/target/release/ft_lex
-LEX_FILE = src/c.l
-LEXER = src/lex_yy.rs
+LEX_FILE = src/parser/c.l
+LEXER = src/parser/lex.rs
 
 FT_YACC = ft_yacc/target/release/ft_yacc
-YACC_FILE = src/c.y
-PARSER = src/c_tab.rs
+YACC_FILE = src/parser/c.y
+PARSER = src/parser/yacc.rs
 
 # ----- cc1 --------------------
 
@@ -21,7 +21,7 @@ $(FT_LEX):
 	$(MAKE) -C ft_lex
 
 $(LEXER): $(FT_LEX) $(LEX_FILE)
-	$(FT_LEX) -cx rust $(LEX_FILE) -o src/parser/lex.rs
+	$(FT_LEX) -cx rust $(LEX_FILE) -o $(LEXER)
 
 # ----- ft_yacc --------------------
 
@@ -29,16 +29,15 @@ $(FT_YACC):
 	$(MAKE) -C ft_yacc
 
 $(PARSER): $(FT_YACC) $(YACC_FILE)
-	$(FT_YACC) -x rust $(YACC_FILE) -o src/parser/yacc.rs
+	$(FT_YACC) -x rust $(YACC_FILE) -o $(PARSER)
 
 # ----- test --------------------
 
 test: $(NAME)
 	cat test/hello.c | ./$(NAME)
-	cargo test
 
 coverage: $(NAME)
-	cargo tarpaulin --exclude-files 'ft_lex/*' 'ft_yacc/*' 'src/parser/*' --out html --out json
+	cargo tarpaulin --exclude-files 'ft_lex/*' 'ft_yacc/*' 'src/parser/*' --out html
 
 ast:
 	clang -std=iso9899:1990 -pedantic -Xclang -ast-dump test/hello.c

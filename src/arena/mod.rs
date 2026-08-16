@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::marker::PhantomData;
 
@@ -34,6 +34,18 @@ impl<T> From<usize> for ArenaId<T> {
         Self(value as u32, PhantomData)
     }
 }
+
+impl<T> Display for ArenaId<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}Id({})",
+            std::any::type_name::<T>().rsplit("::").next().unwrap_or("?"),
+            self.0
+        )
+    }
+}
+
 impl<T> Debug for ArenaId<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

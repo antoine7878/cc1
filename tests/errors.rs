@@ -2,9 +2,8 @@ use std::io::{self, Cursor, Write};
 use std::process::Command;
 
 use cc1::ast::{CompoundStatementNode, ExternalDeclaration, FunctionDefinitionNode, StatementNode};
-use cc1::context::Context;
 use cc1::error::CCError;
-use cc1::parser::{YYLex, Yacc};
+use cc1::parser::{Context, YYLex, Yacc};
 
 fn parse(src: &str) -> Context {
     let lexer = YYLex::new(Cursor::new(src.as_bytes()), || None, Context::default());
@@ -25,9 +24,9 @@ fn first_statement(ctx: &Context) -> &StatementNode {
 
 #[test]
 fn cc_error_display_and_from() {
-    let io_err = io::Error::new(io::ErrorKind::Other, "disk full");
+    let io_err = io::Error::other("coucou");
     let e: CCError = io_err.into();
-    assert_eq!(format!("{e}"), "IO error: disk full");
+    assert_eq!(format!("{e}"), "IO error: coucou");
 }
 
 #[test]
@@ -89,4 +88,3 @@ fn subprocess_valid_input_prints_ast() {
         "stdout was: {stdout}"
     );
 }
-

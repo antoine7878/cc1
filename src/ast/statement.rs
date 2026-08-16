@@ -1,14 +1,14 @@
 use crate::arena::{Arena, ArenaId};
-use crate::ast::{DeclarationNode, ExpressionNode, Name};
-use crate::define_arena;
+use crate::ast::{DeclarationNode, ExpressionNode, Name, Node};
 use crate::parser::Span;
+use crate::{ast_node, define_arena};
 
 define_arena!(Statement, StatementArena, StatementId);
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct StatementNode {
-    pub span: Span,
-    pub id: StatementId,
+ast_node! {
+    pub struct StatementNode {
+        pub id: StatementId,
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -21,10 +21,10 @@ pub enum Statement {
     Jump(JumpStatementNode),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct LabeledStatementNode {
-    pub span: Span,
-    pub inner: Labeled,
+ast_node! {
+    pub struct LabeledStatementNode {
+        pub inner: Labeled,
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -34,23 +34,23 @@ pub enum Labeled {
     Default(StatementNode),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct CompoundStatementNode {
-    pub span: Span,
-    pub declarations: Vec<DeclarationNode>,
-    pub statements: Vec<StatementNode>,
+ast_node! {
+    pub struct CompoundStatementNode {
+        pub declarations: Vec<DeclarationNode>,
+        pub statements: Vec<StatementNode>,
+    }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct ExpressionStatementNode {
-    pub span: Span,
-    pub expr: Option<ExpressionNode>,
+ast_node! {
+    pub struct ExpressionStatementNode {
+        pub expr: Option<ExpressionNode>,
+    }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct SelectionStatementNode {
-    pub span: Span,
-    pub stmt: SelectionStatement,
+ast_node! {
+    pub struct SelectionStatementNode {
+        pub stmt: SelectionStatement,
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -59,10 +59,10 @@ pub enum SelectionStatement {
     Switch(ExpressionNode, StatementNode),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+ast_node! {
 pub struct IterationStatementNode {
-    pub span: Span,
     pub stmt: IterationStatement,
+}
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -77,10 +77,10 @@ pub enum IterationStatement {
     ),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct JumpStatementNode {
-    pub span: Span,
-    pub stmt: JumpStatement,
+ast_node! {
+    pub struct JumpStatementNode {
+        pub stmt: JumpStatement,
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -93,10 +93,7 @@ pub enum JumpStatement {
 
 impl StatementArena {
     pub fn add(&mut self, stmt: Statement, span: Span) -> StatementNode {
-        StatementNode {
-            id: self.alloc(stmt),
-            span,
-        }
+        StatementNode::new(self.alloc(stmt), span)
     }
 
     pub fn labeled(&mut self, node: LabeledStatementNode, span: Span) -> StatementNode {
@@ -125,10 +122,6 @@ impl StatementArena {
 }
 
 impl LabeledStatementNode {
-    pub fn new(inner: Labeled, span: Span) -> LabeledStatementNode {
-        LabeledStatementNode { inner, span }
-    }
-
     pub fn identifier(name: Name, stmt: StatementNode, span: Span) -> LabeledStatementNode {
         Self::new(Labeled::Identifier(name, stmt), span)
     }
@@ -142,26 +135,6 @@ impl LabeledStatementNode {
     }
 }
 
-impl CompoundStatementNode {
-    pub fn new(
-        declarations: Vec<DeclarationNode>,
-        statements: Vec<StatementNode>,
-        span: Span,
-    ) -> CompoundStatementNode {
-        CompoundStatementNode {
-            declarations,
-            statements,
-            span,
-        }
-    }
-}
-
-impl ExpressionStatementNode {
-    pub fn new(expr: Option<ExpressionNode>, span: Span) -> ExpressionStatementNode {
-        ExpressionStatementNode { expr, span }
-    }
-}
-
 impl SelectionStatementNode {
     pub fn new_if(
         expr: ExpressionNode,
@@ -169,33 +142,21 @@ impl SelectionStatementNode {
         selse: Option<StatementNode>,
         span: Span,
     ) -> SelectionStatementNode {
-        SelectionStatementNode {
-            span,
-            stmt: SelectionStatement::If(expr, sif, selse),
-        }
+        SelectionStatementNode::new(SelectionStatement::If(expr, sif, selse), span)
     }
 
     pub fn switch(expr: ExpressionNode, stmt: StatementNode, span: Span) -> SelectionStatementNode {
-        SelectionStatementNode {
-            span,
-            stmt: SelectionStatement::Switch(expr, stmt),
-        }
+        SelectionStatementNode::new(SelectionStatement::Switch(expr, stmt), span)
     }
 }
 
 impl IterationStatementNode {
     pub fn new_while(expr: ExpressionNode, stmt: StatementNode, span: Span) -> IterationStatementNode {
-        IterationStatementNode {
-            span,
-            stmt: IterationStatement::While(expr, stmt),
-        }
+        IterationStatementNode::new(IterationStatement::While(expr, stmt), span)
     }
 
     pub fn new_do(stmt: StatementNode, expr: ExpressionNode, span: Span) -> IterationStatementNode {
-        IterationStatementNode {
-            span,
-            stmt: IterationStatement::Do(stmt, expr),
-        }
+        IterationStatementNode::new(IterationStatement::Do(stmt, expr), span)
     }
 
     pub fn new_for(
@@ -205,21 +166,12 @@ impl IterationStatementNode {
         stmt: StatementNode,
         span: Span,
     ) -> IterationStatementNode {
-        IterationStatementNode {
-            span,
-            stmt: IterationStatement::For(e1, e2, expr, stmt),
-        }
+        IterationStatementNode::new(IterationStatement::For(e1, e2, expr, stmt), span)
     }
 }
 
 impl JumpStatementNode {
-    pub fn new(stmt: JumpStatement, span: Span) -> JumpStatementNode {
-        JumpStatementNode { span, stmt }
-    }
     pub fn new_return(expr: Option<ExpressionNode>, span: Span) -> JumpStatementNode {
-        JumpStatementNode {
-            span,
-            stmt: JumpStatement::Return(expr),
-        }
+        JumpStatementNode::new(JumpStatement::Return(expr), span)
     }
 }

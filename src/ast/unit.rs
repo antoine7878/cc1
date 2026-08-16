@@ -1,22 +1,25 @@
-use crate::ast::{CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode};
-use crate::parser::Span;
+use crate::ast::{CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Node};
+use crate::ast_node;
+use crate::parser::{Position, Span};
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Default)]
-pub struct TranslationUnitNode {
-    pub span: Span,
-    pub declarations: Vec<ExternalDeclarationNode>,
+ast_node! {
+    pub struct TranslationUnitNode {
+        pub declarations: Vec<ExternalDeclarationNode>,
+    }
 }
-
-impl TranslationUnitNode {
-    pub fn new(declarations: Vec<ExternalDeclarationNode>, span: Span) -> TranslationUnitNode {
-        TranslationUnitNode { declarations, span }
+impl Default for TranslationUnitNode {
+    fn default() -> Self {
+        Self {
+            span: Span::new(Position { line: 0, col: 0 }, Position { line: 0, col: 0 }),
+            declarations: Vec::new(),
+        }
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct ExternalDeclarationNode {
-    pub span: Span,
-    pub decl: ExternalDeclaration,
+ast_node! {
+    pub struct ExternalDeclarationNode {
+        pub decl: ExternalDeclaration,
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -41,29 +44,11 @@ impl ExternalDeclarationNode {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct FunctionDefinitionNode {
-    pub span: Span,
-    pub specifiers: Vec<DeclarationSpecifier>,
-    pub declarator: DeclaratorNode,
-    pub declarations: Vec<DeclarationNode>,
-    pub coumpound: CompoundStatementNode,
-}
-
-impl FunctionDefinitionNode {
-    pub fn new(
-        specifiers: Vec<DeclarationSpecifier>,
-        declarator: DeclaratorNode,
-        declarations: Vec<DeclarationNode>,
-        coumpound: CompoundStatementNode,
-        span: Span,
-    ) -> FunctionDefinitionNode {
-        FunctionDefinitionNode {
-            span,
-            specifiers,
-            declarator,
-            declarations,
-            coumpound,
-        }
+ast_node! {
+    pub struct FunctionDefinitionNode {
+        pub specifiers: Vec<DeclarationSpecifier>,
+        pub declarator: DeclaratorNode,
+        pub declarations: Vec<DeclarationNode>,
+        pub coumpound: CompoundStatementNode,
     }
 }
