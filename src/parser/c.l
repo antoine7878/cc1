@@ -135,7 +135,7 @@ fn check_type<R: Read>(lex: &YYLex<R>, name: Name) -> YYToken {
 
 fn alloc_name<R: Read>(lex: &mut YYLex<R>) -> Name {
     let span = lex.span;
-    let name = lex.take_yytext();
+    let name = lex.yytext.clone();
     lex.ctx.arenas.names.add(name, span)
 }
 

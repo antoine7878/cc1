@@ -189,7 +189,7 @@ impl<W: Write> Visitor for AstPrinter<W> {
     fn visit_type(&mut self, arenas: &Arenas, node: &Type, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             for spec in &node.specifiers {
-                let result = write!(printer.w, " {}", spec);
+                let result = write!(printer.w, "{}", spec);
                 printer.ok(result);
             }
             printer.visit_declarator(arenas, &node.declarator, true);

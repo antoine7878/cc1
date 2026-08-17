@@ -11,8 +11,17 @@ pub fn yyerror<D: Display, R: Read>(msg: D, yacc: &Yacc<R>) {
     const SEGMENT: &str = "--------------------------------------------------------------------------------";
 
     let path = &yacc.lexer.ctx.file_name;
-    let line_no = yacc.lexer.pos.line;
-    let col_no = yacc.lexer.pos.col + 1;
+    let span = yacc.lexer.span;
+    let line_no = if span.start.line != 0 {
+        span.start.line
+    } else {
+        yacc.lexer.pos.line
+    };
+    let col_no = if span.start.line != 0 {
+        span.start.col
+    } else {
+        yacc.lexer.pos.col + 1
+    };
 
     let start = line_no.saturating_sub(CONTEXT);
     let end = line_no.saturating_add(CONTEXT);
@@ -27,7 +36,7 @@ pub fn yyerror<D: Display, R: Read>(msg: D, yacc: &Yacc<R>) {
     for (i, line) in lines.enumerate().skip(start).take(end - start + 1) {
         let Ok(line) = line else { break };
 
-        eprintln!("{i:>padding$} {line}");
+        eprintln!("{:>padding$} {line}", i + 1);
         if i == line_no - 1 {
             eprintln!("{:>padding$} {RED}{:>col_no$} {msg}{RESET} ", "", "^");
         }

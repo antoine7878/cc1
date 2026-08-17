@@ -116,7 +116,7 @@ impl<R: Read> Yacc<R> {
     }
 
     fn unwind(&mut self) {
-        yyerror("syntax error", self);
+        yyerror(self.error_message(), self);
         let start = self.span_stack.last().cloned().unwrap_or_default().start;
         while let Some(i) = self.state_stack.last()
             && Self::YY_GOTO_TABLE[*i][Self::YY_ERROR_TOKEN_ID] == 0
@@ -154,6 +154,24 @@ impl<R: Read> Yacc<R> {
                 return;
             }
             self.act = Self::YY_GOTO_TABLE[top][self.lookahead_id];
+        }
+    }
+
+    fn error_message(&self) -> String {
+        let unexpected = self.unexpected_text();
+        format!("syntax error, unexpected {unexpected}")
+    }
+
+    fn unexpected_text(&self) -> String {
+        if self.lookahead_id == Self::YY_EOF_TOKEN_ID {
+            "end of file".to_string()
+        } else {
+            let text = self.lexer.yytext.trim();
+            if text.is_empty() {
+                Self::YY_TOKEN_NAMES[self.lookahead_id].to_string()
+            } else {
+                format!("'{text}'")
+            }
         }
     }
 

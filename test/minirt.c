@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 typedef struct {
+	int a;
 } t_mr;
 
 typedef int t_img;

@@ -20,12 +20,14 @@ impl Generator for RSGenerator {
     fn dump_tables(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
         writeln!(w, "const YY_ERROR_TOKEN_ID: usize = {};", Yacc::ERROR_TOKEN_ID)?;
         writeln!(w, "const YY_EOF_TOKEN_ID: usize = {};", Yacc::END_TOKEN_ID)?;
+        writeln!(w, "const YY_ACCEPT_TOKEN_ID: usize = {};", Yacc::ACCEPT_TOKEN_ID)?;
         self.goto_table(w, parser)?;
         self.rlen_table(w, parser)?;
         self.product_table(w, parser)?;
         self.action_table(w, parser)?;
         self.default_action_table(w, parser)?;
         self.default_reduce_table(w, parser)?;
+        self.token_names(w, parser)?;
         Ok(())
     }
 
@@ -300,6 +302,16 @@ impl RSGenerator {
             } else {
                 write!(w, "0,")?
             }
+        }
+        writeln!(w, "];")?;
+        Ok(())
+    }
+
+    fn token_names(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
+        write!(w, "const YY_TOKEN_NAMES: [&str; {}] = [", parser.yacc.tokens.len())?;
+        for tok in &parser.yacc.tokens {
+            let name = tok.self_display_name().replace('\\', "\\\\").replace('"', "\\\"");
+            write!(w, "\"{}\",", name)?;
         }
         writeln!(w, "];")?;
         Ok(())

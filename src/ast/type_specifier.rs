@@ -59,7 +59,7 @@ impl Display for TypeSpecifier {
             TypeSpecifier::Struct(_) => "struct",
             TypeSpecifier::Union(_) => "union",
             TypeSpecifier::Enum(_) => "enum",
-            TypeSpecifier::TypedefName(_) => "typedef name",
+            TypeSpecifier::TypedefName(_) => "typedef",
         };
         write!(f, "{}", s)
     }
