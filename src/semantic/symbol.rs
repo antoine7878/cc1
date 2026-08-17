@@ -1,20 +1,39 @@
-pub struct SemanticContext {
+use std::collections::HashMap;
+
+use crate::ast::{StringId, Type};
+use crate::parser::Context;
+
+#[derive(Default)]
+struct Scope {
+    symbols: HashMap<String, Symbol>,
+}
+
+struct Symbol {
+    name: StringId,
+    ty: Type,
+}
+
+pub struct Analyzer {
+    ctx: Context,
+    // ast: &'a mut TranslationUnitNode,
     scopes: Vec<Scope>,
-    diagnostics: Vec<Diagnostic>,
-    current_function: Option<FunctionId>,
-    loop_depth: usize,
-    switch_depth: usize,
 }
 
-struct Analyzer<'a> {
-    ast: &'a mut TranslationUnit,
-    sema: SemanticContext,
-}
-
-impl<'a> Analyzer<'a> {
-    fn analyze(&mut self) {
-        self.collect_declarations();
-        self.resolve_names();
-        self.type_check();
+impl Analyzer {
+    pub fn analyze(ctx: Context) -> Context {
+        let mut analyzer = Self {
+            ctx,
+            scopes: Vec::new(),
+        };
+        analyzer.collect_declarations();
+        analyzer.resolve_names();
+        analyzer.type_check();
+        analyzer.ctx
     }
+
+    fn collect_declarations(&mut self) {}
+
+    fn resolve_names(&mut self) {}
+
+    fn type_check(&mut self) {}
 }
