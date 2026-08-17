@@ -1,16 +1,38 @@
 use std::error;
 use std::fmt::{self, Display};
-use std::io;
-use std::io::Read;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, Read};
 
 use crate::parser::Yacc;
 use crate::utils::{RED, RESET};
 
 pub fn yyerror<D: Display, R: Read>(msg: D, yacc: &Yacc<R>) {
-    eprintln!(
-        "{}:{}:{}: {RED}{msg}{RESET}",
-        yacc.lexer.ctx.file_name, yacc.lexer.pos.line, yacc.lexer.pos.col
-    );
+    const CONTEXT: usize = 5;
+    const SEGMENT: &str = "--------------------------------------------------------------------------------";
+
+    let path = &yacc.lexer.ctx.file_name;
+    let line_no = yacc.lexer.pos.line;
+    let col_no = yacc.lexer.pos.col + 1;
+
+    let start = line_no.saturating_sub(CONTEXT);
+    let end = line_no.saturating_add(CONTEXT);
+    let padding = end.to_string().len();
+
+    let Ok(file) = File::open(path) else { return };
+    let lines = BufReader::new(file).lines();
+
+    eprintln!("{path}:{line_no}:{col_no}: {RED}{msg}{RESET}");
+
+    eprintln!("{SEGMENT}");
+    for (i, line) in lines.enumerate().skip(start).take(end - start + 1) {
+        let Ok(line) = line else { break };
+
+        eprintln!("{i:>padding$} {line}");
+        if i == line_no - 1 {
+            eprintln!("{:>padding$} {RED}{:>col_no$} {msg}{RESET} ", "", "^");
+        }
+    }
+    eprintln!("{SEGMENT}");
 }
 
 #[derive(Debug)]

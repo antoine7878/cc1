@@ -3,6 +3,12 @@
 #include "mlx.h"
 #include <stddef.h>
 
+typedef struct {
+} t_mr;
+
+typedef int t_img;
+typedef int t_shape;
+
 int main(int argc, char **argv) {
 	t_mr mr;
 	t_img img;
