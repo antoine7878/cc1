@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-use crate::ast::{DeclarationNode, StringId, Type};
-use crate::parser::Context;
+use crate::ast::visit::{Visitor, walk_translation_unit};
+use crate::ast::{DeclarationNode, FunctionDefinitionNode, StringId, Type};
+use crate::parser::{Arenas, Context};
 
 #[derive(Default)]
 struct Scope {
@@ -14,20 +15,33 @@ struct Symbol {
     ty: Type,
 }
 
+#[derive(Default)]
+struct DeclarationCollector {
+    declarations: Vec<DeclarationNode>,
+}
+
+impl Visitor for DeclarationCollector {
+    fn visit_declaration(&mut self, _arenas: &Arenas, node: &DeclarationNode) {
+        self.declarations.push(node.clone());
+    }
+
+    fn visit_function_definition(&mut self, _arenas: &Arenas, _node: &FunctionDefinitionNode) {}
+}
+
 pub struct Analyzer;
 
 impl Analyzer {
     pub fn analyze(ctx: Context) -> Context {
         let declarations = Self::collect_declarations(&ctx);
-        let names = Self::resolve_names(&ctx, &declarations);
-        let types = Self::resolve_types(&ctx, &declarations);
+        let _names = Self::resolve_names(&ctx, &declarations);
+        let _types = Self::resolve_types(&ctx, &declarations);
         ctx
     }
 
     fn collect_declarations(ctx: &Context) -> Vec<DeclarationNode> {
-        let ret = Vec::new();
-        println!("collect_declarations");
-        ret
+        let mut collector = DeclarationCollector::default();
+        walk_translation_unit(&mut collector, &ctx.arenas, &ctx.ast);
+        collector.declarations
     }
 
     fn resolve_names(ctx: &Context, declarations: &[DeclarationNode]) -> Vec<StringId> {

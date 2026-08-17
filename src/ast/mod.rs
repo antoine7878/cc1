@@ -7,6 +7,7 @@ pub mod statement;
 pub mod tag;
 pub mod type_specifier;
 pub mod unit;
+pub mod visit;
 
 pub use declaration::{DeclarationNode, Declarator, DeclaratorArena};
 pub use declaration::{DeclaratorNode, InitDeclaratorNode, Initializer, InitializerNode};
@@ -20,6 +21,7 @@ pub use tag::{Enum, EnumArena, EnumId, Struct, StructArena, StructDeclaration, S
 pub use tag::{Tag, Union, UnionArena, UnionId, Variant, VariantArena, VariantId};
 pub use type_specifier::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier};
 pub use unit::{ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode};
+pub use visit::Visitor;
 
 use crate::parser::Span;
 
