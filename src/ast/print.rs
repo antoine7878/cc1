@@ -530,8 +530,12 @@ impl<'a, W: Write> AstPrinter<'a, W> {
     }
 
     fn print_type(&mut self, ty: &Type, is_last: bool) -> io::Result<()> {
-        write!(self.w, "type")?;
-        unimplemented!()
+        self.print_node(ty, is_last, |printer| {
+            for spec in &ty.specifiers {
+                write!(printer.w, " {}", spec)?;
+            }
+            printer.print_declarator_node(&ty.declarator, true)
+        })
     }
 }
 
