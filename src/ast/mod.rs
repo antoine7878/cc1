@@ -16,8 +16,8 @@ pub use name::{Name, StringArena, StringId};
 pub use statement::{CompoundStatementNode, ExpressionStatementNode, IterationStatement};
 pub use statement::{IterationStatementNode, JumpStatement, Labeled, LabeledStatementNode, StatementArena};
 pub use statement::{JumpStatementNode, SelectionStatement, SelectionStatementNode, Statement, StatementNode};
-pub use tag::{EnumArena, EnumId, StructArena, StructDeclaration, StructDeclarator, StructId};
-pub use tag::{Tag, UnionArena, UnionId, VariantArena, VariantId};
+pub use tag::{Enum, EnumArena, EnumId, Struct, StructArena, StructDeclaration, StructDeclarator, StructId};
+pub use tag::{Tag, Union, UnionArena, UnionId, Variant, VariantArena, VariantId};
 pub use type_specifier::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier};
 pub use unit::{ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode};
 

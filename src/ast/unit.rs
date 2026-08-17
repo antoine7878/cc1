@@ -1,4 +1,6 @@
-use crate::ast::{CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Node};
+use crate::ast::{
+    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Node,
+};
 use crate::ast_node;
 use crate::parser::{Position, Span};
 
@@ -48,7 +50,7 @@ ast_node! {
     pub struct FunctionDefinitionNode {
         pub specifiers: Vec<DeclarationSpecifier>,
         pub declarator: DeclaratorNode,
-        pub declarations: Vec<DeclarationNode>,
-        pub coumpound: CompoundStatementNode,
+        pub arguments: Vec<DeclarationNode>,
+        pub body: CompoundStatementNode,
     }
 }

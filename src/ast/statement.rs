@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::arena::{Arena, ArenaId};
 use crate::ast::{DeclarationNode, ExpressionNode, Name, Node};
 use crate::parser::Span;
@@ -135,6 +137,50 @@ impl LabeledStatementNode {
     }
 }
 
+impl Display for Labeled {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Labeled::Identifier(..) => "Identifier",
+            Labeled::Case(..) => "Case",
+            Labeled::Default(_) => "Default",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+impl Display for SelectionStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            SelectionStatement::If(..) => "If",
+            SelectionStatement::Switch(..) => "Switch",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+impl Display for IterationStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            IterationStatement::While(..) => "While",
+            IterationStatement::Do(..) => "Do",
+            IterationStatement::For(..) => "For",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+impl Display for JumpStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            JumpStatement::Goto => "Goto",
+            JumpStatement::Continue => "Continue",
+            JumpStatement::Break => "Break",
+            JumpStatement::Return(_) => "Return",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 impl SelectionStatementNode {
     pub fn new_if(
         expr: ExpressionNode,
@@ -151,7 +197,11 @@ impl SelectionStatementNode {
 }
 
 impl IterationStatementNode {
-    pub fn new_while(expr: ExpressionNode, stmt: StatementNode, span: Span) -> IterationStatementNode {
+    pub fn new_while(
+        expr: ExpressionNode,
+        stmt: StatementNode,
+        span: Span,
+    ) -> IterationStatementNode {
         IterationStatementNode::new(IterationStatement::While(expr, stmt), span)
     }
 

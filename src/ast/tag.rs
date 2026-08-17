@@ -1,6 +1,7 @@
 use crate::arena::{Arena, ArenaId};
 use crate::ast::{DeclarationSpecifier, DeclaratorNode, ExpressionNode, Name, Node};
 use crate::parser::Span;
+use crate::utils::{BLUE, RESET};
 use crate::{ast_node, define_arena};
 
 define_arena!(Struct, StructArena, StructId);
@@ -55,6 +56,18 @@ pub enum Tag {
     Struct,
     Union,
     Enum,
+}
+
+impl std::fmt::Display for Enum {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{BLUE}Enum{RESET} {}", self.span)
+    }
+}
+
+impl std::fmt::Display for Variant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{BLUE}Variant{RESET} {}", self.span)
+    }
 }
 
 impl StructArena {

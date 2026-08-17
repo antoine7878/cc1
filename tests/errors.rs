@@ -13,7 +13,7 @@ fn parse(src: &str) -> Context {
 fn first_statement(ctx: &Context) -> &StatementNode {
     let decls = &ctx.ast.declarations;
     let ExternalDeclaration::Function(FunctionDefinitionNode {
-        coumpound: CompoundStatementNode { statements, .. },
+        body: CompoundStatementNode { statements, .. },
         ..
     }) = &decls[0].decl
     else {
