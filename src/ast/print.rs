@@ -8,10 +8,11 @@ use crate::ast::visit::{
     walk_struct_declarator, walk_translation_unit, walk_union, walk_variant,
 };
 use crate::ast::{
-    CompoundStatementNode, DeclarationNode, DeclaratorNode, Enum, Expression, ExpressionNode, ExpressionStatementNode,
-    FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, InitDeclaratorNode, InitializerNode,
-    IterationStatementNode, JumpStatementNode, LabeledStatementNode, Name, ParameterDeclaration, Qualifier,
-    SelectionStatementNode, Struct, StructDeclaration, StructDeclarator, TranslationUnitNode, Type, Union, Variant,
+    CompoundStatementNode, DeclarationNode, DeclaratorNode, DeclarationSpecifier, Enum, Expression, ExpressionNode,
+    ExpressionStatementNode, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, InitDeclaratorNode,
+    InitializerNode, IterationStatementNode, JumpStatementNode, LabeledStatementNode, Name, ParameterDeclaration,
+    Qualifier, SelectionStatementNode, Struct, StructDeclaration, StructDeclarator, TranslationUnitNode, Type,
+    TypeSpecifier, Union, Variant,
 };
 use crate::parser::{Arenas, Context};
 use crate::utils::{CYAN, RESET};
@@ -76,6 +77,30 @@ impl<W: Write> AstPrinter<W> {
             printer.ok(result);
         });
     }
+
+    fn print_specifier(&mut self, arenas: &Arenas, spec: &DeclarationSpecifier) {
+        let s = match spec {
+            DeclarationSpecifier::Type(t) => match t {
+                TypeSpecifier::Struct(id) => match &arenas.structs.get(*id).name {
+                    Some(name) => format!("struct {}", arenas.names.get(name.id)),
+                    None => "struct".to_string(),
+                },
+                TypeSpecifier::Union(id) => match &arenas.unions.get(*id).name {
+                    Some(name) => format!("union {}", arenas.names.get(name.id)),
+                    None => "union".to_string(),
+                },
+                TypeSpecifier::Enum(id) => match &arenas.enums.get(*id).name {
+                    Some(name) => format!("enum {}", arenas.names.get(name.id)),
+                    None => "enum".to_string(),
+                },
+                TypeSpecifier::TypedefName(name) => arenas.names.get(name.id).clone(),
+                other => other.to_string(),
+            },
+            other => other.to_string(),
+        };
+        let result = write!(self.w, "{s}");
+        self.ok(result);
+    }
 }
 
 impl<W: Write> Visitor for AstPrinter<W> {
@@ -88,7 +113,8 @@ impl<W: Write> Visitor for AstPrinter<W> {
     fn visit_function_definition(&mut self, arenas: &Arenas, node: &FunctionDefinitionNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             for spec in &node.specifiers {
-                let result = write!(printer.w, "{} ", spec);
+                printer.print_specifier(arenas, spec);
+                let result = write!(printer.w, " ");
                 printer.ok(result);
             }
             printer.visit_declarator(arenas, &node.declarator, false);
@@ -99,8 +125,9 @@ impl<W: Write> Visitor for AstPrinter<W> {
     fn visit_declaration(&mut self, arenas: &Arenas, node: &DeclarationNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             for spec in &node.specifiers {
-                let result = write!(printer.w, " {}", spec);
+                let result = write!(printer.w, " ");
                 printer.ok(result);
+                printer.print_specifier(arenas, spec);
             }
             walk_declaration(printer, arenas, node, is_last);
         });
@@ -189,8 +216,7 @@ impl<W: Write> Visitor for AstPrinter<W> {
     fn visit_type(&mut self, arenas: &Arenas, node: &Type, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             for spec in &node.specifiers {
-                let result = write!(printer.w, "{}", spec);
-                printer.ok(result);
+                printer.print_specifier(arenas, spec);
             }
             printer.visit_declarator(arenas, &node.declarator, true);
         });
@@ -211,8 +237,9 @@ impl<W: Write> Visitor for AstPrinter<W> {
     fn visit_parameter_declaration(&mut self, arenas: &Arenas, node: &ParameterDeclaration, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             for spec in &node.specifiers {
-                let result = write!(printer.w, " {}", spec);
+                let result = write!(printer.w, " ");
                 printer.ok(result);
+                printer.print_specifier(arenas, spec);
             }
             printer.visit_declarator(arenas, &node.declarator, true);
         });
@@ -237,8 +264,9 @@ impl<W: Write> Visitor for AstPrinter<W> {
     fn visit_struct_declaration(&mut self, arenas: &Arenas, node: &StructDeclaration, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             for spec in &node.specifiers {
-                let result = write!(printer.w, " {}", spec);
+                let result = write!(printer.w, " ");
                 printer.ok(result);
+                printer.print_specifier(arenas, spec);
             }
             for (is_last, declarator) in node.struct_declarators.iter().with_last() {
                 printer.visit_struct_declarator(arenas, declarator, is_last);
