@@ -14,3 +14,6 @@
 | 12. Initializer Analysis           | Scalar initialization, aggregate initialization, designated initializers, string-to-array initialization, initializer type compatibility                                   |
 | 13. Translation Unit Validation    | Exactly one definition (where required), tentative definitions, external/internal linkage, conflicting declarations across translation unit                                |
 | 14. Diagnostics                    | Collect all errors/warnings, continue after recoverable errors, attach source locations, mark invalid nodes to prevent cascaded errors                                     |
+
+
+int base convertion in c.l

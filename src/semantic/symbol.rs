@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::collections::HashMap;
 
 use crate::ast::visit::{Visitor, walk_translation_unit};
@@ -21,11 +22,11 @@ struct DeclarationCollector {
 }
 
 impl Visitor for DeclarationCollector {
-    fn visit_declaration(&mut self, _arenas: &Arenas, node: &DeclarationNode) {
+    fn visit_declaration(&mut self, _arenas: &Arenas, node: &DeclarationNode, _is_last: bool) {
         self.declarations.push(node.clone());
     }
 
-    fn visit_function_definition(&mut self, _arenas: &Arenas, _node: &FunctionDefinitionNode) {}
+    fn visit_function_definition(&mut self, _arenas: &Arenas, _node: &FunctionDefinitionNode, _is_last: bool) {}
 }
 
 pub struct Analyzer;
@@ -40,7 +41,8 @@ impl Analyzer {
 
     fn collect_declarations(ctx: &Context) -> Vec<DeclarationNode> {
         let mut collector = DeclarationCollector::default();
-        walk_translation_unit(&mut collector, &ctx.arenas, &ctx.ast);
+        println!("collect_declarations");
+        walk_translation_unit(&mut collector, &ctx.arenas, &ctx.ast, false);
         collector.declarations
     }
 
@@ -55,6 +57,4 @@ impl Analyzer {
         println!("resolve_types");
         ret
     }
-
-    // fn type_check() {}
 }

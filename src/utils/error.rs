@@ -8,8 +8,8 @@ use crate::utils::{RED, RESET};
 
 pub fn yyerror<D: Display, R: Read>(msg: D, yacc: &Yacc<R>) {
     eprintln!(
-        "filename.c:{}:{}: {RED}{msg}{RESET}",
-        yacc.lexer.pos.line, yacc.lexer.pos.col
+        "{}:{}:{}: {RED}{msg}{RESET}",
+        yacc.lexer.ctx.file_name, yacc.lexer.pos.line, yacc.lexer.pos.col
     );
 }
 
