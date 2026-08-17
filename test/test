@@ -1,6 +1,0 @@
-struct coucou {
-	int a;
-	int c, d;
-	int b : 2;
-};
-

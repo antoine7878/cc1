@@ -36,9 +36,6 @@ $(PARSER): $(FT_YACC) $(YACC_FILE)
 test: $(NAME)
 	cat test/hello.c | ./$(NAME)
 
-coverage: $(NAME)
-	cargo tarpaulin --exclude-files 'ft_lex/*' 'ft_yacc/*' 'src/parser/*' --out html
-
 ast:
 	clang -std=iso9899:1990 -pedantic -Xclang -ast-dump test/hello.c
 
