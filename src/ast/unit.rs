@@ -9,6 +9,7 @@ ast_node! {
         pub declarations: Vec<ExternalDeclarationNode>,
     }
 }
+
 impl Default for TranslationUnitNode {
     fn default() -> Self {
         Self {
