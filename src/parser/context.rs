@@ -1,8 +1,14 @@
 use std::collections::HashSet;
 
-use crate::ast::{DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorArena, DeclaratorNode, Name};
-use crate::ast::{EnumArena, ExpressionArena, StatementArena, Storage, StringArena, StringId, StructArena};
-use crate::ast::{StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena};
+use crate::ast::{
+    DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorArena, DeclaratorNode, Name,
+};
+use crate::ast::{
+    EnumArena, ExpressionArena, StatementArena, Storage, StringArena, StringId, StructArena,
+};
+use crate::ast::{
+    StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena,
+};
 use crate::parser::Span;
 
 #[derive(Debug, Default)]
@@ -144,20 +150,26 @@ mod tests {
     #[test]
     fn declarator_name_recurses_through_array_and_function() {
         let mut ctx = Context::default();
-        let ident = ctx
+        let ident = ctx.arenas.declarators.ident(
+            ctx.arenas.names.add("arr".into(), Span::default()),
+            Span::default(),
+        );
+        let arr = ctx
             .arenas
             .declarators
-            .ident(ctx.arenas.names.add("arr".into(), Span::default()), Span::default());
-        let arr = ctx.arenas.declarators.array(ident, Some(empty_expr()), Span::default());
+            .array(ident, Some(empty_expr()), Span::default());
         let arr_name = ctx.declartor_name(&arr).expect("array declarator name");
         assert_eq!(ctx.arenas.names.get(arr_name.id), "arr");
 
-        let ident2 = ctx
+        let ident2 = ctx.arenas.declarators.ident(
+            ctx.arenas.names.add("fn".into(), Span::default()),
+            Span::default(),
+        );
+        let params = FunctionParametersNode::empty(Span::default());
+        let f = ctx
             .arenas
             .declarators
-            .ident(ctx.arenas.names.add("fn".into(), Span::default()), Span::default());
-        let params = FunctionParametersNode::empty(Span::default());
-        let f = ctx.arenas.declarators.function(ident2, params, Span::default());
+            .function(ident2, params, Span::default());
         assert!(ctx.declartor_name(&f).is_some());
     }
 

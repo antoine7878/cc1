@@ -15,7 +15,6 @@ struct Symbol {
 
 pub struct Analyzer {
     ctx: Context,
-    // ast: &'a mut TranslationUnitNode,
     scopes: Vec<Scope>,
 }
 

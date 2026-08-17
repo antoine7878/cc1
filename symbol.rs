@@ -18,11 +18,17 @@ pub struct Scope {
 
 impl SymbolTable {
     pub fn get_ordinary(&self, name: &str, arenas: &Arenas) -> Option<&DeclarationNode> {
-        self.scopes.iter().rev().find_map(|s| s.get_ordinary(name, arenas))
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|s| s.get_ordinary(name, arenas))
     }
 
     pub fn get_tag(&self, kind: Tag, name: &str, arenas: &Arenas) -> Option<&DeclarationNode> {
-        self.scopes.iter().rev().find_map(|s| s.get_tag(kind, name, arenas))
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|s| s.get_tag(kind, name, arenas))
     }
 
     // pub fn get_label(&self, name: &str, arenas: &Arenas) -> Option<&DeclarationNode> {
