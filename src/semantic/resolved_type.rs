@@ -38,12 +38,12 @@ impl TypeSpecifierCounter {
             *a += 1;
         }
         Some([
-            c.signed, c.unsigned, c.char, c.short, c.short, c.int, c.long, c.float, c.double,
+            c.signed, c.unsigned, c.void, c.char, c.short, c.int, c.long, c.float, c.double,
         ])
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum ResolvedType {
     Void,
     Char,

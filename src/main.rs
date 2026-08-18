@@ -1,4 +1,4 @@
-// use cc1::ast::print::AstPrinter;
+use cc1::ast::print::AstPrinter;
 use cc1::parser::{Context, YYLex, Yacc};
 use cc1::semantic::Analyzer;
 
@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let lexer = YYLex::new(file, || None, ctx);
     let yacc = Yacc::new(lexer);
     let ctx = yacc.yyparse();
-    // AstPrinter::print(&ctx)?;
+    AstPrinter::print(&ctx)?;
     let _ctx = Analyzer::analyze(ctx);
     Ok(())
 }

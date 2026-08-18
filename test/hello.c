@@ -1,18 +1,14 @@
-double extrn;
+// double extrn;
 
-struct tag {
-	int member;
-};
+// struct tag {
+// 	int member;
+// };
 
-int main(void) {
+// int fn(a, b, c)
+// int a, b;
+// int c;
+// { return 1; }
 
-	int a;
-	int b;
-	float d;
-	char unsigned e = 2;
-	float coucou, salut;
-
-	extrn = .3;
-	a = 1;
-	return 0;
+int *fn() {
+	return [ 2, 3 ];
 }

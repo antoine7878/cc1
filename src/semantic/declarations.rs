@@ -11,7 +11,7 @@ pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>>
     });
     let ret = storages.next().cloned();
     if storages.next().is_some() {
-        Diag::diag(ret, DiagnosisInner::MultipleStorageSpecifiers)
+        Diag::with_diag(ret, DiagnosisInner::MultipleStorageSpecifiers)
     } else {
         Diag::res(ret)
     }
@@ -21,7 +21,7 @@ pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>>
 // The declaration of an identifier for a function that has block scope shall have no explicit storage-class specifier other than extern.
 pub fn extern_function_only(scope_type: ScopeType, storage: Storage) -> Diag<()> {
     if scope_type == ScopeType::Block && storage != Storage::Extern {
-        Diag::diag((), DiagnosisInner::BlockScopeNotExtern)
+        Diag::with_diag((), DiagnosisInner::BlockScopeNotExtern)
     } else {
         Diag::res(())
     }
@@ -38,6 +38,7 @@ pub fn resolve_type(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Resolved
             _ => None,
         })
         .collect();
+
     match types.as_slice() {
         [] => return Diag::res_some(ResolvedType::Int),
         [TypeSpecifier::Struct(t)] => return Diag::res_some(ResolvedType::Struct(*t)),
@@ -46,10 +47,10 @@ pub fn resolve_type(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Resolved
         [TypeSpecifier::TypedefName(t)] => return Diag::res_some(ResolvedType::Typedef(*t)),
         _ => ()
     }
-    //   s, u, v, c, s, i, l, f, d
     let Some(a) = TypeSpecifierCounter::count(types.as_slice()) else {
-        return Diag::diag(None, DiagnosisInner::InvalidTypeSpecifer);
+        return Diag::with_diag(None, DiagnosisInner::InvalidTypeSpecifer);
     };
+    //   s, u, v, c, s, i, l, f, d
     match  a {
         [0, 0, 1, 0, 0, 0, 0, 0, 0] => Diag::res_some(ResolvedType::Void),
         [0, 0, 0, 1, 0, 0, 0, 0, 0] => Diag::res_some(ResolvedType::Char),
@@ -61,6 +62,9 @@ pub fn resolve_type(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Resolved
         [1, 0, 0, 0, 1, 1, 0, 0, 0] => Diag::res_some(ResolvedType::Short),
         [0, 1, 0, 0, 1, 0, 0, 0, 0] => Diag::res_some(ResolvedType::UnsignedShort),
         [0, 1, 0, 0, 1, 1, 0, 0, 0] => Diag::res_some(ResolvedType::UnsignedShort),
+        [0, 0, 0, 0, 0, 1, 0, 0, 0] => Diag::res_some(ResolvedType::Int),
+        [1, 0, 0, 0, 0, 0, 0, 0, 0] => Diag::res_some(ResolvedType::Int),
+        [1, 0, 0, 0, 0, 1, 0, 0, 0] => Diag::res_some(ResolvedType::Int),
         [0, 0, 0, 0, 0, 0, 1, 0, 0] => Diag::res_some(ResolvedType::Long),
         [0, 0, 0, 0, 0, 1, 1, 0, 0] => Diag::res_some(ResolvedType::Long),
         [1, 0, 0, 0, 0, 0, 1, 0, 0] => Diag::res_some(ResolvedType::Long),
@@ -70,7 +74,7 @@ pub fn resolve_type(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Resolved
         [0, 0, 0, 0, 0, 0, 0, 1, 0] => Diag::res_some(ResolvedType::Float),
         [0, 0, 0, 0, 0, 0, 0, 0, 1] => Diag::res_some(ResolvedType::Double),
         [0, 0, 0, 0, 0, 0, 1, 0, 1] => Diag::res_some(ResolvedType::LongDouble),
-        _ => Diag::diag(None, DiagnosisInner::InvalidTypeSpecifer),
+        _ => Diag::with_diag(None, DiagnosisInner::InvalidTypeSpecifer),
     }
 }
 
@@ -89,7 +93,7 @@ pub fn get_qualifier(specifiers: &[DeclarationSpecifier]) -> Diag<(bool, bool)> 
     let ret = (const_count > 1, volatile_count > 1);
 
     if const_count > 1 || volatile_count > 1 {
-        return Diag::diag(ret, DiagnosisInner::DuplicateTypeQualifers);
+        return Diag::with_diag(ret, DiagnosisInner::DuplicateTypeQualifers);
     }
     Diag::res(ret)
 }

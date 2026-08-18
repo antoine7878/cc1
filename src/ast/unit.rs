@@ -40,7 +40,7 @@ ast_node! {
     pub struct FunctionDefinitionNode {
         pub specifiers: Vec<DeclarationSpecifier>,
         pub declarator: DeclaratorNode,
-        pub arguments: Vec<DeclarationNode>,
+        pub old_style_declarations: Vec<DeclarationNode>,
         pub body: CompoundStatementNode,
     }
 }

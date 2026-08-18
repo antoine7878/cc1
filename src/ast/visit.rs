@@ -141,8 +141,8 @@ pub fn walk_function_definition<V: Visitor + ?Sized>(
 ) {
     walk_specifiers(v, ctx, &node.specifiers);
     v.visit_declarator(ctx, &node.declarator, false);
-    for arg in &node.arguments {
-        v.visit_declaration(ctx, arg, false);
+    for decl in &node.old_style_declarations {
+        v.visit_declaration(ctx, decl, false);
     }
     v.visit_compound_statement(ctx, &node.body, true);
 }
