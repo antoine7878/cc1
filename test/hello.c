@@ -4,14 +4,15 @@ struct tag {
 	int member;
 };
 
-int functio(void) {
+int main(void) {
 
 	int a;
 	int b;
-	int d;
+	float d;
+	char unsigned e = 2;
 	float coucou, salut;
 
+	extrn = .3;
 	a = 1;
-	non = 1;
 	return 0;
 }

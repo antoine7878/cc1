@@ -8,6 +8,7 @@ ast_node! {
         pub id: StringId,
     }
 }
+impl Copy for Name {}
 
 impl StringArena {
     pub fn add(&mut self, name: String, span: Span) -> Name {

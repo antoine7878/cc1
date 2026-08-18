@@ -1,6 +1,6 @@
 use crate::ast::{CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode};
 use crate::ast_node;
-use crate::parser::{Position, Span};
+use crate::parser::Span;
 
 ast_node! {
     pub struct TranslationUnitNode {
@@ -10,10 +10,7 @@ ast_node! {
 
 impl Default for TranslationUnitNode {
     fn default() -> Self {
-        Self {
-            span: Span::new(Position { line: 0, col: 0 }, Position { line: 0, col: 0 }),
-            declarations: Vec::new(),
-        }
+        TranslationUnitNode::new(Vec::new(), Span::default())
     }
 }
 
@@ -31,17 +28,11 @@ pub enum ExternalDeclaration {
 
 impl ExternalDeclarationNode {
     pub fn declaration(decl: DeclarationNode, span: Span) -> ExternalDeclarationNode {
-        ExternalDeclarationNode {
-            span,
-            decl: ExternalDeclaration::Declaration(decl),
-        }
+        ExternalDeclarationNode::new(ExternalDeclaration::Declaration(decl), span)
     }
 
     pub fn function(decl: FunctionDefinitionNode, span: Span) -> ExternalDeclarationNode {
-        ExternalDeclarationNode {
-            span,
-            decl: ExternalDeclaration::Function(decl),
-        }
+        ExternalDeclarationNode::new(ExternalDeclaration::Function(decl), span)
     }
 }
 

@@ -61,9 +61,9 @@ pub enum SelectionStatement {
 }
 
 ast_node! {
-pub struct IterationStatementNode {
-    pub stmt: IterationStatement,
-}
+    pub struct IterationStatementNode {
+        pub stmt: IterationStatement,
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]

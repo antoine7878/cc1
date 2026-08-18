@@ -36,12 +36,11 @@ pub enum Qualifier {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Storage {
-    Auto,
-    Static,
-    Extern,
     Typedef,
+    Extern,
+    Static,
+    Auto,
     Register,
-    ThreadLocal,
 }
 
 impl Display for TypeSpecifier {
@@ -83,7 +82,6 @@ impl Display for Storage {
             Storage::Extern => "extern",
             Storage::Typedef => "typedef",
             Storage::Register => "register",
-            Storage::ThreadLocal => "thread_local",
         };
         write!(f, "{}", s)
     }

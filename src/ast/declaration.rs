@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::ast::{DeclarationSpecifier, ExpressionNode, FunctionParametersNode, Name, Node, Qualifier};
+use crate::ast::{DeclarationSpecifier, ExpressionNode, FunctionParametersNode, Name, Qualifier};
 use crate::parser::{Context, Span};
 use crate::{ast_node, define_arena};
 
@@ -53,7 +53,7 @@ pub enum Declarator {
 impl Declarator {
     pub fn ident(&self, ctx: &Context) -> Option<Name> {
         match self {
-            Declarator::Ident(n) => Some(n.clone()),
+            Declarator::Ident(n) => Some(*n),
             Declarator::Abstract | Declarator::Pointer { inner: None, .. } => None,
             Declarator::Pointer {
                 inner: Some(declarator),

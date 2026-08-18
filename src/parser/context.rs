@@ -4,6 +4,7 @@ use crate::ast::{DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorAr
 use crate::ast::{EnumArena, ExpressionArena, StatementArena, Storage, StringArena, StringId, StructArena};
 use crate::ast::{StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena};
 use crate::parser::Span;
+use crate::semantic::SymbolArena;
 
 #[derive(Debug, Default)]
 pub struct Arenas {
@@ -15,7 +16,7 @@ pub struct Arenas {
     pub expressions: ExpressionArena,
     pub declarators: DeclaratorArena,
     pub statements: StatementArena,
-    // pub symbols: Symb,
+    pub symbols: SymbolArena,
 }
 
 #[derive(Debug)]
