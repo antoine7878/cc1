@@ -2,10 +2,10 @@ use std::fmt::Display;
 
 use crate::arena::{Arena, ArenaId};
 use crate::ast::{DeclarationNode, ExpressionNode, Name, Node};
-use crate::parser::Span;
+use crate::parser::{Arenas, Span};
 use crate::{ast_node, define_arena};
 
-define_arena!(Statement, StatementArena, StatementId);
+define_arena!(Statement, StatementArena, StatementId, statements);
 
 ast_node! {
     pub struct StatementNode {
@@ -197,11 +197,7 @@ impl SelectionStatementNode {
 }
 
 impl IterationStatementNode {
-    pub fn new_while(
-        expr: ExpressionNode,
-        stmt: StatementNode,
-        span: Span,
-    ) -> IterationStatementNode {
+    pub fn new_while(expr: ExpressionNode, stmt: StatementNode, span: Span) -> IterationStatementNode {
         IterationStatementNode::new(IterationStatement::While(expr, stmt), span)
     }
 

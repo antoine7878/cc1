@@ -1,11 +1,14 @@
-void a() {
-}
+double extrn;
 
-void b() {
-}
+struct t {
+	int hey;
+};
 
-void c() {
-}
+int main(void) {
 
-void d() {
+	int a;
+	int b;
+	int d;
+	float coucou, salut;
+	return 0;
 }

@@ -74,7 +74,7 @@ impl Context {
     }
 
     pub fn declartor_name(&self, decl: &DeclaratorNode) -> Option<&Name> {
-        match self.arenas.declarators.get(decl.id) {
+        match decl.id.resolve(&self.arenas) {
             Declarator::Ident(name) => Some(name),
             Declarator::Pointer { inner: Some(d), .. } => self.declartor_name(d),
             Declarator::Array { declarator, .. } => self.declartor_name(declarator),

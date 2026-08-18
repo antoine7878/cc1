@@ -14,7 +14,7 @@ use crate::ast::{
     Qualifier, SelectionStatementNode, Struct, StructDeclaration, StructDeclarator, TranslationUnitNode, Type,
     TypeSpecifier, Union, Variant,
 };
-use crate::parser::{Arenas, Context};
+use crate::parser::Context;
 use crate::utils::{CYAN, RESET};
 
 pub struct AstPrinter<W: Write> {
@@ -36,7 +36,7 @@ impl<W: Write> AstPrinter<W> {
             w,
             err: None,
         };
-        printer.visit_translation_unit(&ctx.arenas, &ctx.ast, false);
+        printer.visit_translation_unit(ctx, &ctx.ast, false);
         let result = writeln!(printer.w);
         printer.ok(result);
         let _ = write!(printer.w, "{RESET}");
@@ -71,29 +71,29 @@ impl<W: Write> AstPrinter<W> {
         self.prefix.pop();
     }
 
-    fn print_name_node(&mut self, arenas: &Arenas, name: &Name, is_last: bool) {
+    fn print_name_node(&mut self, ctx: &Context, name: &Name, is_last: bool) {
         self.print_node(name, is_last, |printer| {
-            let result = write!(printer.w, "{}", arenas.names.get(name.id));
+            let result = write!(printer.w, "{}", name.id.resolve(&ctx.arenas));
             printer.ok(result);
         });
     }
 
-    fn print_specifier(&mut self, arenas: &Arenas, spec: &DeclarationSpecifier) {
+    fn print_specifier(&mut self, ctx: &Context, spec: &DeclarationSpecifier) {
         let s = match spec {
             DeclarationSpecifier::Type(t) => match t {
-                TypeSpecifier::Struct(id) => match &arenas.structs.get(*id).name {
-                    Some(name) => format!("struct {}", arenas.names.get(name.id)),
+                TypeSpecifier::Struct(id) => match &id.resolve(&ctx.arenas).name {
+                    Some(name) => format!("struct {}", name.id.resolve(&ctx.arenas)),
                     None => "struct".to_string(),
                 },
-                TypeSpecifier::Union(id) => match &arenas.unions.get(*id).name {
-                    Some(name) => format!("union {}", arenas.names.get(name.id)),
+                TypeSpecifier::Union(id) => match &id.resolve(&ctx.arenas).name {
+                    Some(name) => format!("union {}", name.id.resolve(&ctx.arenas)),
                     None => "union".to_string(),
                 },
-                TypeSpecifier::Enum(id) => match &arenas.enums.get(*id).name {
-                    Some(name) => format!("enum {}", arenas.names.get(name.id)),
+                TypeSpecifier::Enum(id) => match &id.resolve(&ctx.arenas).name {
+                    Some(name) => format!("enum {}", name.id.resolve(&ctx.arenas)),
                     None => "enum".to_string(),
                 },
-                TypeSpecifier::TypedefName(name) => arenas.names.get(name.id).clone(),
+                TypeSpecifier::TypedefName(name) => name.id.resolve(&ctx.arenas).clone(),
                 other => other.to_string(),
             },
             other => other.to_string(),
@@ -104,189 +104,189 @@ impl<W: Write> AstPrinter<W> {
 }
 
 impl<W: Write> Visitor for AstPrinter<W> {
-    fn visit_translation_unit(&mut self, arenas: &Arenas, node: &TranslationUnitNode, _is_last: bool) {
+    fn visit_translation_unit(&mut self, ctx: &Context, node: &TranslationUnitNode, _is_last: bool) {
         let result = write!(self.w, "{}", node);
         self.ok(result);
-        walk_translation_unit(self, arenas, node, false);
+        walk_translation_unit(self, ctx, node, false);
     }
 
-    fn visit_function_definition(&mut self, arenas: &Arenas, node: &FunctionDefinitionNode, is_last: bool) {
+    fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             for spec in &node.specifiers {
-                printer.print_specifier(arenas, spec);
+                printer.print_specifier(ctx, spec);
                 let result = write!(printer.w, " ");
                 printer.ok(result);
             }
-            printer.visit_declarator(arenas, &node.declarator, false);
-            printer.visit_compound_statement(arenas, &node.body, true);
+            printer.visit_declarator(ctx, &node.declarator, false);
+            printer.visit_compound_statement(ctx, &node.body, true);
         });
     }
 
-    fn visit_declaration(&mut self, arenas: &Arenas, node: &DeclarationNode, is_last: bool) {
+    fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             for spec in &node.specifiers {
                 let result = write!(printer.w, " ");
                 printer.ok(result);
-                printer.print_specifier(arenas, spec);
+                printer.print_specifier(ctx, spec);
             }
-            walk_declaration(printer, arenas, node, is_last);
+            walk_declaration(printer, ctx, node, is_last);
         });
     }
 
-    fn visit_init_declarator(&mut self, arenas: &Arenas, node: &InitDeclaratorNode, is_last: bool) {
+    fn visit_init_declarator(&mut self, ctx: &Context, node: &InitDeclaratorNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
-            walk_init_declarator(printer, arenas, node, is_last);
+            walk_init_declarator(printer, ctx, node, is_last);
         });
     }
 
-    fn visit_declarator(&mut self, arenas: &Arenas, node: &DeclaratorNode, is_last: bool) {
+    fn visit_declarator(&mut self, ctx: &Context, node: &DeclaratorNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
-            let result = write!(printer.w, "{} ", arenas.declarators.get(node.id));
+            let result = write!(printer.w, "{} ", node.id.resolve(&ctx.arenas));
             printer.ok(result);
-            walk_declarator(printer, arenas, node, is_last);
+            walk_declarator(printer, ctx, node, is_last);
         });
     }
 
-    fn visit_initializer(&mut self, arenas: &Arenas, node: &InitializerNode, is_last: bool) {
+    fn visit_initializer(&mut self, ctx: &Context, node: &InitializerNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
-            walk_initializer(printer, arenas, node, is_last);
+            walk_initializer(printer, ctx, node, is_last);
         });
     }
 
-    fn visit_labeled_statement(&mut self, arenas: &Arenas, node: &LabeledStatementNode, is_last: bool) {
+    fn visit_labeled_statement(&mut self, ctx: &Context, node: &LabeledStatementNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             let result = write!(printer.w, "{} ", &node.inner);
             printer.ok(result);
-            walk_labeled_statement(printer, arenas, node, is_last);
+            walk_labeled_statement(printer, ctx, node, is_last);
         });
     }
 
-    fn visit_compound_statement(&mut self, arenas: &Arenas, node: &CompoundStatementNode, is_last: bool) {
+    fn visit_compound_statement(&mut self, ctx: &Context, node: &CompoundStatementNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
-            walk_compound_statement(printer, arenas, node, is_last);
+            walk_compound_statement(printer, ctx, node, is_last);
         });
     }
 
-    fn visit_expression_statement(&mut self, arenas: &Arenas, node: &ExpressionStatementNode, is_last: bool) {
+    fn visit_expression_statement(&mut self, ctx: &Context, node: &ExpressionStatementNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
-            walk_expression_statement(printer, arenas, node, is_last);
+            walk_expression_statement(printer, ctx, node, is_last);
         });
     }
 
-    fn visit_selection_statement(&mut self, arenas: &Arenas, node: &SelectionStatementNode, is_last: bool) {
-        self.print_node(node, is_last, |printer| {
-            let result = write!(printer.w, "{} ", &node.stmt);
-            printer.ok(result);
-            walk_selection_statement(printer, arenas, node, is_last);
-        });
-    }
-
-    fn visit_iteration_statement(&mut self, arenas: &Arenas, node: &IterationStatementNode, is_last: bool) {
+    fn visit_selection_statement(&mut self, ctx: &Context, node: &SelectionStatementNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             let result = write!(printer.w, "{} ", &node.stmt);
             printer.ok(result);
-            walk_iteration_statement(printer, arenas, node, is_last);
+            walk_selection_statement(printer, ctx, node, is_last);
         });
     }
 
-    fn visit_jump_statement(&mut self, arenas: &Arenas, node: &JumpStatementNode, is_last: bool) {
+    fn visit_iteration_statement(&mut self, ctx: &Context, node: &IterationStatementNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             let result = write!(printer.w, "{} ", &node.stmt);
             printer.ok(result);
-            walk_jump_statement(printer, arenas, node, is_last);
+            walk_iteration_statement(printer, ctx, node, is_last);
         });
     }
 
-    fn visit_expression(&mut self, arenas: &Arenas, node: &ExpressionNode, is_last: bool) {
+    fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
-            let expr = arenas.expressions.get(node.id);
+            let result = write!(printer.w, "{} ", &node.stmt);
+            printer.ok(result);
+            walk_jump_statement(printer, ctx, node, is_last);
+        });
+    }
+
+    fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode, is_last: bool) {
+        self.print_node(node, is_last, |printer| {
+            let expr = node.id.resolve(&ctx.arenas);
             let result = write!(printer.w, "{} ", expr);
             printer.ok(result);
             if let Expression::DotAcces(tag, ident) | Expression::PtrAcces(tag, ident) = expr {
-                printer.visit_expression(arenas, tag, false);
+                printer.visit_expression(ctx, tag, false);
                 let result = write!(printer.w, " ");
                 printer.ok(result);
-                printer.visit_name(arenas, ident);
+                printer.visit_name(ctx, ident);
             } else {
-                walk_expression(printer, arenas, node, is_last);
+                walk_expression(printer, ctx, node, is_last);
             }
         });
     }
 
-    fn visit_type(&mut self, arenas: &Arenas, node: &Type, is_last: bool) {
+    fn visit_type(&mut self, ctx: &Context, node: &Type, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             for spec in &node.specifiers {
-                printer.print_specifier(arenas, spec);
+                printer.print_specifier(ctx, spec);
             }
-            printer.visit_declarator(arenas, &node.declarator, true);
+            printer.visit_declarator(ctx, &node.declarator, true);
         });
     }
 
-    fn visit_function_parameters(&mut self, arenas: &Arenas, node: &FunctionParametersNode, is_last: bool) {
+    fn visit_function_parameters(&mut self, ctx: &Context, node: &FunctionParametersNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             if let FunctionParameters::OldStyle(names) = &node.param {
                 for (is_last, name) in names.iter().with_last() {
-                    printer.print_name_node(arenas, name, is_last);
+                    printer.print_name_node(ctx, name, is_last);
                 }
             } else {
-                walk_function_parameters(printer, arenas, node, is_last);
+                walk_function_parameters(printer, ctx, node, is_last);
             }
         });
     }
 
-    fn visit_parameter_declaration(&mut self, arenas: &Arenas, node: &ParameterDeclaration, is_last: bool) {
+    fn visit_parameter_declaration(&mut self, ctx: &Context, node: &ParameterDeclaration, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             for spec in &node.specifiers {
                 let result = write!(printer.w, " ");
                 printer.ok(result);
-                printer.print_specifier(arenas, spec);
+                printer.print_specifier(ctx, spec);
             }
-            printer.visit_declarator(arenas, &node.declarator, true);
+            printer.visit_declarator(ctx, &node.declarator, true);
         });
     }
 
-    fn visit_struct(&mut self, arenas: &Arenas, node: &Struct, is_last: bool) {
-        self.print_node(node, is_last, |printer| walk_struct(printer, arenas, node, is_last));
+    fn visit_struct(&mut self, ctx: &Context, node: &Struct, is_last: bool) {
+        self.print_node(node, is_last, |printer| walk_struct(printer, ctx, node, is_last));
     }
 
-    fn visit_union(&mut self, arenas: &Arenas, node: &Union, is_last: bool) {
-        self.print_node(node, is_last, |printer| walk_union(printer, arenas, node, is_last));
+    fn visit_union(&mut self, ctx: &Context, node: &Union, is_last: bool) {
+        self.print_node(node, is_last, |printer| walk_union(printer, ctx, node, is_last));
     }
 
-    fn visit_enum(&mut self, arenas: &Arenas, node: &Enum, is_last: bool) {
-        self.print_node(node, is_last, |printer| walk_enum(printer, arenas, node, is_last));
+    fn visit_enum(&mut self, ctx: &Context, node: &Enum, is_last: bool) {
+        self.print_node(node, is_last, |printer| walk_enum(printer, ctx, node, is_last));
     }
 
-    fn visit_variant(&mut self, arenas: &Arenas, node: &Variant, is_last: bool) {
-        self.print_node(node, is_last, |printer| walk_variant(printer, arenas, node, is_last));
+    fn visit_variant(&mut self, ctx: &Context, node: &Variant, is_last: bool) {
+        self.print_node(node, is_last, |printer| walk_variant(printer, ctx, node, is_last));
     }
 
-    fn visit_struct_declaration(&mut self, arenas: &Arenas, node: &StructDeclaration, is_last: bool) {
+    fn visit_struct_declaration(&mut self, ctx: &Context, node: &StructDeclaration, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             for spec in &node.specifiers {
                 let result = write!(printer.w, " ");
                 printer.ok(result);
-                printer.print_specifier(arenas, spec);
+                printer.print_specifier(ctx, spec);
             }
             for (is_last, declarator) in node.struct_declarators.iter().with_last() {
-                printer.visit_struct_declarator(arenas, declarator, is_last);
+                printer.visit_struct_declarator(ctx, declarator, is_last);
             }
         });
     }
 
-    fn visit_struct_declarator(&mut self, arenas: &Arenas, node: &StructDeclarator, is_last: bool) {
+    fn visit_struct_declarator(&mut self, ctx: &Context, node: &StructDeclarator, is_last: bool) {
         self.print_node(node, is_last, |printer| {
-            walk_struct_declarator(printer, arenas, node, is_last);
+            walk_struct_declarator(printer, ctx, node, is_last);
         });
     }
 
-    fn visit_qualifier(&mut self, _arenas: &Arenas, qualifier: &Qualifier) {
+    fn visit_qualifier(&mut self, _ctx: &Context, qualifier: &Qualifier) {
         let result = write!(self.w, " {}", qualifier);
         self.ok(result);
     }
 
-    fn visit_name(&mut self, arenas: &Arenas, node: &Name) {
-        let result = write!(self.w, "{}", arenas.names.get(node.id));
+    fn visit_name(&mut self, ctx: &Context, node: &Name) {
+        let result = write!(self.w, "{}", node.id.resolve(&ctx.arenas));
         self.ok(result);
     }
 }

@@ -2,10 +2,10 @@ use std::fmt::Display;
 
 use crate::arena::{Arena, ArenaId};
 use crate::ast::{DeclarationSpecifier, ExpressionNode, FunctionParametersNode, Name, Node, Qualifier};
-use crate::parser::Span;
+use crate::parser::{Arenas, Context, Span};
 use crate::{ast_node, define_arena};
 
-define_arena!(Declarator, DeclaratorArena, DeclaratorId);
+define_arena!(Declarator, DeclaratorArena, DeclaratorId, declarators);
 
 ast_node! {
     pub struct DeclarationNode {
@@ -15,15 +15,21 @@ ast_node! {
 }
 
 ast_node! {
-pub struct InitDeclaratorNode {
-    pub declarator: DeclaratorNode,
-    pub initializer: Option<InitializerNode>,
-}
+    pub struct InitDeclaratorNode {
+        pub declarator: DeclaratorNode,
+        pub initializer: Option<InitializerNode>,
+    }
 }
 
 ast_node! {
     pub struct DeclaratorNode {
         pub id: DeclaratorId,
+    }
+}
+
+impl DeclaratorNode {
+    pub fn ident(&self, ctx: &Context) -> Option<Name> {
+        self.id.resolve(&ctx.arenas).ident(ctx)
     }
 }
 
@@ -43,6 +49,21 @@ pub enum Declarator {
         declarator: DeclaratorNode,
         params: FunctionParametersNode,
     },
+}
+
+impl Declarator {
+    pub fn ident(&self, ctx: &Context) -> Option<Name> {
+        match self {
+            Declarator::Ident(n) => Some(n.clone()),
+            Declarator::Abstract | Declarator::Pointer { inner: None, .. } => None,
+            Declarator::Pointer {
+                inner: Some(declarator),
+                ..
+            }
+            | Declarator::Array { declarator, .. }
+            | Declarator::Function { declarator, .. } => declarator.ident(ctx),
+        }
+    }
 }
 
 ast_node! {

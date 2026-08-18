@@ -6,148 +6,148 @@ use crate::ast::{
     ParameterDeclaration, Qualifier, SelectionStatement, SelectionStatementNode, Statement, StatementNode, Struct,
     StructDeclaration, StructDeclarator, TranslationUnitNode, Type, TypeSpecifier, Union, Variant,
 };
-use crate::parser::Arenas;
+use crate::parser::Context;
 
 pub trait Visitor {
-    fn visit_translation_unit(&mut self, arenas: &Arenas, node: &TranslationUnitNode, is_last: bool) {
-        walk_translation_unit(self, arenas, node, is_last);
+    fn visit_translation_unit(&mut self, ctx: &Context, node: &TranslationUnitNode, is_last: bool) {
+        walk_translation_unit(self, ctx, node, is_last);
     }
 
-    fn visit_external_declaration(&mut self, arenas: &Arenas, node: &ExternalDeclarationNode, is_last: bool) {
-        walk_external_declaration(self, arenas, node, is_last);
+    fn visit_external_declaration(&mut self, ctx: &Context, node: &ExternalDeclarationNode, is_last: bool) {
+        walk_external_declaration(self, ctx, node, is_last);
     }
 
-    fn visit_function_definition(&mut self, arenas: &Arenas, node: &FunctionDefinitionNode, is_last: bool) {
-        walk_function_definition(self, arenas, node, is_last);
+    fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode, is_last: bool) {
+        walk_function_definition(self, ctx, node, is_last);
     }
 
-    fn visit_declaration(&mut self, arenas: &Arenas, node: &DeclarationNode, is_last: bool) {
-        walk_declaration(self, arenas, node, is_last);
+    fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode, is_last: bool) {
+        walk_declaration(self, ctx, node, is_last);
     }
 
-    fn visit_init_declarator(&mut self, arenas: &Arenas, node: &InitDeclaratorNode, is_last: bool) {
-        walk_init_declarator(self, arenas, node, is_last);
+    fn visit_init_declarator(&mut self, ctx: &Context, node: &InitDeclaratorNode, is_last: bool) {
+        walk_init_declarator(self, ctx, node, is_last);
     }
 
-    fn visit_declarator(&mut self, arenas: &Arenas, node: &DeclaratorNode, is_last: bool) {
-        walk_declarator(self, arenas, node, is_last);
+    fn visit_declarator(&mut self, ctx: &Context, node: &DeclaratorNode, is_last: bool) {
+        walk_declarator(self, ctx, node, is_last);
     }
 
-    fn visit_initializer(&mut self, arenas: &Arenas, node: &InitializerNode, is_last: bool) {
-        walk_initializer(self, arenas, node, is_last);
+    fn visit_initializer(&mut self, ctx: &Context, node: &InitializerNode, is_last: bool) {
+        walk_initializer(self, ctx, node, is_last);
     }
 
-    fn visit_statement(&mut self, arenas: &Arenas, node: &StatementNode, is_last: bool) {
-        walk_statement(self, arenas, node, is_last);
+    fn visit_statement(&mut self, ctx: &Context, node: &StatementNode, is_last: bool) {
+        walk_statement(self, ctx, node, is_last);
     }
 
-    fn visit_labeled_statement(&mut self, arenas: &Arenas, node: &LabeledStatementNode, is_last: bool) {
-        walk_labeled_statement(self, arenas, node, is_last);
+    fn visit_labeled_statement(&mut self, ctx: &Context, node: &LabeledStatementNode, is_last: bool) {
+        walk_labeled_statement(self, ctx, node, is_last);
     }
 
-    fn visit_compound_statement(&mut self, arenas: &Arenas, node: &CompoundStatementNode, is_last: bool) {
-        walk_compound_statement(self, arenas, node, is_last);
+    fn visit_compound_statement(&mut self, ctx: &Context, node: &CompoundStatementNode, is_last: bool) {
+        walk_compound_statement(self, ctx, node, is_last);
     }
 
-    fn visit_expression_statement(&mut self, arenas: &Arenas, node: &ExpressionStatementNode, is_last: bool) {
-        walk_expression_statement(self, arenas, node, is_last);
+    fn visit_expression_statement(&mut self, ctx: &Context, node: &ExpressionStatementNode, is_last: bool) {
+        walk_expression_statement(self, ctx, node, is_last);
     }
 
-    fn visit_selection_statement(&mut self, arenas: &Arenas, node: &SelectionStatementNode, is_last: bool) {
-        walk_selection_statement(self, arenas, node, is_last);
+    fn visit_selection_statement(&mut self, ctx: &Context, node: &SelectionStatementNode, is_last: bool) {
+        walk_selection_statement(self, ctx, node, is_last);
     }
 
-    fn visit_iteration_statement(&mut self, arenas: &Arenas, node: &IterationStatementNode, is_last: bool) {
-        walk_iteration_statement(self, arenas, node, is_last);
+    fn visit_iteration_statement(&mut self, ctx: &Context, node: &IterationStatementNode, is_last: bool) {
+        walk_iteration_statement(self, ctx, node, is_last);
     }
 
-    fn visit_jump_statement(&mut self, arenas: &Arenas, node: &JumpStatementNode, is_last: bool) {
-        walk_jump_statement(self, arenas, node, is_last);
+    fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode, is_last: bool) {
+        walk_jump_statement(self, ctx, node, is_last);
     }
 
-    fn visit_expression(&mut self, arenas: &Arenas, node: &ExpressionNode, is_last: bool) {
-        walk_expression(self, arenas, node, is_last);
+    fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode, is_last: bool) {
+        walk_expression(self, ctx, node, is_last);
     }
 
-    fn visit_type(&mut self, arenas: &Arenas, node: &Type, is_last: bool) {
-        walk_type(self, arenas, node, is_last);
+    fn visit_type(&mut self, ctx: &Context, node: &Type, is_last: bool) {
+        walk_type(self, ctx, node, is_last);
     }
 
-    fn visit_function_parameters(&mut self, arenas: &Arenas, node: &FunctionParametersNode, is_last: bool) {
-        walk_function_parameters(self, arenas, node, is_last);
+    fn visit_function_parameters(&mut self, ctx: &Context, node: &FunctionParametersNode, is_last: bool) {
+        walk_function_parameters(self, ctx, node, is_last);
     }
 
-    fn visit_parameter_declaration(&mut self, arenas: &Arenas, node: &ParameterDeclaration, is_last: bool) {
-        walk_parameter_declaration(self, arenas, node, is_last);
+    fn visit_parameter_declaration(&mut self, ctx: &Context, node: &ParameterDeclaration, is_last: bool) {
+        walk_parameter_declaration(self, ctx, node, is_last);
     }
 
-    fn visit_struct(&mut self, arenas: &Arenas, node: &Struct, is_last: bool) {
-        walk_struct(self, arenas, node, is_last);
+    fn visit_struct(&mut self, ctx: &Context, node: &Struct, is_last: bool) {
+        walk_struct(self, ctx, node, is_last);
     }
 
-    fn visit_union(&mut self, arenas: &Arenas, node: &Union, is_last: bool) {
-        walk_union(self, arenas, node, is_last);
+    fn visit_union(&mut self, ctx: &Context, node: &Union, is_last: bool) {
+        walk_union(self, ctx, node, is_last);
     }
 
-    fn visit_enum(&mut self, arenas: &Arenas, node: &Enum, is_last: bool) {
-        walk_enum(self, arenas, node, is_last);
+    fn visit_enum(&mut self, ctx: &Context, node: &Enum, is_last: bool) {
+        walk_enum(self, ctx, node, is_last);
     }
 
-    fn visit_variant(&mut self, arenas: &Arenas, node: &Variant, is_last: bool) {
-        walk_variant(self, arenas, node, is_last);
+    fn visit_variant(&mut self, ctx: &Context, node: &Variant, is_last: bool) {
+        walk_variant(self, ctx, node, is_last);
     }
 
-    fn visit_struct_declaration(&mut self, arenas: &Arenas, node: &StructDeclaration, is_last: bool) {
-        walk_struct_declaration(self, arenas, node, is_last);
+    fn visit_struct_declaration(&mut self, ctx: &Context, node: &StructDeclaration, is_last: bool) {
+        walk_struct_declaration(self, ctx, node, is_last);
     }
 
-    fn visit_struct_declarator(&mut self, arenas: &Arenas, node: &StructDeclarator, is_last: bool) {
-        walk_struct_declarator(self, arenas, node, is_last);
+    fn visit_struct_declarator(&mut self, ctx: &Context, node: &StructDeclarator, is_last: bool) {
+        walk_struct_declarator(self, ctx, node, is_last);
     }
 
-    fn visit_qualifier(&mut self, _arenas: &Arenas, _qualifier: &Qualifier) {}
+    fn visit_qualifier(&mut self, _ctx: &Context, _qualifier: &Qualifier) {}
 
-    fn visit_name(&mut self, _arenas: &Arenas, _node: &Name) {}
+    fn visit_name(&mut self, _ctx: &Context, _node: &Name) {}
 }
 
 pub fn walk_translation_unit<V: Visitor + ?Sized>(
     v: &mut V,
-    arenas: &Arenas,
+    ctx: &Context,
     node: &TranslationUnitNode,
     _is_last: bool,
 ) {
     for (is_last, decl) in node.declarations.iter().with_last() {
-        v.visit_external_declaration(arenas, decl, is_last);
+        v.visit_external_declaration(ctx, decl, is_last);
     }
 }
 
 pub fn walk_external_declaration<V: Visitor + ?Sized>(
     v: &mut V,
-    arenas: &Arenas,
+    ctx: &Context,
     node: &ExternalDeclarationNode,
     is_last: bool,
 ) {
     match &node.decl {
-        ExternalDeclaration::Function(function) => v.visit_function_definition(arenas, function, is_last),
-        ExternalDeclaration::Declaration(decl) => v.visit_declaration(arenas, decl, is_last),
+        ExternalDeclaration::Function(function) => v.visit_function_definition(ctx, function, is_last),
+        ExternalDeclaration::Declaration(decl) => v.visit_declaration(ctx, decl, is_last),
     }
 }
 
 pub fn walk_function_definition<V: Visitor + ?Sized>(
     v: &mut V,
-    arenas: &Arenas,
+    ctx: &Context,
     node: &FunctionDefinitionNode,
     _is_last: bool,
 ) {
-    walk_specifiers(v, arenas, &node.specifiers);
-    v.visit_declarator(arenas, &node.declarator, false);
+    walk_specifiers(v, ctx, &node.specifiers);
+    v.visit_declarator(ctx, &node.declarator, false);
     for arg in &node.arguments {
-        v.visit_declaration(arenas, arg, false);
+        v.visit_declaration(ctx, arg, false);
     }
-    v.visit_compound_statement(arenas, &node.body, true);
+    v.visit_compound_statement(ctx, &node.body, true);
 }
 
-pub fn walk_declaration<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, node: &DeclarationNode, _is_last: bool) {
+pub fn walk_declaration<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &DeclarationNode, _is_last: bool) {
     let tags = node
         .specifiers
         .iter()
@@ -165,186 +165,181 @@ pub fn walk_declaration<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, node: &
             match type_specifier {
                 TypeSpecifier::Struct(id) => {
                     i += 1;
-                    v.visit_struct(arenas, arenas.structs.get(*id), i == total);
+                    v.visit_struct(ctx, id.resolve(&ctx.arenas), i == total);
                 }
                 TypeSpecifier::Union(id) => {
                     i += 1;
-                    v.visit_union(arenas, arenas.unions.get(*id), i == total);
+                    v.visit_union(ctx, id.resolve(&ctx.arenas), i == total);
                 }
                 TypeSpecifier::Enum(id) => {
                     i += 1;
-                    v.visit_enum(arenas, arenas.enums.get(*id), i == total);
+                    v.visit_enum(ctx, id.resolve(&ctx.arenas), i == total);
                 }
-                TypeSpecifier::TypedefName(name) => v.visit_name(arenas, name),
+                TypeSpecifier::TypedefName(name) => v.visit_name(ctx, name),
                 _ => {}
             }
         }
     }
     for (is_last, init) in node.init_declarators.iter().with_last() {
-        v.visit_init_declarator(arenas, init, is_last);
+        v.visit_init_declarator(ctx, init, is_last);
     }
 }
 
-pub fn walk_init_declarator<V: Visitor + ?Sized>(
-    v: &mut V,
-    arenas: &Arenas,
-    node: &InitDeclaratorNode,
-    _is_last: bool,
-) {
-    v.visit_declarator(arenas, &node.declarator, node.initializer.is_none());
+pub fn walk_init_declarator<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &InitDeclaratorNode, _is_last: bool) {
+    v.visit_declarator(ctx, &node.declarator, node.initializer.is_none());
     if let Some(init) = &node.initializer {
-        v.visit_initializer(arenas, init, true);
+        v.visit_initializer(ctx, init, true);
     }
 }
 
-pub fn walk_declarator<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, node: &DeclaratorNode, _is_last: bool) {
-    match arenas.declarators.get(node.id) {
-        Declarator::Ident(name) => v.visit_name(arenas, name),
+pub fn walk_declarator<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &DeclaratorNode, _is_last: bool) {
+    match node.id.resolve(&ctx.arenas) {
+        Declarator::Ident(name) => v.visit_name(ctx, name),
         Declarator::Abstract => {}
         Declarator::Pointer { qualifiers, inner } => {
             for qualifier in qualifiers {
-                v.visit_qualifier(arenas, qualifier);
+                v.visit_qualifier(ctx, qualifier);
             }
             if let Some(inner) = inner {
-                v.visit_declarator(arenas, inner, true);
+                v.visit_declarator(ctx, inner, true);
             }
         }
         Declarator::Array { declarator, size } => {
-            v.visit_declarator(arenas, declarator, size.is_none());
+            v.visit_declarator(ctx, declarator, size.is_none());
             if let Some(size) = size {
-                v.visit_expression(arenas, size, true);
+                v.visit_expression(ctx, size, true);
             }
         }
         Declarator::Function { declarator, params } => {
-            v.visit_declarator(arenas, declarator, false);
-            v.visit_function_parameters(arenas, params, true);
+            v.visit_declarator(ctx, declarator, false);
+            v.visit_function_parameters(ctx, params, true);
         }
     }
 }
 
-pub fn walk_initializer<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, node: &InitializerNode, _is_last: bool) {
+pub fn walk_initializer<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &InitializerNode, _is_last: bool) {
     match &node.init {
-        Initializer::Single(expr) => v.visit_expression(arenas, expr, true),
+        Initializer::Single(expr) => v.visit_expression(ctx, expr, true),
         Initializer::List(nodes) => {
             for (is_last, init) in nodes.iter().with_last() {
-                v.visit_initializer(arenas, init, is_last);
+                v.visit_initializer(ctx, init, is_last);
             }
         }
     }
 }
 
-pub fn walk_statement<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, node: &StatementNode, is_last: bool) {
-    match arenas.statements.get(node.id) {
-        Statement::Labeled(node) => v.visit_labeled_statement(arenas, node, is_last),
-        Statement::Compound(node) => v.visit_compound_statement(arenas, node, is_last),
-        Statement::Expression(node) => v.visit_expression_statement(arenas, node, is_last),
-        Statement::Selection(node) => v.visit_selection_statement(arenas, node, is_last),
-        Statement::Iteration(node) => v.visit_iteration_statement(arenas, node, is_last),
-        Statement::Jump(node) => v.visit_jump_statement(arenas, node, is_last),
+pub fn walk_statement<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &StatementNode, is_last: bool) {
+    match node.id.resolve(&ctx.arenas) {
+        Statement::Labeled(node) => v.visit_labeled_statement(ctx, node, is_last),
+        Statement::Compound(node) => v.visit_compound_statement(ctx, node, is_last),
+        Statement::Expression(node) => v.visit_expression_statement(ctx, node, is_last),
+        Statement::Selection(node) => v.visit_selection_statement(ctx, node, is_last),
+        Statement::Iteration(node) => v.visit_iteration_statement(ctx, node, is_last),
+        Statement::Jump(node) => v.visit_jump_statement(ctx, node, is_last),
     }
 }
 
 pub fn walk_labeled_statement<V: Visitor + ?Sized>(
     v: &mut V,
-    arenas: &Arenas,
+    ctx: &Context,
     node: &LabeledStatementNode,
     _is_last: bool,
 ) {
     match &node.inner {
         Labeled::Identifier(name, stmt) => {
-            v.visit_name(arenas, name);
-            v.visit_statement(arenas, stmt, true);
+            v.visit_name(ctx, name);
+            v.visit_statement(ctx, stmt, true);
         }
         Labeled::Case(expr, stmt) => {
-            v.visit_expression(arenas, expr, false);
-            v.visit_statement(arenas, stmt, true);
+            v.visit_expression(ctx, expr, false);
+            v.visit_statement(ctx, stmt, true);
         }
-        Labeled::Default(stmt) => v.visit_statement(arenas, stmt, true),
+        Labeled::Default(stmt) => v.visit_statement(ctx, stmt, true),
     }
 }
 
 pub fn walk_compound_statement<V: Visitor + ?Sized>(
     v: &mut V,
-    arenas: &Arenas,
+    ctx: &Context,
     node: &CompoundStatementNode,
     _is_last: bool,
 ) {
     for decl in &node.declarations {
-        v.visit_declaration(arenas, decl, false);
+        v.visit_declaration(ctx, decl, false);
     }
     for (is_last, stmt) in node.statements.iter().with_last() {
-        v.visit_statement(arenas, stmt, is_last);
+        v.visit_statement(ctx, stmt, is_last);
     }
 }
 
 pub fn walk_expression_statement<V: Visitor + ?Sized>(
     v: &mut V,
-    arenas: &Arenas,
+    ctx: &Context,
     node: &ExpressionStatementNode,
     _is_last: bool,
 ) {
     if let Some(expr) = &node.expr {
-        v.visit_expression(arenas, expr, true);
+        v.visit_expression(ctx, expr, true);
     }
 }
 
 pub fn walk_selection_statement<V: Visitor + ?Sized>(
     v: &mut V,
-    arenas: &Arenas,
+    ctx: &Context,
     node: &SelectionStatementNode,
     _is_last: bool,
 ) {
     match &node.stmt {
         SelectionStatement::If(cond, then, otherwise) => {
-            v.visit_expression(arenas, cond, false);
-            v.visit_statement(arenas, then, otherwise.is_none());
+            v.visit_expression(ctx, cond, false);
+            v.visit_statement(ctx, then, otherwise.is_none());
             if let Some(otherwise) = otherwise {
-                v.visit_statement(arenas, otherwise, true);
+                v.visit_statement(ctx, otherwise, true);
             }
         }
         SelectionStatement::Switch(cond, stmt) => {
-            v.visit_expression(arenas, cond, false);
-            v.visit_statement(arenas, stmt, true);
+            v.visit_expression(ctx, cond, false);
+            v.visit_statement(ctx, stmt, true);
         }
     }
 }
 
 pub fn walk_iteration_statement<V: Visitor + ?Sized>(
     v: &mut V,
-    arenas: &Arenas,
+    ctx: &Context,
     node: &IterationStatementNode,
     _is_last: bool,
 ) {
     match &node.stmt {
         IterationStatement::While(cond, body) => {
-            v.visit_expression(arenas, cond, false);
-            v.visit_statement(arenas, body, true);
+            v.visit_expression(ctx, cond, false);
+            v.visit_statement(ctx, body, true);
         }
         IterationStatement::Do(body, cond) => {
-            v.visit_statement(arenas, body, false);
-            v.visit_expression(arenas, cond, true);
+            v.visit_statement(ctx, body, false);
+            v.visit_expression(ctx, cond, true);
         }
         IterationStatement::For(init, cond, inc, body) => {
-            v.visit_expression_statement(arenas, init, false);
-            v.visit_expression_statement(arenas, cond, false);
+            v.visit_expression_statement(ctx, init, false);
+            v.visit_expression_statement(ctx, cond, false);
             if let Some(inc) = inc {
-                v.visit_expression(arenas, inc, false);
+                v.visit_expression(ctx, inc, false);
             }
-            v.visit_statement(arenas, body, true);
+            v.visit_statement(ctx, body, true);
         }
     }
 }
 
-pub fn walk_jump_statement<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, node: &JumpStatementNode, _is_last: bool) {
+pub fn walk_jump_statement<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &JumpStatementNode, _is_last: bool) {
     if let JumpStatement::Return(Some(expr)) = &node.stmt {
-        v.visit_expression(arenas, expr, true);
+        v.visit_expression(ctx, expr, true);
     }
 }
 
-pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, node: &ExpressionNode, _is_last: bool) {
-    match arenas.expressions.get(node.id) {
+pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &ExpressionNode, _is_last: bool) {
+    match node.id.resolve(&ctx.arenas) {
         Expression::Identifier(name) | Expression::Constant(name) | Expression::StringLiteral(name) => {
-            v.visit_name(arenas, name)
+            v.visit_name(ctx, name)
         }
         Expression::ConstantExpression(expr)
         | Expression::PostInc(expr)
@@ -358,7 +353,7 @@ pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, node: &E
         | Expression::BitNot(expr)
         | Expression::Not(expr)
         | Expression::SizeofExpr(expr)
-        | Expression::FunctionCall(expr, None) => v.visit_expression(arenas, expr, true),
+        | Expression::FunctionCall(expr, None) => v.visit_expression(ctx, expr, true),
         Expression::Add(lhs, rhs)
         | Expression::Sub(lhs, rhs)
         | Expression::Mul(lhs, rhs)
@@ -391,34 +386,34 @@ pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, node: &E
         | Expression::List(lhs, rhs)
         | Expression::ArrayAcces(lhs, rhs)
         | Expression::FunctionCall(lhs, Some(rhs)) => {
-            v.visit_expression(arenas, lhs, false);
-            v.visit_expression(arenas, rhs, true);
+            v.visit_expression(ctx, lhs, false);
+            v.visit_expression(ctx, rhs, true);
         }
         Expression::Ternary(cond, then, otherwise) => {
-            v.visit_expression(arenas, cond, false);
-            v.visit_expression(arenas, then, false);
-            v.visit_expression(arenas, otherwise, true);
+            v.visit_expression(ctx, cond, false);
+            v.visit_expression(ctx, then, false);
+            v.visit_expression(ctx, otherwise, true);
         }
         Expression::DotAcces(tag, ident) | Expression::PtrAcces(tag, ident) => {
-            v.visit_expression(arenas, tag, false);
-            v.visit_name(arenas, ident);
+            v.visit_expression(ctx, tag, false);
+            v.visit_name(ctx, ident);
         }
         Expression::Cast(ty, expr) => {
-            v.visit_type(arenas, ty, false);
-            v.visit_expression(arenas, expr, true);
+            v.visit_type(ctx, ty, false);
+            v.visit_expression(ctx, expr, true);
         }
-        Expression::SizeofType(ty) => v.visit_type(arenas, ty, true),
+        Expression::SizeofType(ty) => v.visit_type(ctx, ty, true),
     }
 }
 
-pub fn walk_type<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, node: &Type, _is_last: bool) {
-    walk_specifiers(v, arenas, &node.specifiers);
-    v.visit_declarator(arenas, &node.declarator, true);
+pub fn walk_type<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &Type, _is_last: bool) {
+    walk_specifiers(v, ctx, &node.specifiers);
+    v.visit_declarator(ctx, &node.declarator, true);
 }
 
 pub fn walk_function_parameters<V: Visitor + ?Sized>(
     v: &mut V,
-    arenas: &Arenas,
+    ctx: &Context,
     node: &FunctionParametersNode,
     _is_last: bool,
 ) {
@@ -426,12 +421,12 @@ pub fn walk_function_parameters<V: Visitor + ?Sized>(
         FunctionParameters::Empty => {}
         FunctionParameters::OldStyle(names) => {
             for name in names {
-                v.visit_name(arenas, name);
+                v.visit_name(ctx, name);
             }
         }
         FunctionParameters::ParameterTypeList(decls) | FunctionParameters::Variadic(decls) => {
             for (is_last, decl) in decls.iter().with_last() {
-                v.visit_parameter_declaration(arenas, decl, is_last);
+                v.visit_parameter_declaration(ctx, decl, is_last);
             }
         }
     }
@@ -439,73 +434,68 @@ pub fn walk_function_parameters<V: Visitor + ?Sized>(
 
 pub fn walk_parameter_declaration<V: Visitor + ?Sized>(
     v: &mut V,
-    arenas: &Arenas,
+    ctx: &Context,
     node: &ParameterDeclaration,
     _is_last: bool,
 ) {
-    walk_specifiers(v, arenas, &node.specifiers);
-    v.visit_declarator(arenas, &node.declarator, true);
+    walk_specifiers(v, ctx, &node.specifiers);
+    v.visit_declarator(ctx, &node.declarator, true);
 }
 
-pub fn walk_struct<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, node: &Struct, _is_last: bool) {
+pub fn walk_struct<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &Struct, _is_last: bool) {
     if let Some(name) = &node.name {
-        v.visit_name(arenas, name);
+        v.visit_name(ctx, name);
     }
     for (is_last, field) in node.fields.iter().with_last() {
-        v.visit_struct_declaration(arenas, field, is_last);
+        v.visit_struct_declaration(ctx, field, is_last);
     }
 }
 
-pub fn walk_union<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, node: &Union, _is_last: bool) {
+pub fn walk_union<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &Union, _is_last: bool) {
     if let Some(name) = &node.name {
-        v.visit_name(arenas, name);
+        v.visit_name(ctx, name);
     }
     for (is_last, field) in node.fields.iter().with_last() {
-        v.visit_struct_declaration(arenas, field, is_last);
+        v.visit_struct_declaration(ctx, field, is_last);
     }
 }
 
-pub fn walk_enum<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, node: &Enum, _is_last: bool) {
+pub fn walk_enum<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &Enum, _is_last: bool) {
     if let Some(name) = &node.name {
-        v.visit_name(arenas, name);
+        v.visit_name(ctx, name);
     }
     for (is_last, variant_id) in node.variants.iter().with_last() {
-        v.visit_variant(arenas, arenas.variants.get(*variant_id), is_last);
+        v.visit_variant(ctx, variant_id.resolve(&ctx.arenas), is_last);
     }
 }
 
-pub fn walk_variant<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, node: &Variant, _is_last: bool) {
-    v.visit_name(arenas, &node.name);
+pub fn walk_variant<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &Variant, _is_last: bool) {
+    v.visit_name(ctx, &node.name);
     if let Some(value) = &node.value {
-        v.visit_expression(arenas, value, true);
+        v.visit_expression(ctx, value, true);
     }
 }
 
 pub fn walk_struct_declaration<V: Visitor + ?Sized>(
     v: &mut V,
-    arenas: &Arenas,
+    ctx: &Context,
     node: &StructDeclaration,
     _is_last: bool,
 ) {
-    walk_specifiers(v, arenas, &node.specifiers);
+    walk_specifiers(v, ctx, &node.specifiers);
     for (is_last, declarator) in node.struct_declarators.iter().with_last() {
-        v.visit_struct_declarator(arenas, declarator, is_last);
+        v.visit_struct_declarator(ctx, declarator, is_last);
     }
 }
 
-pub fn walk_struct_declarator<V: Visitor + ?Sized>(
-    v: &mut V,
-    arenas: &Arenas,
-    node: &StructDeclarator,
-    _is_last: bool,
-) {
-    v.visit_declarator(arenas, &node.declarator, node.bit_width.is_none());
+pub fn walk_struct_declarator<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &StructDeclarator, _is_last: bool) {
+    v.visit_declarator(ctx, &node.declarator, node.bit_width.is_none());
     if let Some(bit_width) = &node.bit_width {
-        v.visit_expression(arenas, bit_width, true);
+        v.visit_expression(ctx, bit_width, true);
     }
 }
 
-pub fn walk_specifiers<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, specifiers: &[DeclarationSpecifier]) {
+pub fn walk_specifiers<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, specifiers: &[DeclarationSpecifier]) {
     let tags = specifiers
         .iter()
         .filter(|s| {
@@ -521,17 +511,17 @@ pub fn walk_specifiers<V: Visitor + ?Sized>(v: &mut V, arenas: &Arenas, specifie
             match type_specifier {
                 TypeSpecifier::Struct(id) => {
                     i += 1;
-                    v.visit_struct(arenas, arenas.structs.get(*id), i == tags);
+                    v.visit_struct(ctx, id.resolve(&ctx.arenas), i == tags);
                 }
                 TypeSpecifier::Union(id) => {
                     i += 1;
-                    v.visit_union(arenas, arenas.unions.get(*id), i == tags);
+                    v.visit_union(ctx, id.resolve(&ctx.arenas), i == tags);
                 }
                 TypeSpecifier::Enum(id) => {
                     i += 1;
-                    v.visit_enum(arenas, arenas.enums.get(*id), i == tags);
+                    v.visit_enum(ctx, id.resolve(&ctx.arenas), i == tags);
                 }
-                TypeSpecifier::TypedefName(name) => v.visit_name(arenas, name),
+                TypeSpecifier::TypedefName(name) => v.visit_name(ctx, name),
                 _ => {}
             }
         }

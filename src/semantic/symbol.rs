@@ -1,13 +1,16 @@
 #![allow(unused)]
 use std::collections::HashMap;
 
-use crate::ast::visit::{Visitor, walk_translation_unit};
+use crate::ast::visit::{Visitor, walk_declaration, walk_function_definition, walk_translation_unit};
 use crate::ast::{DeclarationNode, FunctionDefinitionNode, StringId, Type};
-use crate::parser::{Arenas, Context};
+use crate::parser::Context;
 
 #[derive(Default)]
 struct Scope {
-    symbols: HashMap<String, Symbol>,
+    tags: HashMap<String, Symbol>,
+    members: HashMap<String, Symbol>,
+    labels: HashMap<String, Symbol>,
+    ordinaries: HashMap<String, Symbol>,
 }
 
 struct Symbol {
@@ -22,39 +25,24 @@ struct NameResolver {
 }
 
 impl Visitor for NameResolver {
-    fn visit_declaration(&mut self, _arenas: &Arenas, node: &DeclarationNode, _is_last: bool) {
-        // self.declarations.push(node.clone());
+    fn visit_declarator(&mut self, ctx: &Context, node: &crate::ast::DeclaratorNode, is_last: bool) {
+        if let Some(name) = node.ident(ctx) {
+            println!("{}", name.id.resolve(&ctx.arenas));
+        }
     }
-
-    // fn visit_function_definition(&mut self, _arenas: &Arenas, _node: &FunctionDefinitionNode, _is_last: bool) {}
 }
 
 pub struct Analyzer;
 
 impl Analyzer {
     pub fn analyze(ctx: Context) -> Context {
-        let declarations = Self::collect_declarations(&ctx);
-        let _names = Self::resolve_names(&ctx, &declarations);
-        let _types = Self::resolve_types(&ctx, &declarations);
+        let declarations = Self::resolve_names(&ctx);
         ctx
     }
 
-    fn collect_declarations(ctx: &Context) -> Vec<DeclarationNode> {
+    fn resolve_names(ctx: &Context) -> Vec<DeclarationNode> {
         let mut collector = NameResolver::default();
-        println!("collect_declarations");
-        walk_translation_unit(&mut collector, &ctx.arenas, &ctx.ast, false);
-        collector.declarations
-    }
-
-    fn resolve_names(ctx: &Context, declarations: &[DeclarationNode]) -> Vec<StringId> {
-        let ret = Vec::new();
-        println!("resolve_names");
-        ret
-    }
-
-    fn resolve_types(ctx: &Context, declarations: &[DeclarationNode]) -> Vec<Type> {
-        let ret = Vec::new();
-        println!("resolve_types");
-        ret
+        walk_translation_unit(&mut collector, ctx, &ctx.ast, false);
+        Vec::new()
     }
 }

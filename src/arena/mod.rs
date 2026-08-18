@@ -5,9 +5,15 @@ use std::marker::PhantomData;
 
 #[macro_export]
 macro_rules! define_arena {
-    ($ty:ident, $arena:ident, $id:ident) => {
+    ($ty:ident, $arena:ident, $id:ident, $ar:ident) => {
         pub type $id = ArenaId<$ty>;
         pub type $arena = Arena<$id, $ty>;
+
+        impl $id {
+            pub fn resolve<'a>(&self, arenas: &'a Arenas) -> &'a $ty {
+                arenas.$ar.get(self.clone())
+            }
+        }
     };
 }
 

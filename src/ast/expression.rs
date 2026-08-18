@@ -2,10 +2,10 @@ use std::fmt::Display;
 
 use crate::arena::{Arena, ArenaId};
 use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name, Node};
-use crate::parser::{Span, YYToken};
+use crate::parser::{Arenas, Span, YYToken};
 use crate::{ast_node, define_arena};
 
-define_arena!(Expression, ExpressionArena, ExpressionId);
+define_arena!(Expression, ExpressionArena, ExpressionId, expressions);
 
 ast_node! {
     pub struct ExpressionNode {
@@ -142,13 +142,7 @@ impl ExpressionArena {
         Self::add(self.alloc(Expression::Cast(type_node, node_id)), span)
     }
 
-    pub fn access(
-        &mut self,
-        tag: ExpressionNode,
-        tok: YYToken,
-        identifier: Name,
-        span: Span,
-    ) -> ExpressionNode {
+    pub fn access(&mut self, tag: ExpressionNode, tok: YYToken, identifier: Name, span: Span) -> ExpressionNode {
         let expr = match tok {
             YYToken::Char('.') => Expression::DotAcces(tag, identifier),
             YYToken::PTR_OP => Expression::PtrAcces(tag, identifier),
@@ -157,12 +151,7 @@ impl ExpressionArena {
         Self::add(self.alloc(expr), span)
     }
 
-    pub fn unary(
-        &mut self,
-        operator: YYToken,
-        operand: ExpressionNode,
-        span: Span,
-    ) -> ExpressionNode {
+    pub fn unary(&mut self, operator: YYToken, operand: ExpressionNode, span: Span) -> ExpressionNode {
         let expr = match operator {
             YYToken::POST_INC_OP => Expression::PostInc(operand),
             YYToken::POST_DEC_OP => Expression::PostDec(operand),
@@ -179,13 +168,7 @@ impl ExpressionArena {
         Self::add(self.alloc(expr), span)
     }
 
-    pub fn binary(
-        &mut self,
-        lhs: ExpressionNode,
-        tok: YYToken,
-        rhs: ExpressionNode,
-        span: Span,
-    ) -> ExpressionNode {
+    pub fn binary(&mut self, lhs: ExpressionNode, tok: YYToken, rhs: ExpressionNode, span: Span) -> ExpressionNode {
         let expr = match tok {
             YYToken::Char('+') => Expression::Add(lhs, rhs),
             YYToken::Char('-') => Expression::Sub(lhs, rhs),
