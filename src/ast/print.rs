@@ -8,7 +8,7 @@ use crate::ast::visit::{
     walk_struct_declarator, walk_translation_unit, walk_union, walk_variant,
 };
 use crate::ast::{
-    CompoundStatementNode, DeclarationNode, DeclaratorNode, DeclarationSpecifier, Enum, Expression, ExpressionNode,
+    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Enum, Expression, ExpressionNode,
     ExpressionStatementNode, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, InitDeclaratorNode,
     InitializerNode, IterationStatementNode, JumpStatementNode, LabeledStatementNode, Name, ParameterDeclaration,
     Qualifier, SelectionStatementNode, Struct, StructDeclaration, StructDeclarator, TranslationUnitNode, Type,

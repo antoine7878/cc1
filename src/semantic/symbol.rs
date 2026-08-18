@@ -17,16 +17,16 @@ struct Symbol {
 }
 
 #[derive(Default)]
-struct DeclarationCollector {
-    declarations: Vec<DeclarationNode>,
+struct NameResolver {
+    scopes: Vec<Scope>,
 }
 
-impl Visitor for DeclarationCollector {
+impl Visitor for NameResolver {
     fn visit_declaration(&mut self, _arenas: &Arenas, node: &DeclarationNode, _is_last: bool) {
-        self.declarations.push(node.clone());
+        // self.declarations.push(node.clone());
     }
 
-    fn visit_function_definition(&mut self, _arenas: &Arenas, _node: &FunctionDefinitionNode, _is_last: bool) {}
+    // fn visit_function_definition(&mut self, _arenas: &Arenas, _node: &FunctionDefinitionNode, _is_last: bool) {}
 }
 
 pub struct Analyzer;
@@ -40,7 +40,7 @@ impl Analyzer {
     }
 
     fn collect_declarations(ctx: &Context) -> Vec<DeclarationNode> {
-        let mut collector = DeclarationCollector::default();
+        let mut collector = NameResolver::default();
         println!("collect_declarations");
         walk_translation_unit(&mut collector, &ctx.arenas, &ctx.ast, false);
         collector.declarations

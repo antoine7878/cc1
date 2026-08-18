@@ -158,13 +158,8 @@ impl<R: Read> Yacc<R> {
     }
 
     fn error_message(&self) -> String {
-        let unexpected = self.unexpected_text();
-        format!("syntax error, unexpected {unexpected}")
-    }
-
-    fn unexpected_text(&self) -> String {
-        if self.lookahead_id == Self::YY_EOF_TOKEN_ID {
-            "end of file".to_string()
+        let msg = if self.lookahead_id == Self::YY_EOF_TOKEN_ID {
+            "eof".to_string()
         } else {
             let text = self.lexer.yytext.trim();
             if text.is_empty() {
@@ -172,7 +167,8 @@ impl<R: Read> Yacc<R> {
             } else {
                 format!("'{text}'")
             }
-        }
+        };
+        format!("syntax error, unexpected {}", msg)
     }
 
     pub fn yyerrok(&mut self) {

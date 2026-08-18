@@ -12,7 +12,7 @@ PARSER = src/parser/yacc.rs
 
 all: $(NAME)
 
-$(NAME): $(LEXER) $(PARSER)
+$(NAME):
 	cargo build
 
 # ----- ft_lex --------------------
@@ -20,7 +20,7 @@ $(NAME): $(LEXER) $(PARSER)
 $(FT_LEX):
 	$(MAKE) -C ft_lex
 
-$(LEXER): $(FT_LEX) $(LEX_FILE)
+$(LEXER): $(LEX_FILE)
 	$(FT_LEX) -cx rust $(LEX_FILE) -o $(LEXER)
 
 # ----- ft_yacc --------------------
@@ -28,7 +28,7 @@ $(LEXER): $(FT_LEX) $(LEX_FILE)
 $(FT_YACC):
 	$(MAKE) -C ft_yacc
 
-$(PARSER): $(FT_YACC) $(YACC_FILE)
+$(PARSER): $(YACC_FILE)
 	$(FT_YACC) -x rust $(YACC_FILE) -o $(PARSER)
 
 # ----- test --------------------
@@ -50,4 +50,4 @@ clean:
 
 re: clean all
 
-.PHONY: all clean re test lexer parser $(FT_LEX) $(FT_YACC)
+.PHONY: all clean re test lexer parser $(FT_LEX) $(FT_YACC) $(NAME)
