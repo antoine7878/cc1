@@ -1,9 +1,42 @@
 use std::io::{self, Write, stdout};
 
-use crate::{
-    ast::Name,
-    parser::{Context, Span},
-};
+use crate::ast::Name;
+use crate::parser::{Context, Span};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum DiagnosisInner {
+    UndeclaredIdentifier(Name),
+    // 6.5
+    MultipleStorageSpecifiers,
+    BlockScopeNotExtern,
+    InvalidTypeSpecifer,
+    DuplicateTypeQualifers,
+    // 6.7
+    AutoRegisterExternal,
+}
+
+impl Diagnosis {
+    pub fn new(inner: DiagnosisInner, span: Span) -> Self {
+        Self { inner, span }
+    }
+
+    pub fn print(&self, ctx: &Context) -> io::Result<()> {
+        self.write(&mut stdout(), ctx)
+    }
+
+    #[rustfmt::skip]
+    pub fn write<W: Write>(&self, w: &mut W, ctx: &Context) -> io::Result<()> {
+        write!(w, "{}:{}:{} ", ctx.file_name, self.span.start.line, self.span.start.col)?;
+        match &self.inner {
+            DiagnosisInner::UndeclaredIdentifier(name) => writeln!(w, "Use of undeclared identifier '{}'", name.id.resolve(&ctx.arenas)),
+            DiagnosisInner::MultipleStorageSpecifiers => writeln!(w, "Multiple storage class declaration"),
+            DiagnosisInner::BlockScopeNotExtern => writeln!(w, "Function in block not declared as extern"),
+            DiagnosisInner::InvalidTypeSpecifer => writeln!(w, "Invalid type specifer or combination thereof"),
+            DiagnosisInner::DuplicateTypeQualifers => writeln!(w, "Duplicate type qualifers"),
+            DiagnosisInner::AutoRegisterExternal => writeln!(w, "External declaration auto of register"),
+       }
+    }
+}
 
 #[derive(Debug)]
 pub struct Diag<T> {
@@ -47,34 +80,4 @@ impl<T> Diag<Option<T>> {
 pub struct Diagnosis {
     span: Span,
     inner: DiagnosisInner,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum DiagnosisInner {
-    UndeclaredIdentifier(Name),
-    MultipleStorageSpecifiers,
-    BlockScopeNotExtern,
-    InvalidTypeSpecifer,
-    DuplicateTypeQualifers,
-}
-
-impl Diagnosis {
-    pub fn new(inner: DiagnosisInner, span: Span) -> Self {
-        Self { inner, span }
-    }
-
-    pub fn print(&self, ctx: &Context) -> io::Result<()> {
-        self.write(&mut stdout(), ctx)
-    }
-
-    #[rustfmt::skip]
-    pub fn write<W: Write>(&self, w: &mut W, ctx: &Context) -> io::Result<()> {
-        write!(w, "{}:{}:{} ", ctx.file_name, self.span.start.line, self.span.start.col)?;
-        match &self.inner {
-            DiagnosisInner::UndeclaredIdentifier(name) => writeln!(w, "Use of undeclared identifier '{}'", name.id.resolve(&ctx.arenas)),
-            DiagnosisInner::MultipleStorageSpecifiers => writeln!(w, "Multiple storage class declaration"),
-            DiagnosisInner::BlockScopeNotExtern => writeln!(w, "Function in block not declared as extern"),
-            DiagnosisInner::InvalidTypeSpecifer => writeln!(w, "Invalid type specifer or combination thereof"),
-            DiagnosisInner::DuplicateTypeQualifers => writeln!(w, "Duplicate type qualifers"),
-       } }
 }

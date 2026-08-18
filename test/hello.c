@@ -9,6 +9,9 @@
 // int c;
 // { return 1; }
 
-int *fn() {
-	return [ 2, 3 ];
+#include <stdlib.h>
+
+int const *const *const fn() {
+	int volatile const *const volatile *volatile const a;
+	return malloc(12);
 }

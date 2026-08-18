@@ -80,15 +80,9 @@ pub fn resolve_type(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Resolved
 
 /// 6.5.3 Type qualifiers
 /// The same type qualifier shall not appear more than once in the same specifier list or qualifier list, either directly or via one or more typedefs.
-pub fn get_qualifier(specifiers: &[DeclarationSpecifier]) -> Diag<(bool, bool)> {
-    let const_count = specifiers
-        .iter()
-        .filter(|q| matches!(q, DeclarationSpecifier::Qualifier(Qualifier::Const)))
-        .count();
-    let volatile_count = specifiers
-        .iter()
-        .filter(|q| matches!(q, DeclarationSpecifier::Qualifier(Qualifier::Volatile)))
-        .count();
+pub fn check_qualifier(specifiers: &[Qualifier]) -> Diag<(bool, bool)> {
+    let const_count = specifiers.iter().filter(|q| matches!(q, Qualifier::Const)).count();
+    let volatile_count = specifiers.iter().filter(|q| matches!(q, Qualifier::Volatile)).count();
 
     let ret = (const_count > 1, volatile_count > 1);
 
@@ -96,4 +90,15 @@ pub fn get_qualifier(specifiers: &[DeclarationSpecifier]) -> Diag<(bool, bool)> 
         return Diag::with_diag(ret, DiagnosisInner::DuplicateTypeQualifers);
     }
     Diag::res(ret)
+}
+
+pub fn get_qualifier(specifiers: &[DeclarationSpecifier]) -> Diag<(bool, bool)> {
+    let a = specifiers
+        .iter()
+        .filter_map(|s| match s {
+            DeclarationSpecifier::Qualifier(q) => Some(*q),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    check_qualifier(a.as_slice())
 }

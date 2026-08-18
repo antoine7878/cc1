@@ -1,4 +1,59 @@
-use crate::ast::{EnumId, Name, StructId, TypeSpecifier, UnionId};
+use crate::{
+    ast::{EnumId, Name, StructId, TypeSpecifier, UnionId},
+    define_arena,
+};
+
+define_arena!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, resolved_type);
+
+#[derive(Debug, PartialEq, Clone, Copy, Hash, Eq)]
+pub enum ResolvedType {
+    Void,
+    Char,
+    SignedChar,
+    UnsignedChar,
+    Short,
+    UnsignedShort,
+    Int,
+    UnsignedInt,
+    Long,
+    UnsignedLong,
+    Float,
+    Double,
+    LongDouble,
+    Pointer(QualifiedType),
+    Struct(StructId),
+    Union(UnionId),
+    Enum(EnumId),
+    Typedef(Name),
+}
+
+impl ResolvedTypeArena {
+    pub fn pointer(&mut self, inner: ResolvedTypeId, is_const: bool, is_volatile: bool) -> ResolvedTypeId {
+        let qualified_type = QualifiedType {
+            ty: inner,
+            is_const,
+            is_volatile,
+        };
+        self.alloc(ResolvedType::Pointer(qualified_type))
+    }
+}
+
+#[derive(Debug, PartialEq, Clone, Copy, Hash, Eq)]
+pub struct QualifiedType {
+    pub ty: ResolvedTypeId,
+    pub is_const: bool,
+    pub is_volatile: bool,
+}
+
+impl QualifiedType {
+    pub fn new(ty: ResolvedTypeId, is_const: bool, is_volatile: bool) -> Self {
+        QualifiedType {
+            ty,
+            is_const,
+            is_volatile,
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct TypeSpecifierCounter {
@@ -41,25 +96,4 @@ impl TypeSpecifierCounter {
             c.signed, c.unsigned, c.void, c.char, c.short, c.int, c.long, c.float, c.double,
         ])
     }
-}
-
-#[derive(Debug, PartialEq, Clone, Hash, Eq)]
-pub enum ResolvedType {
-    Void,
-    Char,
-    SignedChar,
-    UnsignedChar,
-    Short,
-    UnsignedShort,
-    Int,
-    UnsignedInt,
-    Long,
-    UnsignedLong,
-    Float,
-    Double,
-    LongDouble,
-    Struct(StructId),
-    Union(UnionId),
-    Enum(EnumId),
-    Typedef(Name),
 }
