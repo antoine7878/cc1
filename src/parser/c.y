@@ -133,11 +133,11 @@ function_definition /* FunctionDefinitionNode */
 	;
 
 
-constant_expression /* ExpressionId */
+constant_expression /* ExpressionNode */
     : expression %prec PREC_NO_COMMA                                                { node_span!(self, expressions, constant_expression, $1) }
     ;
 
-expression /* ExpressionId */
+expression /* ExpressionNode */
     : '(' expression ')'                                                            { $2 }
     | IDENTIFIER                                                                    { node_span!(self, expressions, identifier, $1) }
     | CONSTANT                                                                      { node_span!(self, expressions, constant,$1)}

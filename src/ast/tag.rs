@@ -1,6 +1,5 @@
-use crate::arena::{Arena, ArenaId};
-use crate::ast::{DeclarationSpecifier, DeclaratorNode, ExpressionNode, Name, Node};
-use crate::parser::{Arenas, Span};
+use crate::ast::{DeclarationSpecifier, DeclaratorNode, ExpressionNode, Name};
+use crate::parser::Span;
 use crate::utils::{BLUE, RESET};
 use crate::{ast_node, define_arena};
 

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name, Node};
+use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name};
 use crate::ast_node;
 use crate::parser::Span;
 

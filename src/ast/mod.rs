@@ -38,12 +38,12 @@ macro_rules! ast_node {
     ) => {
         #[derive(Clone, Debug, Eq, PartialEq, Hash)]
         $vis struct $name {
-            pub span: Span,
+            pub span: $crate::parser::Span,
             $($field_vis $field: $ty,)*
         }
 
         impl $name {
-            pub fn new($($field: $ty,)* span: Span) -> Self {
+            pub fn new($($field: $ty,)* span: $crate::parser::Span) -> Self {
                 Self {
                     $($field,)*
                     span,
@@ -59,8 +59,8 @@ macro_rules! ast_node {
         }
 
 
-        impl Node for $name {
-            fn span(&self) -> Span {
+        impl $crate::ast::Node for $name {
+            fn span(&self) -> $crate::parser::Span {
                 self.span
             }
         }

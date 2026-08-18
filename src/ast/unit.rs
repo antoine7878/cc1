@@ -1,4 +1,4 @@
-use crate::ast::{CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Node};
+use crate::ast::{CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode};
 use crate::ast_node;
 use crate::parser::{Position, Span};
 

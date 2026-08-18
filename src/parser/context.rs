@@ -15,6 +15,7 @@ pub struct Arenas {
     pub expressions: ExpressionArena,
     pub declarators: DeclaratorArena,
     pub statements: StatementArena,
+    // pub symbols: Symb,
 }
 
 #[derive(Debug)]

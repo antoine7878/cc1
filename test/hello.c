@@ -1,14 +1,17 @@
 double extrn;
 
-struct t {
-	int hey;
+struct tag {
+	int member;
 };
 
-int main(void) {
+int functio(void) {
 
 	int a;
 	int b;
 	int d;
 	float coucou, salut;
+
+	a = 1;
+	non = 1;
 	return 0;
 }
