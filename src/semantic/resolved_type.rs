@@ -28,6 +28,10 @@ pub enum ResolvedType {
 }
 
 impl ResolvedTypeArena {
+    pub fn int(&mut self) -> ResolvedTypeId {
+        self.alloc(ResolvedType::Int)
+    }
+
     pub fn pointer(&mut self, inner: QualifiedType) -> ResolvedTypeId {
         self.alloc(ResolvedType::Pointer(inner))
     }

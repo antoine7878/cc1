@@ -1,0 +1,13 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-std=iso9899:1990",
+      "-pedantic-errors",
+      "test/hello.c"
+    ],
+    "directory": "/home/ale-tell/42/cc1",
+    "file": "/home/ale-tell/42/cc1/test/hello.c"
+  }
+]

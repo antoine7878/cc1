@@ -30,6 +30,10 @@ impl DeclaratorNode {
     pub fn ident(&self, ctx: &Context) -> Option<Name> {
         self.id.resolve(ctx).ident(ctx)
     }
+
+    pub fn is_abstract(&self, ctx: &Context) -> bool {
+        matches!(self.id.resolve(ctx), Declarator::Abstract)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]

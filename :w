@@ -129,10 +129,12 @@ impl SymbolResolver {
         Some(parameters)
     }
 
+    fn add_arguments(&mut self, ctx: &Context, node: &DeclarationNode) {}
+
     fn param_empty(&mut self, lst: &[DeclarationNode], span: &Span) {
         if !lst.is_empty() {
             self.diagnosis
-                .push(DiagnosisNode::new(Diagnosis::ParameterTypeListWithList, *span))
+                .push(DiagnosisNode::new(Diagnosis::ParameterTypeListWithList, span))
         }
     }
 
@@ -174,28 +176,14 @@ impl SymbolResolver {
                         .iter()
                         .map(|decl| {
                             self.add_parameter_declartor(ctx, specifiers, &decl.declarator, span)
-                                .map(|sym_id| self.symbols.get(sym_id).name.id)
+                                .map(|sym_id| self.symbols.get(sym_id).name)
                         })
                         .collect::<Vec<_>>()
                 },
             )
             .collect();
 
-        let names_id: Vec<_> = names.iter().map(|n| n.id).collect();
-
-        let Some(missing_id) = constrain::external::is_valid_old_style(&names_id, declarations).collect(self, span)
-        else {
-            return;
-        };
-        for string_id in missing_id {
-            let ty_id = self.types.int();
-            self.add_symbol(
-                Name::new(string_id, Span::default()),
-                QualifiedType::new(ty_id, false, false),
-                Storage::Register,
-                DeclaratorNode::new(0.into(), Span::default()),
-            );
-        }
+        constrain::external::is_valid_old_style(names, declarations).collect(self, span)
     }
 
     fn add_parameter_declartor(
@@ -208,7 +196,7 @@ impl SymbolResolver {
         let (ty, decl) = self.make_qualified_type(ctx, specifiers, decl, span)?;
         let storage = constrain::declaration::get_storage(specifiers)
             .collect(self, span)
-            .unwrap_or(Storage::Register);
+            .unwrap_or(Storage::Auto);
         constrain::external::param_storage_only_register(storage).collect(self, span)?;
         let name = decl.ident(ctx)?;
         Some(self.add_symbol(name, ty, storage, decl))
@@ -219,6 +207,7 @@ impl Visitor for SymbolResolver {
     fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode, _is_last: bool) {
         let Some(parameters) = self.add_function(ctx, node) else { return };
 
+        // constrain::external::is_valid_style(ctx, args, &node.old_style_declarations);
         let span = &parameters.span;
         match &parameters.param {
             FunctionParameters::Empty => self.param_empty(&node.old_style_declarations, span),

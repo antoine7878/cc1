@@ -1,7 +1,10 @@
+use std::collections::HashSet;
+
 use crate::ast::{
-    DeclarationSpecifier, Declarator, DeclaratorNode, FunctionParameters, FunctionParametersNode, ParameterDeclaration,
-    Storage,
+    DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, FunctionParametersNode, ParameterDeclaration,
+    Storage, StringId,
 };
+use crate::parser::Context;
 use crate::semantic::{Diag, diagnosis::Diagnosis};
 
 /// 6.7 External definitions
@@ -56,18 +59,67 @@ pub fn extract_function_declarator(
 /// If the declarator includes a parameter type list. the declaration of each parameter shall include
 /// an identifier (except for the special case of a parameter list consisting of a single parameter of
 /// type void, in which there shall not be an identifier). No declaration list shall follow.
-pub fn _get2(declarator: &Declarator, params: &[ParameterDeclaration]) -> Diag<bool> {
-    Diag::res(true)
+/// return value:
+///     false -> valid function no parameter symbol
+///     true -> valid function with parameter symbol
+///     Diagnosis -> invalid function
+pub fn is_valid_parameter_style(
+    ctx: &Context,
+    params: &[ParameterDeclaration],
+    old_style_declarations: &[DeclarationNode],
+) -> Diag<bool> {
+    if !old_style_declarations.is_empty() {
+        return Diag::with_diag(false, Diagnosis::ParameterTypeListWithList);
+    }
+    // case fn()
+    if params.is_empty() {
+        return Diag::res(false);
+    }
+    // case fn(void)
+    if let Some(f) = params.first()
+        && f.is_abstract_void(ctx)
+    {
+        return Diag::res(false);
+    }
+
+    if params.iter().all(|p| p.declarator.ident(ctx).is_some()) {
+        Diag::res(true)
+    } else {
+        Diag::with_diag(false, Diagnosis::AbstractParameterDeclaration)
+    }
 }
 
-pub fn _get(declarator: &Declarator, params: &FunctionParametersNode) -> Diag<bool> {
-    match &params.param {
-        FunctionParameters::Empty => Diag::res(true),
-        FunctionParameters::ParameterTypeList(_a) | FunctionParameters::Variadic(_a) => {}
-        FunctionParameters::OldStyle(_a) => Diag::res(true),
+/// 6.7.1 Function definitions
+/// If the declarator includes an identifier list, the types of the parameters may be declared in a following declaration list,
+/// any parameter that is not declared has type int.
+pub fn is_valid_old_style(names: &[StringId], declarations: Vec<Option<StringId>>) -> Diag<Option<Vec<StringId>>> {
+    let declarations_len = declarations.len();
+    let Some(declarations) = declarations.into_iter().collect::<Option<HashSet<StringId>>>() else {
+        return Diag::res(None);
+    };
+    if declarations.len() != declarations_len {
+        return Diag::with_diag(None, Diagnosis::AbstractParameterDeclaration);
     }
-    // case void
-    // case all ident
-    // case no ident
-    // Diag::res(())
+
+    let name_len = names.len();
+    let names = names.iter().cloned().collect::<HashSet<_>>();
+    if names.len() != name_len {
+        return Diag::with_diag(None, Diagnosis::DuplicateParameterName);
+    }
+
+    if declarations.difference(&names).next().is_some() {
+        return Diag::with_diag(None, Diagnosis::MissingParameterInOldStyle);
+    }
+
+    let diff = declarations.difference(&names).cloned().collect::<Vec<_>>();
+    Diag::res(Some(diff))
+}
+
+/// 6.7.1 Function definitions
+///The declarations in the declaration list shall contain no storage-class specifier other than register and, no initializations.
+pub fn param_storage_only_register(storage: Storage) -> Diag<Option<()>> {
+    match storage {
+        Storage::Register => Diag::some(()),
+        _ => Diag::none_diag(Diagnosis::ParameterNotRegister),
+    }
 }

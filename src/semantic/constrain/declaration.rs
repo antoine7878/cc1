@@ -40,11 +40,11 @@ pub fn resolve_type(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Resolved
         .collect();
 
     match types.as_slice() {
-        [] => return Diag::res_some(ResolvedType::Int),
-        [TypeSpecifier::Struct(t)] => return Diag::res_some(ResolvedType::Struct(*t)),
-        [TypeSpecifier::Union(t)] => return Diag::res_some(ResolvedType::Union(*t)),
-        [TypeSpecifier::Enum(t)] => return Diag::res_some(ResolvedType::Enum(*t)),
-        [TypeSpecifier::TypedefName(t)] => return Diag::res_some(ResolvedType::Typedef(*t)),
+        [] => return Diag::some(ResolvedType::Int),
+        [TypeSpecifier::Struct(t)] => return Diag::some(ResolvedType::Struct(*t)),
+        [TypeSpecifier::Union(t)] => return Diag::some(ResolvedType::Union(*t)),
+        [TypeSpecifier::Enum(t)] => return Diag::some(ResolvedType::Enum(*t)),
+        [TypeSpecifier::TypedefName(t)] => return Diag::some(ResolvedType::Typedef(*t)),
         _ => ()
     }
     let Some(a) = TypeSpecifierCounter::count(types.as_slice()) else {
@@ -52,28 +52,28 @@ pub fn resolve_type(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Resolved
     };
     //   s, u, v, c, s, i, l, f, d
     match  a {
-        [0, 0, 1, 0, 0, 0, 0, 0, 0] => Diag::res_some(ResolvedType::Void),
-        [0, 0, 0, 1, 0, 0, 0, 0, 0] => Diag::res_some(ResolvedType::Char),
-        [1, 0, 0, 1, 0, 0, 0, 0, 0] => Diag::res_some(ResolvedType::SignedChar),
-        [0, 1, 0, 1, 0, 0, 0, 0, 0] => Diag::res_some(ResolvedType::UnsignedChar),
-        [0, 0, 0, 0, 1, 0, 0, 0, 0] => Diag::res_some(ResolvedType::Short),
-        [0, 0, 0, 0, 1, 1, 0, 0, 0] => Diag::res_some(ResolvedType::Short),
-        [1, 0, 0, 0, 1, 0, 0, 0, 0] => Diag::res_some(ResolvedType::Short),
-        [1, 0, 0, 0, 1, 1, 0, 0, 0] => Diag::res_some(ResolvedType::Short),
-        [0, 1, 0, 0, 1, 0, 0, 0, 0] => Diag::res_some(ResolvedType::UnsignedShort),
-        [0, 1, 0, 0, 1, 1, 0, 0, 0] => Diag::res_some(ResolvedType::UnsignedShort),
-        [0, 0, 0, 0, 0, 1, 0, 0, 0] => Diag::res_some(ResolvedType::Int),
-        [1, 0, 0, 0, 0, 0, 0, 0, 0] => Diag::res_some(ResolvedType::Int),
-        [1, 0, 0, 0, 0, 1, 0, 0, 0] => Diag::res_some(ResolvedType::Int),
-        [0, 0, 0, 0, 0, 0, 1, 0, 0] => Diag::res_some(ResolvedType::Long),
-        [0, 0, 0, 0, 0, 1, 1, 0, 0] => Diag::res_some(ResolvedType::Long),
-        [1, 0, 0, 0, 0, 0, 1, 0, 0] => Diag::res_some(ResolvedType::Long),
-        [1, 0, 0, 0, 0, 1, 1, 0, 0] => Diag::res_some(ResolvedType::Long),
-        [0, 1, 0, 0, 0, 0, 1, 0, 0] => Diag::res_some(ResolvedType::UnsignedLong),
-        [0, 1, 0, 0, 0, 1, 1, 0, 0] => Diag::res_some(ResolvedType::UnsignedLong),
-        [0, 0, 0, 0, 0, 0, 0, 1, 0] => Diag::res_some(ResolvedType::Float),
-        [0, 0, 0, 0, 0, 0, 0, 0, 1] => Diag::res_some(ResolvedType::Double),
-        [0, 0, 0, 0, 0, 0, 1, 0, 1] => Diag::res_some(ResolvedType::LongDouble),
+        [0, 0, 1, 0, 0, 0, 0, 0, 0] => Diag::some(ResolvedType::Void),
+        [0, 0, 0, 1, 0, 0, 0, 0, 0] => Diag::some(ResolvedType::Char),
+        [1, 0, 0, 1, 0, 0, 0, 0, 0] => Diag::some(ResolvedType::SignedChar),
+        [0, 1, 0, 1, 0, 0, 0, 0, 0] => Diag::some(ResolvedType::UnsignedChar),
+        [0, 0, 0, 0, 1, 0, 0, 0, 0] => Diag::some(ResolvedType::Short),
+        [0, 0, 0, 0, 1, 1, 0, 0, 0] => Diag::some(ResolvedType::Short),
+        [1, 0, 0, 0, 1, 0, 0, 0, 0] => Diag::some(ResolvedType::Short),
+        [1, 0, 0, 0, 1, 1, 0, 0, 0] => Diag::some(ResolvedType::Short),
+        [0, 1, 0, 0, 1, 0, 0, 0, 0] => Diag::some(ResolvedType::UnsignedShort),
+        [0, 1, 0, 0, 1, 1, 0, 0, 0] => Diag::some(ResolvedType::UnsignedShort),
+        [0, 0, 0, 0, 0, 1, 0, 0, 0] => Diag::some(ResolvedType::Int),
+        [1, 0, 0, 0, 0, 0, 0, 0, 0] => Diag::some(ResolvedType::Int),
+        [1, 0, 0, 0, 0, 1, 0, 0, 0] => Diag::some(ResolvedType::Int),
+        [0, 0, 0, 0, 0, 0, 1, 0, 0] => Diag::some(ResolvedType::Long),
+        [0, 0, 0, 0, 0, 1, 1, 0, 0] => Diag::some(ResolvedType::Long),
+        [1, 0, 0, 0, 0, 0, 1, 0, 0] => Diag::some(ResolvedType::Long),
+        [1, 0, 0, 0, 0, 1, 1, 0, 0] => Diag::some(ResolvedType::Long),
+        [0, 1, 0, 0, 0, 0, 1, 0, 0] => Diag::some(ResolvedType::UnsignedLong),
+        [0, 1, 0, 0, 0, 1, 1, 0, 0] => Diag::some(ResolvedType::UnsignedLong),
+        [0, 0, 0, 0, 0, 0, 0, 1, 0] => Diag::some(ResolvedType::Float),
+        [0, 0, 0, 0, 0, 0, 0, 0, 1] => Diag::some(ResolvedType::Double),
+        [0, 0, 0, 0, 0, 0, 1, 0, 1] => Diag::some(ResolvedType::LongDouble),
         _ => Diag::with_diag(None, Diagnosis::InvalidTypeSpecifer),
     }
 }
@@ -87,7 +87,7 @@ pub fn check_qualifier(specifiers: &[Qualifier]) -> Diag<(bool, bool)> {
     let ret = (const_count > 1, volatile_count > 1);
 
     if const_count > 1 || volatile_count > 1 {
-        return Diag::with_diag(ret, Diagnosis::DuplicateTypeQualifers);
+        return Diag::with_diag(ret, Diagnosis::DuplicateParameterName);
     }
     Diag::res(ret)
 }

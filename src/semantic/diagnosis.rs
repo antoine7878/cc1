@@ -16,6 +16,13 @@ pub enum Diagnosis {
     // 6.7.1
     NotFunctionTypeDeclarator,
     FunctionAutoExtern,
+    ParameterOldStyleListLenMismatch,
+    ParameterTypeListWithList,
+    ParameterNotRegister,
+    AbstractParameterDeclaration,
+    MissingDeclarationInOldStyle,
+    DuplicateParameterName,
+    MissingParameterInOldStyle,
 }
 
 impl DiagnosisNode {
@@ -39,6 +46,13 @@ impl DiagnosisNode {
             Diagnosis::AutoRegisterExternal => writeln!(w, "External declaration auto of register"),
             Diagnosis::NotFunctionTypeDeclarator => writeln!(w, "Declarator shall be function type"),
             Diagnosis::FunctionAutoExtern => writeln!(w, "Function storage shall be auto or extern"),
+            Diagnosis::ParameterOldStyleListLenMismatch => writeln!(w, "Old style parameter function declaration shall be followed by a declaration list"),
+            Diagnosis::ParameterTypeListWithList => writeln!(w, "Parameter style function declration shall not be followed by a declaration list"),
+            Diagnosis::ParameterNotRegister => writeln!(w, "Parameter shall only by declared with register storage"),
+            Diagnosis::AbstractParameterDeclaration => writeln!(w, "Absctract declaration in old style function"),
+            Diagnosis::MissingDeclarationInOldStyle => writeln!(w, "Missing argument declaration in old style function"),
+            Diagnosis::MissingParameterInOldStyle => writeln!(w, "Missing parameter"),
+            Diagnosis::DuplicateParameterName => writeln!(w, "Duplicate paramter identifier"),
         }
     }
 }
@@ -79,19 +93,19 @@ impl<T> Diag<T> {
 }
 
 impl<T> Diag<Option<T>> {
-    pub fn diag_none(diagnosis: Diagnosis) -> Self {
+    pub fn none_diag(diagnosis: Diagnosis) -> Self {
         Self::new(None, Some(diagnosis))
     }
 
-    pub fn diag_some(res: T, diagnosis: Diagnosis) -> Self {
+    pub fn some_diag(res: T, diagnosis: Diagnosis) -> Self {
         Self::new(Some(res), Some(diagnosis))
     }
 
-    pub fn res_none() -> Self {
+    pub fn none() -> Self {
         Self::new(None, None)
     }
 
-    pub fn res_some(res: T) -> Self {
+    pub fn some(res: T) -> Self {
         Self::new(Some(res), None)
     }
 }

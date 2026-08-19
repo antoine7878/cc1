@@ -26,14 +26,11 @@ ast_node! {
 }
 
 impl ParameterDeclaration {
-    fn is_abstract_void(&self, ctx: &Context) -> bool {
-        if !matches!(
+    pub fn is_abstract_void(&self, ctx: &Context) -> bool {
+        matches!(
             self.specifiers.as_slice(),
             [DeclarationSpecifier::Type(TypeSpecifier::Void)]
-        ) {
-            return false;
-        }
-        true
+        ) && self.declarator.is_abstract(ctx)
     }
 }
 
