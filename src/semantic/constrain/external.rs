@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use crate::ast::{
-    DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, FunctionParametersNode, ParameterDeclaration,
-    Storage, StringId,
+    DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, FunctionParametersNode, Name,
+    ParameterDeclaration, Storage, StringId,
 };
 use crate::parser::Context;
 use crate::semantic::{Diag, diagnosis::Diagnosis};
@@ -116,10 +116,19 @@ pub fn is_valid_old_style(names: &[StringId], declarations: Vec<Option<StringId>
 }
 
 /// 6.7.1 Function definitions
-///The declarations in the declaration list shall contain no storage-class specifier other than register and, no initializations.
+/// The declarations in the declaration list shall contain no storage-class specifier other than register and, no initializations.
 pub fn param_storage_only_register(storage: Storage) -> Diag<Option<()>> {
     match storage {
         Storage::Register => Diag::some(()),
         _ => Diag::none_diag(Diagnosis::ParameterNotRegister),
     }
+}
+
+/// 6.7.1 Function definitions
+/// [In old style] An identifier declared as a typedef name shall not be redeclared as a parameter.
+pub fn check_typedef(ctx: &Context, name: &Name) -> Diag<bool> {
+    if ctx.typedefs.last().unwrap().contains(&name.id) {
+        return Diag::with_diag(false, Diagnosis::TypedefInOldStyle);
+    }
+    Diag::res(true)
 }

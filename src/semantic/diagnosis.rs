@@ -23,6 +23,7 @@ pub enum Diagnosis {
     MissingDeclarationInOldStyle,
     DuplicateParameterName,
     MissingParameterInOldStyle,
+    TypedefInOldStyle,
 }
 
 impl DiagnosisNode {
@@ -53,6 +54,7 @@ impl DiagnosisNode {
             Diagnosis::MissingDeclarationInOldStyle => writeln!(w, "Missing argument declaration in old style function"),
             Diagnosis::MissingParameterInOldStyle => writeln!(w, "Missing parameter"),
             Diagnosis::DuplicateParameterName => writeln!(w, "Duplicate paramter identifier"),
+            Diagnosis::TypedefInOldStyle => writeln!(w, "Typedef unsed in old style function"),
         }
     }
 }
