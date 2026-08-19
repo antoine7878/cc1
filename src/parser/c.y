@@ -80,11 +80,12 @@ macro_rules! push {
 %type<Vec<InitDeclaratorNode>> init_declarator_list
 %type<InitializerNode> initializer
 %type<Vec<InitializerNode>> initializer_list
-%type<DeclaratorNode> declarator direct_declarator pointer direct_abstract_declarator abstract_declarator
+%type<DeclaratorNode> declarator direct_declarator direct_abstract_declarator abstract_declarator
 %type<FunctionParametersNode> parameter_type_list
 %type<Vec<ParameterDeclaration>> parameter_list
 %type<ParameterDeclaration> parameter_declaration
 %type<Vec<DeclarationSpecifier>> specifier_qualifier_list
+%type<Vec<Vec<Qualifier>>> pointer
 
 %type<Tag> struct_or_union
 %type<Vec<StructDeclaration>> struct_declaration_list
@@ -270,11 +271,12 @@ direct_declarator /* DeclaratorNode */
 	| direct_declarator '(' ')'                                                     { let a = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, $1, a) }
 	;
 
-pointer /* Declarator::Pointer */
-	: '*'                                                                           { node_span!(self, declarators, pointer, vec![], None)     }
-	| '*' type_qualifier_list                                                       { node_span!(self, declarators, pointer, $2,     None)     }
-	| '*' pointer                                                                   { node_span!(self, declarators, pointer, vec![], Some($2)) }
-	| '*' type_qualifier_list pointer                                               { node_span!(self, declarators, pointer, $2,     Some($3)) }
+
+pointer  /* Vec<Vec<Qualifier>> */
+	: '*'                                                                           { vec![vec![]] }
+	| '*' type_qualifier_list                                                       { vec![$2] }
+	| '*' pointer                                                                   { push!($<mut>2, vec![]) }
+	| '*' type_qualifier_list pointer                                               { push!($<mut>3, $2) }
 	;
 
 type_qualifier_list /* Vec<Qualifier> */

@@ -10,8 +10,8 @@ macro_rules! define_arena {
         pub type $arena = $crate::arena::Arena<$id, $ty>;
 
         impl $id {
-            pub fn resolve<'a>(&self, arenas: &'a $crate::parser::Arenas) -> &'a $ty {
-                arenas.$ar.get(self.clone())
+            pub fn resolve<'a>(&self, ctx: &'a $crate::parser::Context) -> &'a $ty {
+                ctx.arenas.$ar.get(self.clone())
             }
         }
     };

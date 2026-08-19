@@ -1,13 +1,18 @@
+#![allow(unused)]
 use std::collections::HashMap;
 
+use crate::ast::declaration::DeclaratorId;
 use crate::ast::visit::{Visitor, walk_compound_statement, walk_expression, walk_translation_unit};
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, ExpressionNode,
-    FunctionDefinitionNode,
+    FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, Name,
 };
 use crate::ast::{Expression, Storage, StringId};
 use crate::parser::{Context, Span};
-use crate::semantic::{Diag, Diagnosis, QualifiedType, ResolvedTypeArena, SymbolArena, SymbolId, constrain};
+use crate::semantic::{
+    Diag, DiagCollector, DiagnosisNode, QualifiedType, ResolvedTypeArena, ResolvedTypeId, SymbolArena, SymbolId,
+    constrain,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScopeType {
@@ -41,22 +46,20 @@ impl Scope {
 #[derive(Default, Debug)]
 struct SymbolResolver {
     scopes: Vec<Scope>,
-    diagnosis: Vec<Diagnosis>,
+    diagnosis: Vec<DiagnosisNode>,
     symbols: SymbolArena,
     types: ResolvedTypeArena,
+}
+
+impl DiagCollector for SymbolResolver {
+    fn diagnosis(&mut self) -> &mut Vec<DiagnosisNode> {
+        &mut self.diagnosis
+    }
 }
 
 impl SymbolResolver {
     fn scope_mut(&mut self) -> &mut Scope {
         self.scopes.last_mut().unwrap()
-    }
-
-    fn extract_diag<T>(&mut self, diag: Diag<T>, span: &Span) -> T {
-        let Diag::<T> { res, diagnosis } = diag;
-        if let Some(d) = diagnosis {
-            self.diagnosis.push(Diagnosis::new(d, *span));
-        }
-        res
     }
 
     fn scope(&self) -> &Scope {
@@ -76,86 +79,107 @@ impl SymbolResolver {
     //     }
     // }
 
-    fn make_qualified_type(&mut self, specifiers: &[DeclarationSpecifier], span: &Span) -> Option<QualifiedType> {
-        let (is_const, is_volatile) = self.extract_diag(constrain::declaration::get_qualifier(specifiers), span);
-        let ty = self.extract_diag(constrain::declaration::resolve_type(specifiers), span)?;
+    fn make_qualified_type(
+        &mut self,
+        ctx: &Context,
+        specifiers: &[DeclarationSpecifier],
+        decl: &DeclaratorNode,
+        span: &Span,
+    ) -> Option<(QualifiedType, DeclaratorNode)> {
+        let (is_const, is_volatile) = constrain::declaration::get_qualifier(specifiers).collect(self, span);
+        let ty = constrain::declaration::resolve_type(specifiers).collect(self, span)?;
         let id = self.types.alloc(ty);
-        Some(QualifiedType::new(id, is_const, is_volatile))
+        let inner_most = QualifiedType::new(id, is_const, is_volatile);
+        Some(self.extract_pointer(ctx, decl, inner_most))
     }
 
-    fn add_function(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
-        let Some(name) = node.declarator.ident(ctx) else { return };
-        let span = &node.span;
-        let qualified_type = self.make_qualified_type(&node.specifiers, span);
-        let storage = self
-            .extract_diag(constrain::declaration::get_storage(&node.specifiers), span)
-            .unwrap_or(Storage::Extern);
-        self.extract_diag(
-            constrain::declaration::extern_function_only(self.scope().ty, storage),
-            span,
-        );
-        if let Some(ty) = qualified_type {
-            let sym_id = self.symbols.add(name, ty, storage, node.declarator.clone());
-            self.scope_mut().ordinaries.insert(name.id, sym_id);
+    fn extract_pointer(
+        &mut self,
+        ctx: &Context,
+        declarator: &DeclaratorNode,
+        inner_most: QualifiedType,
+    ) -> (QualifiedType, DeclaratorNode) {
+        match declarator.id.resolve(ctx) {
+            Declarator::Pointer { qualifiers, inner } => {
+                let (qty, decl) = self.extract_pointer(ctx, inner, inner_most);
+                let (is_const, is_volatile) =
+                    constrain::declaration::check_qualifier(qualifiers).collect(self, &declarator.span);
+                let id = self.types.pointer(qty);
+                (QualifiedType::new(id, is_const, is_volatile), decl)
+            }
+            _ => (inner_most, declarator.clone()),
         }
+    }
+
+    // fn make_qualified_type(&mut self, specifiers: &[DeclarationSpecifier], span: &Span) -> Option<QualifiedType> {
+    //     let (is_const, is_volatile) = self.extract_diag(constrain::declaration::get_qualifier(specifiers), span);
+    //     let ty = self.extract_diag(constrain::declaration::resolve_type(specifiers), span)?;
+    //     let id = self.types.alloc(ty);
+    //     Some(QualifiedType::new(id, is_const, is_volatile))
+    // }
+
+    // fn extract_function(
+    //     &mut self,
+    //     ctx: &Context,
+    //     declarator: &DeclaratorNode,
+    //     inner_most: QualifiedType,
+    // ) -> (QualifiedType, DeclaratorNode, FunctionParametersNode) {
+    //     match declarator.id.resolve(ctx) {
+    //         Declarator::Pointer { qualifiers, inner } => {
+    //             let (qty, decl, params) = self.extract_function(ctx, inner, inner_most);
+    //             let (is_const, is_volatile) =
+    //                 self.extract_diag(constrain::declaration::check_qualifier(qualifiers), &declarator.span);
+    //             let id = self.types.pointer(qty);
+    //             (QualifiedType::new(id, is_const, is_volatile), decl, params)
+    //         }
+    //         Declarator::Function { declarator, params } => (inner_most, declarator.clone(), params.clone()),
+    //         _ => unreachable!(),
+    //     }
+    // }
+
+    fn add_function(&mut self, ctx: &Context, node: &FunctionDefinitionNode) -> Option<FunctionParametersNode> {
+        let span = &node.span;
+
+        let (ty, fn_decl) = self.make_qualified_type(ctx, &node.specifiers, &node.declarator, span)?;
+        let a = constrain::external::extract_function_declarator(fn_decl).collect(self, span);
+
+        // let parial_type = self.make_qualified_type(&node.specifiers, span)?;
+        // let (ty, fn_declarator, parameters) = self.extract_function(ctx, &node.declarator, parial_type);
+        let name = fn_decl.ident(ctx)?;
+
+        let storage = constrain::declaration::get_storage(&node.specifiers)
+            .collect(self, span)
+            .unwrap_or(Storage::Extern);
+
+        constrain::external::check_function_storage(storage).collect(self, span);
+
+        constrain::declaration::extern_function_only(self.scope().ty, storage).collect(self, span);
+        constrain::external::check_external_specifiers(&node.specifiers).collect(self, span);
+
+        let sym_id = self.symbols.add(name, ty, storage, node.declarator.clone());
+        self.scope_mut().ordinaries.insert(name.id, sym_id);
+        Some(parameters)
     }
 
     fn add_arguments(&mut self, ctx: &Context, node: &DeclarationNode) {
         let span = &node.span;
         let qualified_type = self.make_qualified_type(&node.specifiers, span);
-        // let Some(name) = node.declarator.ident(ctx) else { return };
-    }
-
-    fn get_type(&mut self, ctx: &Context, declarator: &DeclaratorNode) -> QualifiedTypeId {
-        match declarator.id.resolve(&ctx.arenas) {
-            Declarator::Pointer {
-                qualifiers,
-                inner: Some(inner),
-            } => {
-                let id = self.get_type(ctx, inner);
-                let (is_const, is_volatile) =
-                    self.extract_diag(constrain::declaration::check_qualifier(&qualifiers), &declarator.span);
-                self.types.pointer(id, is_const, is_volatile)
-            }
-            Declarator::Function { declarator, params } => {
-                self.make_qualified_type(&declarator.specifiers, &node.span).unwrap()
-            }
-            _ => unreachable!(),
-        }
     }
 }
 
 impl Visitor for SymbolResolver {
     fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode, _is_last: bool) {
-        let mut declarator = &node.declarator;
-
-        let (declarator, params) = loop {
-            match declarator.id.resolve(&ctx.arenas) {
-                Declarator::Pointer {
-                    qualifiers,
-                    inner: Some(inner),
-                } => {
-                    let ty = constrain::declaration::check_qualifier(&qualifiers);
-                    declarator = inner;
-                }
-                Declarator::Function { declarator, params } => break (declarator, params),
-                _ => unreachable!(),
-            }
-        };
-
-        self.add_function(ctx, node);
+        let Some(args) = self.add_function(ctx, node) else { return };
 
         self.scopes.push(Scope::new(ScopeType::Prototype));
-        for arg in &node.old_style_declarations {
-            self.add_arguments(ctx, arg);
-        }
+
         self.scopes.pop();
 
         self.visit_compound_statement(ctx, &node.body, true);
     }
 
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode, is_last: bool) {
-        if let Expression::Identifier(_name) = node.id.resolve(&ctx.arenas) {
+        if let Expression::Identifier(_name) = node.id.resolve(ctx) {
             // self.check_symbol(ctx, name, node.span);
         }
         walk_expression(self, ctx, node, is_last);
@@ -183,7 +207,7 @@ impl Analyzer {
         collector.scopes.pop();
         assert!(collector.scopes.is_empty());
         for symbol in &collector.symbols.data {
-            println!("{}", symbol.name.id.resolve(&ctx.arenas));
+            println!("{}", symbol.name.id.resolve(ctx));
         }
         for diag in &collector.diagnosis {
             let _ = diag.print(ctx);

@@ -165,15 +165,15 @@ pub fn walk_declaration<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &De
             match type_specifier {
                 TypeSpecifier::Struct(id) => {
                     i += 1;
-                    v.visit_struct(ctx, id.resolve(&ctx.arenas), i == total);
+                    v.visit_struct(ctx, id.resolve(ctx), i == total);
                 }
                 TypeSpecifier::Union(id) => {
                     i += 1;
-                    v.visit_union(ctx, id.resolve(&ctx.arenas), i == total);
+                    v.visit_union(ctx, id.resolve(ctx), i == total);
                 }
                 TypeSpecifier::Enum(id) => {
                     i += 1;
-                    v.visit_enum(ctx, id.resolve(&ctx.arenas), i == total);
+                    v.visit_enum(ctx, id.resolve(ctx), i == total);
                 }
                 TypeSpecifier::TypedefName(name) => v.visit_name(ctx, name),
                 _ => {}
@@ -193,16 +193,14 @@ pub fn walk_init_declarator<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node:
 }
 
 pub fn walk_declarator<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &DeclaratorNode, _is_last: bool) {
-    match node.id.resolve(&ctx.arenas) {
+    match node.id.resolve(ctx) {
         Declarator::Ident(name) => v.visit_name(ctx, name),
         Declarator::Abstract => {}
         Declarator::Pointer { qualifiers, inner } => {
             for qualifier in qualifiers {
                 v.visit_qualifier(ctx, qualifier);
             }
-            if let Some(inner) = inner {
-                v.visit_declarator(ctx, inner, true);
-            }
+            v.visit_declarator(ctx, inner, true);
         }
         Declarator::Array { declarator, size } => {
             v.visit_declarator(ctx, declarator, size.is_none());
@@ -229,7 +227,7 @@ pub fn walk_initializer<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &In
 }
 
 pub fn walk_statement<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &StatementNode, is_last: bool) {
-    match node.id.resolve(&ctx.arenas) {
+    match node.id.resolve(ctx) {
         Statement::Labeled(node) => v.visit_labeled_statement(ctx, node, is_last),
         Statement::Compound(node) => v.visit_compound_statement(ctx, node, is_last),
         Statement::Expression(node) => v.visit_expression_statement(ctx, node, is_last),
@@ -337,7 +335,7 @@ pub fn walk_jump_statement<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: 
 }
 
 pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &ExpressionNode, _is_last: bool) {
-    match node.id.resolve(&ctx.arenas) {
+    match node.id.resolve(ctx) {
         Expression::Identifier(name) | Expression::Constant(name) | Expression::StringLiteral(name) => {
             v.visit_name(ctx, name)
         }
@@ -465,7 +463,7 @@ pub fn walk_enum<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &Enum, _is
         v.visit_name(ctx, name);
     }
     for (is_last, variant_id) in node.variants.iter().with_last() {
-        v.visit_variant(ctx, variant_id.resolve(&ctx.arenas), is_last);
+        v.visit_variant(ctx, variant_id.resolve(ctx), is_last);
     }
 }
 
@@ -511,15 +509,15 @@ pub fn walk_specifiers<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, specifiers
             match type_specifier {
                 TypeSpecifier::Struct(id) => {
                     i += 1;
-                    v.visit_struct(ctx, id.resolve(&ctx.arenas), i == tags);
+                    v.visit_struct(ctx, id.resolve(ctx), i == tags);
                 }
                 TypeSpecifier::Union(id) => {
                     i += 1;
-                    v.visit_union(ctx, id.resolve(&ctx.arenas), i == tags);
+                    v.visit_union(ctx, id.resolve(ctx), i == tags);
                 }
                 TypeSpecifier::Enum(id) => {
                     i += 1;
-                    v.visit_enum(ctx, id.resolve(&ctx.arenas), i == tags);
+                    v.visit_enum(ctx, id.resolve(ctx), i == tags);
                 }
                 TypeSpecifier::TypedefName(name) => v.visit_name(ctx, name),
                 _ => {}

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::ast::{DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorArena, DeclaratorNode, Name};
+use crate::ast::{DeclarationNode, DeclarationSpecifier, DeclaratorArena, Name};
 use crate::ast::{EnumArena, ExpressionArena, StatementArena, Storage, StringArena, StringId, StructArena};
 use crate::ast::{StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena};
 use crate::parser::Span;
@@ -68,21 +68,11 @@ impl Context {
             return;
         }
         for init_decl in &decl.init_declarators {
-            let Some(name) = self.declartor_name(&init_decl.declarator) else {
+            let Some(name) = init_decl.declarator.ident(self) else {
                 continue;
             };
             let i = name.id;
             self.typedefs.last_mut().map(|ts| ts.insert(i));
-        }
-    }
-
-    pub fn declartor_name(&self, decl: &DeclaratorNode) -> Option<&Name> {
-        match decl.id.resolve(&self.arenas) {
-            Declarator::Ident(name) => Some(name),
-            Declarator::Pointer { inner: Some(d), .. } => self.declartor_name(d),
-            Declarator::Array { declarator, .. } => self.declartor_name(declarator),
-            Declarator::Function { declarator, .. } => self.declartor_name(declarator),
-            _ => None,
         }
     }
 }

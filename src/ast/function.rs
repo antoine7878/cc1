@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
-use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name};
+use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name, TypeSpecifier};
 use crate::ast_node;
-use crate::parser::Span;
+use crate::parser::{Context, Span};
 
 ast_node! {
     pub struct FunctionParametersNode {
@@ -22,6 +22,18 @@ ast_node! {
     pub struct ParameterDeclaration {
         pub specifiers: Vec<DeclarationSpecifier>,
         pub declarator: DeclaratorNode,
+    }
+}
+
+impl ParameterDeclaration {
+    fn is_abstract_void(&self, ctx: &Context) -> bool {
+        if !matches!(
+            self.specifiers.as_slice(),
+            [DeclarationSpecifier::Type(TypeSpecifier::Void)]
+        ) {
+            return false;
+        }
+        true
     }
 }
 

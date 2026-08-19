@@ -28,7 +28,7 @@ ast_node! {
 
 impl DeclaratorNode {
     pub fn ident(&self, ctx: &Context) -> Option<Name> {
-        self.id.resolve(&ctx.arenas).ident(ctx)
+        self.id.resolve(ctx).ident(ctx)
     }
 }
 
@@ -38,7 +38,7 @@ pub enum Declarator {
     Abstract,
     Pointer {
         qualifiers: Vec<Qualifier>,
-        inner: Option<DeclaratorNode>,
+        inner: DeclaratorNode,
     },
     Array {
         declarator: DeclaratorNode,
@@ -54,11 +54,8 @@ impl Declarator {
     pub fn ident(&self, ctx: &Context) -> Option<Name> {
         match self {
             Declarator::Ident(n) => Some(*n),
-            Declarator::Abstract | Declarator::Pointer { inner: None, .. } => None,
-            Declarator::Pointer {
-                inner: Some(declarator),
-                ..
-            }
+            Declarator::Abstract => None,
+            Declarator::Pointer { inner: declarator, .. }
             | Declarator::Array { declarator, .. }
             | Declarator::Function { declarator, .. } => declarator.ident(ctx),
         }
@@ -93,25 +90,12 @@ impl DeclaratorArena {
         self.add(Declarator::Ident(ident), span)
     }
 
-    pub fn pointer(&mut self, qualifiers: Vec<Qualifier>, inner: Option<DeclaratorNode>, span: Span) -> DeclaratorNode {
+    pub fn pointer(&mut self, qualifiers: Vec<Qualifier>, inner: DeclaratorNode, span: Span) -> DeclaratorNode {
         self.add(Declarator::Pointer { qualifiers, inner }, span)
     }
 
-    pub fn with_pointer(&mut self, pointer: DeclaratorNode, i: DeclaratorNode, span: Span) -> DeclaratorNode {
-        match self.get(pointer.id).clone() {
-            Declarator::Pointer {
-                qualifiers,
-                inner: None,
-            } => self.pointer(qualifiers.clone(), Some(i), span),
-            Declarator::Pointer {
-                qualifiers,
-                inner: Some(a),
-            } => {
-                let b = self.with_pointer(a.clone(), i, span);
-                self.pointer(qualifiers.clone(), Some(b), span)
-            }
-            _ => unreachable!(),
-        }
+    pub fn with_pointer(&mut self, pointer: Vec<Vec<Qualifier>>, decl: DeclaratorNode, span: Span) -> DeclaratorNode {
+        pointer.into_iter().fold(decl, |acc, qs| self.pointer(qs, acc, span))
     }
 
     pub fn array(&mut self, declarator: DeclaratorNode, size: Option<ExpressionNode>, span: Span) -> DeclaratorNode {

@@ -4,7 +4,7 @@ use crate::ast::Name;
 use crate::parser::{Context, Span};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-pub enum DiagnosisInner {
+pub enum Diagnosis {
     UndeclaredIdentifier(Name),
     // 6.5
     MultipleStorageSpecifiers,
@@ -13,10 +13,13 @@ pub enum DiagnosisInner {
     DuplicateTypeQualifers,
     // 6.7
     AutoRegisterExternal,
+    // 6.7.1
+    NotFunctionTypeDeclarator,
+    FunctionAutoExtern,
 }
 
-impl Diagnosis {
-    pub fn new(inner: DiagnosisInner, span: Span) -> Self {
+impl DiagnosisNode {
+    pub fn new(inner: Diagnosis, span: Span) -> Self {
         Self { inner, span }
     }
 
@@ -28,28 +31,45 @@ impl Diagnosis {
     pub fn write<W: Write>(&self, w: &mut W, ctx: &Context) -> io::Result<()> {
         write!(w, "{}:{}:{} ", ctx.file_name, self.span.start.line, self.span.start.col)?;
         match &self.inner {
-            DiagnosisInner::UndeclaredIdentifier(name) => writeln!(w, "Use of undeclared identifier '{}'", name.id.resolve(&ctx.arenas)),
-            DiagnosisInner::MultipleStorageSpecifiers => writeln!(w, "Multiple storage class declaration"),
-            DiagnosisInner::BlockScopeNotExtern => writeln!(w, "Function in block not declared as extern"),
-            DiagnosisInner::InvalidTypeSpecifer => writeln!(w, "Invalid type specifer or combination thereof"),
-            DiagnosisInner::DuplicateTypeQualifers => writeln!(w, "Duplicate type qualifers"),
-            DiagnosisInner::AutoRegisterExternal => writeln!(w, "External declaration auto of register"),
-       }
+            Diagnosis::UndeclaredIdentifier(name) => writeln!(w, "Use of undeclared identifier '{}'", name.id.resolve(ctx)),
+            Diagnosis::MultipleStorageSpecifiers => writeln!(w, "Multiple storage class declaration"),
+            Diagnosis::BlockScopeNotExtern => writeln!(w, "Function in block not declared as extern"),
+            Diagnosis::InvalidTypeSpecifer => writeln!(w, "Invalid type specifer or combination thereof"),
+            Diagnosis::DuplicateTypeQualifers => writeln!(w, "Duplicate type qualifers"),
+            Diagnosis::AutoRegisterExternal => writeln!(w, "External declaration auto of register"),
+            Diagnosis::NotFunctionTypeDeclarator => writeln!(w, "Declarator shall be function type"),
+            Diagnosis::FunctionAutoExtern => writeln!(w, "Function storage shall be auto or extern"),
+        }
+    }
+}
+
+pub trait DiagCollector {
+    fn diagnosis(&mut self) -> &mut Vec<DiagnosisNode>;
+
+    fn add_diag<T>(&mut self, diag: Diag<T>, span: &Span) -> T {
+        if let Some(diagnosis) = diag.diagnosis {
+            self.diagnosis().push(DiagnosisNode::new(diagnosis, *span));
+        }
+        diag.res
     }
 }
 
 #[derive(Debug)]
 pub struct Diag<T> {
     pub res: T,
-    pub diagnosis: Option<DiagnosisInner>,
+    pub diagnosis: Option<Diagnosis>,
 }
 
 impl<T> Diag<T> {
-    pub fn new(res: T, diagnosis: Option<DiagnosisInner>) -> Self {
+    pub fn collect<C: DiagCollector>(self, collector: &mut C, span: &Span) -> T {
+        collector.add_diag(self, span)
+    }
+
+    pub fn new(res: T, diagnosis: Option<Diagnosis>) -> Self {
         Self { res, diagnosis }
     }
 
-    pub fn with_diag(res: T, diagnosis: DiagnosisInner) -> Self {
+    pub fn with_diag(res: T, diagnosis: Diagnosis) -> Self {
         Self::new(res, Some(diagnosis))
     }
 
@@ -59,11 +79,11 @@ impl<T> Diag<T> {
 }
 
 impl<T> Diag<Option<T>> {
-    pub fn diag_none(diagnosis: DiagnosisInner) -> Self {
+    pub fn diag_none(diagnosis: Diagnosis) -> Self {
         Self::new(None, Some(diagnosis))
     }
 
-    pub fn diag_some(res: T, diagnosis: DiagnosisInner) -> Self {
+    pub fn diag_some(res: T, diagnosis: Diagnosis) -> Self {
         Self::new(Some(res), Some(diagnosis))
     }
 
@@ -77,7 +97,7 @@ impl<T> Diag<Option<T>> {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Diagnosis {
+pub struct DiagnosisNode {
     span: Span,
-    inner: DiagnosisInner,
+    inner: Diagnosis,
 }

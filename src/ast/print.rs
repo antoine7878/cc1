@@ -37,9 +37,9 @@ impl<W: Write> AstPrinter<W> {
             err: None,
         };
         printer.visit_translation_unit(ctx, &ctx.ast, false);
+        let _ = write!(printer.w, "{RESET}");
         let result = writeln!(printer.w);
         printer.ok(result);
-        let _ = write!(printer.w, "{RESET}");
         match printer.err {
             Some(e) => Err(e),
             None => Ok(()),
@@ -73,7 +73,7 @@ impl<W: Write> AstPrinter<W> {
 
     fn print_name_node(&mut self, ctx: &Context, name: &Name, is_last: bool) {
         self.print_node(name, is_last, |printer| {
-            let result = write!(printer.w, "{}", name.id.resolve(&ctx.arenas));
+            let result = write!(printer.w, "{}", name.id.resolve(ctx));
             printer.ok(result);
         });
     }
@@ -81,19 +81,19 @@ impl<W: Write> AstPrinter<W> {
     fn print_specifier(&mut self, ctx: &Context, spec: &DeclarationSpecifier) {
         let s = match spec {
             DeclarationSpecifier::Type(t) => match t {
-                TypeSpecifier::Struct(id) => match &id.resolve(&ctx.arenas).name {
-                    Some(name) => format!("struct {}", name.id.resolve(&ctx.arenas)),
+                TypeSpecifier::Struct(id) => match &id.resolve(ctx).name {
+                    Some(name) => format!("struct {}", name.id.resolve(ctx)),
                     None => "struct".to_string(),
                 },
-                TypeSpecifier::Union(id) => match &id.resolve(&ctx.arenas).name {
-                    Some(name) => format!("union {}", name.id.resolve(&ctx.arenas)),
+                TypeSpecifier::Union(id) => match &id.resolve(ctx).name {
+                    Some(name) => format!("union {}", name.id.resolve(ctx)),
                     None => "union".to_string(),
                 },
-                TypeSpecifier::Enum(id) => match &id.resolve(&ctx.arenas).name {
-                    Some(name) => format!("enum {}", name.id.resolve(&ctx.arenas)),
+                TypeSpecifier::Enum(id) => match &id.resolve(ctx).name {
+                    Some(name) => format!("enum {}", name.id.resolve(ctx)),
                     None => "enum".to_string(),
                 },
-                TypeSpecifier::TypedefName(name) => name.id.resolve(&ctx.arenas).clone(),
+                TypeSpecifier::TypedefName(name) => name.id.resolve(ctx).clone(),
                 other => other.to_string(),
             },
             other => other.to_string(),
@@ -141,7 +141,7 @@ impl<W: Write> Visitor for AstPrinter<W> {
 
     fn visit_declarator(&mut self, ctx: &Context, node: &DeclaratorNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
-            let result = write!(printer.w, "{} ", node.id.resolve(&ctx.arenas));
+            let result = write!(printer.w, "{} ", node.id.resolve(ctx));
             printer.ok(result);
             walk_declarator(printer, ctx, node, is_last);
         });
@@ -199,7 +199,7 @@ impl<W: Write> Visitor for AstPrinter<W> {
 
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode, is_last: bool) {
         self.print_node(node, is_last, |printer| {
-            let expr = node.id.resolve(&ctx.arenas);
+            let expr = node.id.resolve(ctx);
             let result = write!(printer.w, "{} ", expr);
             printer.ok(result);
             if let Expression::DotAcces(tag, ident) | Expression::PtrAcces(tag, ident) = expr {
@@ -286,7 +286,7 @@ impl<W: Write> Visitor for AstPrinter<W> {
     }
 
     fn visit_name(&mut self, ctx: &Context, node: &Name) {
-        let result = write!(self.w, "{}", node.id.resolve(&ctx.arenas));
+        let result = write!(self.w, "{}", node.id.resolve(ctx));
         self.ok(result);
     }
 }

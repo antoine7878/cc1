@@ -11,7 +11,11 @@
 
 #include <stdlib.h>
 
-int const *const *const fn() {
+int fn(int (*f)(int[]), int a[12]) {
+	return f(a);
+}
+
+int const *const *const fn2() {
 	int volatile const *const volatile *volatile const a;
 	return malloc(12);
 }

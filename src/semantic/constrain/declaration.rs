@@ -1,5 +1,5 @@
 use crate::ast::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier};
-use crate::semantic::diagnosis::{Diag, DiagnosisInner};
+use crate::semantic::diagnosis::{Diag, Diagnosis};
 use crate::semantic::{ResolvedType, ScopeType, TypeSpecifierCounter};
 
 /// 6.5.1 Storage-class specifiers
@@ -11,7 +11,7 @@ pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>>
     });
     let ret = storages.next().cloned();
     if storages.next().is_some() {
-        Diag::with_diag(ret, DiagnosisInner::MultipleStorageSpecifiers)
+        Diag::with_diag(ret, Diagnosis::MultipleStorageSpecifiers)
     } else {
         Diag::res(ret)
     }
@@ -21,7 +21,7 @@ pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>>
 // The declaration of an identifier for a function that has block scope shall have no explicit storage-class specifier other than extern.
 pub fn extern_function_only(scope_type: ScopeType, storage: Storage) -> Diag<()> {
     if scope_type == ScopeType::Block && storage != Storage::Extern {
-        Diag::with_diag((), DiagnosisInner::BlockScopeNotExtern)
+        Diag::with_diag((), Diagnosis::BlockScopeNotExtern)
     } else {
         Diag::res(())
     }
@@ -48,7 +48,7 @@ pub fn resolve_type(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Resolved
         _ => ()
     }
     let Some(a) = TypeSpecifierCounter::count(types.as_slice()) else {
-        return Diag::with_diag(None, DiagnosisInner::InvalidTypeSpecifer);
+        return Diag::with_diag(None, Diagnosis::InvalidTypeSpecifer);
     };
     //   s, u, v, c, s, i, l, f, d
     match  a {
@@ -74,7 +74,7 @@ pub fn resolve_type(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Resolved
         [0, 0, 0, 0, 0, 0, 0, 1, 0] => Diag::res_some(ResolvedType::Float),
         [0, 0, 0, 0, 0, 0, 0, 0, 1] => Diag::res_some(ResolvedType::Double),
         [0, 0, 0, 0, 0, 0, 1, 0, 1] => Diag::res_some(ResolvedType::LongDouble),
-        _ => Diag::with_diag(None, DiagnosisInner::InvalidTypeSpecifer),
+        _ => Diag::with_diag(None, Diagnosis::InvalidTypeSpecifer),
     }
 }
 
@@ -87,7 +87,7 @@ pub fn check_qualifier(specifiers: &[Qualifier]) -> Diag<(bool, bool)> {
     let ret = (const_count > 1, volatile_count > 1);
 
     if const_count > 1 || volatile_count > 1 {
-        return Diag::with_diag(ret, DiagnosisInner::DuplicateTypeQualifers);
+        return Diag::with_diag(ret, Diagnosis::DuplicateTypeQualifers);
     }
     Diag::res(ret)
 }

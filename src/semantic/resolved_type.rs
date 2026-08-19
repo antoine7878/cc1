@@ -28,13 +28,8 @@ pub enum ResolvedType {
 }
 
 impl ResolvedTypeArena {
-    pub fn pointer(&mut self, inner: ResolvedTypeId, is_const: bool, is_volatile: bool) -> ResolvedTypeId {
-        let qualified_type = QualifiedType {
-            ty: inner,
-            is_const,
-            is_volatile,
-        };
-        self.alloc(ResolvedType::Pointer(qualified_type))
+    pub fn pointer(&mut self, inner: QualifiedType) -> ResolvedTypeId {
+        self.alloc(ResolvedType::Pointer(inner))
     }
 }
 
