@@ -94,6 +94,18 @@ impl<T> Diag<T> {
     }
 }
 
+// impl<T> From<T> for Diag<T> {
+//     fn from(value: T) -> Self {
+//         Diag::res(value)
+//     }
+// }
+//
+// impl<T: Default> From<Diagnosis> for Diag<T> {
+//     fn from(value: Diagnosis) -> Self {
+//         Diag::with_diag(T::default(), value)
+//     }
+// }
+
 impl<T> Diag<Option<T>> {
     pub fn none_diag(diagnosis: Diagnosis) -> Self {
         Self::new(None, Some(diagnosis))

@@ -6,6 +6,6 @@ pub mod symbol;
 pub mod constrain;
 
 pub use diagnosis::{Diag, DiagCollector, DiagnosisNode};
-pub use resolution::{Analyzer, ScopeType};
+pub use resolution::{Analyzer, ScopeKind};
 pub use resolved_type::{QualifiedType, ResolvedType, ResolvedTypeArena, ResolvedTypeId, TypeSpecifierCounter};
-pub use symbol::{SymbolArena, SymbolId};
+pub use symbol::{SymbolArena, SymbolId, SymbolKind};

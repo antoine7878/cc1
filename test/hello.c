@@ -1,7 +1,10 @@
-int fn(a)
-int a;
-{ return 1; }
+struct strct {
+	int membr;
+};
 
-int main(void) {
+int fn(void) {
+	const int val = 4;
+	goto end;
+end:
 	return 1;
 }

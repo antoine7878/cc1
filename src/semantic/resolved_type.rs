@@ -25,9 +25,13 @@ pub enum ResolvedType {
     Union(UnionId),
     Enum(EnumId),
     Typedef(Name),
+    Label,
 }
 
 impl ResolvedTypeArena {
+    pub fn label(&mut self) -> ResolvedTypeId {
+        self.alloc(ResolvedType::Label)
+    }
     pub fn int(&mut self) -> ResolvedTypeId {
         self.alloc(ResolvedType::Int)
     }

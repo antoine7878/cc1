@@ -39,7 +39,7 @@ test: $(NAME)
 CCF = -std=iso9899:1990 -pedantic-errors -fno-gnu-keywords -Wno-deprecated-non-prototype -fno-asm -fno-builtin
 
 c:
-	gcc -std=iso9899:1990 -pedantic-errors test/hello.c
+	gcc -c -std=iso9899:1990 -pedantic-errors test/hello.c -o /dev/null
 
 clean:
 	cargo clean

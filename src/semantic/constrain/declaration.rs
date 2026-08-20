@@ -1,6 +1,6 @@
 use crate::ast::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier};
 use crate::semantic::diagnosis::{Diag, Diagnosis};
-use crate::semantic::{ResolvedType, ScopeType, TypeSpecifierCounter};
+use crate::semantic::{ResolvedType, ScopeKind, TypeSpecifierCounter};
 
 /// 6.5.1 Storage-class specifiers
 /// At most, one storage-class specifier may be given in the declaration specifiers in a declaration
@@ -19,8 +19,8 @@ pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>>
 
 // 6.5.1 Storage-class specifiers
 // The declaration of an identifier for a function that has block scope shall have no explicit storage-class specifier other than extern.
-pub fn extern_function_only(scope_type: ScopeType, storage: Storage) -> Diag<()> {
-    if scope_type == ScopeType::Block && storage != Storage::Extern {
+pub fn extern_function_only(scope_type: ScopeKind, storage: Storage) -> Diag<()> {
+    if scope_type == ScopeKind::Block && storage != Storage::Extern {
         Diag::with_diag((), Diagnosis::BlockScopeNotExtern)
     } else {
         Diag::res(())
@@ -87,7 +87,7 @@ pub fn check_qualifier(specifiers: &[Qualifier]) -> Diag<(bool, bool)> {
     let ret = (const_count > 1, volatile_count > 1);
 
     if const_count > 1 || volatile_count > 1 {
-        return Diag::with_diag(ret, Diagnosis::DuplicateParameterName);
+        return Diag::with_diag(ret, Diagnosis::DuplicateTypeQualifers);
     }
     Diag::res(ret)
 }

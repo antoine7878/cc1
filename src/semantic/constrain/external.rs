@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use crate::ast::{
-    DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, FunctionParametersNode, Name,
-    ParameterDeclaration, Storage, StringId,
+    DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, FunctionParametersNode, InitDeclaratorNode,
+    Name, ParameterDeclaration, Storage, StringId,
 };
 use crate::parser::Context;
 use crate::semantic::{Diag, diagnosis::Diagnosis};
@@ -45,7 +45,7 @@ pub fn check_function_storage(storage: Storage) -> Diag<()> {
 
 /// 6.7.1 Function definitions
 /// The identifier declared in a function definition (which is the name of the function) shall have
-/// a function type. as specifed by the declarator portion of the function definition.
+/// a function type, as specifed by the declarator portion of the function definition.
 pub fn extract_function_declarator(
     declarator: &Declarator,
 ) -> Diag<Option<(&DeclaratorNode, &FunctionParametersNode)>> {
@@ -111,7 +111,7 @@ pub fn is_valid_old_style(names: &[StringId], declarations: Vec<Option<StringId>
         return Diag::with_diag(None, Diagnosis::MissingParameterInOldStyle);
     }
 
-    let diff = declarations.difference(&names).cloned().collect::<Vec<_>>();
+    let diff = names.difference(&declarations).cloned().collect::<Vec<_>>();
     Diag::res(Some(diff))
 }
 
@@ -130,5 +130,29 @@ pub fn check_typedef(ctx: &Context, name: &Name) -> Diag<bool> {
     if ctx.typedefs.last().unwrap().contains(&name.id) {
         return Diag::with_diag(false, Diagnosis::TypedefInOldStyle);
     }
+    Diag::res(true)
+}
+
+/// 6.7.2 External object definitions
+/// A declaration of an identifier for an object that has file scope without an initializer and
+/// without a storage-clash specitier or with the storage-class specifier static,
+/// constitutes a tentative definition
+pub fn is_tentative_definition(init_declarator: &InitDeclaratorNode, storage: Storage) -> bool {
+    init_declarator.initializer.is_some() && storage == Storage::Static
+}
+
+/// 6.7.2 External object definitions
+/// If a translation unit contains one or more tentative definitions for an
+/// identifier. and the translation unit contains no external definition for that identifier. then the
+/// behavior is exacti! ah it‘ the trun&tion unit contains a file scope declaration of that identifier.
+/// with the composite type air of the end of the translation unit. with an initializer equal to 0
+pub fn tentative_defintion_init_zero() -> Diag<()> {
+    Diag::res(())
+}
+
+/// 6.7.2 External object definitions
+/// If the declaration of an identifier for an object is a tentative definition and has internal linkage,
+/// the declared type shall not be an incomplete type.
+pub fn no_internal_incomplete_type() -> Diag<bool> {
     Diag::res(true)
 }
