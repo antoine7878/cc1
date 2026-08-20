@@ -4,7 +4,7 @@ use crate::ast::{
     FunctionParameters, FunctionParametersNode, InitDeclaratorNode, Initializer, InitializerNode, IterationStatement,
     IterationStatementNode, JumpStatement, JumpStatementNode, Labeled, LabeledStatementNode, Name,
     ParameterDeclaration, Qualifier, SelectionStatement, SelectionStatementNode, Statement, StatementNode, Struct,
-    StructDeclaration, StructDeclarator, TranslationUnitNode, Type, TypeSpecifier, Union, Variant,
+    StructDeclaration, StructMemberDeclarator, TranslationUnitNode, Type, TypeSpecifier, Union, Variant,
 };
 use crate::parser::Context;
 
@@ -101,7 +101,7 @@ pub trait Visitor {
         walk_struct_declaration(self, ctx, node, is_last);
     }
 
-    fn visit_struct_declarator(&mut self, ctx: &Context, node: &StructDeclarator, is_last: bool) {
+    fn visit_struct_declarator(&mut self, ctx: &Context, node: &StructMemberDeclarator, is_last: bool) {
         walk_struct_declarator(self, ctx, node, is_last);
     }
 
@@ -486,7 +486,7 @@ pub fn walk_struct_declaration<V: Visitor + ?Sized>(
     }
 }
 
-pub fn walk_struct_declarator<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &StructDeclarator, _is_last: bool) {
+pub fn walk_struct_declarator<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &StructMemberDeclarator, _is_last: bool) {
     v.visit_declarator(ctx, &node.declarator, node.bit_width.is_none());
     if let Some(bit_width) = &node.bit_width {
         v.visit_expression(ctx, bit_width, true);

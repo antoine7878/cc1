@@ -2,7 +2,7 @@
 %{
 use crate::ast::{Qualifier, Type, ExpressionNode, Name, DeclarationSpecifier, Initializer, TypeSpecifier, ParameterDeclaration};
 use crate::ast::{DeclarationNode, InitDeclaratorNode, DeclaratorNode, InitializerNode, Storage, FunctionParametersNode, Tag};
-use crate::ast::{StructDeclaration, StructDeclarator, VariantId, EnumId, LabeledStatementNode, StatementNode, Labeled, CompoundStatementNode};
+use crate::ast::{StructDeclaration, StructMemberDeclarator, VariantId, EnumId, LabeledStatementNode, StatementNode, Labeled, CompoundStatementNode};
 use crate::ast::{ExpressionStatementNode, SelectionStatementNode, IterationStatementNode, JumpStatementNode, JumpStatement};
 use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode};
 
@@ -90,8 +90,8 @@ macro_rules! push {
 %type<Tag> struct_or_union
 %type<Vec<StructDeclaration>> struct_declaration_list
 %type<StructDeclaration> struct_declaration
-%type<Vec<StructDeclarator>> struct_declarator_list
-%type<StructDeclarator> struct_declarator
+%type<Vec<StructMemberDeclarator>> struct_declarator_list
+%type<StructMemberDeclarator> struct_declarator
 %type<EnumId> enum_specifier
 %type<Vec<VariantId>> enumerator_list
 %type<VariantId> enumerator
@@ -355,15 +355,15 @@ struct_declaration /* StructDeclaration */
 	: specifier_qualifier_list struct_declarator_list ';'                           { with_span!(self, StructDeclaration::new, $1, $2)  }
 	;
 
-struct_declarator_list /* Vec<StructDeclarator> */
+struct_declarator_list /* Vec<StructMemberDeclarator> */
 	: struct_declarator                                                             { vec![$1] }
 	| struct_declarator_list ',' struct_declarator                                  { push!($<mut>1, $3) }
 	;
 
-struct_declarator /* StructDeclarator */
-	: declarator                                                                    { with_span!(self, StructDeclarator::new, $1, None) }
-	| ':' constant_expression                                                       { let d = node_span!(self, declarators, abstrct); with_span!(self, StructDeclarator::new, d, Some($2)) }
-	| declarator ':' constant_expression                                            { with_span!(self, StructDeclarator::new, $1, Some($3)) }
+struct_declarator /* StructMemberDeclarator */
+	: declarator                                                                    { with_span!(self, StructMemberDeclarator::new, $1, None) }
+	| ':' constant_expression                                                       { let d = node_span!(self, declarators, abstrct); with_span!(self, StructMemberDeclarator::new, d, Some($2)) }
+	| declarator ':' constant_expression                                            { with_span!(self, StructMemberDeclarator::new, $1, Some($3)) }
 	;
 
 enum_specifier /* EnumId */

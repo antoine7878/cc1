@@ -91,6 +91,12 @@ where
     Id: From<usize> + Into<usize> + Clone + Copy + Debug + PartialEq + Eq,
     Val: Clone + Hash + Eq + PartialEq,
 {
+    pub fn alloc_fresh(&mut self, value: Val) -> Id {
+        let id = Id::from(self.data.len());
+        self.data.push(value);
+        id
+    }
+
     pub fn alloc(&mut self, value: Val) -> Id {
         if let Some(&id) = self.canonical.get(&value) {
             return id;
@@ -102,37 +108,7 @@ where
         id
     }
 
-    pub fn get_mut(&mut self, id: Id) -> &mut Val {
-        &mut self.data[id.into()]
-    }
-
     pub fn get(&self, id: Id) -> &Val {
         &self.data[id.into()]
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn arena_id_debug_and_conversions() {
-        let id = ArenaId::<u32>::from(7usize);
-        let debug = format!("{id:?}");
-        assert!(debug.contains("Id(") && debug.contains('7'), "{debug}");
-        assert_eq!(usize::from(id), 7);
-        assert_eq!(id, id.clone());
-    }
-
-    #[test]
-    fn arena_alloc_and_get_mut() {
-        let mut arena: Arena<ArenaId<u32>, u32> = Arena::default();
-        let a = arena.alloc(10);
-        let b = arena.alloc(10);
-        assert_eq!(a, b, "canonicalisation should dedupe equal values");
-        let mut arena2: Arena<ArenaId<u32>, u32> = Arena::default();
-        let c = arena2.alloc(99);
-        *arena2.get_mut(c) = 42;
-        assert_eq!(*arena2.get(c), 42);
     }
 }

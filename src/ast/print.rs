@@ -11,7 +11,7 @@ use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Enum, Expression, ExpressionNode,
     ExpressionStatementNode, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, InitDeclaratorNode,
     InitializerNode, IterationStatementNode, JumpStatementNode, LabeledStatementNode, Name, ParameterDeclaration,
-    Qualifier, SelectionStatementNode, Struct, StructDeclaration, StructDeclarator, TranslationUnitNode, Type,
+    Qualifier, SelectionStatementNode, Struct, StructDeclaration, StructMemberDeclarator, TranslationUnitNode, Type,
     TypeSpecifier, Union, Variant,
 };
 use crate::parser::Context;
@@ -274,7 +274,7 @@ impl<W: Write> Visitor for AstPrinter<W> {
         });
     }
 
-    fn visit_struct_declarator(&mut self, ctx: &Context, node: &StructDeclarator, is_last: bool) {
+    fn visit_struct_declarator(&mut self, ctx: &Context, node: &StructMemberDeclarator, is_last: bool) {
         self.print_node(node, is_last, |printer| {
             walk_struct_declarator(printer, ctx, node, is_last);
         });

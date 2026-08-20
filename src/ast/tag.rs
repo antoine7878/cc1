@@ -25,12 +25,12 @@ ast_node! {
 ast_node! {
     pub struct StructDeclaration {
         pub specifiers: Vec<DeclarationSpecifier>,
-        pub struct_declarators: Vec<StructDeclarator>,
+        pub struct_declarators: Vec<StructMemberDeclarator>,
     }
 }
 
 ast_node! {
-    pub struct StructDeclarator {
+    pub struct StructMemberDeclarator {
         pub declarator: DeclaratorNode,
         pub bit_width: Option<ExpressionNode>,
     }

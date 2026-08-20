@@ -2,12 +2,13 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::visit::{
-    Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_labeled_statement, walk_translation_unit,
+    Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_labeled_statement,
+    walk_struct_declaration, walk_struct_declarator, walk_translation_unit,
 };
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, ExpressionNode,
-    ExternalDeclaration, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, Labeled, Name,
-    ParameterDeclaration, declaration,
+    ExternalDeclaration, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, Labeled,
+    LabeledStatementNode, Name, ParameterDeclaration, StructDeclaration, StructMemberDeclarator, declaration,
 };
 use crate::ast::{Expression, Storage, StringId};
 use crate::parser::{Context, Span};
@@ -26,21 +27,21 @@ pub enum ScopeKind {
 
 #[derive(Debug)]
 struct Scope {
-    tags: HashMap<String, SymbolId>,
-    members: HashMap<String, SymbolId>,
-    labels: HashMap<String, SymbolId>,
+    tags: HashMap<StringId, SymbolId>,
+    members: HashMap<StringId, SymbolId>,
+    labels: HashMap<StringId, SymbolId>,
     ordinaries: HashMap<StringId, SymbolId>,
-    ty: ScopeKind,
+    kind: ScopeKind,
 }
 
 impl Scope {
-    pub fn new(ty: ScopeKind) -> Self {
+    pub fn new(kind: ScopeKind) -> Self {
         Self {
             tags: HashMap::new(),
             members: HashMap::new(),
             labels: HashMap::new(),
             ordinaries: HashMap::new(),
-            ty,
+            kind,
         }
     }
 }
@@ -73,8 +74,8 @@ impl SymbolResolver {
         ctx: &Context,
         specifiers: &[DeclarationSpecifier],
         decl: &DeclaratorNode,
-        span: &Span,
     ) -> Option<(QualifiedType, DeclaratorNode)> {
+        let span = &decl.span;
         let (is_const, is_volatile) = constrain::declaration::get_qualifier(specifiers).collect(self, span);
         let ty = constrain::declaration::resolve_type(specifiers).collect(self, span)?;
         let id = self.types.alloc(ty);
@@ -100,7 +101,7 @@ impl SymbolResolver {
         }
     }
 
-    fn add_symbol(
+    fn add_ordinary_symbol(
         &mut self,
         name: Name,
         ty: QualifiedType,
@@ -108,9 +109,36 @@ impl SymbolResolver {
         kind: SymbolKind,
         declarator: Option<DeclaratorNode>,
     ) -> SymbolId {
-        let sym_id = self.symbols.add(name, ty, storage, kind);
+        self.dedup(&name, &ty, &declarator.map(|d| d.span).unwrap_or_default());
+        let sym_id = self.symbols.add(name, ty, Some(storage), kind);
         self.scope_mut().ordinaries.insert(name.id, sym_id);
         sym_id
+    }
+
+    fn dedup(&mut self, name: &Name, ty: &QualifiedType, span: &Span) {
+        if let Some(old) = self.scope().ordinaries.get(&name.id) {
+            let old_ty = &self.symbols.get(*old).ty;
+            if old_ty != ty {
+                println!("COUCOU");
+                self.diagnosis
+                    .push(DiagnosisNode::new(Diagnosis::DuplicateDeclaration, *span));
+            }
+        }
+    }
+
+    fn add_label_symbol(
+        &mut self,
+        name: Name,
+        ty: QualifiedType,
+        kind: SymbolKind,
+        declarator: Option<DeclaratorNode>,
+    ) -> Diag<Option<SymbolId>> {
+        let sym_id = self.symbols.add(name, ty, None, kind);
+        let Some(scope) = self.scopes.iter_mut().rfind(|s| matches!(s.kind, ScopeKind::Function)) else {
+            return Diag::none_diag(Diagnosis::LabelOutsideFunction);
+        };
+        scope.labels.insert(name.id, sym_id);
+        Diag::some(sym_id)
     }
 
     fn add_function<'a>(
@@ -120,7 +148,7 @@ impl SymbolResolver {
     ) -> Option<&'a FunctionParametersNode> {
         let span = &node.span;
 
-        let (ty, fn_decl) = self.make_qualified_type(ctx, &node.specifiers, &node.declarator, span)?;
+        let (ty, fn_decl) = self.make_qualified_type(ctx, &node.specifiers, &node.declarator)?;
         let (decl, parameters) =
             constrain::external::extract_function_declarator(fn_decl.id.resolve(ctx)).collect(self, span)?;
 
@@ -132,7 +160,7 @@ impl SymbolResolver {
         constrain::external::check_external_specifiers(&node.specifiers).collect(self, span);
 
         let name = fn_decl.ident(ctx)?;
-        self.add_symbol(name, ty, storage, SymbolKind::Function, Some(node.declarator.clone()));
+        self.add_ordinary_symbol(name, ty, storage, SymbolKind::Function, Some(node.declarator.clone()));
         Some(parameters)
     }
 
@@ -202,7 +230,7 @@ impl SymbolResolver {
         };
         for string_id in missing_id {
             let ty_id = self.types.int();
-            self.add_symbol(
+            self.add_ordinary_symbol(
                 Name::new(string_id, Span::default()),
                 QualifiedType::new(ty_id, false, false),
                 Storage::Register,
@@ -219,13 +247,13 @@ impl SymbolResolver {
         decl: &DeclaratorNode,
         span: &Span,
     ) -> Option<SymbolId> {
-        let (ty, decl) = self.make_qualified_type(ctx, specifiers, decl, span)?;
+        let (ty, decl) = self.make_qualified_type(ctx, specifiers, decl)?;
         let storage = constrain::declaration::get_storage(specifiers)
             .collect(self, span)
             .unwrap_or(Storage::Register);
         constrain::external::param_storage_only_register(storage).collect(self, span)?;
         let name = decl.ident(ctx)?;
-        Some(self.add_symbol(name, ty, storage, SymbolKind::Parameter, Some(decl)))
+        Some(self.add_ordinary_symbol(name, ty, storage, SymbolKind::Parameter, Some(decl)))
     }
 }
 
@@ -252,26 +280,22 @@ impl Visitor for SymbolResolver {
         let span = &node.span;
         for init_declarator in &node.init_declarators {
             let decl = &init_declarator.declarator;
-            let Some((ty, decl)) = self.make_qualified_type(ctx, specifiers, decl, span) else { continue };
+            let Some((ty, decl)) = self.make_qualified_type(ctx, specifiers, decl) else { continue };
             let Some(name) = decl.ident(ctx) else { continue };
             let storage = constrain::declaration::get_storage(&node.specifiers)
                 .collect(self, span)
                 .unwrap_or(Storage::Auto);
-            self.add_symbol(name, ty, storage, SymbolKind::Variable, Some(decl));
+            self.add_ordinary_symbol(name, ty, storage, SymbolKind::Variable, Some(decl));
         }
+        walk_declaration(self, ctx, node, is_last);
     }
 
-    fn visit_labeled_statement(&mut self, ctx: &Context, node: &crate::ast::LabeledStatementNode, is_last: bool) {
+    fn visit_labeled_statement(&mut self, ctx: &Context, node: &LabeledStatementNode, is_last: bool) {
         match &node.inner {
             Labeled::Identifier(name, stmt) => {
                 let ty = self.types.label();
-                let _ = self.add_symbol(
-                    *name,
-                    QualifiedType::new(ty, false, false),
-                    Storage::Static,
-                    SymbolKind::Label,
-                    None,
-                );
+                self.add_label_symbol(*name, QualifiedType::new(ty, false, false), SymbolKind::Label, None)
+                    .collect(self, &node.span);
             }
             Labeled::Case(expr, stmt) => (),
             Labeled::Default(stmt) => (),
@@ -280,8 +304,8 @@ impl Visitor for SymbolResolver {
     }
 
     fn visit_compound_statement(&mut self, ctx: &Context, node: &CompoundStatementNode, is_last: bool) {
-        match self.scopes.last().unwrap().ty {
-            ScopeKind::Prototype => self.scopes.last_mut().unwrap().ty = ScopeKind::Block,
+        match self.scopes.last().unwrap().kind {
+            ScopeKind::Prototype => self.scopes.last_mut().unwrap().kind = ScopeKind::Function,
             _ => self.scopes.push(Scope::new(ScopeKind::Block)),
         }
         walk_compound_statement(self, ctx, node, is_last);
