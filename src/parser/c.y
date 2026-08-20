@@ -54,8 +54,8 @@ macro_rules! push {
 %left '|'
 %left '^'
 %left '&'
-%nonassoc EQ_OP NE_OP
-%nonassoc '<' '>' LE_OP GE_OP
+%left EQ_OP NE_OP
+%left '<' '>' LE_OP GE_OP
 %left LEFT_OP RIGHT_OP
 %left '+' '-'
 %left '*' '/' '%'
@@ -108,7 +108,7 @@ macro_rules! push {
 %type<FunctionDefinitionNode> function_definition
 %type<ExternalDeclarationNode> external_declaration
 %type<Vec<ExternalDeclarationNode>> external_declaration_list
-%type<()> translation_unit
+%type<()> translation_unit scope_begin
 
 %%
 
@@ -398,10 +398,14 @@ labeled_statement /* LabeledStatementNode */
 	;
 
 compound_statement /* CompoundStatementNode */
-	: '{' '}'                                                                       { self.lexer.ctx.push_scope(); let node = with_span!(self, CompoundStatementNode::new, vec![], vec![]); self.lexer.ctx.pop_scope(); node }
-	| '{' statement_list '}'                                                        { self.lexer.ctx.push_scope(); let node = with_span!(self, CompoundStatementNode::new, vec![], $2); self.lexer.ctx.pop_scope(); node }
-	| '{' declaration_list '}'                                                      { self.lexer.ctx.push_scope(); let node = with_span!(self, CompoundStatementNode::new, $2, vec![]); self.lexer.ctx.pop_scope(); node }
-	| '{' declaration_list statement_list '}'                                       { self.lexer.ctx.push_scope(); let node = with_span!(self, CompoundStatementNode::new, $2, $3); self.lexer.ctx.pop_scope(); node }
+	: '{' scope_begin '}'                                                           { let node = with_span!(self, CompoundStatementNode::new, vec![], vec![]); self.lexer.ctx.pop_scope(); node }
+	| '{' scope_begin statement_list '}'                                            { let node = with_span!(self, CompoundStatementNode::new, vec![], $3); self.lexer.ctx.pop_scope(); node }
+	| '{' scope_begin declaration_list '}'                                          { let node = with_span!(self, CompoundStatementNode::new, $3, vec![]); self.lexer.ctx.pop_scope(); node }
+	| '{' scope_begin declaration_list statement_list '}'                           { let node = with_span!(self, CompoundStatementNode::new, $3, $4); self.lexer.ctx.pop_scope(); node }
+	;
+
+scope_begin /* push scope before parsing the body */
+	: /* empty */                                                                   { self.lexer.ctx.push_scope(); }
 	;
 
 declaration_list /* Vec<DeclarationNode> */

@@ -268,8 +268,14 @@ impl<R: Read> Yacc<R> {
         let len = self.value_stack.len();
         let idx = len - Self::YY_RLEN_TABLE[self.act as usize];
 
-        self.span.start = self.span_stack[idx].start;
-        self.span.end = self.span_stack[len - 1].end;
+        if idx == len {
+            let pos = self.span_stack[len - 1].end;
+            self.span.start = pos;
+            self.span.end = pos;
+        } else {
+            self.span.start = self.span_stack[idx].start;
+            self.span.end = self.span_stack[len - 1].end;
+        }
 
         /* DEBUGGING */
         for (i, tok) in self.value_stack[idx..].iter().enumerate().rev() {
@@ -289,9 +295,16 @@ impl<R: Read> Yacc<R> {
     }
 
     fn do_action(&mut self, idx: usize) -> YYToken {
+        let rlen = Self::YY_RLEN_TABLE[self.act as usize];
         match Self::YY_ACTION_TABLE[self.act as usize] {
             /* ACTIONS */
-            -1 => std::mem::replace(&mut self.value_stack[idx], YYToken::Empty),
+            -1 => {
+                if rlen == 0 {
+                    YYToken::Empty
+                } else {
+                    std::mem::replace(&mut self.value_stack[idx], YYToken::Empty)
+                }
+            }
             _ => unreachable!(),
         }
     }

@@ -1,16 +1,10 @@
+// typedef struct foo {
+// 	int a;
+// } foo;
 
-struct coucou {
-	struct oui {
-		int a;
-	} b;
-
-	int membr1;
-
-	int membr2;
-	int membr3;
-};
+// struct foo x;
 
 int main(void) {
-	struct oui b;
+	int a = 1 < 2 < 3;
 	return 0;
 }
