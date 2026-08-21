@@ -20,8 +20,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file: File = File::open(&file_name)?;
     let ctx = Context::new(file_name);
     let lexer = YYLex::new(file, || None, ctx);
-    let yacc = Yacc::new(lexer);
-    let ctx = yacc.yyparse();
+    let mut yacc = Yacc::new(lexer);
+    yacc.yyparse();
+    let ctx = yacc.lexer.ctx;
     // AstPrinter::print(&ctx)?;
     println!("------------------------------------------------");
     let _ctx = Analyzer::analyze(ctx);

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use crate::ast::{DeclarationNode, DeclarationSpecifier, DeclaratorArena, Name};
-use crate::ast::{EnumArena, ExpressionArena, StatementArena, Storage, StringArena, StringId, StructArena};
+use crate::ast::{DeclaratorArena, Name};
+use crate::ast::{EnumArena, ExpressionArena, StatementArena, StringArena, StringId, StructArena};
 use crate::ast::{StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena};
 use crate::parser::{Span, YYToken};
 use crate::semantic::{ResolvedTypeArena, SymbolArena, SymbolKind};
@@ -26,6 +26,7 @@ pub struct Context {
     pub arenas: Arenas,
     pub ast: TranslationUnitNode,
     pub file_name: String,
+    pub in_typedef: bool,
 }
 
 impl Context {
@@ -34,6 +35,7 @@ impl Context {
             typedefs: vec![HashMap::default()],
             arenas: Arenas::default(),
             ast: TranslationUnitNode::default(),
+            in_typedef: false,
             file_name,
         }
     }
@@ -60,30 +62,16 @@ impl Context {
         self.typedefs.pop();
     }
 
-    pub fn add_symbol(&mut self, decl: &DeclarationNode) {
-        let kind = if !decl
-            .specifiers
-            .contains(&DeclarationSpecifier::Storage(Storage::Typedef))
-        {
-            SymbolKind::Variable
-        } else {
-            SymbolKind::Typedef
-        };
-        for init_decl in &decl.init_declarators {
-            let Some(name) = init_decl.declarator.ident(self) else {
-                continue;
-            };
-            let id = name.id;
-            self.typedefs.last_mut().map(|ts| ts.insert(id, kind));
-        }
+    pub fn add_symbol(&mut self, id: StringId) {
+        let kind = if self.in_typedef { SymbolKind::Typedef } else { SymbolKind::Variable };
+        self.typedefs.last_mut().map(|ts| ts.insert(id, kind));
     }
 
     pub fn check_type(&self, name: Name) -> YYToken {
-        for ty in self.typedefs.iter().rev() {
-            if let Some(kind) = ty.get(&name.id) {
-                return if *kind == SymbolKind::Typedef { YYToken::TYPE_NAME(name) } else { YYToken::IDENTIFIER(name) };
-            }
+        match self.typedefs.iter().rev().filter_map(|ty| ty.get(&name.id)).next() {
+            Some(SymbolKind::Typedef) => YYToken::TYPE_NAME(name),
+            Some(SymbolKind::Variable) | None => YYToken::IDENTIFIER(name),
+            _ => unreachable!(),
         }
-        YYToken::IDENTIFIER(name)
     }
 }

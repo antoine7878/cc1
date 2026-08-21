@@ -196,7 +196,7 @@ mod test {
         let _ = original.read_to_string(&mut buffer).unwrap();
         let ret = TmpFile::new("yacc_", "");
         let mut file = File::create(&ret.path).unwrap();
-        file.write_all(format!("%{{\nmod {};\n    use {}::YYLex;\n%}}\n", mod_name, mod_name).as_bytes())
+        file.write_all(format!("%{{\nmod {};\n    use {}::{{YYLex, Span}};\n%}}\n", mod_name, mod_name).as_bytes())
             .unwrap();
         file.write_all(buffer.as_bytes()).unwrap();
         ret

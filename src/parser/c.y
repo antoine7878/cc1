@@ -6,7 +6,7 @@ use crate::ast::{StructDeclaration, StructMemberDeclarator, VariantId, EnumId, L
 use crate::ast::{ExpressionStatementNode, SelectionStatementNode, IterationStatementNode, JumpStatementNode, JumpStatement};
 use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode};
 
-use crate::parser::{YYLex, Context};
+use crate::parser::{YYLex, Context, Span};
 use crate::utils::yyerror;
 
 macro_rules! node{
@@ -76,7 +76,7 @@ macro_rules! push {
 %type<Qualifier> type_qualifier
 %type<Vec<Qualifier>> type_qualifier_list
 %type<Vec<DeclarationSpecifier>> declaration_specifiers
-%type<InitDeclaratorNode> declarator_list init_declarator
+%type<InitDeclaratorNode> init_declarator
 %type<Vec<InitDeclaratorNode>> init_declarator_list
 %type<InitializerNode> initializer
 %type<Vec<InitializerNode>> initializer_list
@@ -204,13 +204,13 @@ expression /* ExpressionNode */
     ;
 
 declaration /* DeclarationNode */
-	: declaration_specifiers ';'                                                    { let node = with_span!(self, DeclarationNode::new, $1, vec![]); self.lexer.ctx.add_symbol(&node); node }
-	| declaration_specifiers init_declarator_list ';'                               { let node = with_span!(self, DeclarationNode::new, $1, $2); self.lexer.ctx.add_symbol(&node); node }
+	: declaration_specifiers ';'                                                    { with_span!(self, DeclarationNode::new, $1, vec![]) }
+	| declaration_specifiers init_declarator_list ';'                               { with_span!(self, DeclarationNode::new, $1, $2) }
 	;
 
 declaration_specifiers /* Vec<DeclarationSpecifier> */
-	: storage_class_specifier                                                       { vec![DeclarationSpecifier::Storage($1)] }
-	| storage_class_specifier declaration_specifiers                                { push!($<mut>2, DeclarationSpecifier::Storage($1)) }
+	: storage_class_specifier                                                       { self.lexer.ctx.in_typedef = ($1 == Storage::Typedef); vec![DeclarationSpecifier::Storage($1)] }
+	| storage_class_specifier declaration_specifiers                                { self.lexer.ctx.in_typedef = ($1 == Storage::Typedef); push!($<mut>2, DeclarationSpecifier::Storage($1)) }
 	| type_specifier                                                                { vec![DeclarationSpecifier::Type($1)] }
 	| type_specifier declaration_specifiers                                         { push!($<mut>2, DeclarationSpecifier::Type($1)) }
 	| type_qualifier                                                                { vec![DeclarationSpecifier::Qualifier($1)] }
@@ -272,8 +272,7 @@ declarator /* DeclaratorNode */
 	;
 
 direct_declarator /* DeclaratorNode */
-	: IDENTIFIER                                                                    { node_span!(self, declarators, ident, $1) }
-	| TYPE_NAME                                                                     { node_span!(self, declarators, ident, $1) }
+	: IDENTIFIER                                                                    { self.lexer.ctx.add_symbol($1.id); node_span!(self, declarators, ident, $1) }
 	| '(' declarator ')'                                                            { $2 }
 	| direct_declarator '[' constant_expression ']'                                 { node_span!(self, declarators, array, $1, Some($3)) }
 	| direct_declarator '[' ']'                                                     { node_span!(self, declarators, array, $1, None) }
@@ -381,8 +380,6 @@ enum_specifier /* EnumId */
 	: ENUM '{' enumerator_list '}'                                                  { node_span!(self, enums, add, None, $3) }
 	| ENUM IDENTIFIER '{' enumerator_list '}'                                       { node_span!(self, enums, add, Some($2), $4) }
 	| ENUM IDENTIFIER                                                               { node_span!(self, enums, add, Some($2), vec![]) }
-	| ENUM TYPE_NAME '{' enumerator_list '}'                                        { node_span!(self, enums, add, Some($2), $4) }
-	| ENUM TYPE_NAME                                                                { node_span!(self, enums, add, Some($2), vec![]) }
 	;
 
 enumerator_list /* Vec<VariantId> */

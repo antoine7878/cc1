@@ -1,5 +1,4 @@
 #![allow(unused_braces, mixed_script_confusables, unused)]
-use crate::parser::Span;
 use std::fmt;
 use std::io::Read;
 
@@ -18,6 +17,7 @@ pub struct Yacc<R: Read> {
     continue_parse: bool,
     is_recovering: bool,
     token_since_error: usize,
+    yy_status: i32,
     pub span: Span,
     pub yydebug: bool,
     pub lexer: YYLex<R>,
@@ -60,6 +60,7 @@ impl<R: Read> Yacc<R> {
             is_recovering: false,
             lexer,
             token_since_error: 0,
+            yy_status: 0,
             /* DEFINES */
         }
     }
@@ -80,7 +81,7 @@ impl<R: Read> Yacc<R> {
         Self::YY_DEFAULT_REDUCE_ACT[state_id]
     }
 
-    pub fn yyparse(mut self) -> Context {
+    pub fn yyparse(&mut self) -> i32 {
         /* DEBUGGING */
         yylog!(self, "Starting parse");
         /* DEBUGGING */
@@ -103,15 +104,16 @@ impl<R: Read> Yacc<R> {
             yylog!(self, "Cleanup: popping {:?}", token);
         }
         /* DEBUGGING */
-        self.lexer.ctx
+        self.yy_status
     }
 
     fn error(&mut self) {
         if !self.is_recovering {
             self.unwind()
-        }
-        if matches!(self.lookahead, Some(YYToken::yyeof)) {
+        } else if matches!(self.lookahead, Some(YYToken::yyeof)) {
             self.yyabort();
+        } else {
+            self.yyclearin();
         }
     }
 
@@ -158,17 +160,7 @@ impl<R: Read> Yacc<R> {
     }
 
     fn error_message(&self) -> String {
-        let msg = if self.lookahead_id == Self::YY_EOF_TOKEN_ID {
-            "eof".to_string()
-        } else {
-            let text = self.lexer.yytext.trim();
-            if text.is_empty() {
-                Self::YY_TOKEN_NAMES[self.lookahead_id].to_string()
-            } else {
-                format!("'{text}'")
-            }
-        };
-        format!("syntax error, unexpected {}", msg)
+        "syntax error".to_string()
     }
 
     pub fn yyerrok(&mut self) {
@@ -180,6 +172,7 @@ impl<R: Read> Yacc<R> {
     }
 
     pub fn yyabort(&mut self) {
+        self.yy_status = 3;
         self.continue_parse = false;
     }
 
@@ -218,9 +211,9 @@ impl<R: Read> Yacc<R> {
     fn shift(&mut self) {
         self.act += 1;
 
-        if self.token_since_error >= 2 {
+        if self.is_recovering && self.token_since_error >= 2 {
             self.is_recovering = false;
-        } else {
+        } else if self.is_recovering {
             self.token_since_error += 1;
         }
 
@@ -254,7 +247,7 @@ impl<R: Read> Yacc<R> {
         let product = Self::YY_PRODUCT_TABLE[self.act as usize];
 
         let yyval = self.action();
-        if yyval == YYToken::error {
+        if yyval == YYToken::error && Self::YY_ACTION_TABLE[self.act as usize] != -1 {
             self.error();
             return;
         }

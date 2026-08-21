@@ -44,7 +44,7 @@ impl YaccParser {
             self.parse_program();
         };
 
-        // self.report_unused()?;
+        self.report_unused()?;
         self.yacc.init(self.start);
         Ok(self.yacc)
     }
@@ -58,10 +58,10 @@ impl YaccParser {
             .enumerate()
             .filter(|(i, t)| t.is_nonterminal() && !self.seen_products.contains(i))
         {
-            self.it.error_line(
-                format!("non terminal ‘{}’ is used, but is not defined rule's product", t.name),
-                t.line_no,
-            )?
+            eprintln!(
+                "{}:{}: warning: non terminal ‘{}’ is used, but is not defined rule's product",
+                self.yacc.file, t.line_no, t.name
+            );
         }
         Ok(())
     }

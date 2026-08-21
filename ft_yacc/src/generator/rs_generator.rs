@@ -142,6 +142,7 @@ impl RSGenerator {
                 writeln!(w, "{} => {{", action_id,)?;
                 self.dump_bindings(w, parser, production)?;
                 self.dump_action(w, parser, action_id, production)?;
+                writeln!(w, "YYToken::Empty")?;
                 writeln!(w, "}}")?;
             }
             // (None, _) => writeln!(w, "self.value_stack.last_mut().replace(YYToken::Empty)")?,
