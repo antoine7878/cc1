@@ -339,6 +339,8 @@ struct_or_union_specifier /* TypeSpecifier */
 	: struct_or_union '{' struct_declaration_list '}'                               { let s = self.span; self.lexer.ctx.struct_or_union($1, None, $3, s) }
 	| struct_or_union IDENTIFIER '{' struct_declaration_list '}'                    { let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), $4, s) }
 	| struct_or_union IDENTIFIER                                                    { let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), vec![], s) }
+	| struct_or_union TYPE_NAME '{' struct_declaration_list '}'                     { let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), $4, s) }
+	| struct_or_union TYPE_NAME                                                     { let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), vec![], s) }
 	;
 
 struct_or_union /* Tag */
@@ -370,6 +372,8 @@ enum_specifier /* EnumId */
 	: ENUM '{' enumerator_list '}'                                                  { node_span!(self, enums, add, None, $3) }
 	| ENUM IDENTIFIER '{' enumerator_list '}'                                       { node_span!(self, enums, add, Some($2), $4) }
 	| ENUM IDENTIFIER                                                               { node_span!(self, enums, add, Some($2), vec![]) }
+	| ENUM TYPE_NAME '{' enumerator_list '}'                                        { node_span!(self, enums, add, Some($2), $4) }
+	| ENUM TYPE_NAME                                                                { node_span!(self, enums, add, Some($2), vec![]) }
 	;
 
 enumerator_list /* Vec<VariantId> */

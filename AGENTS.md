@@ -28,7 +28,6 @@ This project is a C compiler LLVM frontend written in Rust.
 ## Post editing Checklist
 
 - run `cargo build` (or `make`)
-- run `cargo fmt --check`
 
 ## Generated files (do NOT edit)
 

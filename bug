@@ -1,0 +1,46 @@
+A. Critical correctness bugs
+A2. Relational/equality operators are %nonassoc (c.y:57-58) → chained comparisons rejected.
+a < b < c and a == b == c are valid C90 (left-associative, evaluated left→right) and accepted by gcc; here they are a syntax error. Should be %left. This is a conformance bug in the precedence table.
+A3. No preprocessor; #… lines are silently discarded (c.l:19).
+#include, #define, #if, #pragma are all swallowed. Consequences:
+- #include <foo.h> vanishes → every symbol from it is undeclared → C90 implicit-int handling would kick in (and identifiers like FILE get no declaration); there is no #define-based constant substitution; macros used as call syntax actually parse as normal calls.
+- gcc under -std=iso9899:1990 -pedantic-errors treats a missing prototype as an error, so behavior diverges on any real program.
+This is the single biggest gap toward the stated goal ("behaviors compared to gcc -pedantic-errors").
+A4. Block-scoped typedefs leak into the enclosing scope (c.y:401-404).
+The compound_statement action calls push_scope()/pop_scope() in the reduction of the whole { … }. By then all inner declarations have already reduced and called add_symbol (c.y:197-198) — i.e. into the enclosing scope — and the push/pop then adds and removes a fresh empty set as a no-op. Net effect: { typedef int T; } leaves T a typedef afterwards, so:
+{ typedef int T; }  int T;   // second line: T lexed as TYPE_NAME → syntax error (legal C90)
+Block-scope tag/typedef shadowing is broken because the parse-time scope bookkeeping is a no-op. (The semantic resolver's own scopes in resolution.rs:306-313 are fine; this only affects typedef lexing.)
+B. Major issues
+B1. f(a,b) collapses to a single comma argument (c.y:147, expression.rs:76).
+expression '(' expression ')' takes one Option<ExpressionNode>; f(a,b,c) becomes FunctionCall(f, Some(List(a, List(b,c)))). The distinction between f(a,b) and f((a,b)) is recoverable only by comparing the argument span against the call-paren span (paren rule discards the wrapper at c.y:141). Any future type-checking/codegen of calls must split top-level Expression::List nodes with fragile span heuristics. Better: Vec<ExpressionNode> args. Nothing in the current analyzer consumes expressions yet, so it's latent.
+B2. Variadic function definitions panic (resolution.rs:272).
+int f(int a, ...) { … } is valid C90; it reaches FunctionParameters::Variadic(_) in visit_function_definition → unimplemented!() → panic.
+B3. Error recovery is cosmetic; parser exits 0 on syntax error.
+The grammar defines no error production, so unwind() (yacc.rs:1044) pops the whole stack and yyabort()s. All yyerrok/token_since_error/is_recovering machinery (yacc.rs:1093-1107) is dead code — only one error is ever reported. Worse, main.rs:27 ignores the parse outcome, so a file with a syntax error still exits 0 (and AstPrinter is commented out).
+B4. goto target label is dropped (c.y:435).
+JumpStatement::Goto stores no Name; the label is never resolvable. case/default also have no switch-context validation and continue/break no loop-context check (all semantic).
+B5. Anonymous struct/enum with body but no tag: ENUM '{' … '}' creates a new distinct tag every occurrence (c.y:370). In C90 an anonymous-enum-in-declaration is expected (each is a distinct type), so this is arguably OK; but struct { … } anonymous with ctx.struct_or_union(tag, None, …) (context.rs:41) also always allocates a fresh struct — fine for C90 semantics. Low severity, listed for completeness.
+C. Minor / hygiene
+- C1. yyerror uses lexer.span, not the offending token's span; combined with the parser using self.lexer.span at shift time, diagnostics can point one token late in some conflicts.
+- C2. 08/09 lexed as valid constants (c.l:56): 0{D}+ matches 08, no octal-digit validation → invalid octal accepted silently (gcc errors under -pedantic-errors). Integer suffixes (ll, mixed uU) also never validated.
+- C3. // comments (c.l:20), trigraph ??/ (missing), stray ??= (not #), catch-all . bad-char skip (c.l:110) are all silently tolerated extensions/leniencies rather than pedantic errors.
+- C4. $ etc. silently dropped (., c.l:110) can mangle identifiers without any warning.
+- C5. AST/parser coupling: Expression::unary/binary/access dispatch on raw YYToken variants (expression.rs:144-204), so the AST module imports parser tokens; any operator addition requires touching grammar + generated yacc.rs + expression.rs. A dedicated operator enum would decouple.
+- C6. Debug leftover println!("COUCOU") in resolution.rs:122.
+- C7. is_tentative_definition is inverted (external.rs:140): returns true only when there is an initializer; a tentative definition is one without one. (Semantic, not parser, but adjacent.)
+- C8. %left ',' ordering vs the rest (c.y:47-48) is correct (PREC_NO_COMMA binds tighter than comma, correctly stopping case 1,2: / int a = 1, b = 2).
+- C9. Declarations-after-statements rejected syntactically (grammar splits declaration_list/statement_list, c.y:402-404) rather than as a constraint diagnosis — output differs from gcc wording, which the project flags as acceptable, but the error class differs.
+D. Confirmed correct
+- Pointer fold Vec<Vec<Qualifier>> → nested Pointer (c.y:275-280, declaration.rs:101-103); array/function/abstract declarator chain; parenthesized declarators; declarator/abstract_declarator distinction.
+- Dangling-else resolved by PREC_THEN < ELSE (c.y:64-65,423); ? : and assignments right-assoc; unary vs postfix ++/-- binding; cast precedence via PREC_UNARY (sizeof (T)(x) parse resolves to cast by shift-preference).
+- constant_expression %prec PREC_NO_COMMA correctly excludes top-level commas from array bounds/case labels/enum values/bit-fields; K&R function definitions (all 4 forms) present.
+- Old-style parameter checks (identifier-list vs declaration-list matching, implicit-int for missing, duplicate/missing parameter diagnoses, typedef redefinition as param) via external.rs:95-134; f(void) handled by is_abstract_void.
+- Span propagation for multi-symbol rules is consistent; no empty-RHS rule exists, so the span-stack indexing in action() cannot underflow.
+- Struct/union/enum body parsing, bit-field widths, initializer lists with trailing comma (c.y:251), trigraphs for { } [ ] ~ ! | ^ > (c.l:91-108).
+Suggested priority for fixes
+1. A1 (typedef-after-tag) — breaks real headers; fix in check_type with a "previous token" hint.
+2. A2 (relational %left), A4 (block scope push/pop at { shift), B2 (variadic panic).
+3. A3 (assert/measure on minirt.c; at minimum diagnose # directives).
+4. B3 (exit code + one-error recovery), B1 (args as Vec).
+5. C-tier hygiene (B4, C1, C2, C6, C7).
+Note: per AGENTS.md I've only investigated — no files were modified. Want me to turn these into a task list for the fixes, or dig deeper into any single item (e.g., trace the exact failing token sequence for A1)?
