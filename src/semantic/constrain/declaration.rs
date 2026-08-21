@@ -65,6 +65,8 @@ pub fn resolve_type(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Resolved
         [0, 0, 0, 0, 0, 1, 0, 0, 0] => Diag::some(ResolvedType::Int),
         [1, 0, 0, 0, 0, 0, 0, 0, 0] => Diag::some(ResolvedType::Int),
         [1, 0, 0, 0, 0, 1, 0, 0, 0] => Diag::some(ResolvedType::Int),
+        [0, 1, 0, 0, 0, 0, 0, 0, 0] => Diag::some(ResolvedType::UnsignedInt),
+        [0, 1, 0, 0, 0, 1, 0, 0, 0] => Diag::some(ResolvedType::UnsignedInt),
         [0, 0, 0, 0, 0, 0, 1, 0, 0] => Diag::some(ResolvedType::Long),
         [0, 0, 0, 0, 0, 1, 1, 0, 0] => Diag::some(ResolvedType::Long),
         [1, 0, 0, 0, 0, 0, 1, 0, 0] => Diag::some(ResolvedType::Long),
