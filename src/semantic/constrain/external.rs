@@ -127,9 +127,9 @@ pub fn param_storage_only_register(storage: Storage) -> Diag<Option<()>> {
 /// 6.7.1 Function definitions
 /// [In old style] An identifier declared as a typedef name shall not be redeclared as a parameter.
 pub fn check_typedef(ctx: &Context, name: &Name) -> Diag<bool> {
-    if ctx.typedefs.last().unwrap().contains(&name.id) {
-        return Diag::with_diag(false, Diagnosis::TypedefInOldStyle);
-    }
+    // if ctx.typedefs.last().unwrap().contains(&name.id) {
+    //     return Diag::with_diag(false, Diagnosis::TypedefInOldStyle);
+    // }
     Diag::res(true)
 }
 

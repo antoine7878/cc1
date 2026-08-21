@@ -1,10 +1,10 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use crate::ast::{DeclarationNode, DeclarationSpecifier, DeclaratorArena, Name};
 use crate::ast::{EnumArena, ExpressionArena, StatementArena, Storage, StringArena, StringId, StructArena};
 use crate::ast::{StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena};
 use crate::parser::Span;
-use crate::semantic::{ResolvedTypeArena, SymbolArena};
+use crate::semantic::{ResolvedTypeArena, SymbolArena, SymbolKind};
 
 #[derive(Debug, Default)]
 pub struct Arenas {
@@ -22,7 +22,7 @@ pub struct Arenas {
 
 #[derive(Debug)]
 pub struct Context {
-    pub typedefs: Vec<HashSet<StringId>>,
+    pub typedefs: Vec<HashMap<StringId, SymbolKind>>,
     pub arenas: Arenas,
     pub ast: TranslationUnitNode,
     pub file_name: String,
@@ -31,7 +31,7 @@ pub struct Context {
 impl Context {
     pub fn new(file_name: String) -> Self {
         Self {
-            typedefs: vec![HashSet::default()],
+            typedefs: vec![HashMap::default()],
             arenas: Arenas::default(),
             ast: TranslationUnitNode::default(),
             file_name,
@@ -53,7 +53,7 @@ impl Context {
     }
 
     pub fn push_scope(&mut self) {
-        self.typedefs.push(HashSet::default());
+        self.typedefs.push(HashMap::default());
     }
 
     pub fn pop_scope(&mut self) {
@@ -61,18 +61,20 @@ impl Context {
     }
 
     pub fn add_symbol(&mut self, decl: &DeclarationNode) {
-        if !decl
+        let kind = if !decl
             .specifiers
             .contains(&DeclarationSpecifier::Storage(Storage::Typedef))
         {
-            return;
-        }
+            SymbolKind::Typedef
+        } else {
+            SymbolKind::Function
+        };
         for init_decl in &decl.init_declarators {
             let Some(name) = init_decl.declarator.ident(self) else {
                 continue;
             };
             let i = name.id;
-            self.typedefs.last_mut().map(|ts| ts.insert(i));
+            self.typedefs.last_mut().map(|ts| ts.insert(i, kind));
         }
     }
 }

@@ -34,7 +34,7 @@ impl SymbolArena {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum SymbolKind {
     Variable,
     Function,
