@@ -88,6 +88,7 @@ macro_rules! push {
 %type<Vec<Vec<Qualifier>>> pointer
 
 %type<Tag> struct_or_union
+%type<Name> tag_name
 %type<Vec<StructDeclaration>> struct_declaration_list
 %type<StructDeclaration> struct_declaration
 %type<Vec<StructMemberDeclarator>> struct_declarator_list
@@ -108,7 +109,7 @@ macro_rules! push {
 %type<FunctionDefinitionNode> function_definition
 %type<ExternalDeclarationNode> external_declaration
 %type<Vec<ExternalDeclarationNode>> external_declaration_list
-%type<()> translation_unit enter_scope exit_scope
+%type<()> translation_unit enter_scope exit_scope enter_struct reopen_params
 
 %start translation_unit
 
@@ -137,10 +138,14 @@ external_declaration /* ExternalDeclarationNode */
 	;
 
 function_definition /* FunctionDefinitionNode */
-	: declaration_specifiers declarator declaration_list compound_statement         { with_span!(self, FunctionDefinitionNode::new, $1, $2, $3, $4) }
-	| declaration_specifiers declarator compound_statement                          { with_span!(self, FunctionDefinitionNode::new, $1, $2, vec![], $3) }
-	| declarator declaration_list compound_statement                                { with_span!(self, FunctionDefinitionNode::new, vec![], $1, $2, $3) }
-	| declarator compound_statement                                                 { with_span!(self, FunctionDefinitionNode::new, vec![], $1, vec![], $2) }
+	: declaration_specifiers declarator reopen_params declaration_list compound_statement         { self.lexer.ctx.pop_scope(); with_span!(self, FunctionDefinitionNode::new, $1, $2, $4, $5) }
+	| declaration_specifiers declarator reopen_params compound_statement                          { self.lexer.ctx.pop_scope(); with_span!(self, FunctionDefinitionNode::new, $1, $2, vec![], $4) }
+	| declarator reopen_params declaration_list compound_statement                                { self.lexer.ctx.pop_scope(); with_span!(self, FunctionDefinitionNode::new, vec![], $1, $3, $4) }
+	| declarator reopen_params compound_statement                                                 { self.lexer.ctx.pop_scope(); with_span!(self, FunctionDefinitionNode::new, vec![], $1, vec![], $3) }
+	;
+
+reopen_params
+	: /* empty */                                                                   { self.lexer.ctx.unstash_scope(); }
 	;
 
 constant_expression /* ExpressionNode */
@@ -156,9 +161,11 @@ expression /* ExpressionNode */
     | expression '(' ')'                                                            { node_span!(self, expressions, function_call, $1, None) }
     | expression '(' expression ')'                                                 { node_span!(self, expressions, function_call, $1, Some($3)) }
     | expression '.' IDENTIFIER                                                     { node_span!(self, expressions, access, $1, $2, $3) }
+    | expression '.' TYPE_NAME                                                      { node_span!(self, expressions, access, $1, $2, $3) }
     | expression PTR_OP IDENTIFIER                                                  { node_span!(self, expressions, access, $1, $2, $3) }
-    | SIZEOF '(' expression ')'                                                     { node_span!(self, expressions, sizeof_expr, $3) }
+    | expression PTR_OP TYPE_NAME                                                   { node_span!(self, expressions, access, $1, $2, $3) }
     | SIZEOF '(' type_name ')'                                                      { node_span!(self, expressions, sizeof_type, $3) }
+    | SIZEOF expression %prec PREC_UNARY                                            { node_span!(self, expressions, sizeof_expr, $2) }
     | '(' type_name ')' expression %prec PREC_UNARY                                 { node_span!(self, expressions, cast, $2, $4) }
     | expression INC_OP                                                             { node_span!(self, expressions, unary, YYToken::POST_INC_OP, $1) }
     | expression DEC_OP                                                             { node_span!(self, expressions, unary, YYToken::POST_DEC_OP, $1) }
@@ -210,11 +217,11 @@ declaration /* DeclarationNode */
 
 declaration_specifiers /* Vec<DeclarationSpecifier> */
 	: storage_class_specifier                                                       { self.lexer.ctx.in_typedef = ($1 == Storage::Typedef); vec![DeclarationSpecifier::Storage($1)] }
-	| storage_class_specifier declaration_specifiers                                { self.lexer.ctx.in_typedef = ($1 == Storage::Typedef); push!($<mut>2, DeclarationSpecifier::Storage($1)) }
-	| type_specifier                                                                { vec![DeclarationSpecifier::Type($1)] }
-	| type_specifier declaration_specifiers                                         { push!($<mut>2, DeclarationSpecifier::Type($1)) }
-	| type_qualifier                                                                { vec![DeclarationSpecifier::Qualifier($1)] }
-	| type_qualifier declaration_specifiers                                         { push!($<mut>2, DeclarationSpecifier::Qualifier($1)) }
+	| storage_class_specifier declaration_specifiers                                { self.lexer.ctx.in_typedef = ($1 == Storage::Typedef) || $<mut>2.iter().any(|s| matches!(s, DeclarationSpecifier::Storage(Storage::Typedef))); push!($<mut>2, DeclarationSpecifier::Storage($1)) }
+	| type_specifier                                                                { self.lexer.ctx.in_typedef = false; vec![DeclarationSpecifier::Type($1)] }
+	| type_specifier declaration_specifiers                                         { self.lexer.ctx.in_typedef = $<mut>2.iter().any(|s| matches!(s, DeclarationSpecifier::Storage(Storage::Typedef))); push!($<mut>2, DeclarationSpecifier::Type($1)) }
+	| type_qualifier                                                                { self.lexer.ctx.in_typedef = false; vec![DeclarationSpecifier::Qualifier($1)] }
+	| type_qualifier declaration_specifiers                                         { self.lexer.ctx.in_typedef = $<mut>2.iter().any(|s| matches!(s, DeclarationSpecifier::Storage(Storage::Typedef))); push!($<mut>2, DeclarationSpecifier::Qualifier($1)) }
 	;
 
 init_declarator_list /* Vec<InitDeclaratorNode> */
@@ -278,7 +285,7 @@ direct_declarator /* DeclaratorNode */
 	| direct_declarator '[' ']'                                                     { node_span!(self, declarators, array, $1, None) }
 	| direct_declarator '(' enter_scope parameter_type_list exit_scope ')'          { node_span!(self, declarators, function, $1, $4) }
 	| direct_declarator '(' enter_scope identifier_list exit_scope ')'              { let a = with_span!(self, FunctionParametersNode::old_style, $4); node_span!(self, declarators, function, $1, a) }
-	| direct_declarator '(' ')'                                                     { let a = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, $1, a) }
+	| direct_declarator '(' enter_scope exit_scope ')'                              { let a = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, $1, a) }
 	;
 
 
@@ -321,10 +328,10 @@ type_name /* Type */
 	;
 
 specifier_qualifier_list /* Vec<DeclarationSpecifier> */
-	: type_specifier specifier_qualifier_list                                       { push!($<mut>2, DeclarationSpecifier::Type($1)) }
-	| type_specifier                                                                { vec![DeclarationSpecifier::Type($1)] }
-	| type_qualifier specifier_qualifier_list                                       { push!($<mut>2, DeclarationSpecifier::Qualifier($1)) }
-	| type_qualifier                                                                { vec![DeclarationSpecifier::Qualifier($1)] }
+	: type_specifier specifier_qualifier_list                                       { self.lexer.ctx.in_typedef = false; push!($<mut>2, DeclarationSpecifier::Type($1)) }
+	| type_specifier                                                                { self.lexer.ctx.in_typedef = false; vec![DeclarationSpecifier::Type($1)] }
+	| type_qualifier specifier_qualifier_list                                       { self.lexer.ctx.in_typedef = false; push!($<mut>2, DeclarationSpecifier::Qualifier($1)) }
+	| type_qualifier                                                                { self.lexer.ctx.in_typedef = false; vec![DeclarationSpecifier::Qualifier($1)] }
 	;
 
 abstract_declarator /* DeclaratorNode */
@@ -346,9 +353,18 @@ direct_abstract_declarator /* DeclaratorNode */
 	;
 
 struct_or_union_specifier /* TypeSpecifier */
-	: struct_or_union '{' struct_declaration_list '}'                               { let s = self.span; self.lexer.ctx.struct_or_union($1, None, $3, s) }
-	| struct_or_union IDENTIFIER '{' struct_declaration_list '}'                    { let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), $4, s) }
-	| struct_or_union IDENTIFIER                                                    { let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), vec![], s) }
+	: struct_or_union '{' enter_struct struct_declaration_list '}'                  { self.lexer.ctx.struct_depth -= 1; let s = self.span; self.lexer.ctx.struct_or_union($1, None, $4, s) }
+	| struct_or_union tag_name '{' enter_struct struct_declaration_list '}'         { self.lexer.ctx.struct_depth -= 1; let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), $5, s) }
+	| struct_or_union tag_name                                                      { let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), vec![], s) }
+	;
+
+enter_struct
+	: /* empty */                                                                   { self.lexer.ctx.struct_depth += 1; }
+	;
+
+tag_name /* Name */
+	: IDENTIFIER                                                                    { $1 }
+	| TYPE_NAME                                                                     { $1 }
 	;
 
 struct_or_union /* Tag */
@@ -378,8 +394,8 @@ struct_declarator /* StructMemberDeclarator */
 
 enum_specifier /* EnumId */
 	: ENUM '{' enumerator_list '}'                                                  { node_span!(self, enums, add, None, $3) }
-	| ENUM IDENTIFIER '{' enumerator_list '}'                                       { node_span!(self, enums, add, Some($2), $4) }
-	| ENUM IDENTIFIER                                                               { node_span!(self, enums, add, Some($2), vec![]) }
+	| ENUM tag_name '{' enumerator_list '}'                                         { node_span!(self, enums, add, Some($2), $4) }
+	| ENUM tag_name                                                                 { node_span!(self, enums, add, Some($2), vec![]) }
 	;
 
 enumerator_list /* Vec<VariantId> */
@@ -403,6 +419,7 @@ statement /* StatementNode */
 
 labeled_statement /* LabeledStatementNode */
 	: IDENTIFIER ':' statement                                                      { with_span!(self, LabeledStatementNode::identifier, $1, $3) }
+	| TYPE_NAME ':' statement                                                       { with_span!(self, LabeledStatementNode::identifier, $1, $3) }
 	| CASE constant_expression ':' statement                                        { with_span!(self, LabeledStatementNode::case, $2, $4) }
 	| DEFAULT ':' statement                                                         { with_span!(self, LabeledStatementNode::default, $3) }
 	;
@@ -443,6 +460,7 @@ iteration_statement /* IterationStatementNode */
 
 jump_statement /* JumpStatementNode */
 	: GOTO IDENTIFIER ';'                                                           { with_span!(self, JumpStatementNode::new, JumpStatement::Goto) }
+	| GOTO TYPE_NAME ';'                                                            { with_span!(self, JumpStatementNode::new, JumpStatement::Goto) }
 	| CONTINUE ';'                                                                  { with_span!(self, JumpStatementNode::new, JumpStatement::Continue) }
 	| BREAK ';'                                                                     { with_span!(self, JumpStatementNode::new, JumpStatement::Break) }
 	| RETURN ';'                                                                    { with_span!(self, JumpStatementNode::new_return, None) }

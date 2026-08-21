@@ -109,17 +109,16 @@ impl SymbolResolver {
         kind: SymbolKind,
         declarator: Option<DeclaratorNode>,
     ) -> SymbolId {
-        self.dedup(&name, &ty, &declarator.map(|d| d.span).unwrap_or_default());
+        self.dedup(&name, &ty, kind, &declarator.map(|d| d.span).unwrap_or_default());
         let sym_id = self.symbols.add(name, ty, Some(storage), kind);
         self.scope_mut().ordinaries.insert(name.id, sym_id);
         sym_id
     }
 
-    fn dedup(&mut self, name: &Name, ty: &QualifiedType, span: &Span) {
+    fn dedup(&mut self, name: &Name, ty: &QualifiedType, kind: SymbolKind, span: &Span) {
         if let Some(old) = self.scope().ordinaries.get(&name.id) {
-            let old_ty = &self.symbols.get(*old).ty;
-            if old_ty != ty {
-                println!("COUCOU");
+            let old_symbol = self.symbols.get(*old);
+            if old_symbol.ty != *ty || old_symbol.kind != kind {
                 self.diagnosis
                     .push(DiagnosisNode::new(Diagnosis::DuplicateDeclaration, *span));
             }
@@ -285,7 +284,8 @@ impl Visitor for SymbolResolver {
             let storage = constrain::declaration::get_storage(&node.specifiers)
                 .collect(self, span)
                 .unwrap_or(Storage::Auto);
-            self.add_ordinary_symbol(name, ty, storage, SymbolKind::Variable, Some(decl));
+            let kind = if storage == Storage::Typedef { SymbolKind::Typedef } else { SymbolKind::Variable };
+            self.add_ordinary_symbol(name, ty, storage, kind, Some(decl));
         }
         walk_declaration(self, ctx, node, is_last);
     }

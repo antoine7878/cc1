@@ -1,15 +1,3 @@
-A. Critical correctness bugs
-A2. Relational/equality operators are %nonassoc (c.y:57-58) → chained comparisons rejected.
-a < b < c and a == b == c are valid C90 (left-associative, evaluated left→right) and accepted by gcc; here they are a syntax error. Should be %left. This is a conformance bug in the precedence table.
-A3. No preprocessor; #… lines are silently discarded (c.l:19).
-#include, #define, #if, #pragma are all swallowed. Consequences:
-- #include <foo.h> vanishes → every symbol from it is undeclared → C90 implicit-int handling would kick in (and identifiers like FILE get no declaration); there is no #define-based constant substitution; macros used as call syntax actually parse as normal calls.
-- gcc under -std=iso9899:1990 -pedantic-errors treats a missing prototype as an error, so behavior diverges on any real program.
-This is the single biggest gap toward the stated goal ("behaviors compared to gcc -pedantic-errors").
-A4. Block-scoped typedefs leak into the enclosing scope (c.y:401-404).
-The compound_statement action calls push_scope()/pop_scope() in the reduction of the whole { … }. By then all inner declarations have already reduced and called add_symbol (c.y:197-198) — i.e. into the enclosing scope — and the push/pop then adds and removes a fresh empty set as a no-op. Net effect: { typedef int T; } leaves T a typedef afterwards, so:
-{ typedef int T; }  int T;   // second line: T lexed as TYPE_NAME → syntax error (legal C90)
-Block-scope tag/typedef shadowing is broken because the parse-time scope bookkeeping is a no-op. (The semantic resolver's own scopes in resolution.rs:306-313 are fine; this only affects typedef lexing.)
 B. Major issues
 B1. f(a,b) collapses to a single comma argument (c.y:147, expression.rs:76).
 expression '(' expression ')' takes one Option<ExpressionNode>; f(a,b,c) becomes FunctionCall(f, Some(List(a, List(b,c)))). The distinction between f(a,b) and f((a,b)) is recoverable only by comparing the argument span against the call-paren span (paren rule discards the wrapper at c.y:141). Any future type-checking/codegen of calls must split top-level Expression::List nodes with fragile span heuristics. Better: Vec<ExpressionNode> args. Nothing in the current analyzer consumes expressions yet, so it's latent.
@@ -30,17 +18,3 @@ C. Minor / hygiene
 - C7. is_tentative_definition is inverted (external.rs:140): returns true only when there is an initializer; a tentative definition is one without one. (Semantic, not parser, but adjacent.)
 - C8. %left ',' ordering vs the rest (c.y:47-48) is correct (PREC_NO_COMMA binds tighter than comma, correctly stopping case 1,2: / int a = 1, b = 2).
 - C9. Declarations-after-statements rejected syntactically (grammar splits declaration_list/statement_list, c.y:402-404) rather than as a constraint diagnosis — output differs from gcc wording, which the project flags as acceptable, but the error class differs.
-D. Confirmed correct
-- Pointer fold Vec<Vec<Qualifier>> → nested Pointer (c.y:275-280, declaration.rs:101-103); array/function/abstract declarator chain; parenthesized declarators; declarator/abstract_declarator distinction.
-- Dangling-else resolved by PREC_THEN < ELSE (c.y:64-65,423); ? : and assignments right-assoc; unary vs postfix ++/-- binding; cast precedence via PREC_UNARY (sizeof (T)(x) parse resolves to cast by shift-preference).
-- constant_expression %prec PREC_NO_COMMA correctly excludes top-level commas from array bounds/case labels/enum values/bit-fields; K&R function definitions (all 4 forms) present.
-- Old-style parameter checks (identifier-list vs declaration-list matching, implicit-int for missing, duplicate/missing parameter diagnoses, typedef redefinition as param) via external.rs:95-134; f(void) handled by is_abstract_void.
-- Span propagation for multi-symbol rules is consistent; no empty-RHS rule exists, so the span-stack indexing in action() cannot underflow.
-- Struct/union/enum body parsing, bit-field widths, initializer lists with trailing comma (c.y:251), trigraphs for { } [ ] ~ ! | ^ > (c.l:91-108).
-Suggested priority for fixes
-1. A1 (typedef-after-tag) — breaks real headers; fix in check_type with a "previous token" hint.
-2. A2 (relational %left), A4 (block scope push/pop at { shift), B2 (variadic panic).
-3. A3 (assert/measure on minirt.c; at minimum diagnose # directives).
-4. B3 (exit code + one-error recovery), B1 (args as Vec).
-5. C-tier hygiene (B4, C1, C2, C6, C7).
-Note: per AGENTS.md I've only investigated — no files were modified. Want me to turn these into a task list for the fixes, or dig deeper into any single item (e.g., trace the exact failing token sequence for A1)?

@@ -27,6 +27,12 @@ pub struct Context {
     pub ast: TranslationUnitNode,
     pub file_name: String,
     pub in_typedef: bool,
+    in_typedef_stack: Vec<bool>,
+    pub struct_depth: usize,
+    pub saw_type_spec: bool,
+    pub pending_tag: bool,
+    brace_stack: Vec<bool>,
+    stashed: Option<HashMap<StringId, SymbolKind>>,
 }
 
 impl Context {
@@ -36,6 +42,12 @@ impl Context {
             arenas: Arenas::default(),
             ast: TranslationUnitNode::default(),
             in_typedef: false,
+            in_typedef_stack: Vec::new(),
+            struct_depth: 0,
+            saw_type_spec: false,
+            pending_tag: false,
+            brace_stack: Vec::new(),
+            stashed: None,
             file_name,
         }
     }
@@ -56,22 +68,61 @@ impl Context {
 
     pub fn push_scope(&mut self) {
         self.typedefs.push(HashMap::default());
+        self.in_typedef_stack.push(self.in_typedef);
     }
 
     pub fn pop_scope(&mut self) {
-        self.typedefs.pop();
+        self.stashed = self.typedefs.pop();
+        self.in_typedef = self.in_typedef_stack.pop().unwrap_or(false);
+    }
+
+    pub fn unstash_scope(&mut self) {
+        self.push_scope();
+        if let Some(stashed) = self.stashed.take() {
+            *self.typedefs.last_mut().unwrap() = stashed;
+        }
     }
 
     pub fn add_symbol(&mut self, id: StringId) {
+        if self.struct_depth > 0 {
+            return;
+        }
         let kind = if self.in_typedef { SymbolKind::Typedef } else { SymbolKind::Variable };
         self.typedefs.last_mut().map(|ts| ts.insert(id, kind));
     }
 
-    pub fn check_type(&self, name: Name) -> YYToken {
+    pub fn check_type(&mut self, name: Name) -> YYToken {
+        if self.pending_tag {
+            // struct/union/enum tag name: `struct S` is itself a complete type specifier
+            self.saw_type_spec = true;
+            return YYToken::IDENTIFIER(name);
+        }
+        if self.saw_type_spec {
+            // a type specifier was already seen: this identifier is a declarator name
+            return YYToken::IDENTIFIER(name);
+        }
         match self.typedefs.iter().rev().filter_map(|ty| ty.get(&name.id)).next() {
-            Some(SymbolKind::Typedef) => YYToken::TYPE_NAME(name),
+            Some(SymbolKind::Typedef) => {
+                self.saw_type_spec = true;
+                YYToken::TYPE_NAME(name)
+            }
             Some(SymbolKind::Variable) | None => YYToken::IDENTIFIER(name),
             _ => unreachable!(),
         }
+    }
+
+    pub fn enter_brace(&mut self) {
+        self.brace_stack.push(self.pending_tag);
+        self.pending_tag = false;
+        self.saw_type_spec = false;
+    }
+
+    pub fn exit_brace(&mut self) {
+        self.saw_type_spec = self.brace_stack.pop().unwrap_or(false);
+    }
+
+    pub fn clear_type_spec(&mut self) {
+        self.saw_type_spec = false;
+        self.pending_tag = false;
     }
 }

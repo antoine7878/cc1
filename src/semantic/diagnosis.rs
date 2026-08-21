@@ -1,4 +1,4 @@
-use std::io::{self, Write, stdout};
+use std::io::{self, Write, stderr};
 
 use crate::ast::Name;
 use crate::parser::{Context, Span};
@@ -35,7 +35,7 @@ impl DiagnosisNode {
     }
 
     pub fn print(&self, ctx: &Context) -> io::Result<()> {
-        self.write(&mut stdout(), ctx)
+        self.write(&mut stderr(), ctx)
     }
 
     #[rustfmt::skip]
