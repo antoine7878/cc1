@@ -129,12 +129,9 @@ fn comment<T: Read>(lex: &mut YYLex<T>) {
 }
 
 fn check_type<R: Read>(lex: &YYLex<R>, name: Name) -> YYToken {
-	if lex.ctx.typedefs.iter().rev().any(|ty| ty.get(&name.id) == Some(&SymbolKind::Typedef)) {
+	if lex.ctx.typedefs.last().unwrap().get(&name.id) == Some(&SymbolKind::Typedef) {
 	    return YYToken::TYPE_NAME(name);
-    }
-	// if lex.ctx.typedefs.last().unwrap().get(&name.id) == Some(&SymbolKind::Typedef) {
-	//     return YYToken::TYPE_NAME(name);
-	// }
+	}
 	YYToken::IDENTIFIER(name)
 }
 
