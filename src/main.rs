@@ -23,6 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let yacc = Yacc::new(lexer);
     let ctx = yacc.yyparse();
     // AstPrinter::print(&ctx)?;
+    println!("------------------------------------------------");
     let _ctx = Analyzer::analyze(ctx);
     Ok(())
 }

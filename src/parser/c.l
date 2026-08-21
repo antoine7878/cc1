@@ -53,7 +53,7 @@ IS			(u|U|l|L)*
 "void"			            { return YYToken::VOID; }
 "volatile"		            { return YYToken::VOLATILE; }
 "while"			            { return YYToken::WHILE; }
-{L}({L}|{D})*		        { let name = alloc_name(self); return check_type(self, name); }
+{L}({L}|{D})*		        { let name = alloc_name(self); return self.ctx.check_type(name); }
 0[xX]{H}+{IS}?		        { return YYToken::CONSTANT(alloc_name(self)); }
 0{D}+{IS}?		            { return YYToken::CONSTANT(alloc_name(self)); }
 {D}+{IS}?		            { return YYToken::CONSTANT(alloc_name(self)); }
@@ -126,15 +126,6 @@ fn comment<T: Read>(lex: &mut YYLex<T>) {
             }
         }
     }
-}
-
-fn check_type<R: Read>(lex: &YYLex<R>, name: Name) -> YYToken {
-    for ty in lex.ctx.typedefs.iter().rev() {
-        if let Some(kind) = ty.get(&name.id) {
-            return if *kind == SymbolKind::Typedef { YYToken::TYPE_NAME(name) } else { YYToken::IDENTIFIER(name) };
-        }
-    }
-    YYToken::IDENTIFIER(name)
 }
 
 fn alloc_name<R: Read>(lex: &mut YYLex<R>) -> Name {

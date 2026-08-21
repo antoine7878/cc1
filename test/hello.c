@@ -1,6 +1,6 @@
 typedef int T;
 
-int main(void) {
+int main(int a) {
 	int T;
 	return 0;
 }

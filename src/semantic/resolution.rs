@@ -197,12 +197,12 @@ impl SymbolResolver {
     }
 
     fn param_old_style(&mut self, ctx: &Context, names: &[Name], lst: &[DeclarationNode], span: &Span) {
-        if names
-            .iter()
-            .any(|name| !constrain::external::check_typedef(ctx, name).collect(self, span))
-        {
-            return;
-        }
+        // if names
+        //     .iter()
+        //     .any(|name| !constrain::external::check_typedef(ctx, name).collect(self, span))
+        // {
+        //     return;
+        // }
         let declarations: Vec<_> = lst
             .iter()
             .flat_map(

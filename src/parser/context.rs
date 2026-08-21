@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::ast::{DeclarationNode, DeclarationSpecifier, DeclaratorArena, Name};
 use crate::ast::{EnumArena, ExpressionArena, StatementArena, Storage, StringArena, StringId, StructArena};
 use crate::ast::{StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena};
-use crate::parser::Span;
+use crate::parser::{Span, YYToken};
 use crate::semantic::{ResolvedTypeArena, SymbolArena, SymbolKind};
 
 #[derive(Debug, Default)]
@@ -73,8 +73,17 @@ impl Context {
             let Some(name) = init_decl.declarator.ident(self) else {
                 continue;
             };
-            let i = name.id;
-            self.typedefs.last_mut().map(|ts| ts.insert(i, kind));
+            let id = name.id;
+            self.typedefs.last_mut().map(|ts| ts.insert(id, kind));
         }
+    }
+
+    pub fn check_type(&self, name: Name) -> YYToken {
+        for ty in self.typedefs.iter().rev() {
+            if let Some(kind) = ty.get(&name.id) {
+                return if *kind == SymbolKind::Typedef { YYToken::TYPE_NAME(name) } else { YYToken::IDENTIFIER(name) };
+            }
+        }
+        YYToken::IDENTIFIER(name)
     }
 }
