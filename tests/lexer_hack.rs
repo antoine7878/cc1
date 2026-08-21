@@ -1,11 +1,3 @@
-//! Differential tests for the typedef/identifier lexer hack (c.l `check_type`).
-//!
-//! Each case is compiled by gcc (`-std=iso9899:1990 -pedantic-errors`, same flags
-//! as `make c`) and by cc1; the accept/reject verdicts must match.
-//!
-//! Cases marked `ignore:` are known limitations where cc1 currently diverges from
-//! gcc; un-ignore them as the lexer hack gets fixed.
-
 use std::fs;
 use std::process::Command;
 
@@ -65,13 +57,6 @@ macro_rules! case {
             run_case(stringify!($name), $src);
         }
     };
-    (ignore: $name:ident, $src:expr) => {
-        #[test]
-        #[ignore = "known lexer hack limitation: cc1 diverges from gcc"]
-        fn $name() {
-            run_case(stringify!($name), $src);
-        }
-    };
 }
 
 // ---- typedef registration, lookup, scoping ------------------------------
@@ -123,32 +108,47 @@ case!(
 
 // ---- known divergences (shadowing: inner ordinary decl must hide typedef) -
 
-case!(ignore: local_var_shadows_typedef, "typedef int T; int main(void) { int T; T = 1; return T; }");
+case!(
+    local_var_shadows_typedef,
+    "typedef int T; int main(void) { int T; T = 1; return T; }"
+);
 
-case!(ignore: param_shadows_typedef, "typedef int T; T f(T T) { return T; }");
+case!(param_shadows_typedef, "typedef int T; T f(T T) { return T; }");
 
-case!(ignore: paren_expr_of_shadowed_typedef, "typedef int T; int main(void) { int T; return (T); }");
+case!(
+    paren_expr_of_shadowed_typedef,
+    "typedef int T; int main(void) { int T; return (T); }"
+);
 
-case!(ignore: sizeof_expr_on_shadowed_typedef, "typedef int T; int main(void) { int T; return sizeof T; }");
+case!(
+    sizeof_expr_on_shadowed_typedef,
+    "typedef int T; int main(void) { int T; return sizeof T; }"
+);
 
-case!(ignore: label_named_as_typedef, "typedef int T; void f(void) { T: ; goto T; }");
+case!(label_named_as_typedef, "typedef int T; void f(void) { T: ; goto T; }");
 
 // ---- known divergences (separate namespaces, C90 6.1.2.3) -----------------
 
 // A1: tags live in their own namespace; enum was patched (ENUM TYPE_NAME), struct/union not
-case!(ignore: struct_tag_named_as_typedef, "typedef int S; struct S { int x; };");
+case!(struct_tag_named_as_typedef, "typedef int S; struct S { int x; };");
 
-case!(ignore: union_tag_named_as_typedef, "typedef int S; union S { int x; };");
+case!(union_tag_named_as_typedef, "typedef int S; union S { int x; };");
 
 // members live in their own namespace
-case!(ignore: member_named_as_typedef, "typedef int T; struct S { T T; };");
+case!(member_named_as_typedef, "typedef int T; struct S { T T; };");
 
-case!(ignore: member_access_named_as_typedef, "typedef int x; struct S { int x; }; void f(void) { struct S s; s.x = 1; }");
+case!(
+    member_access_named_as_typedef,
+    "typedef int x; struct S { int x; }; void f(void) { struct S s; s.x = 1; }"
+);
 
 // ---- known divergences (other) -------------------------------------------
 
 // gcc rejects the redeclaration; cc1 parses it as two type specifiers, no declarator
-case!(ignore: typedef_redeclared_as_var, "typedef int T; int T;");
+case!(typedef_redeclared_as_var, "typedef int T; int T;");
 
 // legal C90: struct definition inside a K&R declaration_list
-case!(ignore: knr_struct_def_in_declaration_list, "f(a) struct S { int x; } *a; { return 0; }");
+case!(
+    knr_struct_def_in_declaration_list,
+    "f(a) struct S { int x; } *a; { return 0; }"
+);

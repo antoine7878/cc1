@@ -273,6 +273,7 @@ declarator /* DeclaratorNode */
 
 direct_declarator /* DeclaratorNode */
 	: IDENTIFIER                                                                    { node_span!(self, declarators, ident, $1) }
+	| TYPE_NAME                                                                     { node_span!(self, declarators, ident, $1) }
 	| '(' declarator ')'                                                            { $2 }
 	| direct_declarator '[' constant_expression ']'                                 { node_span!(self, declarators, array, $1, Some($3)) }
 	| direct_declarator '[' ']'                                                     { node_span!(self, declarators, array, $1, None) }

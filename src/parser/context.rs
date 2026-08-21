@@ -65,9 +65,9 @@ impl Context {
             .specifiers
             .contains(&DeclarationSpecifier::Storage(Storage::Typedef))
         {
-            SymbolKind::Typedef
+            SymbolKind::Variable
         } else {
-            SymbolKind::Function
+            SymbolKind::Typedef
         };
         for init_decl in &decl.init_declarators {
             let Some(name) = init_decl.declarator.ident(self) else {
