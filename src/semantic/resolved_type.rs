@@ -32,12 +32,21 @@ impl ResolvedTypeArena {
     pub fn label(&mut self) -> ResolvedTypeId {
         self.alloc(ResolvedType::Label)
     }
+
     pub fn int(&mut self) -> ResolvedTypeId {
         self.alloc(ResolvedType::Int)
     }
 
     pub fn pointer(&mut self, inner: QualifiedType) -> ResolvedTypeId {
         self.alloc(ResolvedType::Pointer(inner))
+    }
+
+    pub fn new_enum(&mut self, id: EnumId) -> ResolvedTypeId {
+        self.alloc(ResolvedType::Enum(id))
+    }
+
+    pub fn new_struct(&mut self, id: StructId) -> ResolvedTypeId {
+        self.alloc(ResolvedType::Struct(id))
     }
 }
 

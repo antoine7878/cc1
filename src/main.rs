@@ -1,9 +1,10 @@
 use cc1::ast::print::AstPrinter;
-use cc1::parser::{Context, SpliceReader, YYLex, Yacc};
+use cc1::parser::{Context, YYLex, Yacc};
 use cc1::semantic::Analyzer;
 
 use std::env::args;
 use std::fs::File;
+use std::io::BufReader;
 use std::process::exit;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let file: File = File::open(&file_name)?;
     let ctx = Context::new(file_name);
-    let lexer = YYLex::new(SpliceReader::new(file), || None, ctx);
+    let lexer = YYLex::new(BufReader::new(file), || None, ctx);
     let mut yacc = Yacc::new(lexer);
     yacc.yyparse();
     let ctx = yacc.lexer.ctx;

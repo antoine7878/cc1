@@ -147,7 +147,19 @@ pub fn walk_function_definition<V: Visitor + ?Sized>(
     v.visit_compound_statement(ctx, &node.body, true);
 }
 
-pub fn walk_declaration<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &DeclarationNode, _is_last: bool) {
+pub fn walk_declaration<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &DeclarationNode, is_last: bool) {
+    walk_declaration_specifier(v, ctx, node, is_last);
+    for (is_last, init) in node.init_declarators.iter().with_last() {
+        v.visit_init_declarator(ctx, init, is_last);
+    }
+}
+
+pub fn walk_declaration_specifier<V: Visitor + ?Sized>(
+    v: &mut V,
+    ctx: &Context,
+    node: &DeclarationNode,
+    _is_last: bool,
+) {
     let tags = node
         .specifiers
         .iter()
@@ -176,12 +188,9 @@ pub fn walk_declaration<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &De
                     v.visit_enum(ctx, id.resolve(ctx), i == total);
                 }
                 TypeSpecifier::TypedefName(name) => v.visit_name(ctx, name),
-                _ => {}
+                _ => continue,
             }
         }
-    }
-    for (is_last, init) in node.init_declarators.iter().with_last() {
-        v.visit_init_declarator(ctx, init, is_last);
     }
 }
 
@@ -486,7 +495,12 @@ pub fn walk_struct_declaration<V: Visitor + ?Sized>(
     }
 }
 
-pub fn walk_struct_declarator<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &StructMemberDeclarator, _is_last: bool) {
+pub fn walk_struct_declarator<V: Visitor + ?Sized>(
+    v: &mut V,
+    ctx: &Context,
+    node: &StructMemberDeclarator,
+    _is_last: bool,
+) {
     v.visit_declarator(ctx, &node.declarator, node.bit_width.is_none());
     if let Some(bit_width) = &node.bit_width {
         v.visit_expression(ctx, bit_width, true);

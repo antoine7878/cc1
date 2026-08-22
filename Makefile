@@ -34,7 +34,8 @@ $(PARSER): $(YACC_FILE) | $(FT_YACC)
 # ----- test --------------------
 
 test: $(NAME)
-	./$(NAME) test/hello.c
+	clang -E -std=c89 test/hello.c > test/hello.i
+	./$(NAME) test/hello.i
 
 CCF = -std=iso9899:1990 -pedantic-errors -fno-gnu-keywords -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
 

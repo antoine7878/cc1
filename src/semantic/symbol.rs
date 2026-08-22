@@ -2,7 +2,6 @@ use std::fmt;
 
 use crate::ast::{ExpressionNode, Name, Storage};
 use crate::define_arena;
-// use crate::parser::Context;
 use crate::semantic::QualifiedType;
 
 define_arena!(Symbol, SymbolArena, SymbolId, symbols);
@@ -14,7 +13,7 @@ impl SymbolArena {
             ty,
             storage,
             kind,
-            size: None,
+            bit_witdh: None,
         })
     }
 
@@ -31,7 +30,7 @@ impl SymbolArena {
             ty,
             storage,
             kind,
-            size,
+            bit_witdh: size,
         })
     }
 }
@@ -47,7 +46,7 @@ pub enum SymbolKind {
     Member,
     Label,
     Typedef,
-    Enumerator,
+    Variant,
 }
 
 impl fmt::Display for SymbolKind {
@@ -62,7 +61,7 @@ impl fmt::Display for SymbolKind {
             SymbolKind::Member => write!(f, "member"),
             SymbolKind::Label => write!(f, "label"),
             SymbolKind::Typedef => write!(f, "typedef"),
-            SymbolKind::Enumerator => write!(f, "enumerator"),
+            SymbolKind::Variant => write!(f, "variant"),
         }
     }
 }
@@ -73,11 +72,5 @@ pub struct Symbol {
     pub ty: QualifiedType,
     pub storage: Option<Storage>,
     pub kind: SymbolKind,
-    pub size: Option<ExpressionNode>,
+    pub bit_witdh: Option<ExpressionNode>,
 }
-
-// impl Symbol {
-//     fn print(&self, ctx: &Context) {
-//         println!("{}: ", self.name.id.resolve(ctx));
-//     }
-// }
