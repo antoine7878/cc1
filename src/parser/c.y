@@ -124,13 +124,11 @@ macro_rules! spec {
 
 %%
 
-enter_scope
-	: /* empty */                                                                           { self.lexer.ctx.push_scope(); }
-	;
-
-exit_scope
-	: /* empty */                                                                           { self.lexer.ctx.pop_scope(); }
-	;
+enter_scope:                                                                                { self.lexer.ctx.push_scope(); } ;
+exit_scope:                                                                                 { self.lexer.ctx.pop_scope(); } ;
+reopen_params:                                                                              { self.lexer.ctx.unstash_scope(); } ;
+enter_struct:                                                                               { self.lexer.ctx.enter_struct(); } ;
+exit_struct:                                                                                { self.lexer.ctx.exit_struct(); } ;
 
 translation_unit /* (TranslationUnitNode) */
 	: external_declaration_list                                                             { let ast = with_span!(self, TranslationUnitNode::new, $1); self.lexer.ctx.ast = ast; }
@@ -151,10 +149,6 @@ function_definition /* FunctionDefinitionNode */
 	| declaration_specifiers declarator reopen_params compound_statement                    { self.lexer.ctx.pop_scope(); with_span!(self, FunctionDefinitionNode::new, $1, $2, vec![], $4) }
 	| declarator reopen_params declaration_list compound_statement                          { self.lexer.ctx.pop_scope(); with_span!(self, FunctionDefinitionNode::new, vec![], $1, $3, $4) }
 	| declarator reopen_params compound_statement                                           { self.lexer.ctx.pop_scope(); with_span!(self, FunctionDefinitionNode::new, vec![], $1, vec![], $3) }
-	;
-
-reopen_params
-	: /* empty */                                                                           { self.lexer.ctx.unstash_scope(); }
 	;
 
 constant_expression /* ExpressionNode */
@@ -399,14 +393,6 @@ struct_or_union_specifier /* TypeSpecifier */
 	| struct_or_union IDENTIFIER                                                            { let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), vec![], s) }
 	;
 
-enter_struct
-	: /* empty */                                                                           { self.lexer.ctx.enter_struct(); }
-	;
-
-exit_struct
-	: /* empty */                                                                           { self.lexer.ctx.exit_struct(); }
-	;
-
 struct_or_union /* Tag */
 	: STRUCT                                                                                { Tag::Struct }
 	| UNION                                                                                 { Tag::Union }
@@ -459,8 +445,6 @@ statement /* StatementNode */
 
 labeled_statement /* LabeledStatementNode */
 	: IDENTIFIER ':' statement                                                              { with_span!(self, LabeledStatementNode::identifier, $1, $3) }
-	/* `T:` at the head of a block is a label or a declaration, and only the ':'
-	   tells them apart — the one case the parser state cannot settle alone. */
 	| TYPE_NAME ':' statement                                                               { with_span!(self, LabeledStatementNode::identifier, $1, $3) }
 	| CASE constant_expression ':' statement                                                { with_span!(self, LabeledStatementNode::case, $2, $4) }
 	| DEFAULT ':' statement                                                                 { with_span!(self, LabeledStatementNode::default, $3) }
@@ -501,7 +485,7 @@ iteration_statement /* IterationStatementNode */
 	;
 
 jump_statement /* JumpStatementNode */
-	: GOTO IDENTIFIER ';'                                                                   { with_span!(self, JumpStatementNode::new, JumpStatement::Goto) }
+	: GOTO IDENTIFIER ';'                                                                   { with_span!(self, JumpStatementNode::goto, $2) }
 	| CONTINUE ';'                                                                          { with_span!(self, JumpStatementNode::new, JumpStatement::Continue) }
 	| BREAK ';'                                                                             { with_span!(self, JumpStatementNode::new, JumpStatement::Break) }
 	| RETURN ';'                                                                            { with_span!(self, JumpStatementNode::new_return, None) }

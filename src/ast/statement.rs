@@ -86,7 +86,7 @@ ast_node! {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum JumpStatement {
-    Goto,
+    Goto(Name),
     Continue,
     Break,
     Return(Option<ExpressionNode>),
@@ -171,7 +171,7 @@ impl Display for IterationStatement {
 impl Display for JumpStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            JumpStatement::Goto => "Goto",
+            JumpStatement::Goto(_) => "Goto",
             JumpStatement::Continue => "Continue",
             JumpStatement::Break => "Break",
             JumpStatement::Return(_) => "Return",
@@ -216,6 +216,9 @@ impl IterationStatementNode {
 }
 
 impl JumpStatementNode {
+    pub fn goto(name: Name, span: Span) -> JumpStatementNode {
+        JumpStatementNode::new(JumpStatement::Goto(name), span)
+    }
     pub fn new_return(expr: Option<ExpressionNode>, span: Span) -> JumpStatementNode {
         JumpStatementNode::new(JumpStatement::Return(expr), span)
     }
