@@ -20,7 +20,6 @@ IS			(u|U|l|L)*
 
 #.*                         {}
 "//".*                      {}
-"/*"			            { comment(self); }
 "auto"			            { return YYToken::AUTO; }
 "break"			            { return YYToken::BREAK; }
 "case"			            { return YYToken::CASE; }
@@ -113,21 +112,6 @@ L\"(\\.|[^\\"])*\"	        { let len = self.yytext.len(); return YYToken::STRING
 .			                { /* ignore bad characters */ }
 
 %%
-
-fn comment<T: Read>(lex: &mut YYLex<T>) {
-    let mut c = lex.input();
-    while c != b'*' && c != 0 {
-        c = lex.input();
-        if c == b'*' {
-            while c == b'*' {
-                c = lex.input();
-            }
-            if c == b'/' || c == 0 {
-                return;
-            }
-        }
-    }
-}
 
 impl<R: Read> YYFeedback for YYLex<R> {
     fn yy_feedback(&mut self, accepts: &dyn Fn(usize) -> bool) {
