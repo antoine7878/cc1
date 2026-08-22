@@ -115,29 +115,44 @@ impl SymbolResolver {
         sym_id
     }
 
-    fn dedup(&mut self, name: &Name, ty: &QualifiedType, kind: SymbolKind, span: &Span) {
-        if let Some(old) = self.scope().ordinaries.get(&name.id) {
-            let old_symbol = self.symbols.get(*old);
-            if old_symbol.ty != *ty || old_symbol.kind != kind {
-                self.diagnosis
-                    .push(DiagnosisNode::new(Diagnosis::DuplicateDeclaration, *span));
-            }
-        }
-    }
-
     fn add_label_symbol(
         &mut self,
         name: Name,
         ty: QualifiedType,
         kind: SymbolKind,
-        declarator: Option<DeclaratorNode>,
+        span: &Span,
     ) -> Diag<Option<SymbolId>> {
         let sym_id = self.symbols.add(name, ty, None, kind);
+        self.dedup(&name, &ty, kind, span);
         let Some(scope) = self.scopes.iter_mut().rfind(|s| matches!(s.kind, ScopeKind::Function)) else {
             return Diag::none_diag(Diagnosis::LabelOutsideFunction);
         };
         scope.labels.insert(name.id, sym_id);
         Diag::some(sym_id)
+    }
+
+    fn get_map(&self, kind: SymbolKind) -> &HashMap<StringId, SymbolId> {
+        match kind {
+            SymbolKind::Struct | SymbolKind::Enum | SymbolKind::Union => &self.scope().tags,
+            SymbolKind::Member => &self.scope().members,
+            SymbolKind::Label => &self.scope().labels,
+            SymbolKind::Typedef | SymbolKind::Variable | SymbolKind::Parameter | SymbolKind::Function => {
+                &self.scope().ordinaries
+            }
+        }
+    }
+
+    fn dedup(&mut self, name: &Name, ty: &QualifiedType, kind: SymbolKind, span: &Span) {
+        let scope = self.scopes.last().unwrap();
+        if let Some(old) = self.get_map(kind).get(&name.id) {
+            let old_symbol = self.symbols.get(*old);
+            if scope.kind != ScopeKind::File
+                || ((old_symbol.ty != *ty || old_symbol.kind != kind) && scope.kind == ScopeKind::File)
+            {
+                self.diagnosis
+                    .push(DiagnosisNode::new(Diagnosis::DuplicateDeclaration(kind, *name), *span));
+            }
+        }
     }
 
     fn add_function<'a>(
@@ -294,8 +309,13 @@ impl Visitor for SymbolResolver {
         match &node.inner {
             Labeled::Identifier(name, stmt) => {
                 let ty = self.types.label();
-                self.add_label_symbol(*name, QualifiedType::new(ty, false, false), SymbolKind::Label, None)
-                    .collect(self, &node.span);
+                self.add_label_symbol(
+                    *name,
+                    QualifiedType::new(ty, false, false),
+                    SymbolKind::Label,
+                    &node.span,
+                )
+                .collect(self, &node.span);
             }
             Labeled::Case(expr, stmt) => (),
             Labeled::Default(stmt) => (),

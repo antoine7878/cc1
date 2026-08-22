@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::ast::{ExpressionNode, Name, Storage};
 use crate::define_arena;
 // use crate::parser::Context;
@@ -45,6 +47,22 @@ pub enum SymbolKind {
     Member,
     Label,
     Typedef,
+}
+
+impl fmt::Display for SymbolKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SymbolKind::Variable => write!(f, "variable"),
+            SymbolKind::Function => write!(f, "function"),
+            SymbolKind::Parameter => write!(f, "parameter"),
+            SymbolKind::Struct => write!(f, "struct"),
+            SymbolKind::Enum => write!(f, "enum"),
+            SymbolKind::Union => write!(f, "union"),
+            SymbolKind::Member => write!(f, "member"),
+            SymbolKind::Label => write!(f, "label"),
+            SymbolKind::Typedef => write!(f, "typedef"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]

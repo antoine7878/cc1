@@ -1,8 +1,9 @@
 typedef int T;
 
-int main(int a) {
-	int T;
-	T = 2;
-T:
+void f(void) {
+	int(T);
+}
+
+int main(void) {
 	return 0;
 }

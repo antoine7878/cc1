@@ -2,6 +2,7 @@ use std::io::{self, Write, stderr};
 
 use crate::ast::Name;
 use crate::parser::{Context, Span};
+use crate::semantic::SymbolKind;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Diagnosis {
@@ -26,7 +27,7 @@ pub enum Diagnosis {
     TypedefInOldStyle,
 
     LabelOutsideFunction,
-    DuplicateDeclaration,
+    DuplicateDeclaration(SymbolKind, Name),
 }
 
 impl DiagnosisNode {
@@ -59,7 +60,7 @@ impl DiagnosisNode {
             Diagnosis::DuplicateParameterName => writeln!(w, "Duplicate paramter identifier"),
             Diagnosis::TypedefInOldStyle => writeln!(w, "Typedef unsed in old style function"),
             Diagnosis::LabelOutsideFunction => writeln!(w, "Label outside function"),
-            Diagnosis::DuplicateDeclaration => writeln!(w, "duplicate declaration"),
+            Diagnosis::DuplicateDeclaration(kind, name) => writeln!(w, "duplicate declaration of {} `{}'", kind, name.id.resolve(ctx)),
         }
     }
 }
