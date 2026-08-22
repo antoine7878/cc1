@@ -339,7 +339,7 @@ impl Visitor for SymbolResolver {
     }
 
     fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode, is_last: bool) {
-        walk_declaration_specifier(self, ctx, node, is_last);
+        // walk_declaration_specifier(self, ctx, node, is_last);
         let specifiers = &node.specifiers;
         let span = &node.span;
         // self.add_tag(ctx, specifiers);
