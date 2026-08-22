@@ -549,3 +549,18 @@ syntax!(concat_with_escapes, "char *s = \"a\\tb\" \"c\\nd\";");
 syntax!(concat_with_escaped_quote, "char *s = \"a\\\"\" \"b\";");
 literal!(literal_concat_wide, "int f(void) { return (L\"a\" L\"b\")[0]; }", "ab");
 syntax!(concat_wide_in_init, "int f(void) { return L\"ab\" \"cd\"[0]; }");
+
+// ---- phase 2: backslash-newline line splicing ---------------------------
+
+syntax!(splice_in_string, "char *s = \"a\\\nb\";");
+syntax!(splice_in_identifier, "int ab; int f(void) { return a\\\nb; }");
+syntax!(splice_in_keyword, "in\\\nt x;");
+syntax!(splice_in_operator, "int f(int a) { if (a =\\\n= 1) return 1; return 0; }");
+syntax!(splice_in_constant, "int f(void) { return 1\\\n2; }");
+syntax!(splice_consecutive, "int a\\\n\\\nb;");
+syntax!(splice_at_line_start, "int x;\n\\\nint y;");
+syntax!(splice_in_declarator, "int *\\\np;");
+syntax!(splice_escaped_backslash_before, "char *s = \"a\\\\\\\nb\";");
+
+literal!(literal_splice_in_string, "char *s = \"a\\\nb\";", "ab");
+literal!(literal_splice_concat_pieces, "char *s = \"a\" \\\n\"b\";", "ab");
