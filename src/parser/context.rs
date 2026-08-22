@@ -121,4 +121,12 @@ impl Context {
             },
         }
     }
+
+    // pub fn concat_strings(&mut self, names: Vec<String>) -> Name {
+    //     // let s1 = n1.id.resolve(self);
+    //     // let s2 = n2.id.resolve(self);
+    //     let s = String::from(s1) + s2;
+    //     let span = Span::merge(n1.span, n2.span);
+    //     self.arenas.names.add(s, span)
+    // }
 }

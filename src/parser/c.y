@@ -45,7 +45,8 @@ macro_rules! spec {
 
 %}
 
-%token<Name> IDENTIFIER STRING_LITERAL CONSTANT TYPE_NAME
+%token<Name> IDENTIFIER CONSTANT TYPE_NAME
+%token<String> STRING_LITERAL
 %token TYPEDEF EXTERN STATIC AUTO REGISTER
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID
 %token STRUCT UNION ENUM ELLIPSIS
@@ -71,11 +72,13 @@ macro_rules! spec {
 %nonassoc PREC_THEN
 %nonassoc ELSE
 
+%type<String> string_literal
 %type<Vec<Name>> identifier_list
-%type<Type> type_name
+%type<Name> merged_literal
 
 %type<ExpressionNode> expression constant_expression
 
+%type<Type> type_name
 %type<DeclarationNode> declaration
 %type<Vec<DeclarationNode>> declaration_list
 %type<TypeSpecifier> type_specifier type_specifier_kw struct_or_union_specifier
@@ -158,11 +161,20 @@ constant_expression /* ExpressionNode */
     : expression %prec PREC_NO_COMMA                                                        { node_span!(self, expressions, constant_expression, $1) }
     ;
 
+string_literal /* String */
+      : STRING_LITERAL                                                                      { $1 }
+      | string_literal STRING_LITERAL                                                       { $<mut>1.push_str(&$2); $1 }
+      ;
+
+merged_literal /* Name */
+      : string_literal                                                                      { self.lexer.ctx.arenas.names.add($1, self.lexer.span.clone()) }
+      ;
+
 expression /* ExpressionNode */
     : '(' expression ')'                                                                    { $2 }
     | IDENTIFIER                                                                            { node_span!(self, expressions, identifier, $1) }
-    | CONSTANT                                                                              { node_span!(self, expressions, constant,$1)}
-    | STRING_LITERAL                                                                        { node_span!(self, expressions, string_literal,$1) }
+    | CONSTANT                                                                              { node_span!(self, expressions, constant, $1)}
+    | merged_literal                                                                        { node_span!(self, expressions, string_literal, $1) }
     | expression '[' expression ']'                                                         { node_span!(self, expressions, binary, $1, $2, $3) }
     | expression '(' ')'                                                                    { node_span!(self, expressions, function_call, $1, None) }
     | expression '(' expression ')'                                                         { node_span!(self, expressions, function_call, $1, Some($3)) }

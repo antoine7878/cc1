@@ -1,4 +1,4 @@
 int main(void) {
-	char *a = "b\\nv";
+	int *a = L"1" L"2";
 	return 0;
 }

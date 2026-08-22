@@ -59,6 +59,62 @@ fn run_syntax(name: &str, src: &str) {
     assert!(parsed, "cc1 failed to parse `{name}`:\n{src}\n{stderr}");
 }
 
+fn cc1_stdout(path: &str) -> String {
+    let out = Command::new(env!("CARGO_BIN_EXE_cc1"))
+        .arg(path)
+        .output()
+        .expect("run cc1 binary");
+    String::from_utf8_lossy(&out.stdout).into_owned()
+}
+
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c != '\x1b' {
+            out.push(c);
+            continue;
+        }
+        for c in chars.by_ref() {
+            if c == 'm' {
+                break;
+            }
+        }
+    }
+    out
+}
+
+fn literal_values(path: &str) -> Vec<String> {
+    strip_ansi(&cc1_stdout(path))
+        .lines()
+        .filter_map(|l| l.split_once("StringLiteral "))
+        .map(|(_, v)| v.trim_end().to_string())
+        .collect()
+}
+
+/// Value check for adjacent string literal concatenation (6.1.4, phase 6):
+/// the AST must hold one literal carrying `expected`. Reads the AstPrinter
+/// dump, so it needs `AstPrinter::print` live in main.rs.
+fn run_literal(name: &str, src: &str, expected: &str) {
+    let path = write_case(name, src);
+    let gcc = gcc_accepts(&path);
+    let stderr = cc1_stderr(&path);
+    let values = literal_values(&path);
+    fs::remove_file(&path).ok();
+
+    assert!(gcc, "fixture `{name}` is not valid C90 — gcc rejects it:\n{src}");
+    assert!(
+        !stderr.contains("syntax error"),
+        "cc1 failed to parse `{name}`:\n{src}\n{stderr}"
+    );
+    assert_eq!(
+        values,
+        vec![expected.to_string()],
+        "wrong string literal value for `{name}` (no values at all means the \
+         AstPrinter dump in main.rs is disabled):\n{src}"
+    );
+}
+
 /// Verdict comparison: cc1 must accept exactly what gcc accepts.
 fn run_case(name: &str, src: &str) {
     let path = write_case(name, src);
@@ -91,6 +147,15 @@ macro_rules! syntax {
         #[test]
         fn $name() {
             run_syntax(stringify!($name), $src);
+        }
+    };
+}
+
+macro_rules! literal {
+    ($name:ident, $src:expr, $expected:expr) => {
+        #[test]
+        fn $name() {
+            run_literal(stringify!($name), $src, $expected);
         }
     };
 }
@@ -458,3 +523,29 @@ syntax!(typedef_as_return_type, "typedef int T; T f(void) { return 0; }");
 syntax!(typedef_in_cast_and_sizeof, "typedef int T; int f(void) { return (T)1 + sizeof(T); }");
 syntax!(typedef_in_struct_member, "typedef int T; struct S { T a; T *b; T c[2]; };");
 syntax!(typedef_abstract_declarator, "typedef int T; int f(void) { return sizeof(T *) + sizeof(T (*)(void)); }");
+
+// ---- 6.1.4 adjacent string literal concatenation (phase 6) ---------------
+
+literal!(literal_single, "char *s = \"x\";", "x");
+literal!(literal_concat_two, "char *s = \"x\" \"y\";", "xy");
+literal!(literal_concat_three, "char *s = \"x\" \"y\" \"z\";", "xyz");
+literal!(literal_concat_across_comment, "char *s = \"x\" /* c */ \"y\";", "xy");
+literal!(literal_concat_across_newline, "char *s = \"x\"\n\"y\"\n\"z\";", "xyz");
+literal!(literal_concat_empty_pieces, "char *s = \"\" \"x\" \"\";", "x");
+literal!(literal_concat_all_empty, "char *s = \"\" \"\";", "");
+literal!(literal_wide_prefix, "int f(void) { return L\"x\"[0]; }", "x");
+
+syntax!(concat_in_char_array_init, "char s[] = \"ab\" \"cd\";");
+syntax!(concat_in_sized_array_init, "char s[5] = \"ab\" \"cd\";");
+syntax!(concat_in_pointer_init, "char *s = \"ab\" \"cd\";");
+syntax!(concat_in_array_of_pointers, "char *s[] = { \"a\" \"b\", \"c\" };");
+syntax!(concat_as_call_argument, "int g(char *); int f(void) { return g(\"a\" \"b\"); }");
+syntax!(concat_in_sizeof, "int f(void) { return sizeof(\"a\" \"b\"); }");
+syntax!(concat_in_return, "char *f(void) { return \"a\" \"b\"; }");
+syntax!(concat_subscripted, "int f(void) { return (\"ab\" \"cd\")[1]; }");
+syntax!(concat_in_conditional, "char *f(int c) { return c ? \"a\" \"b\" : \"c\" \"d\"; }");
+syntax!(concat_in_struct_init, "struct S { char *a; char *b; } s = { \"x\" \"y\", \"z\" };");
+syntax!(concat_with_escapes, "char *s = \"a\\tb\" \"c\\nd\";");
+syntax!(concat_with_escaped_quote, "char *s = \"a\\\"\" \"b\";");
+literal!(literal_concat_wide, "int f(void) { return (L\"a\" L\"b\")[0]; }", "ab");
+syntax!(concat_wide_in_init, "int f(void) { return L\"ab\" \"cd\"[0]; }");

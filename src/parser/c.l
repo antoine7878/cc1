@@ -61,7 +61,8 @@ L?'(\\.|[^\\'])+'	        { return YYToken::CONSTANT(alloc_name(self)); }
 {D}+{E}{FS}?		        { return YYToken::CONSTANT(alloc_name(self)); }
 {D}*"."{D}+({E})?{FS}?	    { return YYToken::CONSTANT(alloc_name(self)); }
 {D}+"."{D}*({E})?{FS}?	    { return YYToken::CONSTANT(alloc_name(self)); }
-L?\"(\\.|[^\\"])*\"	        { return YYToken::STRING_LITERAL(alloc_name(self)); }
+\"(\\.|[^\\"])*\"	        { let len = self.yytext.len(); return YYToken::STRING_LITERAL(self.yytext[1..len-1].to_string()); }
+L\"(\\.|[^\\"])*\"	        { let len = self.yytext.len(); return YYToken::STRING_LITERAL(self.yytext[2..len-1].to_string()); }
 "..."			            { return YYToken::ELLIPSIS; }
 ">>="			            { return YYToken::RIGHT_ASSIGN; }
 "<<="			            { return YYToken::LEFT_ASSIGN; }
