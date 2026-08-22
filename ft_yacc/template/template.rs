@@ -6,6 +6,12 @@ use std::io::Read;
 
 /* TOKENS */
 
+/* FEEDBACK */
+pub trait YYFeedback {
+    fn yy_feedback(&mut self, accepts: &dyn Fn(usize) -> bool);
+}
+/* FEEDBACK */
+
 pub struct Yacc<R: Read> {
     state_stack: Vec<usize>,
     value_stack: Vec<YYToken>,
@@ -64,6 +70,43 @@ impl<R: Read> Yacc<R> {
             /* DEFINES */
         }
     }
+
+    /* FEEDBACK */
+    fn yy_accepts_at(state_stack: &[usize], token_id: usize) -> bool {
+        let mut stack = state_stack.to_vec();
+        for _ in 0..Self::YY_PROBE_LIMIT {
+            let &state = stack.last().unwrap();
+            let mut act = Self::YY_DEFAULT_ACT[state];
+            if act == 0 {
+                act = Self::YY_GOTO_TABLE[state][token_id];
+            }
+            if act == 0 {
+                act = Self::YY_DEFAULT_REDUCE_ACT[state];
+            }
+            match act {
+                1 => return true,
+                a if a < 0 => return true,
+                0 => return false,
+                _ => (),
+            }
+            let rule = (act - 1) as usize;
+            let len = Self::YY_RLEN_TABLE[rule];
+            if len >= stack.len() {
+                return false;
+            }
+            stack.truncate(stack.len() - len);
+            let &top = stack.last().unwrap();
+            let goto = Self::YY_GOTO_TABLE[top][Self::YY_PRODUCT_TABLE[rule]];
+            if goto >= 0 {
+                return false;
+            }
+            stack.push(-(goto + 1) as usize);
+        }
+        false
+    }
+
+    const YY_PROBE_LIMIT: usize = 1024;
+    /* FEEDBACK */
 
     fn next_act(&mut self) -> isize {
         let &state_id = self.state_stack.last().unwrap();
@@ -195,6 +238,11 @@ impl<R: Read> Yacc<R> {
     }
 
     fn read_token(&mut self) {
+        /* FEEDBACK */
+        let state_stack = &self.state_stack;
+        self.lexer
+            .yy_feedback(&|token_id| Self::yy_accepts_at(state_stack, token_id));
+        /* FEEDBACK */
         let c = self.lexer.yylex();
         self.lookahead_id = c.index();
         self.lookahead_span = self.lexer.span;

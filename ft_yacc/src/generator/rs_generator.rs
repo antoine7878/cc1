@@ -92,7 +92,7 @@ impl RSGenerator {
         writeln!(
             w,
             "impl YYToken {{
-                fn index(&self) -> usize {{
+                pub fn index(&self) -> usize {{
                     match self {{",
         )?;
         for (i, tok) in tokens.iter().enumerate() {
@@ -102,6 +102,19 @@ impl RSGenerator {
             w,
             "_ => unreachable!()
                     }}
+                }}
+",
+        )?;
+        write!(w, "const YY_ID_OF: [(&'static str, usize); {}] = [", tokens.len())?;
+        for (i, tok) in tokens.iter().enumerate() {
+            write!(w, "({:?},{}),", tok.name, i)?;
+        }
+        writeln!(w, "];")?;
+        writeln!(
+            w,
+            "
+                pub fn id_of(name: &str) -> Option<usize> {{
+                    Self::YY_ID_OF.iter().find(|(n, _)| *n == name).map(|(_, i)| *i)
                 }}
             }}",
         )?;

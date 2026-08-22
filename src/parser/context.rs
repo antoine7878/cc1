@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{DeclaratorArena, Name};
+use crate::ast::{DeclarationSpecifier, DeclaratorArena, Name, Storage};
 use crate::ast::{EnumArena, ExpressionArena, StatementArena, StringArena, StringId, StructArena};
 use crate::ast::{StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena};
 use crate::parser::{Span, YYToken};
@@ -28,10 +28,11 @@ pub struct Context {
     pub file_name: String,
     pub in_typedef: bool,
     in_typedef_stack: Vec<bool>,
-    pub struct_depth: usize,
-    pub saw_type_spec: bool,
-    pub pending_tag: bool,
-    brace_stack: Vec<bool>,
+    struct_depth: usize,
+    type_name_id: usize,
+    identifier_id: usize,
+    type_name_ok: bool,
+    identifier_ok: bool,
     stashed: Option<HashMap<StringId, SymbolKind>>,
 }
 
@@ -44,9 +45,10 @@ impl Context {
             in_typedef: false,
             in_typedef_stack: Vec::new(),
             struct_depth: 0,
-            saw_type_spec: false,
-            pending_tag: false,
-            brace_stack: Vec::new(),
+            type_name_id: YYToken::id_of("TYPE_NAME").expect("TYPE_NAME token"),
+            identifier_id: YYToken::id_of("IDENTIFIER").expect("IDENTIFIER token"),
+            type_name_ok: false,
+            identifier_ok: true,
             stashed: None,
             file_name,
         }
@@ -83,6 +85,19 @@ impl Context {
         }
     }
 
+    pub fn note_specifiers(&mut self, specs: Vec<DeclarationSpecifier>) -> Vec<DeclarationSpecifier> {
+        self.in_typedef = specs.contains(&DeclarationSpecifier::Storage(Storage::Typedef));
+        specs
+    }
+
+    pub fn enter_struct(&mut self) {
+        self.struct_depth += 1;
+    }
+
+    pub fn exit_struct(&mut self) {
+        self.struct_depth -= 1;
+    }
+
     pub fn add_symbol(&mut self, id: StringId) {
         if self.struct_depth > 0 {
             return;
@@ -91,38 +106,19 @@ impl Context {
         self.typedefs.last_mut().map(|ts| ts.insert(id, kind));
     }
 
+    pub fn feedback(&mut self, accepts: &dyn Fn(usize) -> bool) {
+        self.type_name_ok = accepts(self.type_name_id);
+        self.identifier_ok = accepts(self.identifier_id);
+    }
+
     pub fn check_type(&mut self, name: Name) -> YYToken {
-        if self.pending_tag {
-            // struct/union/enum tag name: `struct S` is itself a complete type specifier
-            self.saw_type_spec = true;
-            return YYToken::IDENTIFIER(name);
+        match (self.type_name_ok, self.identifier_ok) {
+            (false, _) => YYToken::IDENTIFIER(name),
+            (true, false) => YYToken::TYPE_NAME(name),
+            (true, true) => match self.typedefs.iter().rev().find_map(|ty| ty.get(&name.id)) {
+                Some(SymbolKind::Typedef) => YYToken::TYPE_NAME(name),
+                _ => YYToken::IDENTIFIER(name),
+            },
         }
-        if self.saw_type_spec {
-            // a type specifier was already seen: this identifier is a declarator name
-            return YYToken::IDENTIFIER(name);
-        }
-        match self.typedefs.iter().rev().filter_map(|ty| ty.get(&name.id)).next() {
-            Some(SymbolKind::Typedef) => {
-                self.saw_type_spec = true;
-                YYToken::TYPE_NAME(name)
-            }
-            Some(SymbolKind::Variable) | None => YYToken::IDENTIFIER(name),
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn enter_brace(&mut self) {
-        self.brace_stack.push(self.pending_tag);
-        self.pending_tag = false;
-        self.saw_type_spec = false;
-    }
-
-    pub fn exit_brace(&mut self) {
-        self.saw_type_spec = self.brace_stack.pop().unwrap_or(false);
-    }
-
-    pub fn clear_type_spec(&mut self) {
-        self.saw_type_spec = false;
-        self.pending_tag = false;
     }
 }

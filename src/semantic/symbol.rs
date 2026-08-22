@@ -47,6 +47,7 @@ pub enum SymbolKind {
     Member,
     Label,
     Typedef,
+    Enumerator,
 }
 
 impl fmt::Display for SymbolKind {
@@ -61,6 +62,7 @@ impl fmt::Display for SymbolKind {
             SymbolKind::Member => write!(f, "member"),
             SymbolKind::Label => write!(f, "label"),
             SymbolKind::Typedef => write!(f, "typedef"),
+            SymbolKind::Enumerator => write!(f, "enumerator"),
         }
     }
 }

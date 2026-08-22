@@ -1,4 +1,5 @@
 %no_main
+%feedback
 %{
 use crate::ast::{Qualifier, Type, ExpressionNode, Name, DeclarationSpecifier, Initializer, TypeSpecifier, ParameterDeclaration};
 use crate::ast::{DeclarationNode, InitDeclaratorNode, DeclaratorNode, InitializerNode, Storage, FunctionParametersNode, Tag};
@@ -33,6 +34,12 @@ macro_rules! push {
     ($vec:expr, $elem:expr) => {{
         $vec.push($elem);
         $vec
+    }};
+}
+
+macro_rules! spec {
+    ($self:expr, $specs:expr) => {{
+        $self.lexer.ctx.note_specifiers($specs)
     }};
 }
 
@@ -71,11 +78,11 @@ macro_rules! push {
 
 %type<DeclarationNode> declaration
 %type<Vec<DeclarationNode>> declaration_list
-%type<TypeSpecifier> type_specifier struct_or_union_specifier
+%type<TypeSpecifier> type_specifier type_specifier_kw struct_or_union_specifier
 %type<Storage> storage_class_specifier
 %type<Qualifier> type_qualifier
 %type<Vec<Qualifier>> type_qualifier_list
-%type<Vec<DeclarationSpecifier>> declaration_specifiers
+%type<Vec<DeclarationSpecifier>> declaration_specifiers declaration_specifiers_untyped declaration_specifiers_typed
 %type<InitDeclaratorNode> init_declarator
 %type<Vec<InitDeclaratorNode>> init_declarator_list
 %type<InitializerNode> initializer
@@ -84,11 +91,10 @@ macro_rules! push {
 %type<FunctionParametersNode> parameter_type_list
 %type<Vec<ParameterDeclaration>> parameter_list
 %type<ParameterDeclaration> parameter_declaration
-%type<Vec<DeclarationSpecifier>> specifier_qualifier_list
+%type<Vec<DeclarationSpecifier>> specifier_qualifier_list specifier_qualifier_list_untyped specifier_qualifier_list_typed
 %type<Vec<Vec<Qualifier>>> pointer
 
 %type<Tag> struct_or_union
-%type<Name> tag_name
 %type<Vec<StructDeclaration>> struct_declaration_list
 %type<StructDeclaration> struct_declaration
 %type<Vec<StructMemberDeclarator>> struct_declarator_list
@@ -109,7 +115,7 @@ macro_rules! push {
 %type<FunctionDefinitionNode> function_definition
 %type<ExternalDeclarationNode> external_declaration
 %type<Vec<ExternalDeclarationNode>> external_declaration_list
-%type<()> translation_unit enter_scope exit_scope enter_struct reopen_params
+%type<()> translation_unit enter_scope exit_scope enter_struct exit_struct reopen_params
 
 %start translation_unit
 
@@ -161,9 +167,7 @@ expression /* ExpressionNode */
     | expression '(' ')'                                                                    { node_span!(self, expressions, function_call, $1, None) }
     | expression '(' expression ')'                                                         { node_span!(self, expressions, function_call, $1, Some($3)) }
     | expression '.' IDENTIFIER                                                             { node_span!(self, expressions, access, $1, $2, $3) }
-    | expression '.' TYPE_NAME                                                              { node_span!(self, expressions, access, $1, $2, $3) }
     | expression PTR_OP IDENTIFIER                                                          { node_span!(self, expressions, access, $1, $2, $3) }
-    | expression PTR_OP TYPE_NAME                                                           { node_span!(self, expressions, access, $1, $2, $3) }
     | SIZEOF '(' type_name ')'                                                              { node_span!(self, expressions, sizeof_type, $3) }
     | SIZEOF expression %prec PREC_UNARY                                                    { node_span!(self, expressions, sizeof_expr, $2) }
     | '(' type_name ')' expression %prec PREC_UNARY                                         { node_span!(self, expressions, cast, $2, $4) }
@@ -216,12 +220,23 @@ declaration /* DeclarationNode */
 	;
 
 declaration_specifiers /* Vec<DeclarationSpecifier> */
-	: storage_class_specifier                                                               { self.lexer.ctx.in_typedef = ($1 == Storage::Typedef); vec![DeclarationSpecifier::Storage($1)] }
-	| storage_class_specifier declaration_specifiers                                        { self.lexer.ctx.in_typedef = ($1 == Storage::Typedef) || $<mut>2.iter().any(|s| matches!(s, DeclarationSpecifier::Storage(Storage::Typedef))); push!($<mut>2, DeclarationSpecifier::Storage($1)) }
-	| type_specifier                                                                        { self.lexer.ctx.in_typedef = false; vec![DeclarationSpecifier::Type($1)] }
-	| type_specifier declaration_specifiers                                                 { self.lexer.ctx.in_typedef = $<mut>2.iter().any(|s| matches!(s, DeclarationSpecifier::Storage(Storage::Typedef))); push!($<mut>2, DeclarationSpecifier::Type($1)) }
-	| type_qualifier                                                                        { self.lexer.ctx.in_typedef = false; vec![DeclarationSpecifier::Qualifier($1)] }
-	| type_qualifier declaration_specifiers                                                 { self.lexer.ctx.in_typedef = $<mut>2.iter().any(|s| matches!(s, DeclarationSpecifier::Storage(Storage::Typedef))); push!($<mut>2, DeclarationSpecifier::Qualifier($1)) }
+	: declaration_specifiers_untyped                                                        { $1 }
+	| declaration_specifiers_typed                                                          { $1 }
+	;
+
+declaration_specifiers_untyped /* Vec<DeclarationSpecifier> — no type yet */
+	: storage_class_specifier                                                               { spec!(self, vec![DeclarationSpecifier::Storage($1)]) }
+	| type_qualifier                                                                        { spec!(self, vec![DeclarationSpecifier::Qualifier($1)]) }
+	| declaration_specifiers_untyped storage_class_specifier                                { spec!(self, push!($<mut>1, DeclarationSpecifier::Storage($2))) }
+	| declaration_specifiers_untyped type_qualifier                                         { spec!(self, push!($<mut>1, DeclarationSpecifier::Qualifier($2))) }
+	;
+
+declaration_specifiers_typed /* Vec<DeclarationSpecifier> — a type has been seen */
+	: type_specifier                                                                        { spec!(self, vec![DeclarationSpecifier::Type($1)]) }
+	| declaration_specifiers_untyped type_specifier                                         { spec!(self, push!($<mut>1, DeclarationSpecifier::Type($2))) }
+	| declaration_specifiers_typed type_specifier_kw                                        { spec!(self, push!($<mut>1, DeclarationSpecifier::Type($2))) }
+	| declaration_specifiers_typed storage_class_specifier                                  { spec!(self, push!($<mut>1, DeclarationSpecifier::Storage($2))) }
+	| declaration_specifiers_typed type_qualifier                                           { spec!(self, push!($<mut>1, DeclarationSpecifier::Qualifier($2))) }
 	;
 
 init_declarator_list /* Vec<InitDeclaratorNode> */
@@ -248,6 +263,11 @@ type_qualifier  /* Qualifier */
 	;
 
 type_specifier /* TypeSpecifier */
+	: type_specifier_kw                                                                     { $1 }
+	| TYPE_NAME                                                                             { TypeSpecifier::TypedefName($1) }
+	;
+
+type_specifier_kw /* TypeSpecifier */
 	: VOID                                                                                  { TypeSpecifier::Void }
 	| CHAR                                                                                  { TypeSpecifier::Char }
 	| SHORT                                                                                 { TypeSpecifier::Short }
@@ -259,7 +279,6 @@ type_specifier /* TypeSpecifier */
 	| UNSIGNED                                                                              { TypeSpecifier::Unsigned }
 	| struct_or_union_specifier                                                             { $1 }
 	| enum_specifier                                                                        { TypeSpecifier::Enum($1) }
-	| TYPE_NAME                                                                             { TypeSpecifier::TypedefName($1) }
 	;
 
 initializer /* InitializerNode */
@@ -328,10 +347,20 @@ type_name /* Type */
 	;
 
 specifier_qualifier_list /* Vec<DeclarationSpecifier> */
-	: type_specifier specifier_qualifier_list                                               { self.lexer.ctx.in_typedef = false; push!($<mut>2, DeclarationSpecifier::Type($1)) }
-	| type_specifier                                                                        { self.lexer.ctx.in_typedef = false; vec![DeclarationSpecifier::Type($1)] }
-	| type_qualifier specifier_qualifier_list                                               { self.lexer.ctx.in_typedef = false; push!($<mut>2, DeclarationSpecifier::Qualifier($1)) }
-	| type_qualifier                                                                        { self.lexer.ctx.in_typedef = false; vec![DeclarationSpecifier::Qualifier($1)] }
+	: specifier_qualifier_list_untyped                                                      { $1 }
+	| specifier_qualifier_list_typed                                                        { $1 }
+	;
+
+specifier_qualifier_list_untyped /* Vec<DeclarationSpecifier> — no type specifier yet */
+	: type_qualifier                                                                        { spec!(self, vec![DeclarationSpecifier::Qualifier($1)]) }
+	| specifier_qualifier_list_untyped type_qualifier                                       { spec!(self, push!($<mut>1, DeclarationSpecifier::Qualifier($2))) }
+	;
+
+specifier_qualifier_list_typed /* Vec<DeclarationSpecifier> — a type specifier has been seen */
+	: type_specifier                                                                        { spec!(self, vec![DeclarationSpecifier::Type($1)]) }
+	| specifier_qualifier_list_untyped type_specifier                                       { spec!(self, push!($<mut>1, DeclarationSpecifier::Type($2))) }
+	| specifier_qualifier_list_typed type_specifier_kw                                      { spec!(self, push!($<mut>1, DeclarationSpecifier::Type($2))) }
+	| specifier_qualifier_list_typed type_qualifier                                         { spec!(self, push!($<mut>1, DeclarationSpecifier::Qualifier($2))) }
 	;
 
 abstract_declarator /* DeclaratorNode */
@@ -353,18 +382,17 @@ direct_abstract_declarator /* DeclaratorNode */
 	;
 
 struct_or_union_specifier /* TypeSpecifier */
-	: struct_or_union '{' enter_struct struct_declaration_list '}'                          { self.lexer.ctx.struct_depth -= 1; let s = self.span; self.lexer.ctx.struct_or_union($1, None, $4, s) }
-	| struct_or_union tag_name '{' enter_struct struct_declaration_list '}'                 { self.lexer.ctx.struct_depth -= 1; let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), $5, s) }
-	| struct_or_union tag_name                                                              { let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), vec![], s) }
+	: struct_or_union '{' enter_struct struct_declaration_list exit_struct '}'              { let s = self.span; self.lexer.ctx.struct_or_union($1, None, $4, s) }
+	| struct_or_union IDENTIFIER '{' enter_struct struct_declaration_list exit_struct '}'   { let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), $5, s) }
+	| struct_or_union IDENTIFIER                                                            { let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), vec![], s) }
 	;
 
 enter_struct
-	: /* empty */                                                                           { self.lexer.ctx.struct_depth += 1; }
+	: /* empty */                                                                           { self.lexer.ctx.enter_struct(); }
 	;
 
-tag_name /* Name */
-	: IDENTIFIER                                                                            { $1 }
-	| TYPE_NAME                                                                             { $1 }
+exit_struct
+	: /* empty */                                                                           { self.lexer.ctx.exit_struct(); }
 	;
 
 struct_or_union /* Tag */
@@ -394,8 +422,8 @@ struct_declarator /* StructMemberDeclarator */
 
 enum_specifier /* EnumId */
 	: ENUM '{' enumerator_list '}'                                                          { node_span!(self, enums, add, None, $3) }
-	| ENUM tag_name '{' enumerator_list '}'                                                 { node_span!(self, enums, add, Some($2), $4) }
-	| ENUM tag_name                                                                         { node_span!(self, enums, add, Some($2), vec![]) }
+	| ENUM IDENTIFIER '{' enumerator_list '}'                                               { node_span!(self, enums, add, Some($2), $4) }
+	| ENUM IDENTIFIER                                                                       { node_span!(self, enums, add, Some($2), vec![]) }
 	;
 
 enumerator_list /* Vec<VariantId> */
@@ -419,6 +447,8 @@ statement /* StatementNode */
 
 labeled_statement /* LabeledStatementNode */
 	: IDENTIFIER ':' statement                                                              { with_span!(self, LabeledStatementNode::identifier, $1, $3) }
+	/* `T:` at the head of a block is a label or a declaration, and only the ':'
+	   tells them apart — the one case the parser state cannot settle alone. */
 	| TYPE_NAME ':' statement                                                               { with_span!(self, LabeledStatementNode::identifier, $1, $3) }
 	| CASE constant_expression ':' statement                                                { with_span!(self, LabeledStatementNode::case, $2, $4) }
 	| DEFAULT ':' statement                                                                 { with_span!(self, LabeledStatementNode::default, $3) }
@@ -460,7 +490,6 @@ iteration_statement /* IterationStatementNode */
 
 jump_statement /* JumpStatementNode */
 	: GOTO IDENTIFIER ';'                                                                   { with_span!(self, JumpStatementNode::new, JumpStatement::Goto) }
-	| GOTO TYPE_NAME ';'                                                                    { with_span!(self, JumpStatementNode::new, JumpStatement::Goto) }
 	| CONTINUE ';'                                                                          { with_span!(self, JumpStatementNode::new, JumpStatement::Continue) }
 	| BREAK ';'                                                                             { with_span!(self, JumpStatementNode::new, JumpStatement::Break) }
 	| RETURN ';'                                                                            { with_span!(self, JumpStatementNode::new_return, None) }

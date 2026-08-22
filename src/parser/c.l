@@ -4,7 +4,7 @@
 use std::fmt;
 
 use crate::ast::Name;
-use crate::parser::{YYToken, Context};
+use crate::parser::{YYToken, YYFeedback, Context};
 use crate::semantic::{SymbolKind};
 
 %}
@@ -24,33 +24,33 @@ IS			(u|U|l|L)*
 "auto"			            { return YYToken::AUTO; }
 "break"			            { return YYToken::BREAK; }
 "case"			            { return YYToken::CASE; }
-"char"			            { self.ctx.saw_type_spec = true; return YYToken::CHAR; }
+"char"			            { return YYToken::CHAR; }
 "const"			            { return YYToken::CONST; }
 "continue"		            { return YYToken::CONTINUE; }
 "default"		            { return YYToken::DEFAULT; }
 "do"			            { return YYToken::DO; }
-"double"		            { self.ctx.saw_type_spec = true; return YYToken::DOUBLE; }
+"double"		            { return YYToken::DOUBLE; }
 "else"			            { return YYToken::ELSE; }
-"enum"			            { self.ctx.pending_tag = true; return YYToken::ENUM; }
+"enum"			            { return YYToken::ENUM; }
 "extern"		            { return YYToken::EXTERN; }
-"float"			            { self.ctx.saw_type_spec = true; return YYToken::FLOAT; }
+"float"			            { return YYToken::FLOAT; }
 "for"			            { return YYToken::FOR; }
 "goto"			            { return YYToken::GOTO; }
 "if"			            { return YYToken::IF; }
-"int"			            { self.ctx.saw_type_spec = true; return YYToken::INT; }
-"long"			            { self.ctx.saw_type_spec = true; return YYToken::LONG; }
+"int"			            { return YYToken::INT; }
+"long"			            { return YYToken::LONG; }
 "register"		            { return YYToken::REGISTER; }
 "return"		            { return YYToken::RETURN; }
-"short"			            { self.ctx.saw_type_spec = true; return YYToken::SHORT; }
-"signed"		            { self.ctx.saw_type_spec = true; return YYToken::SIGNED; }
+"short"			            { return YYToken::SHORT; }
+"signed"		            { return YYToken::SIGNED; }
 "sizeof"		            { return YYToken::SIZEOF; }
 "static"		            { return YYToken::STATIC; }
-"struct"		            { self.ctx.pending_tag = true; return YYToken::STRUCT; }
+"struct"		            { return YYToken::STRUCT; }
 "switch"		            { return YYToken::SWITCH; }
 "typedef"		            { return YYToken::TYPEDEF; }
-"union"			            { self.ctx.pending_tag = true; return YYToken::UNION; }
-"unsigned"		            { self.ctx.saw_type_spec = true; return YYToken::UNSIGNED; }
-"void"			            { self.ctx.saw_type_spec = true; return YYToken::VOID; }
+"union"			            { return YYToken::UNION; }
+"unsigned"		            { return YYToken::UNSIGNED; }
+"void"			            { return YYToken::VOID; }
 "volatile"		            { return YYToken::VOLATILE; }
 "while"			            { return YYToken::WHILE; }
 {L}({L}|{D})*		        { let name = alloc_name(self); return self.ctx.check_type(name); }
@@ -84,12 +84,12 @@ L?\"(\\.|[^\\"])*\"	        { return YYToken::STRING_LITERAL(alloc_name(self)); 
 ">="			            { return YYToken::GE_OP; }
 "=="			            { return YYToken::EQ_OP; }
 "!="			            { return YYToken::NE_OP; }
-";"			                { self.ctx.clear_type_spec(); return YYToken::Char(';'); }
-","			                { self.ctx.clear_type_spec(); return YYToken::Char(','); }
+";"			                { return YYToken::Char(';'); }
+","			                { return YYToken::Char(','); }
 ":"			                { return YYToken::Char(':'); }
 "="			                { return YYToken::Char('='); }
-"("			                { self.ctx.clear_type_spec(); return YYToken::Char('('); }
-")"			                { self.ctx.clear_type_spec(); return YYToken::Char(')'); }
+"("			                { return YYToken::Char('('); }
+")"			                { return YYToken::Char(')'); }
 ("["|"<:"|"??(")            { return YYToken::Char('['); }
 ("]"|":>"|"??)")            { return YYToken::Char(']'); }
 "."			                { return YYToken::Char('.'); }
@@ -106,8 +106,8 @@ L?\"(\\.|[^\\"])*\"	        { return YYToken::STRING_LITERAL(alloc_name(self)); 
 "^"			                { return YYToken::Char('^'); }
 ("|"|"??!")	                { return YYToken::Char('|'); }
 "?"			                { return YYToken::Char('?'); }
-("{"|"<%"|"??<")            { self.ctx.enter_brace(); return YYToken::Char('{'); }
-("}"|"%>")|"??>"            { self.ctx.exit_brace(); return YYToken::Char('}'); }
+("{"|"<%"|"??<")            { return YYToken::Char('{'); }
+("}"|"%>")|"??>"            { return YYToken::Char('}'); }
 [ \t\v\n\f]		            { }
 .			                { /* ignore bad characters */ }
 
@@ -125,6 +125,12 @@ fn comment<T: Read>(lex: &mut YYLex<T>) {
                 return;
             }
         }
+    }
+}
+
+impl<R: Read> YYFeedback for YYLex<R> {
+    fn yy_feedback(&mut self, accepts: &dyn Fn(usize) -> bool) {
+        self.ctx.feedback(accepts);
     }
 }
 

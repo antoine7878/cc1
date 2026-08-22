@@ -56,6 +56,7 @@ impl Dumper {
             match line.trim() {
                 "/* REMOVE */" => remove = !remove,
                 "/* DEBUGGING */" if !args.t => remove = !remove,
+                "/* FEEDBACK */" if !parser.yacc.options.feedback => remove = !remove,
                 _ if remove => (),
                 "/* CODE_BEFORE */" => generator.dump_code_before(&mut w, &parser.yacc, !args.l)?,
                 "/* MAIN */" if parser.yacc.options.no_main => break,

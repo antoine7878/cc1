@@ -6,6 +6,7 @@ use crate::utils::BitSet;
 #[derive(Debug, Default)]
 pub struct YaccOptions {
     pub no_main: bool,
+    pub feedback: bool,
 }
 
 pub type StateId = usize;

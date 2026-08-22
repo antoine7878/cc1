@@ -10,7 +10,7 @@ use crate::ast::{
     ExternalDeclaration, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, Labeled,
     LabeledStatementNode, Name, ParameterDeclaration, StructDeclaration, StructMemberDeclarator, declaration,
 };
-use crate::ast::{Expression, Storage, StringId};
+use crate::ast::{Expression, Storage, StringId, TypeSpecifier};
 use crate::parser::{Context, Span};
 use crate::semantic::diagnosis::Diagnosis;
 use crate::semantic::{
@@ -105,14 +105,34 @@ impl SymbolResolver {
         &mut self,
         name: Name,
         ty: QualifiedType,
-        storage: Storage,
+        storage: Option<Storage>,
         kind: SymbolKind,
         declarator: Option<DeclaratorNode>,
     ) -> SymbolId {
         self.dedup(&name, &ty, kind, &declarator.map(|d| d.span).unwrap_or_default());
-        let sym_id = self.symbols.add(name, ty, Some(storage), kind);
+        let sym_id = self.symbols.add(name, ty, storage, kind);
         self.scope_mut().ordinaries.insert(name.id, sym_id);
         sym_id
+    }
+
+    /// 6.5.2.2: an enumeration specifier declares its enumerators as ordinary
+    /// identifiers in the scope holding the specifier, so they collide with
+    /// typedefs, variables and functions of the same name.
+    fn declare_enumerators(&mut self, ctx: &Context, specifiers: &[DeclarationSpecifier]) {
+        for spec in specifiers {
+            let DeclarationSpecifier::Type(TypeSpecifier::Enum(enum_id)) = spec else { continue };
+            for variant_id in enum_id.resolve(ctx).variants.clone() {
+                let variant = variant_id.resolve(ctx);
+                let ty = self.types.int();
+                self.add_ordinary_symbol(
+                    variant.name,
+                    QualifiedType::new(ty, false, false),
+                    None,
+                    SymbolKind::Enumerator,
+                    None,
+                );
+            }
+        }
     }
 
     fn add_label_symbol(
@@ -136,9 +156,11 @@ impl SymbolResolver {
             SymbolKind::Struct | SymbolKind::Enum | SymbolKind::Union => &self.scope().tags,
             SymbolKind::Member => &self.scope().members,
             SymbolKind::Label => &self.scope().labels,
-            SymbolKind::Typedef | SymbolKind::Variable | SymbolKind::Parameter | SymbolKind::Function => {
-                &self.scope().ordinaries
-            }
+            SymbolKind::Typedef
+            | SymbolKind::Variable
+            | SymbolKind::Parameter
+            | SymbolKind::Function
+            | SymbolKind::Enumerator => &self.scope().ordinaries,
         }
     }
 
@@ -174,7 +196,7 @@ impl SymbolResolver {
         constrain::external::check_external_specifiers(&node.specifiers).collect(self, span);
 
         let name = fn_decl.ident(ctx)?;
-        self.add_ordinary_symbol(name, ty, storage, SymbolKind::Function, Some(node.declarator.clone()));
+        self.add_ordinary_symbol(name, ty, Some(storage), SymbolKind::Function, Some(node.declarator.clone()));
         Some(parameters)
     }
 
@@ -247,7 +269,7 @@ impl SymbolResolver {
             self.add_ordinary_symbol(
                 Name::new(string_id, Span::default()),
                 QualifiedType::new(ty_id, false, false),
-                Storage::Register,
+                Some(Storage::Register),
                 SymbolKind::Parameter,
                 None,
             );
@@ -267,7 +289,7 @@ impl SymbolResolver {
             .unwrap_or(Storage::Register);
         constrain::external::param_storage_only_register(storage).collect(self, span)?;
         let name = decl.ident(ctx)?;
-        Some(self.add_ordinary_symbol(name, ty, storage, SymbolKind::Parameter, Some(decl)))
+        Some(self.add_ordinary_symbol(name, ty, Some(storage), SymbolKind::Parameter, Some(decl)))
     }
 }
 
@@ -292,6 +314,7 @@ impl Visitor for SymbolResolver {
     fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode, is_last: bool) {
         let specifiers = &node.specifiers;
         let span = &node.span;
+        self.declare_enumerators(ctx, specifiers);
         for init_declarator in &node.init_declarators {
             let decl = &init_declarator.declarator;
             let Some((ty, decl)) = self.make_qualified_type(ctx, specifiers, decl) else { continue };
@@ -300,7 +323,7 @@ impl Visitor for SymbolResolver {
                 .collect(self, span)
                 .unwrap_or(Storage::Auto);
             let kind = if storage == Storage::Typedef { SymbolKind::Typedef } else { SymbolKind::Variable };
-            self.add_ordinary_symbol(name, ty, storage, kind, Some(decl));
+            self.add_ordinary_symbol(name, ty, Some(storage), kind, Some(decl));
         }
         walk_declaration(self, ctx, node, is_last);
     }

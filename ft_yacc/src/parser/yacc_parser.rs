@@ -96,6 +96,7 @@ impl YaccParser {
         let name = self.it.take_name();
         match name.as_str() {
             "no_main" => self.yacc.options.no_main = true,
+            "feedback" => self.yacc.options.feedback = true,
             "union" => self.parse_union()?,
             name if ["token", "left", "right", "nonassoc", "type"]
                 .iter()
