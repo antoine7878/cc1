@@ -1,15 +1,5 @@
 use std::io::{Read, Result};
 
-/// C90 translation phase 2: each backslash immediately followed by a newline is
-/// deleted, splicing the two physical lines into one logical line. Sitting
-/// between the file and the lexer, it applies to every construct — inside a
-/// string literal, but equally in the middle of an identifier, a keyword or an
-/// operator.
-///
-/// A spliced newline is deferred rather than dropped: it is re-emitted once the
-/// logical line ends, so the newline count is preserved and every line after a
-/// splice keeps its physical line number. Columns inside a spliced logical line
-/// are those of the splice, not of the original physical lines.
 pub struct SpliceReader<R: Read> {
     inner: R,
     buf: [u8; 4096],
