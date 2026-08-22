@@ -321,7 +321,7 @@ impl SymbolResolver {
 }
 
 impl Visitor for SymbolResolver {
-    fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode, _is_last: bool) {
+    fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
         let Some(parameters) = self.add_function(ctx, node) else { return };
 
         self.scopes.push(Scope::new(ScopeKind::Prototype));
@@ -335,11 +335,11 @@ impl Visitor for SymbolResolver {
             FunctionParameters::Variadic(_) => unimplemented!(),
         }
 
-        self.visit_compound_statement(ctx, &node.body, true);
+        self.visit_compound_statement(ctx, &node.body);
     }
 
-    fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode, is_last: bool) {
-        // walk_declaration_specifier(self, ctx, node, is_last);
+    fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode) {
+        // walk_declaration_specifier(self, ctx, node);
         let specifiers = &node.specifiers;
         let span = &node.span;
         // self.add_tag(ctx, specifiers);
@@ -353,10 +353,10 @@ impl Visitor for SymbolResolver {
             let kind = if storage == Storage::Typedef { SymbolKind::Typedef } else { SymbolKind::Variable };
             self.add_ordinary_symbol(name, ty, Some(storage), kind, &decl.span);
         }
-        walk_declaration(self, ctx, node, is_last);
+        walk_declaration(self, ctx, node);
     }
 
-    fn visit_labeled_statement(&mut self, ctx: &Context, node: &LabeledStatementNode, is_last: bool) {
+    fn visit_labeled_statement(&mut self, ctx: &Context, node: &LabeledStatementNode) {
         match &node.inner {
             Labeled::Identifier(name, stmt) => {
                 let ty = self.types.label();
@@ -371,15 +371,15 @@ impl Visitor for SymbolResolver {
             Labeled::Case(expr, stmt) => (),
             Labeled::Default(stmt) => (),
         }
-        walk_labeled_statement(self, ctx, node, is_last);
+        walk_labeled_statement(self, ctx, node);
     }
 
-    fn visit_compound_statement(&mut self, ctx: &Context, node: &CompoundStatementNode, is_last: bool) {
+    fn visit_compound_statement(&mut self, ctx: &Context, node: &CompoundStatementNode) {
         match self.scopes.last().unwrap().kind {
             ScopeKind::Prototype => self.scopes.last_mut().unwrap().kind = ScopeKind::Function,
             _ => self.scopes.push(Scope::new(ScopeKind::Block)),
         }
-        walk_compound_statement(self, ctx, node, is_last);
+        walk_compound_statement(self, ctx, node);
         self.scopes.pop();
     }
 }
@@ -395,7 +395,7 @@ impl Analyzer {
     fn resolve_names(ctx: &Context) -> Vec<DeclarationNode> {
         let mut collector = SymbolResolver::default();
         collector.scopes.push(Scope::new(ScopeKind::File));
-        walk_translation_unit(&mut collector, ctx, &ctx.ast, false);
+        walk_translation_unit(&mut collector, ctx, &ctx.ast);
         collector.scopes.pop();
         assert!(collector.scopes.is_empty());
         for symbol in &collector.symbols.data {
