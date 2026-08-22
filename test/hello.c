@@ -1,10 +1,4 @@
-typedef int T;
-
-void f(void) {
-	int(T);
-}
-
-// typedef int T; void f(T T);
 int main(void) {
+	char *a = "b\\nv";
 	return 0;
 }

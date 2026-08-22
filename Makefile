@@ -36,10 +36,10 @@ $(PARSER): $(YACC_FILE) | $(FT_YACC)
 test: $(NAME)
 	./$(NAME) test/hello.c
 
-CCF = -std=iso9899:1990 -pedantic-errors -fno-gnu-keywords -Wno-deprecated-non-prototype -fno-asm -fno-builtin
+CCF = -std=iso9899:1990 -pedantic-errors -fno-gnu-keywords -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
 
 c:
-	gcc -c -std=iso9899:1990 -pedantic-errors test/hello.c -o /dev/null
+	gcc -c $(CCF) test/hello.c -o /dev/null
 
 clean:
 	cargo clean
