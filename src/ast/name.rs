@@ -1,7 +1,7 @@
 use crate::parser::Span;
-use crate::{ast_node, define_arena};
+use crate::{ast_node, define_interner};
 
-define_arena!(String, StringArena, StringId, names);
+define_interner!(String, StringArena, StringId, names);
 
 ast_node! {
     pub struct Name {

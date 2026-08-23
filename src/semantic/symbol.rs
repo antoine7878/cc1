@@ -10,7 +10,7 @@ define_arena!(Symbol, SymbolArena, SymbolId, symbols);
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Symbol {
     pub name: Name,
-    pub ty: QualifiedType,
+    pub ty: Option<QualifiedType>,
     pub storage: Option<Storage>,
     pub kind: SymbolKind,
     pub bit_width: Option<ExpressionNode>,
@@ -32,12 +32,12 @@ impl SymbolArena {
     pub fn add(
         &mut self,
         name: Name,
-        ty: QualifiedType,
+        ty: Option<QualifiedType>,
         storage: Option<Storage>,
         kind: SymbolKind,
         is_init: bool,
     ) -> SymbolId {
-        self.alloc_fresh(Symbol {
+        self.alloc(Symbol {
             name,
             ty,
             storage,
@@ -50,7 +50,7 @@ impl SymbolArena {
     pub fn with_size(
         &mut self,
         name: Name,
-        ty: QualifiedType,
+        ty: Option<QualifiedType>,
         storage: Option<Storage>,
         kind: SymbolKind,
         size: Option<ExpressionNode>,

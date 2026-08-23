@@ -1,9 +1,6 @@
-use crate::{
-    ast::{EnumId, Name, StructId, TypeSpecifier, UnionId},
-    define_arena,
-};
+use crate::{ast::TypeSpecifier, define_interner, semantic::TagDefId};
 
-define_arena!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, resolved_type);
+define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, resolved_type);
 
 #[derive(Debug, PartialEq, Clone, Copy, Hash, Eq)]
 pub enum ResolvedType {
@@ -21,11 +18,7 @@ pub enum ResolvedType {
     Double,
     LongDouble,
     Pointer(QualifiedType),
-    Struct(StructId),
-    Union(UnionId),
-    Enum(EnumId),
-    Typedef(Name),
-    Label,
+    Tag(TagDefId),
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Hash, Eq)]
@@ -36,10 +29,6 @@ pub struct QualifiedType {
 }
 
 impl ResolvedTypeArena {
-    pub fn label(&mut self) -> ResolvedTypeId {
-        self.alloc(ResolvedType::Label)
-    }
-
     pub fn int(&mut self) -> ResolvedTypeId {
         self.alloc(ResolvedType::Int)
     }
@@ -48,17 +37,10 @@ impl ResolvedTypeArena {
         self.alloc(ResolvedType::Pointer(inner))
     }
 
-    pub fn new_enum(&mut self, id: EnumId) -> ResolvedTypeId {
-        self.alloc(ResolvedType::Enum(id))
+    pub fn tag(&mut self, id: TagDefId) -> ResolvedTypeId {
+        self.alloc(ResolvedType::Tag(id))
     }
 
-    pub fn new_struct(&mut self, id: StructId) -> ResolvedTypeId {
-        self.alloc(ResolvedType::Struct(id))
-    }
-
-    pub fn new_union(&mut self, id: UnionId) -> ResolvedTypeId {
-        self.alloc(ResolvedType::Union(id))
-    }
 }
 
 impl QualifiedType {

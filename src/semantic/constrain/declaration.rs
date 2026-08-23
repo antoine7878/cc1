@@ -1,6 +1,8 @@
-use crate::ast::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier};
+use crate::ast::{DeclarationSpecifier, Qualifier, Storage, Tag, TypeSpecifier};
+use crate::parser::{Context, Span};
 use crate::semantic::diagnosis::{Diag, Diagnosis};
-use crate::semantic::{ResolvedType, ScopeKind, TypeSpecifierCounter};
+use crate::semantic::resolution::SymbolResolver;
+use crate::semantic::{QualifiedType, ResolvedType, ScopeKind, TypeSpecifierCounter};
 
 /// 6.5.1 Storage-class specifiers
 /// At most, one storage-class specifier may be given in the declaration specifiers in a declaration
@@ -17,8 +19,8 @@ pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>>
     }
 }
 
-// 6.5.1 Storage-class specifiers
-// The declaration of an identifier for a function that has block scope shall have no explicit storage-class specifier other than extern.
+/// 6.5.1 Storage-class specifiers
+/// The declaration of an identifier for a function that has block scope shall have no explicit storage-class specifier other than extern.
 pub fn extern_function_only(scope_type: ScopeKind, storage: Storage) -> Diag<()> {
     if scope_type == ScopeKind::Block && storage != Storage::Extern {
         Diag::with_diag((), Diagnosis::BlockScopeNotExtern)
@@ -29,8 +31,14 @@ pub fn extern_function_only(scope_type: ScopeKind, storage: Storage) -> Diag<()>
 
 /// 6.5.2 Type specifiers
 /// Each list of type specifiers shall be one of the following sets...
-#[rustfmt::skip]
-pub fn resolve_type(specifiers: &[DeclarationSpecifier]) -> Diag<Option<ResolvedType>> {
+pub fn resolve_type(
+    resolver: &mut SymbolResolver,
+    ctx: &Context,
+    specifiers: &[DeclarationSpecifier],
+    span: &Span,
+) -> Option<QualifiedType> {
+    let (is_const, is_volatile) = get_qualifier(specifiers).collect(resolver, span);
+
     let types: Vec<_> = specifiers
         .iter()
         .filter_map(|s| match s {
@@ -39,15 +47,36 @@ pub fn resolve_type(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Resolved
         })
         .collect();
 
-    match types.as_slice() {
-        [] => return Diag::some(ResolvedType::Int),
-        [TypeSpecifier::Struct(t)] => return Diag::some(ResolvedType::Struct(*t)),
-        [TypeSpecifier::Union(t)] => return Diag::some(ResolvedType::Union(*t)),
-        [TypeSpecifier::Enum(t)] => return Diag::some(ResolvedType::Enum(*t)),
-        [TypeSpecifier::TypedefName(t)] => return Diag::some(ResolvedType::Typedef(*t)),
-        _ => ()
+    let id = match types.as_slice() {
+        [TypeSpecifier::Struct(t)] => {
+            let node = t.resolve(ctx);
+            let tag = resolver.resolve_struct_or_union(ctx, Tag::Struct, node.name, &node.fields, &node.span);
+            resolver.types.tag(tag)
+        }
+        [TypeSpecifier::Union(t)] => {
+            let node = t.resolve(ctx);
+            let tag = resolver.resolve_struct_or_union(ctx, Tag::Union, node.name, &node.fields, &node.span);
+            resolver.types.tag(tag)
+        }
+        [TypeSpecifier::Enum(t)] => {
+            let tag = resolver.resolve_enum(ctx, *t);
+            resolver.types.tag(tag)
+        }
+        [TypeSpecifier::TypedefName(t)] => return resolver.resolve_typedef(*t, is_const, is_volatile, span),
+        s => {
+            let ty = basic_type(s).collect(resolver, span)?;
+            resolver.types.alloc(ty)
+        }
+    };
+    Some(QualifiedType::new(id, is_const, is_volatile))
+}
+
+#[rustfmt::skip]
+fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
+    if types.is_empty() {
+        return Diag::some(ResolvedType::Int);
     }
-    let Some(a) = TypeSpecifierCounter::count(types.as_slice()) else {
+    let Some(a) = TypeSpecifierCounter::count(types) else {
         return Diag::with_diag(None, Diagnosis::InvalidTypeSpecifer);
     };
     //   s, u, v, c, s, i, l, f, d
@@ -86,7 +115,7 @@ pub fn check_qualifier(specifiers: &[Qualifier]) -> Diag<(bool, bool)> {
     let const_count = specifiers.iter().filter(|q| matches!(q, Qualifier::Const)).count();
     let volatile_count = specifiers.iter().filter(|q| matches!(q, Qualifier::Volatile)).count();
 
-    let ret = (const_count > 1, volatile_count > 1);
+    let ret = (const_count >= 1, volatile_count >= 1);
 
     if const_count > 1 || volatile_count > 1 {
         return Diag::with_diag(ret, Diagnosis::DuplicateTypeQualifers);

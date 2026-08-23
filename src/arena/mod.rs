@@ -17,9 +17,36 @@ macro_rules! define_arena {
     };
 }
 
+#[macro_export]
+macro_rules! define_interner {
+    ($ty:ident, $arena:ident, $id:ident, $ar:ident) => {
+        pub type $id = $crate::arena::ArenaId<$ty>;
+        pub type $arena = $crate::arena::Interner<$id, $ty>;
+
+        impl $id {
+            pub fn resolve<'a>(&self, ctx: &'a $crate::parser::Context) -> &'a $ty {
+                ctx.arenas.$ar.get(self.clone())
+            }
+        }
+    };
+}
+
 #[repr(transparent)]
-#[derive(PartialEq, Eq, Hash)]
 pub struct ArenaId<T>(u32, PhantomData<fn() -> T>);
+
+impl<T> PartialEq for ArenaId<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl<T> Eq for ArenaId<T> {}
+
+impl<T> Hash for ArenaId<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
 
 impl<T> From<ArenaId<T>> for usize {
     fn from(value: ArenaId<T>) -> usize {
@@ -67,13 +94,61 @@ impl<T> Debug for ArenaId<T> {
 pub struct Arena<Id, Val>
 where
     Id: From<usize> + Into<usize> + Clone + Copy + Debug + PartialEq + Eq,
-    Val: Hash + Eq + PartialEq,
 {
     pub data: Vec<Val>,
-    pub canonical: HashMap<Val, Id>,
+    marker: PhantomData<fn() -> Id>,
 }
 
 impl<Id, Val> Default for Arena<Id, Val>
+where
+    Id: From<usize> + Into<usize> + Clone + Copy + Debug + PartialEq + Eq,
+{
+    fn default() -> Self {
+        Self {
+            data: Vec::new(),
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<Id, Val> Arena<Id, Val>
+where
+    Id: From<usize> + Into<usize> + Clone + Copy + Debug + PartialEq + Eq,
+{
+    pub fn alloc(&mut self, value: Val) -> Id {
+        let id = Id::from(self.data.len());
+        self.data.push(value);
+        id
+    }
+
+    pub fn get(&self, id: Id) -> &Val {
+        &self.data[id.into()]
+    }
+
+    pub fn get_mut(&mut self, id: Id) -> &mut Val {
+        &mut self.data[id.into()]
+    }
+
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+}
+
+#[derive(Debug)]
+pub struct Interner<Id, Val>
+where
+    Id: From<usize> + Into<usize> + Clone + Copy + Debug + PartialEq + Eq,
+    Val: Hash + Eq + PartialEq,
+{
+    pub data: Vec<Val>,
+    canonical: HashMap<Val, Id>,
+}
+
+impl<Id, Val> Default for Interner<Id, Val>
 where
     Id: From<usize> + Into<usize> + Clone + Copy + Debug + PartialEq + Eq,
     Val: Hash + Eq + PartialEq,
@@ -86,17 +161,11 @@ where
     }
 }
 
-impl<Id, Val> Arena<Id, Val>
+impl<Id, Val> Interner<Id, Val>
 where
     Id: From<usize> + Into<usize> + Clone + Copy + Debug + PartialEq + Eq,
     Val: Clone + Hash + Eq + PartialEq,
 {
-    pub fn alloc_fresh(&mut self, value: Val) -> Id {
-        let id = Id::from(self.data.len());
-        self.data.push(value);
-        id
-    }
-
     pub fn alloc(&mut self, value: Val) -> Id {
         if let Some(&id) = self.canonical.get(&value) {
             return id;
@@ -112,7 +181,11 @@ where
         &self.data[id.into()]
     }
 
-    pub fn get_mut(&mut self, id: Id) -> &mut Val {
-        &mut self.data[id.into()]
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
     }
 }

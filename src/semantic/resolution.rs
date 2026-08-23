@@ -5,9 +5,9 @@ use crate::ast::visit::{
     walk_translation_unit,
 };
 use crate::ast::{
-    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, ExpressionNode,
+    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, EnumId,
     FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, JumpStatement, JumpStatementNode, Labeled,
-    LabeledStatementNode, Name, ParameterDeclaration, StructId, UnionId,
+    LabeledStatementNode, Name, ParameterDeclaration, StructDeclaration, Tag,
 };
 use crate::ast::{Storage, StringId};
 use crate::parser::{Context, Span};
@@ -15,7 +15,7 @@ use crate::semantic::diagnosis::Diagnosis;
 use crate::semantic::symbol::Symbol;
 use crate::semantic::{
     Diag, DiagCollector, DiagnosisNode, QualifiedType, ResolvedType, ResolvedTypeArena, SymbolArena, SymbolId,
-    SymbolKind, constrain,
+    SymbolKind, TagDefArena, TagDefId, constrain,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,16 +26,9 @@ pub enum ScopeKind {
     Prototype,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum TagId {
-    StructId(StructId),
-    UnionId(UnionId),
-}
-
 #[derive(Debug)]
 struct Scope {
-    tags: HashMap<StringId, SymbolId>,
-    members: HashMap<(TagId, StringId), SymbolId>,
+    tags: HashMap<StringId, TagDefId>,
     labels: HashMap<StringId, SymbolId>,
     ordinaries: HashMap<StringId, SymbolId>,
     kind: ScopeKind,
@@ -45,7 +38,6 @@ impl Scope {
     pub fn new(kind: ScopeKind) -> Self {
         Self {
             tags: HashMap::new(),
-            members: HashMap::new(),
             labels: HashMap::new(),
             ordinaries: HashMap::new(),
             kind,
@@ -54,11 +46,12 @@ impl Scope {
 }
 
 #[derive(Default, Debug)]
-struct SymbolResolver {
+pub struct SymbolResolver {
     scopes: Vec<Scope>,
     diagnosis: Vec<DiagnosisNode>,
     symbol_arena: SymbolArena,
-    types: ResolvedTypeArena,
+    pub types: ResolvedTypeArena,
+    tags: TagDefArena,
 }
 
 impl DiagCollector for SymbolResolver {
@@ -78,7 +71,6 @@ impl SymbolResolver {
 
     fn get_map_mut(&mut self, kind: SymbolKind) -> &mut HashMap<StringId, SymbolId> {
         match kind {
-            SymbolKind::Struct | SymbolKind::Enum | SymbolKind::Union => &mut self.scope_mut().tags,
             SymbolKind::Label => &mut self.scope_mut().labels,
             SymbolKind::Typedef
             | SymbolKind::Variable
@@ -91,7 +83,6 @@ impl SymbolResolver {
 
     fn get_map(&self, kind: SymbolKind) -> &HashMap<StringId, SymbolId> {
         match kind {
-            SymbolKind::Struct | SymbolKind::Enum | SymbolKind::Union => &self.scope().tags,
             SymbolKind::Label => &self.scope().labels,
             SymbolKind::Typedef
             | SymbolKind::Variable
@@ -102,23 +93,34 @@ impl SymbolResolver {
         }
     }
 
-    fn process_specifiers(
+    fn lookup_ordinary(&self, name: StringId) -> Option<SymbolId> {
+        self.scopes.iter().rev().find_map(|s| s.ordinaries.get(&name)).copied()
+    }
+
+    pub fn resolve_typedef(
         &mut self,
-        ctx: &Context,
-        specifiers: &[DeclarationSpecifier],
+        name: Name,
+        is_const: bool,
+        is_volatile: bool,
         span: &Span,
     ) -> Option<QualifiedType> {
-        let (is_const, is_volatile) = constrain::declaration::get_qualifier(specifiers).collect(self, span);
-        let ty = constrain::declaration::resolve_type(specifiers).collect(self, span)?;
-        match ty {
-            ResolvedType::Enum(id) => self.add_enum(ctx, id),
-            ResolvedType::Struct(id) => self.add_struct_or_union(ctx, TagId::StructId(id)),
-            ResolvedType::Union(id) => self.add_struct_or_union(ctx, TagId::UnionId(id)),
-            _ => (),
+        let sym_id = self.lookup_ordinary(name.id)?;
+        let sym = self.symbol_arena.get(sym_id);
+        if sym.kind != SymbolKind::Typedef {
+            self.diagnosis
+                .push(DiagnosisNode::new(Diagnosis::UndeclaredIdentifier(name), *span));
+            return None;
         }
-        let id = self.types.alloc(ty);
-        let inner_most = QualifiedType::new(id, is_const, is_volatile);
-        Some(inner_most)
+        let base = sym.ty?;
+        if (is_const && base.is_const) || (is_volatile && base.is_volatile) {
+            self.diagnosis
+                .push(DiagnosisNode::new(Diagnosis::DuplicateTypeQualifers, *span));
+        }
+        Some(QualifiedType::new(
+            base.ty,
+            base.is_const || is_const,
+            base.is_volatile || is_volatile,
+        ))
     }
 
     fn make_qualified_type(
@@ -148,54 +150,87 @@ impl SymbolResolver {
         }
     }
 
-    fn add_struct_or_union(&mut self, ctx: &Context, id: TagId) {
-        let (name, fields) = match id {
-            TagId::StructId(id) => (id.resolve(ctx).name, &id.resolve(ctx).fields),
-            TagId::UnionId(id) => (id.resolve(ctx).name, &id.resolve(ctx).fields),
+    fn declare_tag(&mut self, kind: Tag, name: Option<Name>, is_definition: bool, span: &Span) -> TagDefId {
+        let Some(name) = name else { return self.tags.declare(kind, None) };
+
+        let found = if is_definition {
+            self.scope().tags.get(&name.id).copied()
+        } else {
+            self.scopes.iter().rev().find_map(|s| s.tags.get(&name.id)).copied()
         };
-        if let Some(name) = name {
-            let ty = match id {
-                TagId::StructId(id) => self.types.new_struct(id),
-                TagId::UnionId(id) => self.types.new_union(id),
-            };
-            self.add_symbol(
-                name,
-                QualifiedType::new(ty, false, false),
-                None,
-                SymbolKind::Struct,
-                &Span::default(),
-                false,
-            );
+
+        if let Some(id) = found {
+            let def = self.tags.get(id);
+            if def.kind != kind || (is_definition && def.is_complete) {
+                let kind = def.kind();
+                self.diagnosis
+                    .push(DiagnosisNode::new(Diagnosis::DuplicateDeclaration(kind, name), *span));
+            }
+            return id;
         }
+
+        let id = self.tags.declare(kind, Some(name));
+        self.scope_mut().tags.insert(name.id, id);
+        id
+    }
+
+    pub fn resolve_struct_or_union(
+        &mut self,
+        ctx: &Context,
+        kind: Tag,
+        name: Option<Name>,
+        fields: &[StructDeclaration],
+        span: &Span,
+    ) -> TagDefId {
+        let is_definition = !fields.is_empty();
+        let tag = self.declare_tag(kind, name, is_definition, span);
+        if !is_definition {
+            return tag;
+        }
+
+        let mut members = Vec::new();
         for field in fields {
-            let qual = self.process_specifiers(ctx, &field.specifiers, &field.span);
+            let qual = constrain::declaration::resolve_type(self, ctx, &field.specifiers, &field.span);
             for declarator in &field.struct_declarators {
                 let decl = &declarator.declarator;
                 let Some((ty, node)) = self.make_qualified_type(ctx, qual, decl) else { continue };
                 let Some(name) = node.ident(ctx) else { continue };
-                self.add_member(name, ty, &decl.span, declarator.bit_width.clone(), id);
+                if members.iter().any(|&m| self.symbol_arena.get(m).name.id == name.id) {
+                    self.diagnosis.push(DiagnosisNode::new(
+                        Diagnosis::DuplicateDeclaration(SymbolKind::Member, name),
+                        decl.span,
+                    ));
+                    continue;
+                }
+                members.push(self.symbol_arena.with_size(
+                    name,
+                    Some(ty),
+                    None,
+                    SymbolKind::Member,
+                    declarator.bit_width.clone(),
+                ));
             }
         }
+        self.tags.complete(tag, members);
+        tag
     }
 
-    fn add_enum(&mut self, ctx: &Context, id: EnumId) {
+    pub fn resolve_enum(&mut self, ctx: &Context, id: EnumId) -> TagDefId {
         let enum_node = id.resolve(ctx);
-        if let Some(name) = enum_node.name {
-            let ty = self.types.new_enum(id);
-            self.add_symbol(
-                name,
-                QualifiedType::new(ty, false, false),
-                None,
-                SymbolKind::Enum,
-                &enum_node.span,
-                !enum_node.variants.is_empty(),
-            );
+        let is_definition = !enum_node.variants.is_empty();
+        let tag = self.declare_tag(Tag::Enum, enum_node.name, is_definition, &enum_node.span);
+        if !is_definition {
+            return tag;
         }
+
+        let mut members = Vec::new();
         for variant_id in &enum_node.variants {
             let variant = variant_id.resolve(ctx);
             let ty = QualifiedType::new(self.types.int(), false, false);
-            self.add_symbol(variant.name, ty, None, SymbolKind::Variant, &enum_node.span, true);
+            members.push(self.add_symbol(variant.name, ty, None, SymbolKind::Variant, &variant.span, true));
         }
+        self.tags.complete(tag, members);
+        tag
     }
 
     fn dedup(&mut self, sym: &Symbol, span: &Span) -> Option<SymbolId> {
@@ -223,7 +258,7 @@ impl SymbolResolver {
     ) -> SymbolId {
         let sym = Symbol {
             name,
-            ty,
+            ty: Some(ty),
             storage,
             kind,
             bit_width: None,
@@ -232,36 +267,9 @@ impl SymbolResolver {
         };
         let sym_id = self
             .dedup(&sym, span)
-            .unwrap_or(self.symbol_arena.add(name, ty, storage, kind, is_init));
+            .unwrap_or(self.symbol_arena.add(name, Some(ty), storage, kind, is_init));
         self.get_map_mut(kind).insert(name.id, sym_id);
         sym_id
-    }
-
-    fn add_member(
-        &mut self,
-        name: Name,
-        ty: QualifiedType,
-        span: &Span,
-        bit_width: Option<ExpressionNode>,
-        tag_id: TagId,
-    ) {
-        let sym = Symbol {
-            name,
-            ty,
-            storage: None,
-            kind: SymbolKind::Member,
-            bit_width,
-            is_complete: true,
-            is_init: true,
-        };
-        if self.scope_mut().members.contains_key(&(tag_id, name.id)) {
-            return self.diagnosis.push(DiagnosisNode::new(
-                Diagnosis::DuplicateDeclaration(sym.kind, sym.name),
-                *span,
-            ));
-        }
-        let sym_id = self.symbol_arena.add(name, ty, None, SymbolKind::Member, true);
-        self.scope_mut().members.insert((tag_id, name.id), sym_id);
     }
 
     fn add_label_symbol(&mut self, name: Name, span: &Span, is_init: bool) {
@@ -279,9 +287,7 @@ impl SymbolResolver {
                 *span,
             ));
         };
-        let ty = self.types.label();
-        let ty = QualifiedType::new(ty, false, false);
-        let sym_id = self.symbol_arena.add(name, ty, None, SymbolKind::Label, is_init);
+        let sym_id = self.symbol_arena.add(name, None, None, SymbolKind::Label, is_init);
         self.scopes
             .iter_mut()
             .find(|s| s.kind == ScopeKind::Function)
@@ -297,7 +303,7 @@ impl SymbolResolver {
     ) -> Option<&'a FunctionParametersNode> {
         let span = &node.span;
 
-        let qualif = self.process_specifiers(ctx, &node.specifiers, span);
+        let qualif = constrain::declaration::resolve_type(self, ctx, &node.specifiers, span);
         let (ty, fn_decl) = self.make_qualified_type(ctx, qualif, &node.declarator)?;
         let (decl, parameters) =
             constrain::external::extract_function_declarator(fn_decl.id.resolve(ctx)).collect(self, span)?;
@@ -405,7 +411,7 @@ impl SymbolResolver {
         decl: &DeclaratorNode,
         span: &Span,
     ) -> Option<SymbolId> {
-        let qualif = self.process_specifiers(ctx, specifiers, span);
+        let qualif = constrain::declaration::resolve_type(self, ctx, specifiers, span);
         let (ty, decl) = self.make_qualified_type(ctx, qualif, decl)?;
         let storage = constrain::declaration::get_storage(specifiers)
             .collect(self, span)
@@ -437,7 +443,7 @@ impl Visitor for SymbolResolver {
     fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode) {
         let specifiers = &node.specifiers;
         let span = &node.span;
-        let qualif = self.process_specifiers(ctx, specifiers, span);
+        let qualif = constrain::declaration::resolve_type(self, ctx, specifiers, span);
         for init_declarator in &node.init_declarators {
             let decl = &init_declarator.declarator;
             let Some((ty, decl)) = self.make_qualified_type(ctx, qualif, decl) else { continue };
@@ -480,38 +486,7 @@ impl Visitor for SymbolResolver {
         walk_compound_statement(self, ctx, node);
         self.scopes.pop();
     }
-
-    // fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
-    //     match node.id.resolve(ctx) {
-    //         Expression::Identifier(name) => self.check_ident(name),
-    //         Expression::PtrAcces(tag_expr, member) | Expression::DotAcces(tag_expr, member) => {
-    //             // check tag_expr type is tag
-    //             // check if member is in tag_expr type members
-    //         }
-    //         Expression::Cast(ty, _) | Expression::SizeofType(ty) => {
-    //             // check is ty is complete
-    //         }
-    //         // for every binary check type compat
-    //         _ => (),
-    //     }
-    //     walk_expression(self, ctx, node);
-    // }
 }
-
-// impl SymbolResolver {
-//     fn check_ident(&mut self, name: &Name) {
-//         if !self
-//             .scopes
-//             .iter()
-//             .rev()
-//             .find_map(|s| s.ordinaries.get(&name.id))
-//             .is_some()
-//         {
-//             self.diagnosis
-//                 .push(DiagnosisNode::new(Diagnosis::UndeclaredIdentifier(*name), name.span));
-//         }
-//     }
-// }
 
 pub struct Analyzer;
 
@@ -521,20 +496,67 @@ impl Analyzer {
         ctx
     }
 
-    fn resolve_names(ctx: &Context) -> Vec<DeclarationNode> {
+    fn resolve_names(ctx: &Context) {
         let mut collector = SymbolResolver::default();
         collector.scopes.push(Scope::new(ScopeKind::File));
         walk_translation_unit(&mut collector, ctx, &ctx.ast);
         collector.scopes.pop();
         assert!(collector.scopes.is_empty());
+        collector.report(ctx);
+    }
+}
+
+impl SymbolResolver {
+    fn describe(&self, ctx: &Context, qt: QualifiedType) -> String {
+        let mut out = String::new();
+        if qt.is_const {
+            out.push_str("const ");
+        }
+        if qt.is_volatile {
+            out.push_str("volatile ");
+        }
+        match *self.types.get(qt.ty) {
+            ResolvedType::Void => out.push_str("void"),
+            ResolvedType::Char => out.push_str("char"),
+            ResolvedType::SignedChar => out.push_str("signed char"),
+            ResolvedType::UnsignedChar => out.push_str("unsigned char"),
+            ResolvedType::Short => out.push_str("short"),
+            ResolvedType::UnsignedShort => out.push_str("unsigned short"),
+            ResolvedType::Int => out.push_str("int"),
+            ResolvedType::UnsignedInt => out.push_str("unsigned int"),
+            ResolvedType::Long => out.push_str("long"),
+            ResolvedType::UnsignedLong => out.push_str("unsigned long"),
+            ResolvedType::Float => out.push_str("float"),
+            ResolvedType::Double => out.push_str("double"),
+            ResolvedType::LongDouble => out.push_str("long double"),
+            ResolvedType::Pointer(inner) => {
+                out.push_str("pointer to ");
+                out.push_str(&self.describe(ctx, inner));
+            }
+            ResolvedType::Tag(id) => {
+                let def = self.tags.get(id);
+                let name = def.name.map(|n| n.id.resolve(ctx).as_str()).unwrap_or("<anonymous>");
+                out.push_str(&format!("{} {}", def.kind(), name));
+                if !def.is_complete {
+                    out.push_str(" (incomplete)");
+                }
+            }
+        }
+        out
+    }
+
+    fn report(&self, ctx: &Context) {
         println!("Symbols:");
-        for symbol in &collector.symbol_arena.data {
-            println!("{}", symbol.name.id.resolve(ctx));
+        for symbol in &self.symbol_arena.data {
+            let name = symbol.name.id.resolve(ctx);
+            match symbol.ty {
+                Some(ty) => println!("{:<10} {:<10} {}", symbol.kind, name, self.describe(ctx, ty)),
+                None => println!("{:<10} {}", symbol.kind, name),
+            }
         }
         println!("Diagnosis:");
-        for diag in &collector.diagnosis {
+        for diag in &self.diagnosis {
             let _ = diag.print(ctx);
         }
-        Vec::new()
     }
 }

@@ -1,92 +1,6 @@
-use std::fs;
-use std::process::Command;
+mod common;
 
-const GCC_FLAGS: &[&str] = &[
-    "-fsyntax-only",
-    "-std=iso9899:1990",
-    "-pedantic-errors",
-    "-fno-gnu-keywords",
-    "-Wno-deprecated-non-prototype",
-    "-Wno-strict-prototypes",
-    "-fno-asm",
-    "-fno-builtin",
-];
-
-fn gcc_accepts(path: &str) -> bool {
-    let out = Command::new("gcc")
-        .args(GCC_FLAGS)
-        .arg(path)
-        .output()
-        .expect("run gcc (is gcc installed?)");
-    out.status.success()
-}
-
-struct Cc1Out {
-    stdout: String,
-    stderr: String,
-}
-
-fn cc1(path: &str) -> Cc1Out {
-    let out = Command::new(env!("CARGO_BIN_EXE_cc1"))
-        .arg(path)
-        .output()
-        .expect("run cc1 binary");
-    Cc1Out {
-        stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
-        stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
-    }
-}
-
-struct Case {
-    src: String,
-    pp: String,
-}
-
-impl Drop for Case {
-    fn drop(&mut self) {
-        fs::remove_file(&self.src).ok();
-        fs::remove_file(&self.pp).ok();
-    }
-}
-
-fn write_case(name: &str, src: &str) -> Case {
-    let dir = std::env::temp_dir().join(format!("cc1-tests-{}", std::process::id()));
-    fs::create_dir_all(&dir).expect("create temp dir");
-
-    let src_path = dir.join(format!("{name}.c"));
-    fs::write(&src_path, format!("{src}\n")).expect("write case");
-
-    let pp_path = dir.join(format!("{name}.i"));
-    let out = Command::new("clang")
-        .args(["-E", "-std=c89"])
-        .arg(&src_path)
-        .output()
-        .expect("run clang -E (is clang installed?)");
-    assert!(
-        out.status.success(),
-        "clang -E failed for `{name}`:\n{src}\n{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    fs::write(&pp_path, &out.stdout).expect("write preprocessed case");
-
-    Case {
-        src: src_path.to_string_lossy().into_owned(),
-        pp: pp_path.to_string_lossy().into_owned(),
-    }
-}
-
-fn run_syntax(name: &str, src: &str) {
-    let case = write_case(name, src);
-    let gcc = gcc_accepts(&case.src);
-    let out = cc1(&case.pp);
-
-    assert!(gcc, "fixture `{name}` is not valid C90 — gcc rejects it:\n{src}");
-    assert!(
-        !out.stderr.contains("syntax error"),
-        "cc1 failed to parse `{name}`:\n{src}\n{}",
-        out.stderr
-    );
-}
+use common::{cc1, gcc_accepts, write_case};
 
 fn strip_ansi(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -131,39 +45,6 @@ fn run_literal(name: &str, src: &str, expected: &str) {
         "wrong string literal value for `{name}` (no values at all means the \
          AstPrinter dump in main.rs is disabled):\n{src}"
     );
-}
-
-fn run_case(name: &str, src: &str) {
-    let case = write_case(name, src);
-
-    let gcc = gcc_accepts(&case.src);
-    let cc1_ok = cc1(&case.pp).stderr.is_empty();
-
-    assert_eq!(
-        cc1_ok,
-        gcc,
-        "verdict mismatch for `{name}`: gcc {} but cc1 {}\nsource:\n{src}",
-        if gcc { "accepts" } else { "rejects" },
-        if cc1_ok { "accepts" } else { "rejects" },
-    );
-}
-
-macro_rules! case {
-    ($name:ident, $src:expr) => {
-        #[test]
-        fn $name() {
-            run_case(stringify!($name), $src);
-        }
-    };
-}
-
-macro_rules! syntax {
-    ($name:ident, $src:expr) => {
-        #[test]
-        fn $name() {
-            run_syntax(stringify!($name), $src);
-        }
-    };
 }
 
 macro_rules! literal {
