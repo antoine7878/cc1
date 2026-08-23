@@ -11,6 +11,7 @@ use crate::ast::{
 };
 use crate::ast::{Storage, StringId};
 use crate::parser::{Context, Span};
+use crate::utils::{BLUE, RESET};
 use crate::semantic::diagnosis::Diagnosis;
 use crate::semantic::symbol::Symbol;
 use crate::semantic::{
@@ -546,17 +547,59 @@ impl SymbolResolver {
     }
 
     fn report(&self, ctx: &Context) {
+        let rows: Vec<[String; 5]> = self
+            .symbol_arena
+            .data
+            .iter()
+            .map(|symbol| {
+                [
+                    symbol.kind.to_string(),
+                    symbol.name.id.resolve(ctx).clone(),
+                    symbol.storage.map(|s| s.to_string()).unwrap_or_default(),
+                    if symbol.is_init { String::from("yes") } else { String::new() },
+                    symbol.ty.map(|ty| self.describe(ctx, ty)).unwrap_or_default(),
+                ]
+            })
+            .collect();
+
         println!("Symbols:");
-        for symbol in &self.symbol_arena.data {
-            let name = symbol.name.id.resolve(ctx);
-            match symbol.ty {
-                Some(ty) => println!("{:<10} {:<10} {}", symbol.kind, name, self.describe(ctx, ty)),
-                None => println!("{:<10} {}", symbol.kind, name),
-            }
-        }
+        print_table(&["KIND", "NAME", "STORAGE", "INIT", "TYPE"], &rows);
+
         println!("Diagnosis:");
         for diag in &self.diagnosis {
             let _ = diag.print(ctx);
         }
     }
+}
+
+fn print_table<const N: usize>(headers: &[&str; N], rows: &[[String; N]]) {
+    if rows.is_empty() {
+        return;
+    }
+
+    let mut widths = headers.map(str::len);
+    for row in rows {
+        for (width, cell) in widths.iter_mut().zip(row) {
+            *width = (*width).max(cell.chars().count());
+        }
+    }
+
+    let rule: [String; N] = std::array::from_fn(|i| "-".repeat(widths[i]));
+
+    println!("{}{}{}", BLUE, table_row(&widths, headers), RESET);
+    println!("{}", table_row(&widths, &rule.each_ref().map(String::as_str)));
+    for row in rows {
+        println!("{}", table_row(&widths, &row.each_ref().map(String::as_str)));
+    }
+}
+
+fn table_row<const N: usize>(widths: &[usize; N], cells: &[&str; N]) -> String {
+    let mut out = String::new();
+    for (i, cell) in cells.iter().enumerate() {
+        out.push_str(cell);
+        if i + 1 < N {
+            out.push_str(&" ".repeat(widths[i] - cell.chars().count() + 2));
+        }
+    }
+    out
 }
