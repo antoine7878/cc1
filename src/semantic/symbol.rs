@@ -14,6 +14,8 @@ pub struct Symbol {
     pub storage: Option<Storage>,
     pub kind: SymbolKind,
     pub bit_width: Option<ExpressionNode>,
+    // pub bit_width: Option<u8>,
+    // pub value: Option<i64>,
     pub is_complete: bool,
     pub is_init: bool,
 }

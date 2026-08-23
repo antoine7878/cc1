@@ -11,13 +11,13 @@ use crate::ast::{
 };
 use crate::ast::{Storage, StringId};
 use crate::parser::{Context, Span};
-use crate::utils::{BLUE, RESET};
 use crate::semantic::diagnosis::Diagnosis;
 use crate::semantic::symbol::Symbol;
 use crate::semantic::{
     Diag, DiagCollector, DiagnosisNode, QualifiedType, ResolvedType, ResolvedTypeArena, SymbolArena, SymbolId,
     SymbolKind, TagDefArena, TagDefId, constrain,
 };
+use crate::utils::{BLUE, RESET};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScopeKind {
@@ -130,7 +130,15 @@ impl SymbolResolver {
         inner_most: Option<QualifiedType>,
         decl: &DeclaratorNode,
     ) -> Option<(QualifiedType, DeclaratorNode)> {
-        Some(self.extract_pointer(ctx, decl, inner_most?))
+        let (ty, decl) = self.extract_pointer(ctx, decl, inner_most?);
+        match decl.id.resolve(ctx) {
+            Declarator::Ident(name) => (),
+            Declarator::Abstract => (),
+            Declarator::Pointer { qualifiers, inner } => (),
+            Declarator::Array { declarator, size } => (),
+            Declarator::Function { declarator, params } => (),
+        }
+        Some((ty, decl))
     }
 
     fn extract_pointer(
@@ -540,6 +548,15 @@ impl SymbolResolver {
                 out.push_str(&format!("{} {}", def.kind(), name));
                 if !def.is_complete {
                     out.push_str(" (incomplete)");
+                }
+            }
+            ResolvedType::Array { elem, len } => {
+                out.push_str("array");
+                out.push_str(&self.describe(ctx, elem));
+                if let Some(len) = len {
+                    out.push('[');
+                    out.push_str(&len.to_string());
+                    out.push('[');
                 }
             }
         }
