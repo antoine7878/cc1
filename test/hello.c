@@ -1,10 +1,5 @@
-struct a {
-	int a;
-};
+enum Res { OUI, NON };
 
-int fn(void) {
-	char a;
-	int b;
-	struct a s;
-	return a + s;
+void fn(void) {
+	int a[NON];
 }
