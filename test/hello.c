@@ -1,6 +1,10 @@
-const struct a b;
-// salut
-int main(void) {
+struct a {
 	int a;
-	return 0;
+};
+
+int fn(void) {
+	char a;
+	int b;
+	struct a s;
+	return a + s;
 }

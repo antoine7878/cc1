@@ -48,6 +48,10 @@ impl ResolvedTypeArena {
     pub fn new_struct(&mut self, id: StructId) -> ResolvedTypeId {
         self.alloc(ResolvedType::Struct(id))
     }
+
+    pub fn new_union(&mut self, id: UnionId) -> ResolvedTypeId {
+        self.alloc(ResolvedType::Union(id))
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Hash, Eq)]

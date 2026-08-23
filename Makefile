@@ -40,7 +40,7 @@ test: $(NAME)
 ctest: $(NAME)
 	cargo test
 
-CCF = -std=iso9899:1990 -pedantic-errors -fno-gnu-keywords -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
+CCF = -std=iso9899:1990 -pedantic -fno-gnu-keywords -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
 
 c:
 	gcc -c $(CCF) test/hello.c -o /dev/null

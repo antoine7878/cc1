@@ -1,4 +1,5 @@
 use std::fmt;
+use std::hash::Hash;
 
 use crate::ast::{ExpressionNode, Name, Storage};
 use crate::define_arena;
@@ -6,17 +7,46 @@ use crate::semantic::QualifiedType;
 
 define_arena!(Symbol, SymbolArena, SymbolId, symbols);
 
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct Symbol {
+    pub name: Name,
+    pub ty: QualifiedType,
+    pub storage: Option<Storage>,
+    pub kind: SymbolKind,
+    pub bit_width: Option<ExpressionNode>,
+    pub is_complete: bool,
+    pub is_init: bool,
+}
+
+impl Symbol {
+    pub fn is_compatible(&self, other: &Self) -> bool {
+        self.name.id == other.name.id
+            && self.ty == other.ty
+            && self.storage == other.storage
+            && self.kind == other.kind
+            && self.bit_width == other.bit_width
+    }
+}
+
 impl SymbolArena {
-    pub fn add(&mut self, name: Name, ty: QualifiedType, storage: Option<Storage>, kind: SymbolKind) -> SymbolId {
+    pub fn add(
+        &mut self,
+        name: Name,
+        ty: QualifiedType,
+        storage: Option<Storage>,
+        kind: SymbolKind,
+        is_init: bool,
+    ) -> SymbolId {
         self.alloc_fresh(Symbol {
             name,
             ty,
             storage,
             kind,
-            bit_witdh: None,
+            bit_width: None,
+            is_complete: true,
+            is_init,
         })
     }
-
     pub fn with_size(
         &mut self,
         name: Name,
@@ -30,7 +60,9 @@ impl SymbolArena {
             ty,
             storage,
             kind,
-            bit_witdh: size,
+            bit_width: size,
+            is_complete: true,
+            is_init: true,
         })
     }
 }
@@ -64,13 +96,4 @@ impl fmt::Display for SymbolKind {
             SymbolKind::Variant => write!(f, "variant"),
         }
     }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Symbol {
-    pub name: Name,
-    pub ty: QualifiedType,
-    pub storage: Option<Storage>,
-    pub kind: SymbolKind,
-    pub bit_witdh: Option<ExpressionNode>,
 }
