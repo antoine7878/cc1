@@ -28,6 +28,13 @@ pub enum ResolvedType {
     Label,
 }
 
+#[derive(Debug, PartialEq, Clone, Copy, Hash, Eq)]
+pub struct QualifiedType {
+    pub ty: ResolvedTypeId,
+    pub is_const: bool,
+    pub is_volatile: bool,
+}
+
 impl ResolvedTypeArena {
     pub fn label(&mut self) -> ResolvedTypeId {
         self.alloc(ResolvedType::Label)
@@ -52,13 +59,6 @@ impl ResolvedTypeArena {
     pub fn new_union(&mut self, id: UnionId) -> ResolvedTypeId {
         self.alloc(ResolvedType::Union(id))
     }
-}
-
-#[derive(Debug, PartialEq, Clone, Copy, Hash, Eq)]
-pub struct QualifiedType {
-    pub ty: ResolvedTypeId,
-    pub is_const: bool,
-    pub is_volatile: bool,
 }
 
 impl QualifiedType {
