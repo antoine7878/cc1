@@ -255,10 +255,10 @@ impl SymbolResolver {
                 let Some((ty, node)) = self.make_qualified_type(ctx, qual, decl) else { continue };
                 let Some(name) = node.ident(ctx) else { continue };
                 if members.iter().any(|&m| self.symbols.get(m).name.id == name.id) {
-                    self.diagnosis.push(DiagnosisNode::new(
-                        Diagnosis::DuplicateDeclaration(SymbolKind::Member, name),
-                        decl.span,
-                    ));
+                    self.add_diag(
+                        Diag::with_diag((), Diagnosis::DuplicateDeclaration(SymbolKind::Member, name)),
+                        &decl.span,
+                    );
                     continue;
                 }
                 members.push(self.symbols.with_size(
@@ -290,17 +290,21 @@ impl SymbolResolver {
             let ty = QualifiedType::new(self.types.int(), false, false);
             if let Some(expr) = &variant.value {
                 self.visit_expression(ctx, expr);
-                let Some(val) = self.const_eval(ctx, expr) else { continue };
-                let Some(val) = val.get_integer_value() else {
-                    return self.add_diag(
-                        Diag::with_diag(None, Diagnosis::NonIntegerConstantExpression),
-                        &variant.span,
-                    );
-                };
-                value = val as i64;
+                if let Some(val) = self.const_eval(ctx, expr) {
+                    match val.get_integer_value() {
+                        Some(v) => value = v as i64,
+                        None => {
+                            self.add_diag(
+                                Diag::with_diag((), Diagnosis::NonIntegerConstantExpression),
+                                &variant.span,
+                            );
+                        }
+                    }
+                }
             }
             if value < i32::MIN as i64 || value > i32::MAX as i64 {
-                return self.add_diag(Diag::with_diag(None, Diagnosis::VariantBadValue), &variant.span);
+                self.add_diag(Diag::with_diag((), Diagnosis::VariantBadValue), &variant.span);
+                value = 0
             }
             members.push(self.add_variant_symbol(
                 variant.name,
@@ -389,10 +393,10 @@ impl SymbolResolver {
             if !(is_init && old_init) {
                 return;
             }
-            return self.diagnosis.push(DiagnosisNode::new(
-                Diagnosis::DuplicateDeclaration(SymbolKind::Label, name),
-                *span,
-            ));
+            return self.add_diag(
+                Diag::with_diag((), Diagnosis::DuplicateDeclaration(SymbolKind::Label, name)),
+                span,
+            );
         };
         let sym_id = self.symbols.add(name, None, None, SymbolKind::Label, is_init);
         self.scopes
@@ -573,7 +577,7 @@ impl SymbolResolver {
                     self.const_eval(ctx, e2)
                 }
             }
-            Expression::SizeofExpr(expr) => None,
+            Expression::SizeofExpr(_expr) => None,
             Expression::SizeofType(ty) => {
                 let qualif = constrain::declaration::resolve_type(self, ctx, &ty.specifiers, &expr.span)?;
                 Some(Value::UnsignedLong(self.type_size(ctx, qualif)?))
