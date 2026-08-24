@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::ast::Storage;
 use crate::ast::visit::{
     Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_jump_statement, walk_labeled_statement,
     walk_translation_unit,
@@ -9,50 +10,21 @@ use crate::ast::{
     ExpressionId, ExpressionNode, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, JumpStatement,
     JumpStatementNode, Labeled, LabeledStatementNode, Name, ParameterDeclaration, StructDeclaration, Tag, Value,
 };
-use crate::ast::{Storage, StringId};
 use crate::parser::{Context, Span};
 use crate::semantic::diagnosis::Diagnosis;
 use crate::semantic::symbol::Symbol;
 use crate::semantic::{
-    Diag, DiagCollector, DiagnosisNode, QualifiedType, ResolvedType, ResolvedTypeArena, SymbolArena, SymbolId,
-    SymbolKind, TagDefArena, TagDefId, constrain,
+    Diag, DiagCollector, DiagnosisNode, QualifiedType, ResolvedType, ResolvedTypeArena, ScopeKind, Scopes, SymbolArena,
+    SymbolId, SymbolKind, TagDefArena, TagDefId, constrain,
 };
-use crate::utils::{BLUE, RESET};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ScopeKind {
-    Block,
-    Function,
-    File,
-    Prototype,
-}
-
-#[derive(Debug)]
-struct Scope {
-    tags: HashMap<StringId, TagDefId>,
-    labels: HashMap<StringId, SymbolId>,
-    ordinaries: HashMap<StringId, SymbolId>,
-    kind: ScopeKind,
-}
-
-impl Scope {
-    pub fn new(kind: ScopeKind) -> Self {
-        Self {
-            tags: HashMap::new(),
-            labels: HashMap::new(),
-            ordinaries: HashMap::new(),
-            kind,
-        }
-    }
-}
 
 #[derive(Default, Debug)]
 pub struct SymbolResolver {
-    scopes: Vec<Scope>,
-    diagnosis: Vec<DiagnosisNode>,
-    symbols: SymbolArena,
+    scopes: Scopes,
+    pub(super) diagnosis: Vec<DiagnosisNode>,
+    pub(super) symbols: SymbolArena,
     pub types: ResolvedTypeArena,
-    tags: TagDefArena,
+    pub(super) tags: TagDefArena,
     bindings: HashMap<ExpressionId, Option<SymbolId>>,
     const_expr: HashMap<ExpressionId, Option<Value>>,
 }
@@ -113,42 +85,6 @@ impl SymbolResolver {
         Some(size as u64)
     }
 
-    fn scope_mut(&mut self) -> &mut Scope {
-        self.scopes.last_mut().unwrap()
-    }
-
-    fn scope(&self) -> &Scope {
-        self.scopes.last().unwrap()
-    }
-
-    fn get_map_mut(&mut self, kind: SymbolKind) -> &mut HashMap<StringId, SymbolId> {
-        match kind {
-            SymbolKind::Label => &mut self.scope_mut().labels,
-            SymbolKind::Typedef
-            | SymbolKind::Variable
-            | SymbolKind::Parameter
-            | SymbolKind::Function
-            | SymbolKind::Variant => &mut self.scope_mut().ordinaries,
-            _ => unimplemented!(),
-        }
-    }
-
-    fn get_map(&self, kind: SymbolKind) -> &HashMap<StringId, SymbolId> {
-        match kind {
-            SymbolKind::Label => &self.scope().labels,
-            SymbolKind::Typedef
-            | SymbolKind::Variable
-            | SymbolKind::Parameter
-            | SymbolKind::Function
-            | SymbolKind::Variant => &self.scope().ordinaries,
-            _ => unimplemented!(),
-        }
-    }
-
-    fn lookup_ordinary(&self, name: StringId) -> Option<SymbolId> {
-        self.scopes.iter().rev().find_map(|s| s.ordinaries.get(&name)).copied()
-    }
-
     pub fn resolve_typedef(
         &mut self,
         name: Name,
@@ -156,7 +92,7 @@ impl SymbolResolver {
         is_volatile: bool,
         span: &Span,
     ) -> Option<QualifiedType> {
-        let sym_id = self.lookup_ordinary(name.id)?;
+        let sym_id = self.scopes.lookup_ordinary(name.id)?;
         let sym = self.symbols.get(sym_id);
         if sym.kind != SymbolKind::Typedef {
             self.diagnosis
@@ -213,13 +149,7 @@ impl SymbolResolver {
     fn declare_tag(&mut self, kind: Tag, name: Option<Name>, is_definition: bool, span: &Span) -> TagDefId {
         let Some(name) = name else { return self.tags.declare(kind, None) };
 
-        let found = if is_definition {
-            self.scope().tags.get(&name.id).copied()
-        } else {
-            self.scopes.iter().rev().find_map(|s| s.tags.get(&name.id)).copied()
-        };
-
-        if let Some(id) = found {
+        if let Some(id) = self.scopes.lookup_tag(name.id, is_definition) {
             let def = self.tags.get(id);
             if def.kind != kind || (is_definition && def.is_complete) {
                 let kind = def.kind();
@@ -230,7 +160,7 @@ impl SymbolResolver {
         }
 
         let id = self.tags.declare(kind, Some(name));
-        self.scope_mut().tags.insert(name.id, id);
+        self.scopes.insert_tag(name.id, id);
         id
     }
 
@@ -306,7 +236,8 @@ impl SymbolResolver {
                 self.add_diag(Diag::with_diag((), Diagnosis::VariantBadValue), &variant.span);
                 value = 0
             }
-            members.push(self.add_variant_symbol(variant.name, &variant.span, value as i32));
+            let ty = QualifiedType::new(self.types.int(), false, false);
+            members.push(self.declare(Symbol::variant(variant.name, ty, value as i32), &variant.span));
             value += 1;
         }
         self.tags.complete(tag, members);
@@ -314,9 +245,11 @@ impl SymbolResolver {
     }
 
     fn dedup(&mut self, sym: &Symbol, span: &Span) -> Option<SymbolId> {
-        let old_id = *self.get_map(sym.kind).get(&sym.name.id)?;
+        let old_id = self.scopes.current(sym.kind, sym.name.id)?;
         let old_symbol = self.symbols.get(old_id);
-        if self.scope().kind == ScopeKind::File && old_symbol.is_compatible(sym) && !(sym.is_init && old_symbol.is_init)
+        if self.scopes.kind() == ScopeKind::File
+            && old_symbol.is_compatible(sym)
+            && !(sym.is_init && old_symbol.is_init)
         {
             return Some(old_id);
         }
@@ -326,48 +259,18 @@ impl SymbolResolver {
         )
     }
 
-    fn add_symbol(
-        &mut self,
-        name: Name,
-        ty: QualifiedType,
-        storage: Option<Storage>,
-        kind: SymbolKind,
-        span: &Span,
-        is_init: bool,
-    ) -> SymbolId {
-        let sym = Symbol {
-            name,
-            ty: Some(ty),
-            storage,
-            kind,
-            bit_width: None,
-            is_complete: true,
-            value: None,
-            is_init,
+    fn declare(&mut self, sym: Symbol, span: &Span) -> SymbolId {
+        let (name, kind) = (sym.name, sym.kind);
+        let sym_id = match self.dedup(&sym, span) {
+            Some(id) => id,
+            None => self.symbols.alloc(sym),
         };
-        let sym_id = self.dedup(&sym, span).unwrap_or(self.symbols.alloc(sym));
-        self.get_map_mut(kind).insert(name.id, sym_id);
-        sym_id
-    }
-
-    fn add_variant_symbol(&mut self, name: Name, span: &Span, value: i32) -> SymbolId {
-        let sym = Symbol {
-            name,
-            ty: Some(QualifiedType::new(self.types.int(), false, false)),
-            storage: None,
-            kind: SymbolKind::Variant,
-            bit_width: None,
-            is_complete: true,
-            is_init: true,
-            value: Some(value),
-        };
-        let sym_id = self.dedup(&sym, span).unwrap_or(self.symbols.alloc(sym));
-        self.get_map_mut(SymbolKind::Variant).insert(name.id, sym_id);
+        self.scopes.insert(kind, name.id, sym_id);
         sym_id
     }
 
     fn add_label_symbol(&mut self, name: Name, span: &Span, is_init: bool) {
-        if let Some(&old) = self.scopes.iter().rev().find_map(|s| s.labels.get(&name.id)) {
+        if let Some(old) = self.scopes.lookup_label(name.id) {
             let old_init = self.symbols.get(old).is_init;
             if !old_init && is_init {
                 self.symbols.get_mut(old).is_init = true;
@@ -382,12 +285,7 @@ impl SymbolResolver {
             );
         };
         let sym_id = self.symbols.add(name, None, None, SymbolKind::Label, is_init);
-        self.scopes
-            .iter_mut()
-            .find(|s| s.kind == ScopeKind::Function)
-            .unwrap()
-            .labels
-            .insert(name.id, sym_id);
+        self.scopes.insert(SymbolKind::Label, name.id, sym_id);
     }
 
     fn add_function<'a>(
@@ -410,14 +308,8 @@ impl SymbolResolver {
         constrain::external::check_external_specifiers(&node.specifiers).collect(self, span);
 
         let name = decl.ident(ctx)?;
-        self.add_symbol(
-            name,
-            ty,
-            Some(storage),
-            SymbolKind::Function,
-            &node.declarator.span,
-            true,
-        );
+        let sym = Symbol::new(name, Some(ty), Some(storage), SymbolKind::Function, true);
+        self.declare(sym, &node.declarator.span);
         Some(parameters)
     }
 
@@ -486,15 +378,10 @@ impl SymbolResolver {
             return;
         };
         for string_id in missing_id {
-            let ty_id = self.types.int();
-            self.add_symbol(
-                Name::new(string_id, Span::default()),
-                QualifiedType::new(ty_id, false, false),
-                Some(Storage::Register),
-                SymbolKind::Parameter,
-                &Span::default(),
-                false,
-            );
+            let ty = QualifiedType::new(self.types.int(), false, false);
+            let name = Name::new(string_id, Span::default());
+            let sym = Symbol::new(name, Some(ty), Some(Storage::Register), SymbolKind::Parameter, false);
+            self.declare(sym, &Span::default());
         }
     }
 
@@ -512,7 +399,8 @@ impl SymbolResolver {
             .unwrap_or(Storage::Register);
         constrain::external::param_storage_only_register(storage).collect(self, span)?;
         let name = decl.ident(ctx)?;
-        Some(self.add_symbol(name, ty, Some(storage), SymbolKind::Parameter, &decl.span, false))
+        let sym = Symbol::new(name, Some(ty), Some(storage), SymbolKind::Parameter, false);
+        Some(self.declare(sym, &decl.span))
     }
 
     fn cast_value(&mut self, ctx: &Context, qualif: QualifiedType, val: Value, span: &Span) -> Option<Value> {
@@ -622,7 +510,7 @@ impl Visitor for SymbolResolver {
     fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
         let Some(parameters) = self.add_function(ctx, node) else { return };
 
-        self.scopes.push(Scope::new(ScopeKind::Prototype));
+        self.scopes.push(ScopeKind::Prototype);
         let span = &parameters.span;
         match &parameters.param {
             FunctionParameters::Empty => self.param_empty(&node.old_style_declarations, span),
@@ -648,14 +536,8 @@ impl Visitor for SymbolResolver {
                 .collect(self, span)
                 .unwrap_or(Storage::Auto);
             let kind = if storage == Storage::Typedef { SymbolKind::Typedef } else { SymbolKind::Variable };
-            self.add_symbol(
-                name,
-                ty,
-                Some(storage),
-                kind,
-                &decl.span,
-                init_declarator.initializer.is_some(),
-            );
+            let is_init = init_declarator.initializer.is_some();
+            self.declare(Symbol::new(name, Some(ty), Some(storage), kind, is_init), &decl.span);
         }
         walk_declaration(self, ctx, node);
     }
@@ -675,9 +557,9 @@ impl Visitor for SymbolResolver {
     }
 
     fn visit_compound_statement(&mut self, ctx: &Context, node: &CompoundStatementNode) {
-        match self.scopes.last().unwrap().kind {
-            ScopeKind::Prototype => self.scopes.last_mut().unwrap().kind = ScopeKind::Function,
-            _ => self.scopes.push(Scope::new(ScopeKind::Block)),
+        match self.scopes.kind() {
+            ScopeKind::Prototype => self.scopes.set_kind(ScopeKind::Function),
+            _ => self.scopes.push(ScopeKind::Block),
         }
         walk_compound_statement(self, ctx, node);
         self.scopes.pop();
@@ -693,7 +575,7 @@ impl Visitor for SymbolResolver {
                 self.const_expr.insert(node.id, value);
             }
             Expression::Identifier(name) => {
-                let sym = self.lookup_ordinary(name.id);
+                let sym = self.scopes.lookup_ordinary(name.id);
                 if sym.is_none() {
                     self.add_diag(Diag::with_diag((), Diagnosis::UndeclaredIdentifier(*name)), &node.span);
                 }
@@ -714,116 +596,10 @@ impl Analyzer {
 
     fn resolve_names(ctx: &Context) {
         let mut collector = SymbolResolver::default();
-        collector.scopes.push(Scope::new(ScopeKind::File));
+        collector.scopes.push(ScopeKind::File);
         walk_translation_unit(&mut collector, ctx, &ctx.ast);
         collector.scopes.pop();
         assert!(collector.scopes.is_empty());
         collector.report(ctx);
     }
-}
-
-impl SymbolResolver {
-    fn describe(&self, ctx: &Context, qt: QualifiedType) -> String {
-        let mut out = String::new();
-        if qt.is_const {
-            out.push_str("const ");
-        }
-        if qt.is_volatile {
-            out.push_str("volatile ");
-        }
-        match *self.types.get(qt.ty) {
-            ResolvedType::Void => out.push_str("void"),
-            ResolvedType::Char => out.push_str("char"),
-            ResolvedType::SignedChar => out.push_str("signed char"),
-            ResolvedType::UnsignedChar => out.push_str("unsigned char"),
-            ResolvedType::Short => out.push_str("short"),
-            ResolvedType::UnsignedShort => out.push_str("unsigned short"),
-            ResolvedType::Int => out.push_str("int"),
-            ResolvedType::UnsignedInt => out.push_str("unsigned int"),
-            ResolvedType::Long => out.push_str("long"),
-            ResolvedType::UnsignedLong => out.push_str("unsigned long"),
-            ResolvedType::Float => out.push_str("float"),
-            ResolvedType::Double => out.push_str("double"),
-            ResolvedType::LongDouble => out.push_str("long double"),
-            ResolvedType::Pointer(inner) => {
-                out.push_str("pointer to ");
-                out.push_str(&self.describe(ctx, inner));
-            }
-            ResolvedType::Tag(id) => {
-                let def = self.tags.get(id);
-                let name = def.name.map(|n| n.id.resolve(ctx).as_str()).unwrap_or("<anonymous>");
-                out.push_str(&format!("{} {}", def.kind(), name));
-                if !def.is_complete {
-                    out.push_str(" (incomplete)");
-                }
-            }
-            ResolvedType::Array { elem, len } => {
-                out.push_str("array");
-                out.push_str(&self.describe(ctx, elem));
-                if let Some(len) = len {
-                    out.push('[');
-                    out.push_str(&len.to_string());
-                    out.push('[');
-                }
-            }
-        }
-        out
-    }
-
-    fn report(&self, ctx: &Context) {
-        let rows: Vec<[String; 5]> = self
-            .symbols
-            .data
-            .iter()
-            .map(|symbol| {
-                [
-                    symbol.kind.to_string(),
-                    symbol.name.id.resolve(ctx).clone(),
-                    symbol.storage.map(|s| s.to_string()).unwrap_or_default(),
-                    symbol.value.map(|v| v.to_string()).unwrap_or("-".to_string()),
-                    symbol.ty.map(|ty| self.describe(ctx, ty)).unwrap_or_default(),
-                ]
-            })
-            .collect();
-
-        println!("Symbols:");
-        print_table(&["KIND", "NAME", "STORAGE", "INIT", "TYPE"], &rows);
-
-        println!("Diagnosis:");
-        for diag in &self.diagnosis {
-            let _ = diag.print(ctx);
-        }
-    }
-}
-
-fn print_table<const N: usize>(headers: &[&str; N], rows: &[[String; N]]) {
-    if rows.is_empty() {
-        return;
-    }
-
-    let mut widths = headers.map(str::len);
-    for row in rows {
-        for (width, cell) in widths.iter_mut().zip(row) {
-            *width = (*width).max(cell.chars().count());
-        }
-    }
-
-    let rule: [String; N] = std::array::from_fn(|i| "-".repeat(widths[i]));
-
-    println!("{}{}{}", BLUE, table_row(&widths, headers), RESET);
-    println!("{}", table_row(&widths, &rule.each_ref().map(String::as_str)));
-    for row in rows {
-        println!("{}", table_row(&widths, &row.each_ref().map(String::as_str)));
-    }
-}
-
-fn table_row<const N: usize>(widths: &[usize; N], cells: &[&str; N]) -> String {
-    let mut out = String::new();
-    for (i, cell) in cells.iter().enumerate() {
-        out.push_str(cell);
-        if i + 1 < N {
-            out.push_str(&" ".repeat(widths[i] - cell.chars().count() + 2));
-        }
-    }
-    out
 }

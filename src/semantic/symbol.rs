@@ -20,6 +20,32 @@ pub struct Symbol {
 }
 
 impl Symbol {
+    pub fn new(
+        name: Name,
+        ty: Option<QualifiedType>,
+        storage: Option<Storage>,
+        kind: SymbolKind,
+        is_init: bool,
+    ) -> Self {
+        Self {
+            name,
+            ty,
+            storage,
+            kind,
+            bit_width: None,
+            value: None,
+            is_complete: true,
+            is_init,
+        }
+    }
+
+    pub fn variant(name: Name, ty: QualifiedType, value: i32) -> Self {
+        Self {
+            value: Some(value),
+            ..Self::new(name, Some(ty), None, SymbolKind::Variant, true)
+        }
+    }
+
     pub fn is_compatible(&self, other: &Self) -> bool {
         self.name.id == other.name.id && self.ty == other.ty && self.storage == other.storage && self.kind == other.kind
         // && self.bit_width == other.bit_width
@@ -35,16 +61,7 @@ impl SymbolArena {
         kind: SymbolKind,
         is_init: bool,
     ) -> SymbolId {
-        self.alloc(Symbol {
-            name,
-            ty,
-            storage,
-            kind,
-            bit_width: None,
-            is_complete: true,
-            value: None,
-            is_init,
-        })
+        self.alloc(Symbol::new(name, ty, storage, kind, is_init))
     }
 
     pub fn with_size(
