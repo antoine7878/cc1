@@ -5,9 +5,9 @@ use crate::ast::visit::{
     walk_translation_unit,
 };
 use crate::ast::{
-    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, EnumId,
-    FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, JumpStatement, JumpStatementNode, Labeled,
-    LabeledStatementNode, Name, ParameterDeclaration, StructDeclaration, Tag,
+    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, Expression,
+    ExpressionNode, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, JumpStatement,
+    JumpStatementNode, Labeled, LabeledStatementNode, Name, ParameterDeclaration, StructDeclaration, Tag, Value,
 };
 use crate::ast::{Storage, StringId};
 use crate::parser::{Context, Span};
@@ -224,22 +224,41 @@ impl SymbolResolver {
         tag
     }
 
-    pub fn resolve_enum(&mut self, ctx: &Context, id: EnumId) -> TagDefId {
+    pub fn resolve_enum(&mut self, ctx: &Context, id: EnumId) -> Option<TagDefId> {
         let enum_node = id.resolve(ctx);
         let is_definition = !enum_node.variants.is_empty();
         let tag = self.declare_tag(Tag::Enum, enum_node.name, is_definition, &enum_node.span);
         if !is_definition {
-            return tag;
+            return Some(tag);
         }
 
         let mut members = Vec::new();
+        let mut value = 0;
         for variant_id in &enum_node.variants {
             let variant = variant_id.resolve(ctx);
             let ty = QualifiedType::new(self.types.int(), false, false);
-            members.push(self.add_symbol(variant.name, ty, None, SymbolKind::Variant, &variant.span, true));
+            if let Some(expr) = &variant.value {
+                let Some(val) = self.const_eval(ctx, expr)?.get_integer_value() else {
+                    return self.add_diag(
+                        Diag::with_diag(None, Diagnosis::NonIntegerConstantExpression),
+                        &variant.span,
+                    );
+                };
+                value = val as i32;
+            }
+            members.push(self.add_variant_symbol(
+                variant.name,
+                ty,
+                None,
+                SymbolKind::Variant,
+                &variant.span,
+                true,
+                value,
+            ));
+            value += 1;
         }
         self.tags.complete(tag, members);
-        tag
+        Some(tag)
     }
 
     fn dedup(&mut self, sym: &Symbol, span: &Span) -> Option<SymbolId> {
@@ -249,11 +268,10 @@ impl SymbolResolver {
         {
             return Some(old_id);
         }
-        self.diagnosis.push(DiagnosisNode::new(
-            Diagnosis::DuplicateDeclaration(sym.kind, sym.name),
-            *span,
-        ));
-        Some(old_id)
+        self.add_diag(
+            Diag::some_diag(old_id, Diagnosis::DuplicateDeclaration(sym.kind, sym.name)),
+            span,
+        )
     }
 
     fn add_symbol(
@@ -272,11 +290,38 @@ impl SymbolResolver {
             kind,
             bit_width: None,
             is_complete: true,
+            value: None,
             is_init,
         };
-        let sym_id = self
-            .dedup(&sym, span)
-            .unwrap_or(self.symbol_arena.add(name, Some(ty), storage, kind, is_init));
+        let sym_id = self.dedup(&sym, span).unwrap_or(self.symbol_arena.alloc(sym));
+        // let sym_id = self
+        //     .dedup(&sym, span)
+        //     .unwrap_or(self.symbol_arena.add(name, Some(ty), storage, kind, is_init));
+        self.get_map_mut(kind).insert(name.id, sym_id);
+        sym_id
+    }
+
+    fn add_variant_symbol(
+        &mut self,
+        name: Name,
+        ty: QualifiedType,
+        storage: Option<Storage>,
+        kind: SymbolKind,
+        span: &Span,
+        is_init: bool,
+        value: i32,
+    ) -> SymbolId {
+        let sym = Symbol {
+            name,
+            ty: Some(ty),
+            storage,
+            kind,
+            bit_width: None,
+            is_complete: true,
+            is_init,
+            value: Some(value),
+        };
+        let sym_id = self.dedup(&sym, span).unwrap_or(self.symbol_arena.alloc(sym));
         self.get_map_mut(kind).insert(name.id, sym_id);
         sym_id
     }
@@ -429,6 +474,75 @@ impl SymbolResolver {
         let name = decl.ident(ctx)?;
         Some(self.add_symbol(name, ty, Some(storage), SymbolKind::Parameter, &decl.span, false))
     }
+
+    pub fn const_eval(&mut self, ctx: &Context, expr: &ExpressionNode) -> Option<Value> {
+        match expr.id.resolve(ctx) {
+            Expression::ConstantExpression(expr) => self.const_eval(ctx, expr),
+            Expression::Identifier(name) => {
+                let Some(a) = self.lookup_ordinary(name.id) else {
+                    return self.add_diag(Diag::none_diag(Diagnosis::UndeclaredIdentifier(*name)), &expr.span);
+                };
+                let symbol = self.symbol_arena.get(a);
+                if symbol.kind != SymbolKind::Variant {
+                    return self.add_diag(Diag::none_diag(Diagnosis::NonConstantExpression), &expr.span);
+                }
+                symbol.value.map(Value::Int)
+            }
+            Expression::Constant(value_node) => {
+                println!("COUCOU");
+                Some(value_node.value)
+            }
+            Expression::StringLiteral(_)
+            | Expression::PostInc(_)
+            | Expression::PostDec(_)
+            | Expression::PreInc(_)
+            | Expression::Deref(_)
+            | Expression::Addr(_)
+            | Expression::PreDec(_) => self.add_diag(Diag::none_diag(Diagnosis::NonConstantExpression), &expr.span),
+            Expression::Plus(expr) => self.const_eval(ctx, expr),
+            Expression::Minus(expr) => self.const_eval(ctx, expr),
+            Expression::BitNot(expr) => self.const_eval(ctx, expr),
+            Expression::Not(expr) => self.const_eval(ctx, expr),
+            // Expression::Add(ExpressionNode, ExpressionNode),
+            // Expression::Sub(ExpressionNode, ExpressionNode), Expression::Mul(ExpressionNode, ExpressionNode),
+            // Expression::Div(ExpressionNode, ExpressionNode),
+            // Expression::Mod(ExpressionNode, ExpressionNode),
+            // Expression::Right(ExpressionNode, ExpressionNode),
+            // Expression::Left(ExpressionNode, ExpressionNode),
+            // Expression::Greater(ExpressionNode, ExpressionNode),
+            // Expression::Lower(ExpressionNode, ExpressionNode),
+            // Expression::GreaterEq(ExpressionNode, ExpressionNode),
+            // Expression::LowerEq(ExpressionNode, ExpressionNode),
+            // Expression::Eq(ExpressionNode, ExpressionNode),
+            // Expression::Neq(ExpressionNode, ExpressionNode),
+            // Expression::BitAnd(ExpressionNode, ExpressionNode),
+            // Expression::BitOr(ExpressionNode, ExpressionNode),
+            // Expression::BitXor(ExpressionNode, ExpressionNode),
+            // Expression::And(ExpressionNode, ExpressionNode),
+            // Expression::Or(ExpressionNode, ExpressionNode),
+            // Expression::Assign(ExpressionNode, ExpressionNode),
+            // Expression::MulAssign(ExpressionNode, ExpressionNode),
+            // Expression::DivAssign(ExpressionNode, ExpressionNode),
+            // Expression::ModAssign(ExpressionNode, ExpressionNode),
+            // Expression::AddAssign(ExpressionNode, ExpressionNode),
+            // Expression::SubAssign(ExpressionNode, ExpressionNode),
+            // Expression::LeftAssign(ExpressionNode, ExpressionNode),
+            // Expression::RightAssign(ExpressionNode, ExpressionNode),
+            // Expression::AndAssign(ExpressionNode, ExpressionNode),
+            // Expression::XorAssign(ExpressionNode, ExpressionNode),
+            // Expression::OrAssign(ExpressionNode, ExpressionNode),
+            // Expression::List(ExpressionNode, ExpressionNode),
+            // Expression::Ternary(ExpressionNode, ExpressionNode, ExpressionNode),
+            // Expression::ArrayAcces(ExpressionNode, ExpressionNode),
+            // Expression::FunctionCall(ExpressionNode, Option<ExpressionNode>),
+            // Expression::DotAcces(ExpressionNode, Name),
+            // Expression::PtrAcces(ExpressionNode, Name),
+            // Expression::SizeofExpr(ExpressionNode),
+            // Expression::SizeofType(Type),
+            // Expression::Cast(Type, ExpressionNode),
+            _ => None,
+        }
+    }
 }
 
 impl Visitor for SymbolResolver {
@@ -573,7 +687,7 @@ impl SymbolResolver {
                     symbol.kind.to_string(),
                     symbol.name.id.resolve(ctx).clone(),
                     symbol.storage.map(|s| s.to_string()).unwrap_or_default(),
-                    if symbol.is_init { String::from("yes") } else { String::new() },
+                    symbol.value.map(|v| v.to_string()).unwrap_or("-".to_string()),
                     symbol.ty.map(|ty| self.describe(ctx, ty)).unwrap_or_default(),
                 ]
             })

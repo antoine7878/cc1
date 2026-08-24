@@ -7,6 +7,9 @@ use crate::semantic::SymbolKind;
 #[derive(Clone, Copy, Debug)]
 pub enum Diagnosis {
     UndeclaredIdentifier(Name),
+    // 6.4
+    NonConstantExpression,
+    NonIntegerConstantExpression,
     // 6.5
     MultipleStorageSpecifiers,
     BlockScopeNotExtern,
@@ -44,6 +47,8 @@ impl DiagnosisNode {
         write!(w, "{}:{}:{} ", ctx.file_name, self.span.start.line, self.span.start.col)?;
         match &self.inner {
             Diagnosis::UndeclaredIdentifier(name) => writeln!(w, "Use of undeclared identifier '{}'", name.id.resolve(ctx)),
+            Diagnosis::NonConstantExpression => writeln!(w, "Non constant expression"),
+            Diagnosis::NonIntegerConstantExpression => writeln!(w, "Non integer constant expression"),
             Diagnosis::MultipleStorageSpecifiers => writeln!(w, "Multiple storage class declaration"),
             Diagnosis::BlockScopeNotExtern => writeln!(w, "Function in block not declared as extern"),
             Diagnosis::InvalidTypeSpecifer => writeln!(w, "Invalid type specifer or combination thereof"),
@@ -99,18 +104,6 @@ impl<T> Diag<T> {
         Self::new(res, None)
     }
 }
-
-// impl<T> From<T> for Diag<T> {
-//     fn from(value: T) -> Self {
-//         Diag::res(value)
-//     }
-// }
-//
-// impl<T: Default> From<Diagnosis> for Diag<T> {
-//     fn from(value: Diagnosis) -> Self {
-//         Diag::with_diag(T::default(), value)
-//     }
-// }
 
 impl<T> Diag<Option<T>> {
     pub fn none_diag(diagnosis: Diagnosis) -> Self {

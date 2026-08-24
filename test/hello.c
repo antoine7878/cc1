@@ -1,4 +1,5 @@
+
 int main(void) {
-	int a = '\x11x';
+	int a[];
 	return 0;
 }

@@ -14,7 +14,7 @@ pub struct Symbol {
     pub kind: SymbolKind,
     pub bit_width: Option<ExpressionNode>,
     // pub bit_width: Option<u8>,
-    // pub value: Option<i64>,
+    pub value: Option<i32>,
     pub is_complete: bool,
     pub is_init: bool,
 }
@@ -42,9 +42,11 @@ impl SymbolArena {
             kind,
             bit_width: None,
             is_complete: true,
+            value: None,
             is_init,
         })
     }
+
     pub fn with_size(
         &mut self,
         name: Name,
@@ -59,6 +61,7 @@ impl SymbolArena {
             storage,
             kind,
             bit_width: size,
+            value: None,
             is_complete: true,
             is_init: true,
         })

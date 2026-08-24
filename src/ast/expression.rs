@@ -87,66 +87,6 @@ pub enum Expression {
     Cast(Type, ExpressionNode),
 }
 
-// impl Expression {
-//     pub fn is_const(&self) -> bool {
-//         matches!(self, Expression::ConstantExpression(_) | Expression::Constant(_))
-//         match self {
-//             Expression::Identifier(Name) => false,
-//             Expression::Constant(Name) => true,
-//             Expression::StringLiteral(Name) => ,
-//             Expression::ConstantExpression(ExpressionNode),
-//             Expression::PostInc(ExpressionNode),
-//             Expression::PostDec(ExpressionNode),
-//             Expression::PreInc(ExpressionNode),
-//             Expression::PreDec(ExpressionNode),
-//             Expression::Addr(ExpressionNode),
-//             Expression::Deref(ExpressionNode),
-//             Expression::Plus(ExpressionNode),
-//             Expression::Minus(ExpressionNode),
-//             Expression::BitNot(ExpressionNode),
-//             Expression::Not(ExpressionNode),
-//             Expression::Add(ExpressionNode, ExpressionNode),
-//             Expression::Sub(ExpressionNode, ExpressionNode),
-//             Expression::Mul(ExpressionNode, ExpressionNode),
-//             Expression::Div(ExpressionNode, ExpressionNode),
-//             Expression::Mod(ExpressionNode, ExpressionNode),
-//             Expression::Right(ExpressionNode, ExpressionNode),
-//             Expression::Left(ExpressionNode, ExpressionNode),
-//             Expression::Greater(ExpressionNode, ExpressionNode),
-//             Expression::Lower(ExpressionNode, ExpressionNode),
-//             Expression::GreaterEq(ExpressionNode, ExpressionNode),
-//             Expression::LowerEq(ExpressionNode, ExpressionNode),
-//             Expression::Eq(ExpressionNode, ExpressionNode),
-//             Expression::Neq(ExpressionNode, ExpressionNode),
-//             Expression::BitAnd(ExpressionNode, ExpressionNode),
-//             Expression::BitOr(ExpressionNode, ExpressionNode),
-//             Expression::BitXor(ExpressionNode, ExpressionNode),
-//             Expression::And(ExpressionNode, ExpressionNode),
-//             Expression::Or(ExpressionNode, ExpressionNode),
-//             Expression::Assign(ExpressionNode, ExpressionNode),
-//             Expression::MulAssign(ExpressionNode, ExpressionNode),
-//             Expression::DivAssign(ExpressionNode, ExpressionNode),
-//             Expression::ModAssign(ExpressionNode, ExpressionNode),
-//             Expression::AddAssign(ExpressionNode, ExpressionNode),
-//             Expression::SubAssign(ExpressionNode, ExpressionNode),
-//             Expression::LeftAssign(ExpressionNode, ExpressionNode),
-//             Expression::RightAssign(ExpressionNode, ExpressionNode),
-//             Expression::AndAssign(ExpressionNode, ExpressionNode),
-//             Expression::XorAssign(ExpressionNode, ExpressionNode),
-//             Expression::OrAssign(ExpressionNode, ExpressionNode),
-//             Expression::List(ExpressionNode, ExpressionNode),
-//             Expression::Ternary(ExpressionNode, ExpressionNode, ExpressionNode),
-//             Expression::ArrayAcces(ExpressionNode, ExpressionNode),
-//             Expression::FunctionCall(ExpressionNode, Option<ExpressionNode>),
-//             Expression::DotAcces(ExpressionNode, Name),
-//             Expression::PtrAcces(ExpressionNode, Name),
-//             Expression::SizeofExpr(ExpressionNode),
-//             Expression::SizeofType(Type),
-//             Expression::Cast(Type, ExpressionNode),
-//         }
-//     }
-// }
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct Type {
     pub specifiers: Vec<DeclarationSpecifier>,

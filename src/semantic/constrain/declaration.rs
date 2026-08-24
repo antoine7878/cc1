@@ -59,7 +59,7 @@ pub fn resolve_type(
             resolver.types.tag(tag)
         }
         [TypeSpecifier::Enum(t)] => {
-            let tag = resolver.resolve_enum(ctx, *t);
+            let tag = resolver.resolve_enum(ctx, *t)?;
             resolver.types.tag(tag)
         }
         [TypeSpecifier::TypedefName(t)] => return resolver.resolve_typedef(*t, is_const, is_volatile, span),

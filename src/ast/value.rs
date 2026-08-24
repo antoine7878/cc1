@@ -1,7 +1,7 @@
 use crate::ast_node;
 
 // TODO add custom f80
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Value {
     Int(i32),
     Long(i64),
@@ -14,11 +14,21 @@ pub enum Value {
 
 ast_node! {
     pub struct ValueNode {
-        pub id: Value,
+        pub value: Value,
     }
 }
 
 impl Value {
+    pub fn get_integer_value(&self) -> Option<u64> {
+        match *self {
+            Value::Int(c) => Some(c as u64),
+            Value::UnsignedInt(c) => Some(c as u64),
+            Value::Long(c) => Some(c as u64),
+            Value::UnsignedLong(c) => Some(c),
+            _ => None,
+        }
+    }
+
     fn get_radix(s: &str) -> (&str, u32) {
         if s.starts_with("0x") {
             ("0x", 16)
