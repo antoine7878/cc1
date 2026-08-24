@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
 use crate::ast::visit::{
-    Visitor, walk_compound_statement, walk_declaration, walk_jump_statement, walk_labeled_statement,
+    Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_jump_statement, walk_labeled_statement,
     walk_translation_unit,
 };
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, Expression,
-    ExpressionNode, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, JumpStatement,
+    ExpressionId, ExpressionNode, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, JumpStatement,
     JumpStatementNode, Labeled, LabeledStatementNode, Name, ParameterDeclaration, StructDeclaration, Tag, Value,
 };
 use crate::ast::{Storage, StringId};
@@ -53,6 +53,7 @@ pub struct SymbolResolver {
     symbols: SymbolArena,
     pub types: ResolvedTypeArena,
     tags: TagDefArena,
+    bindings: HashMap<ExpressionId, Option<SymbolId>>,
 }
 
 impl DiagCollector for SymbolResolver {
@@ -288,7 +289,9 @@ impl SymbolResolver {
             let variant = variant_id.resolve(ctx);
             let ty = QualifiedType::new(self.types.int(), false, false);
             if let Some(expr) = &variant.value {
-                let Some(val) = self.const_eval(ctx, expr)?.get_integer_value() else {
+                self.visit_expression(ctx, expr);
+                let Some(val) = self.const_eval(ctx, expr) else { continue };
+                let Some(val) = val.get_integer_value() else {
                     return self.add_diag(
                         Diag::with_diag(None, Diagnosis::NonIntegerConstantExpression),
                         &variant.span,
@@ -528,15 +531,13 @@ impl SymbolResolver {
     pub fn const_eval(&mut self, ctx: &Context, expr: &ExpressionNode) -> Option<Value> {
         match expr.id.resolve(ctx) {
             Expression::ConstantExpression(expr) => self.const_eval(ctx, expr),
-            Expression::Identifier(name) => {
-                let Some(a) = self.lookup_ordinary(name.id) else {
-                    return self.add_diag(Diag::none_diag(Diagnosis::UndeclaredIdentifier(*name)), &expr.span);
-                };
-                let symbol = self.symbols.get(a);
-                if symbol.kind != SymbolKind::Variant {
+            Expression::Identifier(_) => {
+                let id = self.bindings.get(&expr.id).copied().flatten()?;
+                let s = self.symbols.get(id);
+                if s.kind != SymbolKind::Variant {
                     return self.add_diag(Diag::none_diag(Diagnosis::NonConstantExpression), &expr.span);
                 }
-                symbol.value.map(Value::Int)
+                s.value.map(Value::Int)
             }
             Expression::Constant(value_node) => Some(value_node.value),
             Expression::Plus(expr) => self.const_eval(ctx, expr),
@@ -572,9 +573,7 @@ impl SymbolResolver {
                     self.const_eval(ctx, e2)
                 }
             }
-            Expression::SizeofExpr(expr) => {
-                Some(Value::UnsignedLong(ctx.target.value_size(self.const_eval(ctx, expr)?)))
-            }
+            Expression::SizeofExpr(expr) => None,
             Expression::SizeofType(ty) => {
                 let qualif = constrain::declaration::resolve_type(self, ctx, &ty.specifiers, &expr.span)?;
                 Some(Value::UnsignedLong(self.type_size(ctx, qualif)?))
@@ -674,6 +673,22 @@ impl Visitor for SymbolResolver {
         }
         walk_compound_statement(self, ctx, node);
         self.scopes.pop();
+    }
+
+    fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
+        if self.bindings.contains_key(&node.id) {
+            return;
+        }
+        match node.id.resolve(ctx) {
+            Expression::Identifier(name) => {
+                let sym = self.lookup_ordinary(name.id);
+                if sym.is_none() {
+                    self.add_diag(Diag::with_diag((), Diagnosis::UndeclaredIdentifier(*name)), &node.span);
+                }
+                self.bindings.insert(node.id, sym);
+            }
+            _ => walk_expression(self, ctx, node),
+        }
     }
 }
 

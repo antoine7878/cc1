@@ -108,6 +108,7 @@ pub trait Visitor {
     fn visit_qualifier(&mut self, _ctx: &Context, _qualifier: &Qualifier) {}
 
     fn visit_name(&mut self, _ctx: &Context, _node: &Name) {}
+
     fn visit_value(&mut self, _ctx: &Context, _node: &ValueNode) {}
 }
 
