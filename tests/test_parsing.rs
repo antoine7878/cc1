@@ -233,7 +233,7 @@ syntax!(cast_void, "void g(void); void f(void) { (void)0; }");
 syntax!(cast_nested, "int f(void) { return (int)(char)(long)1; }");
 syntax!(
     cast_to_function_pointer,
-    "void f(void) { void *p; p = 0; (void)(int (*)(int))p; }"
+    "void f(void) { int (*p)(int); p = 0; (void)(int (*)(int))p; }"
 );
 
 // ---- 6.3.5 - 6.3.14 binary operators ------------------------------------
