@@ -123,3 +123,37 @@ macro_rules! syntax {
         }
     };
 }
+
+pub fn run_recover(name: &str, src: &str, expected: usize, forbidden: &[&str]) {
+    let case = write_case(name, src);
+    let out = cc1(&case.pp);
+
+    assert!(!gcc_accepts(&case.src), "`{name}` should be rejected by gcc:\n{src}");
+
+    let diagnosis: Vec<&str> = out.stderr.lines().filter(|line| !line.trim().is_empty()).collect();
+    assert_eq!(
+        diagnosis.len(),
+        expected,
+        "`{name}` expected {expected} diagnosis, got {}:\n{src}\n{}",
+        diagnosis.len(),
+        out.stderr
+    );
+
+    for word in forbidden {
+        assert!(
+            !out.stderr.contains(word),
+            "`{name}` cascading diagnosis mentions {word}:\n{src}\n{}",
+            out.stderr
+        );
+    }
+}
+
+#[macro_export]
+macro_rules! recover {
+    ($name:ident, $src:expr, $expected:expr, $forbidden:expr) => {
+        #[test]
+        fn $name() {
+            $crate::common::run_recover(stringify!($name), $src, $expected, $forbidden);
+        }
+    };
+}
