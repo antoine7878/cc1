@@ -16,6 +16,7 @@ RUN dpkg --add-architecture i386 && \
     zsh \
     git \
     vim \
+    clang \
     gdb
 
 RUN rm -rf /var/lib/apt/lists/*

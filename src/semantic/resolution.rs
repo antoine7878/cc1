@@ -54,6 +54,7 @@ pub struct SymbolResolver {
     pub types: ResolvedTypeArena,
     tags: TagDefArena,
     bindings: HashMap<ExpressionId, Option<SymbolId>>,
+    const_expr: HashMap<ExpressionId, Option<Value>>,
 }
 
 impl DiagCollector for SymbolResolver {
@@ -287,7 +288,6 @@ impl SymbolResolver {
 
         for variant_id in &enum_node.variants {
             let variant = variant_id.resolve(ctx);
-            let ty = QualifiedType::new(self.types.int(), false, false);
             if let Some(expr) = &variant.value {
                 self.visit_expression(ctx, expr);
                 if let Some(val) = self.const_eval(ctx, expr) {
@@ -306,15 +306,7 @@ impl SymbolResolver {
                 self.add_diag(Diag::with_diag((), Diagnosis::VariantBadValue), &variant.span);
                 value = 0
             }
-            members.push(self.add_variant_symbol(
-                variant.name,
-                ty,
-                None,
-                SymbolKind::Variant,
-                &variant.span,
-                true,
-                value as i32,
-            ));
+            members.push(self.add_variant_symbol(variant.name, &variant.span, value as i32));
             value += 1;
         }
         self.tags.complete(tag, members);
@@ -358,28 +350,19 @@ impl SymbolResolver {
         sym_id
     }
 
-    fn add_variant_symbol(
-        &mut self,
-        name: Name,
-        ty: QualifiedType,
-        storage: Option<Storage>,
-        kind: SymbolKind,
-        span: &Span,
-        is_init: bool,
-        value: i32,
-    ) -> SymbolId {
+    fn add_variant_symbol(&mut self, name: Name, span: &Span, value: i32) -> SymbolId {
         let sym = Symbol {
             name,
-            ty: Some(ty),
-            storage,
-            kind,
+            ty: Some(QualifiedType::new(self.types.int(), false, false)),
+            storage: None,
+            kind: SymbolKind::Variant,
             bit_width: None,
             is_complete: true,
-            is_init,
+            is_init: true,
             value: Some(value),
         };
         let sym_id = self.dedup(&sym, span).unwrap_or(self.symbols.alloc(sym));
-        self.get_map_mut(kind).insert(name.id, sym_id);
+        self.get_map_mut(SymbolKind::Variant).insert(name.id, sym_id);
         sym_id
     }
 
@@ -705,6 +688,10 @@ impl Visitor for SymbolResolver {
             return;
         }
         match node.id.resolve(ctx) {
+            Expression::ConstantExpression(expr) => {
+                let value = self.const_eval(ctx, expr);
+                self.const_expr.insert(node.id, value);
+            }
             Expression::Identifier(name) => {
                 let sym = self.lookup_ordinary(name.id);
                 if sym.is_none() {

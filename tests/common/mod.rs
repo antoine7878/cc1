@@ -99,7 +99,7 @@ pub fn run_case(name: &str, src: &str) {
     assert_eq!(
         cc1_ok,
         gcc,
-        "verdict mismatch for `{name}`: gcc {} but cc1 {}\nsource:\n{src}",
+        "failed `{name}`: gcc {} but cc1 {}\nsource:\n{src}",
         if gcc { "accepts" } else { "rejects" },
         if cc1_ok { "accepts" } else { "rejects" },
     );
@@ -163,7 +163,11 @@ pub fn run_value(name: &str, src: &str, expected: &[(&str, &str)]) {
     let case = write_case(name, src);
     let out = cc1(&case.pp);
 
-    assert!(out.stderr.is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", out.stderr);
+    assert!(
+        out.stderr.is_empty(),
+        "`{name}` unexpected diagnosis:\n{src}\n{}",
+        out.stderr
+    );
 
     for (variant, value) in expected {
         let found = out.stdout.lines().find_map(|line| {
