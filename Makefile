@@ -43,7 +43,8 @@ ctest: $(NAME)
 CCF = -std=iso9899:1990 -pedantic -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
 
 c:
-	gcc -c $(CCF) test/hello.c -o /dev/null
+	gcc $(CCF) test/hello.c
+	./a.out
 
 clean:
 	cargo clean

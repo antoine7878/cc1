@@ -1,3 +1,4 @@
-void fn(void) {
-	int a = 1234LU;
+int main(void) {
+	int a = '\x11x';
+	return 0;
 }

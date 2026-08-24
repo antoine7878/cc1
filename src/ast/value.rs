@@ -128,8 +128,8 @@ impl Value {
         let s = s.to_lowercase();
         let (prefix, radix) = Self::get_radix(s.as_str());
         let suffix = Self::get_suffix(s.as_str());
-        let s = &s[prefix.len()..(s.len() - suffix.len() - 1)];
-        let value = u64::from_str_radix(s, radix).unwrap();
+        let s = &s[prefix.len()..(s.len() - suffix.len())];
+        let value = if s.is_empty() { 0 } else { u64::from_str_radix(s, radix).unwrap() };
         match suffix {
             "u" => Value::Int(value as i32),
             "l" => Value::Long(value as i64),

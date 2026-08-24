@@ -52,10 +52,10 @@ IS			(u|U|l|L|ul|UL|Ul|uL|lu|LU|lU|Lu)
 "void"			            { return YYToken::VOID; }
 "volatile"		            { return YYToken::VOLATILE; }
 "while"			            { return YYToken::WHILE; }
+
 {L}({L}|{D})*		        { let name = alloc_name(self); return self.ctx.check_type(name); }
 
 L?'(\\.|[^\\'])+'	        { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
-
 0[xX]{H}+{IS}?		        { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
 0{D}+{IS}?		            { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
 {D}+{IS}?		            { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
@@ -65,6 +65,7 @@ L?'(\\.|[^\\'])+'	        { return YYToken::CONSTANT(ValueNode::new(Value::from(
 
 \"(\\.|[^\\"])*\"	        { let len = self.yytext.len(); return YYToken::STRING_LITERAL(self.yytext[1..len-1].to_string()); }
 L\"(\\.|[^\\"])*\"	        { let len = self.yytext.len(); return YYToken::STRING_LITERAL(self.yytext[2..len-1].to_string()); }
+
 "..."			            { return YYToken::ELLIPSIS; }
 ">>="			            { return YYToken::RIGHT_ASSIGN; }
 "<<="			            { return YYToken::LEFT_ASSIGN; }
