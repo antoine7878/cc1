@@ -4,6 +4,7 @@ use std::fs;
 use std::process::Command;
 
 pub const GCC_FLAGS: &[&str] = &[
+    "-m32",
     "-fsyntax-only",
     "-std=iso9899:1990",
     "-pedantic-errors",
