@@ -1,5 +1,4 @@
 use std::fmt;
-use std::hash::Hash;
 
 use crate::ast::{ExpressionNode, Name, Storage};
 use crate::define_arena;
@@ -7,7 +6,7 @@ use crate::semantic::QualifiedType;
 
 define_arena!(Symbol, SymbolArena, SymbolId, symbols);
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug)]
 pub struct Symbol {
     pub name: Name,
     pub ty: Option<QualifiedType>,
@@ -22,11 +21,8 @@ pub struct Symbol {
 
 impl Symbol {
     pub fn is_compatible(&self, other: &Self) -> bool {
-        self.name.id == other.name.id
-            && self.ty == other.ty
-            && self.storage == other.storage
-            && self.kind == other.kind
-            && self.bit_width == other.bit_width
+        self.name.id == other.name.id && self.ty == other.ty && self.storage == other.storage && self.kind == other.kind
+        // && self.bit_width == other.bit_width
     }
 }
 
@@ -69,7 +65,7 @@ impl SymbolArena {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SymbolKind {
     Variable,
     Function,

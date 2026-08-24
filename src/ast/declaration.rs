@@ -36,7 +36,7 @@ impl DeclaratorNode {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Declarator {
     Ident(Name),
     Abstract,
@@ -72,7 +72,7 @@ ast_node! {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Initializer {
     Single(ExpressionNode),
     List(Vec<InitializerNode>),

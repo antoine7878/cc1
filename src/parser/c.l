@@ -3,7 +3,7 @@
 %{
 use std::fmt;
 
-use crate::ast::Name;
+use crate::ast::{Name, ValueNode, Value};
 use crate::parser::{YYToken, YYFeedback, Context};
 use crate::semantic::{SymbolKind};
 
@@ -14,7 +14,7 @@ L			[a-zA-Z_]
 H			[a-fA-F0-9]
 E			[Ee][+-]?{D}+
 FS			(f|F|l|L)
-IS			(u|U|l|L)*
+IS			(u|U|l|L|ul|UL|Ul|uL|lu|LU|lU|Lu)
 
 %%
 
@@ -53,13 +53,16 @@ IS			(u|U|l|L)*
 "volatile"		            { return YYToken::VOLATILE; }
 "while"			            { return YYToken::WHILE; }
 {L}({L}|{D})*		        { let name = alloc_name(self); return self.ctx.check_type(name); }
-0[xX]{H}+{IS}?		        { return YYToken::CONSTANT(alloc_name(self)); }
-0{D}+{IS}?		            { return YYToken::CONSTANT(alloc_name(self)); }
-{D}+{IS}?		            { return YYToken::CONSTANT(alloc_name(self)); }
-L?'(\\.|[^\\'])+'	        { return YYToken::CONSTANT(alloc_name(self)); }
-{D}+{E}{FS}?		        { return YYToken::CONSTANT(alloc_name(self)); }
-{D}*"."{D}+({E})?{FS}?	    { return YYToken::CONSTANT(alloc_name(self)); }
-{D}+"."{D}*({E})?{FS}?	    { return YYToken::CONSTANT(alloc_name(self)); }
+
+L?'(\\.|[^\\'])+'	        { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
+
+0[xX]{H}+{IS}?		        { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
+0{D}+{IS}?		            { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
+{D}+{IS}?		            { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
+{D}+{E}{FS}?		        { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
+{D}*"."{D}+({E})?{FS}?	    { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
+{D}+"."{D}*({E})?{FS}?	    { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
+
 \"(\\.|[^\\"])*\"	        { let len = self.yytext.len(); return YYToken::STRING_LITERAL(self.yytext[1..len-1].to_string()); }
 L\"(\\.|[^\\"])*\"	        { let len = self.yytext.len(); return YYToken::STRING_LITERAL(self.yytext[2..len-1].to_string()); }
 "..."			            { return YYToken::ELLIPSIS; }

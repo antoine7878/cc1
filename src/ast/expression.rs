@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name};
+use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name, ValueNode};
 use crate::parser::{Span, YYToken};
 use crate::{ast_node, define_arena};
 
@@ -12,11 +12,11 @@ ast_node! {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
     // Values
     Identifier(Name),
-    Constant(Name),
+    Constant(ValueNode),
     StringLiteral(Name),
 
     // Cst
@@ -147,7 +147,7 @@ pub enum Expression {
 //     }
 // }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Type {
     pub specifiers: Vec<DeclarationSpecifier>,
     pub declarator: DeclaratorNode,
@@ -168,8 +168,8 @@ impl ExpressionArena {
         Self::add(self.alloc(Expression::Identifier(name)), span)
     }
 
-    pub fn constant(&mut self, name: Name, span: Span) -> ExpressionNode {
-        Self::add(self.alloc(Expression::Constant(name)), span)
+    pub fn constant(&mut self, value: ValueNode, span: Span) -> ExpressionNode {
+        Self::add(self.alloc(Expression::Constant(value)), span)
     }
 
     pub fn string_literal(&mut self, name: Name, span: Span) -> ExpressionNode {
@@ -279,7 +279,7 @@ impl ExpressionArena {
 impl Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            Expression::Constant(_) => "IntegerLiteral",
+            Expression::Constant(_) => "NumberLiteral",
             Expression::Identifier(_) => "Identifier",
             Expression::StringLiteral(_) => "StringLiteral",
             Expression::PostInc(_) => "post ++",

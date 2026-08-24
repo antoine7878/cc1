@@ -20,7 +20,7 @@ ast_node! {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ExternalDeclaration {
     Function(FunctionDefinitionNode),
     Declaration(DeclarationNode),

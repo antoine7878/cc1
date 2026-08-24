@@ -7,7 +7,6 @@ pub const GCC_FLAGS: &[&str] = &[
     "-fsyntax-only",
     "-std=iso9899:1990",
     "-pedantic-errors",
-    "-fno-gnu-keywords",
     "-Wno-deprecated-non-prototype",
     "-Wno-strict-prototypes",
     "-fno-asm",

@@ -131,13 +131,13 @@ impl SymbolResolver {
         decl: &DeclaratorNode,
     ) -> Option<(QualifiedType, DeclaratorNode)> {
         let (ty, decl) = self.extract_pointer(ctx, decl, inner_most?);
-        match decl.id.resolve(ctx) {
-            Declarator::Ident(name) => (),
-            Declarator::Abstract => (),
-            Declarator::Pointer { qualifiers, inner } => (),
-            Declarator::Array { declarator, size } => (),
-            Declarator::Function { declarator, params } => (),
-        }
+        // match decl.id.resolve(ctx) {
+        //     Declarator::Ident(name) => (),
+        //     Declarator::Abstract => (),
+        //     Declarator::Pointer { qualifiers, inner } => (),
+        //     Declarator::Array { declarator, size } => (),
+        //     Declarator::Function { declarator, params } => (),
+        // }
         Some((ty, decl))
     }
 

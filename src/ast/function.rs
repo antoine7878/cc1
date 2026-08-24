@@ -10,7 +10,7 @@ ast_node! {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum FunctionParameters {
     Empty,
     OldStyle(Vec<Name>),

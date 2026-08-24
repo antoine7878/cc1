@@ -36,21 +36,21 @@ ast_node! {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug)]
 pub struct Enum {
     pub span: Span,
     pub name: Option<Name>,
     pub variants: Vec<VariantId>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug)]
 pub struct Variant {
     pub span: Span,
     pub name: Name,
     pub value: Option<ExpressionNode>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tag {
     Struct,
     Union,

@@ -1,17 +1,16 @@
 use std::fmt::Debug;
 use std::fmt::Display;
-use std::hash::Hash;
 
 use crate::ast::{EnumId, Name, StructId, UnionId};
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DeclarationSpecifier {
     Type(TypeSpecifier),
     Qualifier(Qualifier),
     Storage(Storage),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum TypeSpecifier {
     Void,
     Char,
@@ -28,13 +27,13 @@ pub enum TypeSpecifier {
     TypedefName(Name),
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Qualifier {
     Const,
     Volatile,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Storage {
     Typedef,
     Extern,

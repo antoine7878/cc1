@@ -127,7 +127,7 @@ pub fn get_qualifier(specifiers: &[DeclarationSpecifier]) -> Diag<(bool, bool)> 
     let a = specifiers
         .iter()
         .filter_map(|s| match s {
-            DeclarationSpecifier::Qualifier(q) => Some(*q),
+            DeclarationSpecifier::Qualifier(q) => Some(q.clone()),
             _ => None,
         })
         .collect::<Vec<_>>();

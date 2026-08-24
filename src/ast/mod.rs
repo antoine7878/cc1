@@ -7,6 +7,7 @@ pub mod statement;
 pub mod tag;
 pub mod type_specifier;
 pub mod unit;
+pub mod value;
 pub mod visit;
 
 pub use declaration::{DeclarationNode, Declarator, DeclaratorArena};
@@ -17,10 +18,11 @@ pub use name::{Name, StringArena, StringId};
 pub use statement::{CompoundStatementNode, ExpressionStatementNode, IterationStatement};
 pub use statement::{IterationStatementNode, JumpStatement, Labeled, LabeledStatementNode, StatementArena};
 pub use statement::{JumpStatementNode, SelectionStatement, SelectionStatementNode, Statement, StatementNode};
-pub use tag::{Enum, EnumArena, EnumId, Struct, StructArena, StructDeclaration, StructMemberDeclarator, StructId};
+pub use tag::{Enum, EnumArena, EnumId, Struct, StructArena, StructDeclaration, StructId, StructMemberDeclarator};
 pub use tag::{Tag, Union, UnionArena, UnionId, Variant, VariantArena, VariantId};
 pub use type_specifier::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier};
 pub use unit::{ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode};
+pub use value::{Value, ValueNode};
 pub use visit::Visitor;
 
 use crate::parser::Span;
@@ -36,7 +38,7 @@ macro_rules! ast_node {
             $($field_vis:vis $field:ident : $ty:ty),* $(,)?
         }
     ) => {
-        #[derive(Clone, Debug, Eq, PartialEq, Hash)]
+        #[derive(Clone, Debug, PartialEq)]
         $vis struct $name {
             pub span: $crate::parser::Span,
             $($field_vis $field: $ty,)*

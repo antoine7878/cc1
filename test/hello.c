@@ -1,4 +1,3 @@
-
 void fn(void) {
-	int a[42];
+	int a = 1234LU;
 }

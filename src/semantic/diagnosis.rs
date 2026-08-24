@@ -4,7 +4,7 @@ use crate::ast::Name;
 use crate::parser::{Context, Span};
 use crate::semantic::SymbolKind;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug)]
 pub enum Diagnosis {
     UndeclaredIdentifier(Name),
     // 6.5

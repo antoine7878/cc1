@@ -12,7 +12,7 @@ ast_node! {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Statement {
     Labeled(LabeledStatementNode),
     Compound(CompoundStatementNode),
@@ -28,7 +28,7 @@ ast_node! {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Labeled {
     Identifier(Name, StatementNode),
     Case(ExpressionNode, StatementNode),
@@ -54,7 +54,7 @@ ast_node! {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SelectionStatement {
     If(ExpressionNode, StatementNode, Option<StatementNode>),
     Switch(ExpressionNode, StatementNode),
@@ -66,7 +66,7 @@ ast_node! {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum IterationStatement {
     While(ExpressionNode, StatementNode),
     Do(StatementNode, ExpressionNode),
@@ -84,7 +84,7 @@ ast_node! {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum JumpStatement {
     Goto(Name),
     Continue,

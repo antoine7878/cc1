@@ -1,6 +1,6 @@
 use crate::semantic::ResolvedType;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub struct Layout {
     pub size: u32,
     pub align: u32,
@@ -12,7 +12,7 @@ impl Layout {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub struct Target {
     pub name: &'static str,
     pub char: Layout,
