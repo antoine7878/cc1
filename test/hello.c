@@ -1,25 +1,7 @@
-#include <stdio.h>
+enum e { A = Z, B = 2, C = B + 6 };
 
-struct a {
-	char a1;  /* 1 1 */
-	short a3; /* 4 8 */
-	char a2;  /* 1 2 */
-			  /* 8 */
-};
+enum e v;
 
-struct b {
-	int b2;	 /* 4 4 */
-	char b1; /* 1 5 */
-	char b3; /* 1 6 */
-	/* 8 */
-};
-
-int x;
-
-enum e { a = (int)(0.3), b = sizeof(struct b) };
-
-int main(void) {
-	printf("a: %i\n", a);
-	printf("b: %i\n", b);
-	return 0;
+int f(void) {
+	return B + C;
 }

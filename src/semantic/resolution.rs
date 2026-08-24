@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::ast::Storage;
 use crate::ast::visit::{
     Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_jump_statement, walk_labeled_statement,
     walk_translation_unit,
@@ -9,7 +8,9 @@ use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, Expression,
     ExpressionId, ExpressionNode, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, JumpStatement,
     JumpStatementNode, Labeled, LabeledStatementNode, Name, ParameterDeclaration, StructDeclaration, Tag, Value,
+    Variant,
 };
+use crate::ast::{Storage, VariantId};
 use crate::parser::{Context, Span};
 use crate::semantic::diagnosis::Diagnosis;
 use crate::semantic::symbol::Symbol;
@@ -205,6 +206,17 @@ impl SymbolResolver {
         tag
     }
 
+    fn gougou(&mut self, ctx: &Context, expr: &ExpressionNode) -> Diag<Option<i64>> {
+        self.visit_expression(ctx, expr);
+        let Some(val) = self.const_expr.get(&expr.id).cloned().flatten() else {
+            return Diag::none_diag(Diagnosis::NonConstantExpression);
+        };
+        match val.get_integer_value() {
+            Some(v) => Diag::some(v as i64),
+            None => Diag::none_diag(Diagnosis::NonIntegerConstantExpression),
+        }
+    }
+
     pub fn resolve_enum(&mut self, ctx: &Context, id: EnumId) -> Option<TagDefId> {
         let enum_node = id.resolve(ctx);
         let is_definition = !enum_node.variants.is_empty();
@@ -218,19 +230,10 @@ impl SymbolResolver {
 
         for variant_id in &enum_node.variants {
             let variant = variant_id.resolve(ctx);
-            if let Some(expr) = &variant.value {
-                self.visit_expression(ctx, expr);
-                if let Some(val) = self.const_eval(ctx, expr) {
-                    match val.get_integer_value() {
-                        Some(v) => value = v as i64,
-                        None => {
-                            self.add_diag(
-                                Diag::with_diag((), Diagnosis::NonIntegerConstantExpression),
-                                &variant.span,
-                            );
-                        }
-                    }
-                }
+            if let Some(expr) = &variant.value
+                && let Some(v) = self.gougou(ctx, expr).collect(self, &expr.span)
+            {
+                value = v;
             }
             if value < i32::MIN as i64 || value > i32::MAX as i64 {
                 self.add_diag(Diag::with_diag((), Diagnosis::VariantBadValue), &variant.span);
@@ -427,7 +430,7 @@ impl SymbolResolver {
                 let id = self.bindings.get(&expr.id).copied().flatten()?;
                 let s = self.symbols.get(id);
                 if s.kind != SymbolKind::Variant {
-                    return self.add_diag(Diag::none_diag(Diagnosis::NonConstantExpression), &expr.span);
+                    return None;
                 }
                 s.value.map(Value::Int)
             }
@@ -475,7 +478,7 @@ impl SymbolResolver {
                 let (qualif, _) = self.make_qualified_type(ctx, base, &ty.declarator)?;
                 let val = self.const_eval(ctx, operand)?;
                 if val.is_floating() && !matches!(operand.id.resolve(ctx), Expression::Constant(_)) {
-                    return self.add_diag(Diag::none_diag(Diagnosis::NonIntegerConstantExpression), &expr.span);
+                    return None;
                 }
                 self.cast_value(ctx, qualif, val, &expr.span)
             }
@@ -501,7 +504,7 @@ impl SymbolResolver {
             | Expression::FunctionCall(_, _)
             | Expression::DotAcces(_, _)
             | Expression::PtrAcces(_, _)
-            | Expression::PreDec(_) => self.add_diag(Diag::none_diag(Diagnosis::NonConstantExpression), &expr.span),
+            | Expression::PreDec(_) => None,
         }
     }
 }
