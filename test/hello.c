@@ -1,5 +1,5 @@
+enum e { OUI = !(int)3.5, NON };
 
 int main(void) {
-	int a[];
 	return 0;
 }

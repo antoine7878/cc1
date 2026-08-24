@@ -1,7 +1,12 @@
 use crate::ast_node;
+use std::cmp::Ordering;
+use std::ops::{
+    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign, Mul, MulAssign,
+    Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
+};
 
 // TODO add custom f80
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub enum Value {
     Int(i32),
     Long(i64),
@@ -149,6 +154,42 @@ impl Value {
     }
 }
 
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match self.usual(*other) {
+            (Value::Int(a), Value::Int(b)) => a == b,
+            (Value::UnsignedInt(a), Value::UnsignedInt(b)) => a == b,
+            (Value::Long(a), Value::Long(b)) => a == b,
+            (Value::UnsignedLong(a), Value::UnsignedLong(b)) => a == b,
+            (Value::Float(a), Value::Float(b)) => a == b,
+            (Value::Double(a), Value::Double(b)) => a == b,
+            (Value::LongDouble(a), Value::LongDouble(b)) => a == b,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.usual(*other) {
+            (Value::Int(a), Value::Int(b)) => a.partial_cmp(&b),
+            (Value::UnsignedInt(a), Value::UnsignedInt(b)) => a.partial_cmp(&b),
+            (Value::Long(a), Value::Long(b)) => a.partial_cmp(&b),
+            (Value::UnsignedLong(a), Value::UnsignedLong(b)) => a.partial_cmp(&b),
+            (Value::Float(a), Value::Float(b)) => a.partial_cmp(&b),
+            (Value::Double(a), Value::Double(b)) => a.partial_cmp(&b),
+            (Value::LongDouble(a), Value::LongDouble(b)) => a.partial_cmp(&b),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl From<bool> for Value {
+    fn from(value: bool) -> Self {
+        Value::Int(value as i32)
+    }
+}
+
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
         if s.contains('.') {
@@ -160,3 +201,239 @@ impl From<&str> for Value {
         }
     }
 }
+
+impl Value {
+    fn rank(self) -> u8 {
+        match self {
+            Value::Int(_) => 0,
+            Value::UnsignedInt(_) => 1,
+            Value::Long(_) => 2,
+            Value::UnsignedLong(_) => 3,
+            Value::Float(_) => 4,
+            Value::Double(_) => 5,
+            Value::LongDouble(_) => 6,
+        }
+    }
+
+    fn to_i64(self) -> i64 {
+        match self {
+            Value::Int(v) => v as i64,
+            Value::UnsignedInt(v) => v as i64,
+            Value::Long(v) => v,
+            Value::UnsignedLong(v) => v as i64,
+            Value::Float(v) => v as i64,
+            Value::Double(v) | Value::LongDouble(v) => v as i64,
+        }
+    }
+
+    fn to_u64(self) -> u64 {
+        match self {
+            Value::Int(v) => v as u64,
+            Value::UnsignedInt(v) => v as u64,
+            Value::Long(v) => v as u64,
+            Value::UnsignedLong(v) => v,
+            Value::Float(v) => v as u64,
+            Value::Double(v) | Value::LongDouble(v) => v as u64,
+        }
+    }
+
+    fn to_f64(self) -> f64 {
+        match self {
+            Value::Int(v) => v as f64,
+            Value::UnsignedInt(v) => v as f64,
+            Value::Long(v) => v as f64,
+            Value::UnsignedLong(v) => v as f64,
+            Value::Float(v) => v as f64,
+            Value::Double(v) | Value::LongDouble(v) => v,
+        }
+    }
+
+    pub fn is_floating(self) -> bool {
+        self.rank() >= 4
+    }
+
+    pub fn is_true(self) -> bool {
+        self != Value::Int(0)
+    }
+
+    pub fn logical_not(self) -> Value {
+        Value::from(!self.is_true())
+    }
+
+    pub fn convert(self, rank: u8) -> Self {
+        match rank {
+            0 => Value::Int(self.to_i64() as i32),
+            1 => Value::UnsignedInt(self.to_u64() as u32),
+            2 => Value::Long(self.to_i64()),
+            3 => Value::UnsignedLong(self.to_u64()),
+            4 => Value::Float(self.to_f64() as f32),
+            5 => Value::Double(self.to_f64()),
+            _ => Value::LongDouble(self.to_f64()),
+        }
+    }
+
+    fn usual(self, rhs: Value) -> (Self, Self) {
+        let rank = u8::max(self.rank(), rhs.rank());
+        (self.convert(rank), rhs.convert(rank))
+    }
+
+    fn usual_integer(self, rhs: Value) -> (Self, Self) {
+        let rank = u8::min(u8::max(self.rank(), rhs.rank()), 3);
+        (self.convert(rank), rhs.convert(rank))
+    }
+}
+
+macro_rules! value_arithmetic {
+    ($trait:ident, $method:ident, $wrapping:ident) => {
+        impl $trait for Value {
+            type Output = Value;
+
+            fn $method(self, rhs: Value) -> Value {
+                match self.usual(rhs) {
+                    (Value::Int(a), Value::Int(b)) => Value::Int(a.$wrapping(b)),
+                    (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt(a.$wrapping(b)),
+                    (Value::Long(a), Value::Long(b)) => Value::Long(a.$wrapping(b)),
+                    (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong(a.$wrapping(b)),
+                    (Value::Float(a), Value::Float(b)) => Value::Float($trait::$method(a, b)),
+                    (Value::Double(a), Value::Double(b)) => Value::Double($trait::$method(a, b)),
+                    (Value::LongDouble(a), Value::LongDouble(b)) => Value::LongDouble($trait::$method(a, b)),
+                    _ => unreachable!(),
+                }
+            }
+        }
+    };
+}
+
+macro_rules! value_division {
+    ($trait:ident, $method:ident, $checked:ident) => {
+        impl $trait for Value {
+            type Output = Value;
+
+            fn $method(self, rhs: Value) -> Value {
+                match self.usual(rhs) {
+                    (Value::Int(a), Value::Int(b)) => Value::Int(a.$checked(b).unwrap_or(0)),
+                    (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt(a.$checked(b).unwrap_or(0)),
+                    (Value::Long(a), Value::Long(b)) => Value::Long(a.$checked(b).unwrap_or(0)),
+                    (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong(a.$checked(b).unwrap_or(0)),
+                    (Value::Float(a), Value::Float(b)) => Value::Float($trait::$method(a, b)),
+                    (Value::Double(a), Value::Double(b)) => Value::Double($trait::$method(a, b)),
+                    (Value::LongDouble(a), Value::LongDouble(b)) => Value::LongDouble($trait::$method(a, b)),
+                    _ => unreachable!(),
+                }
+            }
+        }
+    };
+}
+
+macro_rules! value_bitwise {
+    ($trait:ident, $method:ident) => {
+        impl $trait for Value {
+            type Output = Value;
+
+            fn $method(self, rhs: Value) -> Value {
+                match self.usual_integer(rhs) {
+                    (Value::Int(a), Value::Int(b)) => Value::Int($trait::$method(a, b)),
+                    (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt($trait::$method(a, b)),
+                    (Value::Long(a), Value::Long(b)) => Value::Long($trait::$method(a, b)),
+                    (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong($trait::$method(a, b)),
+                    _ => unreachable!(),
+                }
+            }
+        }
+    };
+}
+
+macro_rules! value_shift {
+    ($trait:ident, $method:ident, $wrapping:ident) => {
+        impl $trait for Value {
+            type Output = Value;
+
+            fn $method(self, rhs: Value) -> Value {
+                let count = rhs.convert(rhs.rank().min(3)).to_u64() as u32;
+                match self.convert(self.rank().min(3)) {
+                    Value::Int(a) => Value::Int(a.$wrapping(count)),
+                    Value::UnsignedInt(a) => Value::UnsignedInt(a.$wrapping(count)),
+                    Value::Long(a) => Value::Long(a.$wrapping(count)),
+                    Value::UnsignedLong(a) => Value::UnsignedLong(a.$wrapping(count)),
+                    _ => unreachable!(),
+                }
+            }
+        }
+    };
+}
+
+macro_rules! value_assign {
+    ($trait:ident, $method:ident, $base:ident, $base_method:ident) => {
+        impl $trait for Value {
+            fn $method(&mut self, rhs: Value) {
+                *self = $base::$base_method(*self, rhs);
+            }
+        }
+    };
+}
+
+value_arithmetic!(Add, add, wrapping_add);
+value_arithmetic!(Sub, sub, wrapping_sub);
+value_arithmetic!(Mul, mul, wrapping_mul);
+value_division!(Div, div, checked_div);
+
+impl Rem for Value {
+    type Output = Value;
+
+    fn rem(self, rhs: Value) -> Value {
+        match self.usual_integer(rhs) {
+            (Value::Int(a), Value::Int(b)) => Value::Int(a.checked_rem(b).unwrap_or(0)),
+            (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt(a.checked_rem(b).unwrap_or(0)),
+            (Value::Long(a), Value::Long(b)) => Value::Long(a.checked_rem(b).unwrap_or(0)),
+            (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong(a.checked_rem(b).unwrap_or(0)),
+            _ => unreachable!(),
+        }
+    }
+}
+
+value_bitwise!(BitAnd, bitand);
+value_bitwise!(BitOr, bitor);
+value_bitwise!(BitXor, bitxor);
+value_shift!(Shl, shl, wrapping_shl);
+value_shift!(Shr, shr, wrapping_shr);
+
+impl Neg for Value {
+    type Output = Value;
+
+    fn neg(self) -> Value {
+        match self {
+            Value::Int(v) => Value::Int(v.wrapping_neg()),
+            Value::UnsignedInt(v) => Value::UnsignedInt(v.wrapping_neg()),
+            Value::Long(v) => Value::Long(v.wrapping_neg()),
+            Value::UnsignedLong(v) => Value::UnsignedLong(v.wrapping_neg()),
+            Value::Float(v) => Value::Float(-v),
+            Value::Double(v) => Value::Double(-v),
+            Value::LongDouble(v) => Value::LongDouble(-v),
+        }
+    }
+}
+
+impl Not for Value {
+    type Output = Value;
+
+    fn not(self) -> Value {
+        match self.convert(self.rank().min(3)) {
+            Value::Int(v) => Value::Int(!v),
+            Value::UnsignedInt(v) => Value::UnsignedInt(!v),
+            Value::Long(v) => Value::Long(!v),
+            Value::UnsignedLong(v) => Value::UnsignedLong(!v),
+            _ => unreachable!(),
+        }
+    }
+}
+
+value_assign!(AddAssign, add_assign, Add, add);
+value_assign!(SubAssign, sub_assign, Sub, sub);
+value_assign!(MulAssign, mul_assign, Mul, mul);
+value_assign!(DivAssign, div_assign, Div, div);
+value_assign!(RemAssign, rem_assign, Rem, rem);
+value_assign!(BitAndAssign, bitand_assign, BitAnd, bitand);
+value_assign!(BitOrAssign, bitor_assign, BitOr, bitor);
+value_assign!(BitXorAssign, bitxor_assign, BitXor, bitxor);
+value_assign!(ShlAssign, shl_assign, Shl, shl);
+value_assign!(ShrAssign, shr_assign, Shr, shr);
