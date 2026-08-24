@@ -6,6 +6,7 @@ use crate::semantic::SymbolKind;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Diagnosis {
+    InvalidSizeof,
     UndeclaredIdentifier(Name),
     // 6.4
     NonConstantExpression,
@@ -15,6 +16,8 @@ pub enum Diagnosis {
     BlockScopeNotExtern,
     InvalidTypeSpecifer,
     DuplicateTypeQualifers,
+    // 6.5.2.2 Enumeration specifiers
+    VariantBadValue,
     // 6.7
     AutoRegisterExternal,
     // 6.7.1
@@ -46,9 +49,11 @@ impl DiagnosisNode {
     pub fn write<W: Write>(&self, w: &mut W, ctx: &Context) -> io::Result<()> {
         write!(w, "{}:{}:{} ", ctx.file_name, self.span.start.line, self.span.start.col)?;
         match &self.inner {
+            Diagnosis::InvalidSizeof => writeln!(w, "invalid application of sizeof"),
             Diagnosis::UndeclaredIdentifier(name) => writeln!(w, "Use of undeclared identifier '{}'", name.id.resolve(ctx)),
             Diagnosis::NonConstantExpression => writeln!(w, "Non constant expression"),
             Diagnosis::NonIntegerConstantExpression => writeln!(w, "Non integer constant expression"),
+            Diagnosis::VariantBadValue => writeln!(w, "Variant value should be in int range"),
             Diagnosis::MultipleStorageSpecifiers => writeln!(w, "Multiple storage class declaration"),
             Diagnosis::BlockScopeNotExtern => writeln!(w, "Function in block not declared as extern"),
             Diagnosis::InvalidTypeSpecifer => writeln!(w, "Invalid type specifer or combination thereof"),

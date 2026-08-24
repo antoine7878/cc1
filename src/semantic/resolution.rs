@@ -50,7 +50,7 @@ impl Scope {
 pub struct SymbolResolver {
     scopes: Vec<Scope>,
     diagnosis: Vec<DiagnosisNode>,
-    symbol_arena: SymbolArena,
+    symbols: SymbolArena,
     pub types: ResolvedTypeArena,
     tags: TagDefArena,
 }
@@ -62,6 +62,55 @@ impl DiagCollector for SymbolResolver {
 }
 
 impl SymbolResolver {
+    fn symbol_size(&mut self, ctx: &Context, id: SymbolId) -> Option<u64> {
+        let symbol = self.symbols.get(id);
+        self.type_size(ctx, symbol.ty?)
+    }
+
+    fn type_size(&mut self, ctx: &Context, qualified_type: QualifiedType) -> Option<u64> {
+        let ty = self.types.get(qualified_type.ty);
+        match ty {
+            ResolvedType::Tag(id) => self.tag_size(ctx, *id),
+            _ => Some(ctx.target.scalar(ty)?.size as u64),
+        }
+    }
+
+    fn tag_size(&mut self, ctx: &Context, id: TagDefId) -> Option<u64> {
+        let tag = self.tags.get(id).clone();
+        if !tag.is_complete {
+            return self.add_diag(Diag::none_diag(Diagnosis::InvalidSizeof), &Span::default());
+        }
+        match tag.kind {
+            Tag::Struct => self.struct_size(ctx, &tag.members),
+            Tag::Union => tag.members.iter().filter_map(|id| self.symbol_size(ctx, *id)).max(),
+            Tag::Enum => Some(ctx.target.int.size.into()),
+        }
+    }
+
+    fn struct_size(&mut self, ctx: &Context, members: &[SymbolId]) -> Option<u64> {
+        let layouts = members
+            .iter()
+            .map(|id| {
+                let sym = self.symbols.get(*id);
+                if !sym.is_complete {
+                    return None;
+                }
+                let t = self.types.get(sym.ty?.ty);
+                ctx.target.scalar(t)
+            })
+            .collect::<Option<Vec<_>>>()?;
+        let align = layouts.iter().map(|l| l.align).max()?;
+        let mut size = 0;
+        for l in &layouts {
+            if l.size > align - size % align {
+                size += size % align
+            }
+            size += l.size;
+        }
+        size += size % align;
+        Some(size as u64)
+    }
+
     fn scope_mut(&mut self) -> &mut Scope {
         self.scopes.last_mut().unwrap()
     }
@@ -106,7 +155,7 @@ impl SymbolResolver {
         span: &Span,
     ) -> Option<QualifiedType> {
         let sym_id = self.lookup_ordinary(name.id)?;
-        let sym = self.symbol_arena.get(sym_id);
+        let sym = self.symbols.get(sym_id);
         if sym.kind != SymbolKind::Typedef {
             self.diagnosis
                 .push(DiagnosisNode::new(Diagnosis::UndeclaredIdentifier(name), *span));
@@ -204,14 +253,14 @@ impl SymbolResolver {
                 let decl = &declarator.declarator;
                 let Some((ty, node)) = self.make_qualified_type(ctx, qual, decl) else { continue };
                 let Some(name) = node.ident(ctx) else { continue };
-                if members.iter().any(|&m| self.symbol_arena.get(m).name.id == name.id) {
+                if members.iter().any(|&m| self.symbols.get(m).name.id == name.id) {
                     self.diagnosis.push(DiagnosisNode::new(
                         Diagnosis::DuplicateDeclaration(SymbolKind::Member, name),
                         decl.span,
                     ));
                     continue;
                 }
-                members.push(self.symbol_arena.with_size(
+                members.push(self.symbols.with_size(
                     name,
                     Some(ty),
                     None,
@@ -233,7 +282,8 @@ impl SymbolResolver {
         }
 
         let mut members = Vec::new();
-        let mut value = 0;
+        let mut value: i64 = 0;
+
         for variant_id in &enum_node.variants {
             let variant = variant_id.resolve(ctx);
             let ty = QualifiedType::new(self.types.int(), false, false);
@@ -244,7 +294,10 @@ impl SymbolResolver {
                         &variant.span,
                     );
                 };
-                value = val as i32;
+                value = val as i64;
+            }
+            if value < i32::MIN as i64 || value > i32::MAX as i64 {
+                return self.add_diag(Diag::with_diag(None, Diagnosis::VariantBadValue), &variant.span);
             }
             members.push(self.add_variant_symbol(
                 variant.name,
@@ -253,7 +306,7 @@ impl SymbolResolver {
                 SymbolKind::Variant,
                 &variant.span,
                 true,
-                value,
+                value as i32,
             ));
             value += 1;
         }
@@ -263,7 +316,7 @@ impl SymbolResolver {
 
     fn dedup(&mut self, sym: &Symbol, span: &Span) -> Option<SymbolId> {
         let old_id = *self.get_map(sym.kind).get(&sym.name.id)?;
-        let old_symbol = self.symbol_arena.get(old_id);
+        let old_symbol = self.symbols.get(old_id);
         if self.scope().kind == ScopeKind::File && old_symbol.is_compatible(sym) && !(sym.is_init && old_symbol.is_init)
         {
             return Some(old_id);
@@ -293,10 +346,7 @@ impl SymbolResolver {
             value: None,
             is_init,
         };
-        let sym_id = self.dedup(&sym, span).unwrap_or(self.symbol_arena.alloc(sym));
-        // let sym_id = self
-        //     .dedup(&sym, span)
-        //     .unwrap_or(self.symbol_arena.add(name, Some(ty), storage, kind, is_init));
+        let sym_id = self.dedup(&sym, span).unwrap_or(self.symbols.alloc(sym));
         self.get_map_mut(kind).insert(name.id, sym_id);
         sym_id
     }
@@ -321,16 +371,16 @@ impl SymbolResolver {
             is_init,
             value: Some(value),
         };
-        let sym_id = self.dedup(&sym, span).unwrap_or(self.symbol_arena.alloc(sym));
+        let sym_id = self.dedup(&sym, span).unwrap_or(self.symbols.alloc(sym));
         self.get_map_mut(kind).insert(name.id, sym_id);
         sym_id
     }
 
     fn add_label_symbol(&mut self, name: Name, span: &Span, is_init: bool) {
         if let Some(&old) = self.scopes.iter().rev().find_map(|s| s.labels.get(&name.id)) {
-            let old_init = self.symbol_arena.get(old).is_init;
+            let old_init = self.symbols.get(old).is_init;
             if !old_init && is_init {
-                self.symbol_arena.get_mut(old).is_init = true;
+                self.symbols.get_mut(old).is_init = true;
                 return;
             }
             if !(is_init && old_init) {
@@ -341,7 +391,7 @@ impl SymbolResolver {
                 *span,
             ));
         };
-        let sym_id = self.symbol_arena.add(name, None, None, SymbolKind::Label, is_init);
+        let sym_id = self.symbols.add(name, None, None, SymbolKind::Label, is_init);
         self.scopes
             .iter_mut()
             .find(|s| s.kind == ScopeKind::Function)
@@ -432,7 +482,7 @@ impl SymbolResolver {
                         .iter()
                         .map(|decl| {
                             self.add_parameter_declarator(ctx, specifiers, &decl.declarator, span)
-                                .map(|sym_id| self.symbol_arena.get(sym_id).name.id)
+                                .map(|sym_id| self.symbols.get(sym_id).name.id)
                         })
                         .collect::<Vec<_>>()
                 },
@@ -482,20 +532,13 @@ impl SymbolResolver {
                 let Some(a) = self.lookup_ordinary(name.id) else {
                     return self.add_diag(Diag::none_diag(Diagnosis::UndeclaredIdentifier(*name)), &expr.span);
                 };
-                let symbol = self.symbol_arena.get(a);
+                let symbol = self.symbols.get(a);
                 if symbol.kind != SymbolKind::Variant {
                     return self.add_diag(Diag::none_diag(Diagnosis::NonConstantExpression), &expr.span);
                 }
                 symbol.value.map(Value::Int)
             }
             Expression::Constant(value_node) => Some(value_node.value),
-            Expression::StringLiteral(_)
-            | Expression::PostInc(_)
-            | Expression::PostDec(_)
-            | Expression::PreInc(_)
-            | Expression::Deref(_)
-            | Expression::Addr(_)
-            | Expression::PreDec(_) => self.add_diag(Diag::none_diag(Diagnosis::NonConstantExpression), &expr.span),
             Expression::Plus(expr) => self.const_eval(ctx, expr),
             Expression::Minus(expr) => Some(-self.const_eval(ctx, expr)?),
             Expression::BitNot(expr) => Some(!self.const_eval(ctx, expr)?),
@@ -516,29 +559,53 @@ impl SymbolResolver {
             Expression::LowerEq(e1, e2) => Some(Value::from(self.const_eval(ctx, e1)? <= self.const_eval(ctx, e2)?)),
             Expression::Eq(e1, e2) => Some(Value::from(self.const_eval(ctx, e1)? == self.const_eval(ctx, e2)?)),
             Expression::Neq(e1, e2) => Some(Value::from(self.const_eval(ctx, e1)? != self.const_eval(ctx, e2)?)),
-            // Expression::LogicalAnd(e1,e2),
-            // Expression::LogicalOr(e1,e2),
-            // Expression::Ternary(ExpressionNode, ExpressionNode, ExpressionNode),
-            // Expression::SizeofExpr(ExpressionNode),
-            // Expression::SizeofType(Type),
-            // Expression::Cast(Type, ExpressionNode),
-            //
-            // Expression::Assign(e1,e2),
-            // Expression::MulAssign(e1,e2),
-            // Expression::DivAssign(e1,e2),
-            // Expression::ModAssign(e1,e2),
-            // Expression::AddAssign(e1,e2),
-            // Expression::SubAssign(e1,e2),
-            // Expression::LeftAssign(e1,e2),
-            // Expression::RightAssign(e1,e2),
-            // Expression::AndAssign(e1,e2),
-            // Expression::XorAssign(e1,e2),
-            // Expression::OrAssign(e1,e2),
-            // Expression::List(ExpressionNode, ExpressionNode),
-            // Expression::ArrayAcces(ExpressionNode, ExpressionNode),
-            // Expression::FunctionCall(ExpressionNode, Option<ExpressionNode>),
-            // Expression::DotAcces(ExpressionNode, Name),
-            // Expression::PtrAcces(ExpressionNode, Name),
+            Expression::LogicalAnd(e1, e2) => Some(Value::from(
+                self.const_eval(ctx, e1)?.is_true() && self.const_eval(ctx, e2)?.is_true(),
+            )),
+            Expression::LogicalOr(e1, e2) => Some(Value::from(
+                self.const_eval(ctx, e1)?.is_true() || self.const_eval(ctx, e2)?.is_true(),
+            )),
+            Expression::Ternary(condition, e1, e2) => {
+                if self.const_eval(ctx, condition)?.is_true() {
+                    self.const_eval(ctx, e1)
+                } else {
+                    self.const_eval(ctx, e2)
+                }
+            }
+            Expression::SizeofExpr(expr) => {
+                Some(Value::UnsignedLong(ctx.target.value_size(self.const_eval(ctx, expr)?)))
+            }
+            Expression::SizeofType(ty) => {
+                let qualif = constrain::declaration::resolve_type(self, ctx, &ty.specifiers, &expr.span)?;
+                Some(Value::UnsignedLong(self.type_size(ctx, qualif)?))
+            }
+            // Expression::Cast(ty, expr) => {
+            //     let val = self.const_eval(ctx, expr)?;
+            //     None
+            // }
+            Expression::StringLiteral(_)
+            | Expression::PostInc(_)
+            | Expression::PostDec(_)
+            | Expression::PreInc(_)
+            | Expression::Deref(_)
+            | Expression::Addr(_)
+            | Expression::Assign(_, _)
+            | Expression::MulAssign(_, _)
+            | Expression::DivAssign(_, _)
+            | Expression::ModAssign(_, _)
+            | Expression::AddAssign(_, _)
+            | Expression::SubAssign(_, _)
+            | Expression::LeftAssign(_, _)
+            | Expression::RightAssign(_, _)
+            | Expression::AndAssign(_, _)
+            | Expression::XorAssign(_, _)
+            | Expression::OrAssign(_, _)
+            | Expression::List(_, _)
+            | Expression::ArrayAcces(_, _)
+            | Expression::FunctionCall(_, _)
+            | Expression::DotAcces(_, _)
+            | Expression::PtrAcces(_, _)
+            | Expression::PreDec(_) => self.add_diag(Diag::none_diag(Diagnosis::NonConstantExpression), &expr.span),
             _ => None,
         }
     }
@@ -678,7 +745,7 @@ impl SymbolResolver {
 
     fn report(&self, ctx: &Context) {
         let rows: Vec<[String; 5]> = self
-            .symbol_arena
+            .symbols
             .data
             .iter()
             .map(|symbol| {

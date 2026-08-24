@@ -5,6 +5,7 @@ use crate::ast::{EnumArena, ExpressionArena, StatementArena, StringArena, String
 use crate::ast::{StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena};
 use crate::parser::{Span, YYToken};
 use crate::semantic::{ResolvedTypeArena, SymbolArena, SymbolKind, TagDefArena};
+use crate::target::Target;
 
 #[derive(Debug, Default)]
 pub struct Arenas {
@@ -35,6 +36,7 @@ pub struct Context {
     type_name_ok: bool,
     identifier_ok: bool,
     stashed: Option<HashMap<StringId, SymbolKind>>,
+    pub target: Target,
 }
 
 impl Context {
@@ -52,6 +54,7 @@ impl Context {
             identifier_ok: true,
             stashed: None,
             file_name,
+            target: Target::default(),
         }
     }
 

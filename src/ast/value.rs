@@ -44,12 +44,8 @@ impl Value {
         }
     }
 
-    fn get_suffix(s: &str) -> &str {
-        if s.ends_with("ul") || s.ends_with("lu") {
-            "ul"
-        } else if s.ends_with('u') {
-            "u"
-        } else if s.ends_with('f') {
+    fn get_float_suffix(s: &str) -> &str {
+        if s.ends_with('f') {
             "f"
         } else if s.ends_with('l') {
             "l"
@@ -58,12 +54,24 @@ impl Value {
         }
     }
 
-    fn no_integer_prefix(value: u64) -> Self {
-        if value < i32::MAX as u64 {
+    fn get_integer_suffix(s: &str) -> &str {
+        if s.ends_with("ul") || s.ends_with("lu") {
+            "ul"
+        } else if s.ends_with('u') {
+            "u"
+        } else if s.ends_with('l') {
+            "l"
+        } else {
+            ""
+        }
+    }
+
+    fn no_integer_prefix(value: u64, radix: u32) -> Self {
+        if value <= i32::MAX as u64 {
             Value::Int(value as i32)
-        } else if value < u32::MAX as u64 {
+        } else if radix != 10 && value <= u32::MAX as u64 {
             Value::UnsignedInt(value as u32)
-        } else if value < i64::MAX as u64 {
+        } else if value <= i64::MAX as u64 {
             Value::Long(value as i64)
         } else {
             Value::UnsignedLong(value)
@@ -72,8 +80,8 @@ impl Value {
 
     fn parse_float(s: &str) -> Self {
         let s = s.to_lowercase();
-        let suffix = Self::get_suffix(s.as_str());
-        let s = &s[0..(s.len() - suffix.len() - 1)];
+        let suffix = Self::get_float_suffix(s.as_str());
+        let s = &s[0..(s.len() - suffix.len())];
         match suffix {
             "f" => Value::Float(s.parse::<f32>().unwrap()),
             "l" => Value::LongDouble(s.parse::<f64>().unwrap()),
@@ -142,14 +150,16 @@ impl Value {
     fn parse_integer(s: &str) -> Self {
         let s = s.to_lowercase();
         let (prefix, radix) = Self::get_radix(s.as_str());
-        let suffix = Self::get_suffix(s.as_str());
+        let suffix = Self::get_integer_suffix(s.as_str());
         let s = &s[prefix.len()..(s.len() - suffix.len())];
         let value = if s.is_empty() { 0 } else { u64::from_str_radix(s, radix).unwrap() };
         match suffix {
-            "u" => Value::Int(value as i32),
+            "u" if value > u32::MAX as u64 => Value::UnsignedLong(value),
+            "u" => Value::UnsignedInt(value as u32),
+            "l" if value > i64::MAX as u64 => Value::UnsignedLong(value),
             "l" => Value::Long(value as i64),
             "ul" => Value::UnsignedLong(value),
-            _ => Self::no_integer_prefix(value),
+            _ => Self::no_integer_prefix(value, radix),
         }
     }
 }
@@ -192,10 +202,11 @@ impl From<bool> for Value {
 
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
-        if s.contains('.') {
-            Self::parse_float(s)
-        } else if s.contains('\'') {
+        let lower = s.to_lowercase();
+        if s.contains('\'') {
             Self::parse_char(s)
+        } else if !lower.starts_with("0x") && (lower.contains('.') || lower.contains('e')) {
+            Self::parse_float(s)
         } else {
             Self::parse_integer(s)
         }

@@ -1,4 +1,4 @@
-use crate::semantic::ResolvedType;
+use crate::{ast::Value, semantic::ResolvedType};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Layout {
@@ -68,7 +68,19 @@ impl Default for Target {
 }
 
 impl Target {
-    pub fn scalar(&self, ty: ResolvedType) -> Option<Layout> {
+    pub fn value_size(&self, value: Value) -> u64 {
+        match value {
+            Value::Int(_) | Value::UnsignedInt(_) => self.int,
+            Value::Long(_) | Value::UnsignedLong(_) => self.long,
+            Value::Float(_) => self.float,
+            Value::Double(_) => self.double,
+            Value::LongDouble(_) => self.long_double,
+        }
+        .size
+        .into()
+    }
+
+    pub fn scalar(&self, ty: &ResolvedType) -> Option<Layout> {
         let layout = match ty {
             ResolvedType::Char | ResolvedType::SignedChar | ResolvedType::UnsignedChar => self.char,
             ResolvedType::Short | ResolvedType::UnsignedShort => self.short,
@@ -83,7 +95,7 @@ impl Target {
         Some(layout)
     }
 
-    pub fn is_integral(&self, ty: ResolvedType) -> bool {
+    pub fn is_integral(&self, ty: &ResolvedType) -> bool {
         matches!(
             ty,
             ResolvedType::Char
@@ -98,7 +110,7 @@ impl Target {
         )
     }
 
-    pub fn is_signed(&self, ty: ResolvedType) -> bool {
+    pub fn is_signed(&self, ty: &ResolvedType) -> bool {
         match ty {
             ResolvedType::Char => self.char_signed,
             ResolvedType::SignedChar
@@ -112,11 +124,11 @@ impl Target {
         }
     }
 
-    pub fn bits(&self, ty: ResolvedType) -> Option<u32> {
+    pub fn bits(&self, ty: &ResolvedType) -> Option<u32> {
         self.scalar(ty).map(|l| l.size * 8)
     }
 
-    pub fn max_value(&self, ty: ResolvedType) -> Option<u64> {
+    pub fn max_value(&self, ty: &ResolvedType) -> Option<u64> {
         if !self.is_integral(ty) {
             return None;
         }
@@ -128,7 +140,7 @@ impl Target {
         Some(if signed { (1u64 << (bits - 1)) - 1 } else { (1u64 << bits) - 1 })
     }
 
-    pub fn min_value(&self, ty: ResolvedType) -> Option<i64> {
+    pub fn min_value(&self, ty: &ResolvedType) -> Option<i64> {
         if !self.is_integral(ty) {
             return None;
         }
@@ -142,7 +154,7 @@ impl Target {
         Some(-(1i64 << (bits - 1)))
     }
 
-    pub fn truncate(&self, value: i64, ty: ResolvedType) -> Option<i64> {
+    pub fn truncate(&self, value: i64, ty: &ResolvedType) -> Option<i64> {
         if !self.is_integral(ty) {
             return None;
         }
