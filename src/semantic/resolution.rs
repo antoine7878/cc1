@@ -532,6 +532,23 @@ impl SymbolResolver {
         Some(self.add_symbol(name, ty, Some(storage), SymbolKind::Parameter, &decl.span, false))
     }
 
+    fn cast_value(&mut self, ctx: &Context, qualif: QualifiedType, val: Value, span: &Span) -> Option<Value> {
+        let ty = *self.types.get(qualif.ty);
+        if let ResolvedType::Tag(id) = ty {
+            return match self.tags.get(id).kind {
+                Tag::Enum => ctx.target.cast(&ResolvedType::Int, val),
+                _ => self.add_diag(Diag::none_diag(Diagnosis::CastToNonScalar), span),
+            };
+        }
+        if let Some(casted) = ctx.target.cast(&ty, val) {
+            return Some(casted);
+        }
+        match ty {
+            ResolvedType::Array { .. } => self.add_diag(Diag::none_diag(Diagnosis::CastToNonScalar), span),
+            _ => self.add_diag(Diag::none_diag(Diagnosis::NonIntegerConstantExpression), span),
+        }
+    }
+
     pub fn const_eval(&mut self, ctx: &Context, expr: &ExpressionNode) -> Option<Value> {
         match expr.id.resolve(ctx) {
             Expression::ConstantExpression(expr) => self.const_eval(ctx, expr),
@@ -582,10 +599,15 @@ impl SymbolResolver {
                 let qualif = constrain::declaration::resolve_type(self, ctx, &ty.specifiers, &expr.span)?;
                 Some(Value::UnsignedLong(self.type_size(ctx, qualif)?))
             }
-            // Expression::Cast(ty, expr) => {
-            //     let val = self.const_eval(ctx, expr)?;
-            //     None
-            // }
+            Expression::Cast(ty, operand) => {
+                let base = constrain::declaration::resolve_type(self, ctx, &ty.specifiers, &expr.span);
+                let (qualif, _) = self.make_qualified_type(ctx, base, &ty.declarator)?;
+                let val = self.const_eval(ctx, operand)?;
+                if val.is_floating() && !matches!(operand.id.resolve(ctx), Expression::Constant(_)) {
+                    return self.add_diag(Diag::none_diag(Diagnosis::NonIntegerConstantExpression), &expr.span);
+                }
+                self.cast_value(ctx, qualif, val, &expr.span)
+            }
             Expression::StringLiteral(_)
             | Expression::PostInc(_)
             | Expression::PostDec(_)
@@ -609,7 +631,6 @@ impl SymbolResolver {
             | Expression::DotAcces(_, _)
             | Expression::PtrAcces(_, _)
             | Expression::PreDec(_) => self.add_diag(Diag::none_diag(Diagnosis::NonConstantExpression), &expr.span),
-            _ => None,
         }
     }
 }

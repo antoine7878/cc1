@@ -16,7 +16,7 @@ struct b {
 
 int x;
 
-enum e { a = sizeof(x), b = sizeof(struct b) };
+enum e { a = (int)(0.3), b = sizeof(struct b) };
 
 int main(void) {
 	printf("a: %i\n", a);

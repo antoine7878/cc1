@@ -157,3 +157,36 @@ macro_rules! recover {
         }
     };
 }
+
+pub fn run_value(name: &str, src: &str, expected: &[(&str, &str)]) {
+    let case = write_case(name, src);
+    let out = cc1(&case.pp);
+
+    assert!(out.stderr.is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", out.stderr);
+
+    for (variant, value) in expected {
+        let found = out.stdout.lines().find_map(|line| {
+            let mut fields = line.split_whitespace();
+            if fields.next()? != "variant" || fields.next()? != *variant {
+                return None;
+            }
+            fields.next()
+        });
+        assert_eq!(
+            found,
+            Some(*value),
+            "`{name}` variant `{variant}` should be {value}:\n{src}\n{}",
+            out.stdout
+        );
+    }
+}
+
+#[macro_export]
+macro_rules! value {
+    ($name:ident, $src:expr, $expected:expr) => {
+        #[test]
+        fn $name() {
+            $crate::common::run_value(stringify!($name), $src, $expected);
+        }
+    };
+}

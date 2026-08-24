@@ -226,7 +226,7 @@ impl Value {
         }
     }
 
-    fn to_i64(self) -> i64 {
+    pub fn to_i64(self) -> i64 {
         match self {
             Value::Int(v) => v as i64,
             Value::UnsignedInt(v) => v as i64,
@@ -237,7 +237,7 @@ impl Value {
         }
     }
 
-    fn to_u64(self) -> u64 {
+    pub fn to_u64(self) -> u64 {
         match self {
             Value::Int(v) => v as u64,
             Value::UnsignedInt(v) => v as u64,
@@ -256,6 +256,23 @@ impl Value {
             Value::UnsignedLong(v) => v as f64,
             Value::Float(v) => v as f64,
             Value::Double(v) | Value::LongDouble(v) => v,
+        }
+    }
+
+    pub fn truncate(self, bits: u32, signed: bool) -> Value {
+        if bits == 0 || bits >= 64 {
+            return if signed {
+                Value::Long(self.to_i64())
+            } else {
+                Value::UnsignedLong(self.to_u64())
+            };
+        }
+        let mask = (1u64 << bits) - 1;
+        let raw = if signed { self.to_i64() as u64 } else { self.to_u64() } & mask;
+        if signed && raw & (1 << (bits - 1)) != 0 {
+            Value::Long((raw | !mask) as i64)
+        } else {
+            Value::Long(raw as i64)
         }
     }
 

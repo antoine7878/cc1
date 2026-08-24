@@ -95,6 +95,19 @@ impl Target {
         Some(layout)
     }
 
+    pub fn cast(&self, ty: &ResolvedType, val: Value) -> Option<Value> {
+        if !self.is_integral(ty) {
+            return None;
+        }
+        let v = val.truncate(self.bits(ty)?, self.is_signed(ty));
+        Some(match ty {
+            ResolvedType::Long => Value::Long(v.to_i64()),
+            ResolvedType::UnsignedLong => Value::UnsignedLong(v.to_u64()),
+            ResolvedType::UnsignedInt => Value::UnsignedInt(v.to_u64() as u32),
+            _ => Value::Int(v.to_i64() as i32),
+        })
+    }
+
     pub fn is_integral(&self, ty: &ResolvedType) -> bool {
         matches!(
             ty,

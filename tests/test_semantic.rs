@@ -132,3 +132,65 @@ recover!(
 );
 
 // case!(identifier_implicit_function_declaration, "int f(void) { return g(); }");
+
+case!(cast_float_constant_to_int, "enum e { A = (int)1.5 };");
+
+case!(cast_parenthesized_float_constant, "enum e { A = (int)(1.5) };");
+
+case!(cast_integral_expression, "enum e { A = (int)(1 + 2) };");
+
+case!(cast_narrowing_to_char, "enum e { A = (char)300 };");
+
+case!(cast_narrowing_to_unsigned_char, "enum e { A = (unsigned char)-1 };");
+
+case!(cast_narrowing_to_short, "enum e { A = (short)70000 };");
+
+case!(cast_nested_integral, "enum e { A = (int)(char)300 };");
+
+case!(cast_mixed_integer_ranks, "enum e { A = (long)1 + (short)2 };");
+
+case!(cast_to_enum_tag, "enum f { X = 1 }; enum e { A = (enum f)2 };");
+
+case!(cast_to_floating_rejected, "enum e { A = (double)1 };");
+
+case!(cast_through_floating_rejected, "enum e { A = (int)(double)1 };");
+
+case!(cast_non_immediate_float_operand_rejected, "enum e { A = (int)(1.5 + 1) };");
+
+case!(cast_to_pointer_rejected, "enum e { A = (int *)0 };");
+
+case!(cast_to_void_rejected, "enum e { A = (void)0 };");
+
+case!(cast_to_struct_rejected, "struct s { int a; }; enum e { A = (int)(struct s)1 };");
+
+case!(cast_of_object_rejected, "int x; enum e { A = (int)x };");
+
+case!(cast_unsigned_wraparound_exceeds_int_range, "enum e { A = (unsigned int)-1 };");
+
+value!(cast_value_float_truncates_toward_zero, "enum e { A = (int)1.5 };", &[("A", "1")]);
+
+value!(cast_value_char_wraps, "enum e { A = (char)300 };", &[("A", "44")]);
+
+value!(cast_value_char_is_signed, "enum e { A = (char)-1 };", &[("A", "-1")]);
+
+value!(cast_value_unsigned_char_wraps, "enum e { A = (unsigned char)-1 };", &[("A", "255")]);
+
+value!(cast_value_short_wraps, "enum e { A = (short)70000 };", &[("A", "4464")]);
+
+value!(
+    cast_value_unsigned_int_wraps,
+    "enum e { A = (unsigned int)-1 % 1000 };",
+    &[("A", "295")]
+);
+
+value!(
+    cast_value_long_is_32_bits_on_i386,
+    "enum e { A = (unsigned long)-1 % 1000 };",
+    &[("A", "295")]
+);
+
+value!(
+    cast_value_enum_sequence,
+    "enum e { A = (int)(1 + 2), B, C = (char)-1, D };",
+    &[("A", "3"), ("B", "4"), ("C", "-1"), ("D", "0")]
+);

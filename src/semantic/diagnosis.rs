@@ -11,6 +11,7 @@ pub enum Diagnosis {
     // 6.4
     NonConstantExpression,
     NonIntegerConstantExpression,
+    CastToNonScalar,
     // 6.5
     MultipleStorageSpecifiers,
     BlockScopeNotExtern,
@@ -53,6 +54,7 @@ impl DiagnosisNode {
             Diagnosis::UndeclaredIdentifier(name) => writeln!(w, "Use of undeclared identifier '{}'", name.id.resolve(ctx)),
             Diagnosis::NonConstantExpression => writeln!(w, "Non constant expression"),
             Diagnosis::NonIntegerConstantExpression => writeln!(w, "Non integer constant expression"),
+            Diagnosis::CastToNonScalar => writeln!(w, "Conversion to non scalar type requested"),
             Diagnosis::VariantBadValue => writeln!(w, "Variant value should be in int range"),
             Diagnosis::MultipleStorageSpecifiers => writeln!(w, "Multiple storage class declaration"),
             Diagnosis::BlockScopeNotExtern => writeln!(w, "Function in block not declared as extern"),
