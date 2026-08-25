@@ -1,43 +1,55 @@
 use std::error;
 use std::fmt::{self, Display};
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Read};
+use std::io::{self, BufRead, BufReader, Read, Write, stderr};
 
-use crate::parser::Yacc;
+use crate::parser::{Context, Span, Yacc};
 use crate::utils::{RED, RESET};
 
 pub fn yyerror<D: Display, R: Read>(msg: D, yacc: &Yacc<R>) {
+    let _ = report(&mut stderr(), &yacc.lexer.ctx, yacc.lexer.span, msg);
+}
+
+pub fn report<W: Write, D: Display>(w: &mut W, ctx: &Context, span: Span, msg: D) -> io::Result<()> {
     const CONTEXT: usize = 5;
     const ELLIPSIS: &str = "...";
 
-    let path = &yacc.lexer.ctx.file_name;
-    let span = yacc.lexer.span;
+    let path = ctx.file_of(span);
     let line_no = span.start.line;
-    let col_no = span.end.col;
     let start = line_no.saturating_sub(CONTEXT);
     let end = line_no.saturating_add(CONTEXT);
     let padding = end.to_string().len();
 
-    let Ok(file) = File::open(path) else { return };
+    writeln!(w, "{path}:{line_no}:{}: {RED}{msg}{RESET}", span.start.col)?;
+
+    let Ok(file) = File::open(path) else { return Ok(()) };
     let lines = BufReader::new(file).lines();
 
-    eprintln!("{path}:{line_no}:{}: {RED}{msg}{RESET}", span.start.col);
-
-    eprintln!("{ELLIPSIS}");
+    writeln!(w, "{ELLIPSIS}")?;
     for (i, line) in lines.enumerate().skip(start).take(end - start + 1) {
         let Ok(line) = line else { break };
+        let line = line.replace('\t', " ");
 
-        eprintln!("{:>padding$} {line}", i + 1);
+        writeln!(w, "{:>padding$} {line}", i + 1)?;
 
-        if i == line_no - 1 {
-            eprintln!(
+        if i + 1 == line_no {
+            let col_no = caret_end(span, &line);
+            writeln!(
+                w,
                 "{:>padding$} {RED}{:>col_no$} {msg}{RESET} ",
                 "",
-                "^".repeat(span.end.col - span.start.col + 1)
-            );
+                "^".repeat(col_no + 1 - span.start.col)
+            )?;
         }
     }
-    eprintln!("{ELLIPSIS}");
+    writeln!(w, "{ELLIPSIS}")
+}
+
+fn caret_end(span: Span, line: &str) -> usize {
+    match span.start.line == span.end.line {
+        true => span.end.col.max(span.start.col),
+        false => line.len().max(span.start.col),
+    }
 }
 
 #[derive(Debug)]

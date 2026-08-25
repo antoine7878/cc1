@@ -18,6 +18,7 @@ IS			(u|U|l|L|ul|UL|Ul|uL|lu|LU|lU|Lu)
 
 %%
 
+^#[ \t]*[0-9]+.*\n         { line_marker(self); }
 #.*                         {}
 "//".*                      {}
 "auto"			            { return YYToken::AUTO; }
@@ -121,6 +122,19 @@ impl<R: Read> YYFeedback for YYLex<R> {
     fn yy_feedback(&mut self, accepts: &dyn Fn(usize) -> bool) {
         self.ctx.feedback(accepts);
     }
+}
+
+fn line_marker<R: Read>(lex: &mut YYLex<R>) {
+    let text = lex.yytext.clone();
+    let rest = text.trim_start().trim_start_matches('#').trim_start();
+    let end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
+    let Ok(line) = rest[..end].parse::<usize>() else { return };
+
+    if let Some(file) = rest[end..].trim_start().strip_prefix('"').and_then(|s| s.split('"').next()) {
+        lex.pos.file = lex.ctx.arenas.names.alloc(file.to_string()).into();
+    }
+    lex.pos.line = line;
+    lex.pos.col = 1;
 }
 
 fn alloc_name<R: Read>(lex: &mut YYLex<R>) -> Name {

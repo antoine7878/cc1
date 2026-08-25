@@ -21,6 +21,7 @@ enum LexerState {
 pub struct Position {
     pub line: usize,
     pub col: usize,
+    pub file: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Default)]
@@ -105,7 +106,11 @@ impl<R: Read> YYLex<R> {
             yyin,
             yytext: String::new(),
             span: Span::default(),
-            pos: Position { line: 1, col: 1 },
+            pos: Position {
+                line: 1,
+                col: 1,
+                file: 0,
+            },
             ctx,
         }
     }
