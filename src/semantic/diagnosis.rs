@@ -3,8 +3,8 @@ use std::io::{self, Write, stderr};
 
 use crate::ast::Name;
 use crate::parser::{Context, Span};
-use crate::utils::{RED, YELLOW, report};
 use crate::semantic::SymbolKind;
+use crate::utils::{RED, YELLOW, report};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Severity {
