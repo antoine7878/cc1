@@ -21,18 +21,15 @@ impl Pipeline {
         self
     }
 
-    pub fn tap(mut self, observe: fn(&Context)) -> Self {
+    pub fn peek(self, observe: fn(&Context)) -> Self {
         if self.stopped() {
             return self;
         }
-        let watermark = self.ctx.diagnosis.len();
         observe(&self.ctx);
-        debug_assert!(self.ctx.diagnosis.len() >= watermark);
-        self.exit_code = if self.ctx.diagnosis[watermark..].iter().any(DiagnosisNode::is_error) { 1 } else { 0 };
         self
     }
 
-    pub fn finaly(self, f: fn(&Context)) -> ! {
+    pub fn finally(self, f: fn(&Context)) -> ! {
         f(&self.ctx);
         exit(self.exit_code)
     }
@@ -40,8 +37,4 @@ impl Pipeline {
     pub fn stopped(&self) -> bool {
         self.exit_code > 0
     }
-
-    // pub fn exit(self) {
-    //     exit(self.exit_code)
-    // }
 }

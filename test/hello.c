@@ -1,7 +1,7 @@
 
 
 int f(void) {
-	return return L" x "[0];
+	return L" x "[0];
 }
 
 // #include <stdio.h>

@@ -49,7 +49,7 @@ fn a_pass_that_reports_nothing_leaves_the_pipeline_running() {
 #[test]
 fn tap_observes_the_context_without_stopping_it() {
     TAPPED.store(0, Ordering::SeqCst);
-    let (ctx, stopped) = Pipeline::default().then(mark).tap(tap).then(mark).finish();
+    let (ctx, stopped) = Pipeline::default().then(mark).peek(tap).then(mark).finish();
     assert_eq!(TAPPED.load(Ordering::SeqCst), 2);
     assert_eq!(ctx.file_name, "mm");
     assert!(!stopped);
