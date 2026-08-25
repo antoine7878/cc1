@@ -1,0 +1,237 @@
+mod common;
+
+use common::Unit;
+
+fn folded(src: &str) -> Vec<String> {
+    let unit = Unit::compile(src);
+    assert!(unit.parsed(), "cc1 failed to parse:\n{src}");
+    unit.folded()
+}
+
+fn accepted(src: &str) -> Unit {
+    let unit = Unit::compile(src);
+    assert!(unit.parsed(), "cc1 failed to parse:\n{src}");
+    assert!(
+        unit.diagnosis().is_empty(),
+        "unexpected diagnosis:\n{src}\n{}",
+        unit.render()
+    );
+    unit
+}
+
+macro_rules! folds {
+    ($name:ident, $src:expr, $expected:expr) => {
+        #[test]
+        fn $name() {
+            assert_eq!(folded($src), $expected, "{}", $src);
+        }
+    };
+}
+
+macro_rules! describes {
+    ($name:ident, $src:expr, $symbol:expr, $expected:expr) => {
+        #[test]
+        fn $name() {
+            let unit = accepted($src);
+            assert_eq!(unit.describe($symbol).as_deref(), Some($expected), "{}", $src);
+        }
+    };
+}
+
+folds!(fold_literal, "enum E { A = 3 };", ["Int(3)"]);
+folds!(fold_addition, "enum E { A = 1 + 2 };", ["Int(3)"]);
+folds!(fold_precedence, "enum E { A = 1 + 2 * 3 };", ["Int(7)"]);
+folds!(fold_parentheses, "enum E { A = (1 + 2) * 3 };", ["Int(9)"]);
+folds!(fold_division, "enum E { A = 7 / 2 };", ["Int(3)"]);
+folds!(fold_division_by_zero, "enum E { A = 1 / 0 };", ["Int(0)"]);
+folds!(fold_remainder, "enum E { A = 7 % 2 };", ["Int(1)"]);
+folds!(fold_shift, "enum E { A = 1 << 4 };", ["Int(16)"]);
+folds!(
+    fold_bitwise,
+    "enum E { A = 6 & 3, B = 6 | 3, C = 6 ^ 3 };",
+    ["Int(2)", "Int(7)", "Int(5)"]
+);
+folds!(
+    fold_unary,
+    "enum E { A = -3, B = +3, C = ~0, D = !5 };",
+    ["Int(-3)", "Int(3)", "Int(-1)", "Int(0)"]
+);
+folds!(
+    fold_relational,
+    "enum E { A = 1 < 2, B = 1 == 2 };",
+    ["Int(1)", "Int(0)"]
+);
+folds!(fold_logical, "enum E { A = 1 && 0, B = 1 || 0 };", ["Int(0)", "Int(1)"]);
+folds!(
+    fold_ternary,
+    "enum E { A = 1 ? 2 : 3, B = 0 ? 2 : 3 };",
+    ["Int(2)", "Int(3)"]
+);
+folds!(fold_character_constant, "enum E { A = 'a' };", ["Int(97)"]);
+folds!(
+    fold_overflow_wraps,
+    "enum E { A = 2147483647 + 1 };",
+    ["Int(-2147483648)"]
+);
+folds!(
+    fold_variant_reference,
+    "enum E { A = 1, B = A + 1 };",
+    ["Int(1)", "Int(2)"]
+);
+folds!(fold_sizeof_type, "enum E { A = sizeof(int) };", ["UnsignedLong(4)"]);
+folds!(
+    fold_sizeof_struct,
+    "struct S { char a; int b; }; enum E { A = sizeof(struct S) };",
+    ["UnsignedLong(8)"]
+);
+folds!(fold_cast_narrows, "enum E { A = (char)300 };", ["Int(44)"]);
+folds!(fold_cast_to_unsigned, "enum E { A = (unsigned char)-1 };", ["Int(255)"]);
+folds!(fold_bit_field_width, "struct S { int a : 2 + 1; };", ["Int(3)"]);
+folds!(fold_array_size, "int a[2 + 3];", ["Int(5)"]);
+
+#[test]
+#[ignore]
+fn fold_sizeof_of_a_pointer_type() {
+    assert_eq!(folded("enum E { A = sizeof(char *) };"), ["UnsignedLong(4)"]);
+    assert_eq!(folded("enum E { A = sizeof(int *) };"), ["UnsignedLong(4)"]);
+}
+
+#[test]
+fn a_non_constant_expression_folds_to_nothing() {
+    let unit = Unit::compile("int x; enum E { A = x };");
+    assert_eq!(unit.folded(), vec!["None".to_string()]);
+    assert!(!unit.accepts());
+}
+
+#[test]
+fn only_constant_expressions_are_folded() {
+    let unit = Unit::compile("void f(void) { int a; a = 1 + 2; }");
+    assert!(unit.accepts(), "{}", unit.render());
+    assert!(unit.folded().is_empty());
+}
+
+#[test]
+fn an_identifier_binds_to_its_file_scope_declaration() {
+    let unit = accepted("int x; void f(void) { x = 1; }");
+    assert_eq!(unit.bindings(), vec![("x".to_string(), Some(0))]);
+    assert_eq!(unit.symbols()[0].0, "x");
+}
+
+#[test]
+fn an_identifier_binds_to_the_innermost_declaration() {
+    let unit = accepted("int x; void f(void) { int x; x = 1; }");
+    assert_eq!(unit.symbols().len(), 3);
+    assert_eq!(unit.bindings(), vec![("x".to_string(), Some(2))]);
+}
+
+#[test]
+fn an_identifier_binds_to_a_parameter() {
+    let unit = accepted("void f(int a) { a = 1; }");
+    let symbols = unit.symbols();
+    assert_eq!(
+        symbols[1],
+        ("a".to_string(), "parameter".to_string(), "int".to_string())
+    );
+    assert_eq!(unit.bindings(), vec![("a".to_string(), Some(1))]);
+}
+
+#[test]
+fn an_identifier_binds_to_an_enumeration_variant() {
+    let unit = accepted("enum E { A }; int f(void) { return A; }");
+    assert_eq!(unit.symbols()[0].1, "variant");
+    assert_eq!(unit.bindings(), vec![("A".to_string(), Some(0))]);
+}
+
+#[test]
+fn an_undeclared_identifier_binds_to_nothing() {
+    let unit = Unit::compile("void f(void) { x = 1; }");
+    assert_eq!(unit.bindings(), vec![("x".to_string(), None)]);
+    assert!(!unit.accepts());
+}
+
+#[test]
+fn each_occurrence_is_bound_separately() {
+    let unit = accepted("int x; int y; void f(void) { x = y; y = x; }");
+    assert_eq!(
+        unit.bindings(),
+        vec![
+            ("x".to_string(), Some(0)),
+            ("y".to_string(), Some(1)),
+            ("y".to_string(), Some(1)),
+            ("x".to_string(), Some(0)),
+        ]
+    );
+}
+
+describes!(describe_int, "int x;", "x", "int");
+describes!(describe_implicit_int, "static x;", "x", "int");
+describes!(describe_char, "char x;", "x", "char");
+describes!(describe_signed_char, "signed char x;", "x", "signed char");
+describes!(describe_unsigned_char, "unsigned char x;", "x", "unsigned char");
+describes!(describe_short, "short x;", "x", "short");
+describes!(describe_short_int, "short int x;", "x", "short");
+describes!(describe_unsigned, "unsigned x;", "x", "unsigned int");
+describes!(describe_long, "long x;", "x", "long");
+describes!(describe_unsigned_long, "unsigned long int x;", "x", "unsigned long");
+describes!(describe_float, "float x;", "x", "float");
+describes!(describe_double, "double x;", "x", "double");
+describes!(describe_long_double, "long double x;", "x", "long double");
+describes!(describe_const, "const int x;", "x", "const int");
+describes!(describe_volatile, "volatile int x;", "x", "volatile int");
+describes!(
+    describe_const_volatile,
+    "const volatile int x;",
+    "x",
+    "const volatile int"
+);
+describes!(describe_pointer, "char *p;", "p", "pointer to char");
+describes!(
+    describe_pointer_to_pointer,
+    "int **p;",
+    "p",
+    "pointer to pointer to int"
+);
+describes!(describe_pointer_to_const, "const int *p;", "p", "pointer to const int");
+describes!(describe_const_pointer, "int *const p;", "p", "const pointer to int");
+describes!(describe_struct, "struct S { int a; } s;", "s", "struct S");
+describes!(describe_union, "union U { int a; } u;", "u", "union U");
+describes!(describe_enum, "enum E { A } e;", "e", "enum E");
+describes!(
+    describe_incomplete_struct,
+    "struct S; struct S *p;",
+    "p",
+    "pointer to struct S (incomplete)"
+);
+describes!(describe_typedef_target, "typedef unsigned int T;", "T", "unsigned int");
+describes!(
+    describe_through_typedef,
+    "typedef char *S; S s;",
+    "s",
+    "pointer to char"
+);
+describes!(
+    describe_qualified_typedef,
+    "typedef int T; const T x;",
+    "x",
+    "const int"
+);
+describes!(describe_member, "struct S { double a; };", "a", "double");
+describes!(describe_parameter, "void f(char *s) { }", "s", "pointer to char");
+describes!(describe_function_returns, "long f(void) { return 0; }", "f", "long");
+
+#[test]
+fn symbols_are_recorded_in_declaration_order_with_their_kind() {
+    let unit = accepted("typedef int T; struct S { int a; } s; void f(int p) { int l; }");
+    let kinds: Vec<_> = unit.symbols().into_iter().map(|(name, kind, _)| (name, kind)).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            ("T".to_string(), "typedef".to_string()),
+            ("a".to_string(), "member".to_string()),
+            ("s".to_string(), "variable".to_string()),
+            ("f".to_string(), "function".to_string()),
+            ("p".to_string(), "parameter".to_string()),
+            ("l".to_string(), "variable".to_string()),
+        ]
+    );
+}

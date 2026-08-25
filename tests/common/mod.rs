@@ -3,7 +3,8 @@
 use std::io::{Cursor, Write};
 use std::process::{Command, Stdio};
 
-use cc1::ast::{Expression, Name};
+use cc1::ast::print::AstPrinter;
+use cc1::ast::{Expression, Name, Value};
 use cc1::parser::{Context, YYLex, Yacc};
 use cc1::pipeline::Pipeline;
 use cc1::semantic::{Analyzer, Diagnosis, DiagnosisNode, SymbolKind};
@@ -104,6 +105,91 @@ impl Unit {
             .collect()
     }
 
+    pub fn const_values(&self) -> Vec<Option<Value>> {
+        let mut entries: Vec<_> = self
+            .ctx
+            .const_values
+            .iter()
+            .map(|(id, value)| (usize::from(*id), *value))
+            .collect();
+        entries.sort_by_key(|(id, _)| *id);
+        entries.into_iter().map(|(_, value)| value).collect()
+    }
+
+    pub fn folded(&self) -> Vec<String> {
+        self.const_values()
+            .into_iter()
+            .map(|value| match value {
+                Some(value) => format!("{value:?}"),
+                None => "None".to_string(),
+            })
+            .collect()
+    }
+
+    pub fn bindings(&self) -> Vec<(String, Option<usize>)> {
+        let mut entries: Vec<_> = self
+            .ctx
+            .bindings
+            .iter()
+            .map(|(id, symbol)| (usize::from(*id), symbol.map(usize::from)))
+            .collect();
+        entries.sort_by_key(|(id, _)| *id);
+        entries
+            .into_iter()
+            .map(|(id, symbol)| {
+                let name = match &self.ctx.arenas.expressions.data[id] {
+                    Expression::Identifier(name) => name.id.resolve(&self.ctx).clone(),
+                    other => format!("{other:?}"),
+                };
+                (name, symbol)
+            })
+            .collect()
+    }
+
+    pub fn symbols(&self) -> Vec<(String, String, String)> {
+        self.ctx
+            .arenas
+            .symbols
+            .data
+            .iter()
+            .map(|symbol| {
+                (
+                    symbol.name.id.resolve(&self.ctx).clone(),
+                    symbol.kind.to_string(),
+                    symbol.ty.map(|ty| self.ctx.describe(ty)).unwrap_or_default(),
+                )
+            })
+            .collect()
+    }
+
+    pub fn describe(&self, name: &str) -> Option<String> {
+        self.symbols()
+            .into_iter()
+            .find(|(symbol, _, _)| symbol == name)
+            .map(|(_, _, ty)| ty)
+    }
+
+    pub fn messages(&self) -> Vec<String> {
+        self.diagnosis()
+            .iter()
+            .map(|diag| {
+                let mut buf = Vec::new();
+                let _ = diag.write(&mut buf, &self.ctx);
+                strip_ansi(&String::from_utf8_lossy(&buf)).trim_end().to_string()
+            })
+            .collect()
+    }
+
+    pub fn ast(&self) -> String {
+        let mut buf = Vec::new();
+        let _ = AstPrinter::write_ast(&mut buf, &self.ctx);
+        strip_ansi(&String::from_utf8_lossy(&buf))
+            .lines()
+            .map(|line| line.trim_end().to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
     pub fn render(&self) -> String {
         let mut out = String::new();
         for diag in self.diagnosis() {
@@ -113,6 +199,23 @@ impl Unit {
         }
         out
     }
+}
+
+pub fn strip_ansi(text: &str) -> String {
+    let mut out = String::new();
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        if c != '\x1b' {
+            out.push(c);
+            continue;
+        }
+        for c in chars.by_ref() {
+            if c == 'm' {
+                break;
+            }
+        }
+    }
+    out
 }
 
 pub fn run_syntax(name: &str, src: &str) {

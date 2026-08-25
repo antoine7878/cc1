@@ -40,6 +40,9 @@ test: $(NAME)
 ctest: $(NAME)
 	cargo nextest run
 
+coverage: $(NAME)
+	cargo llvm-cov nextest
+
 CCF = -std=iso9899:1990 -pedantic-errors -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
 
 c:
