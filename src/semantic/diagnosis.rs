@@ -1,9 +1,34 @@
+use std::fmt::{self, Display};
 use std::io::{self, Write, stderr};
 
 use crate::ast::Name;
 use crate::parser::{Context, Span};
-use crate::utils::report;
+use crate::utils::{RED, YELLOW, report};
 use crate::semantic::SymbolKind;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Severity {
+    Warning,
+    Error,
+}
+
+impl Severity {
+    pub fn color(&self) -> &'static str {
+        match self {
+            Severity::Warning => YELLOW,
+            Severity::Error => RED,
+        }
+    }
+}
+
+impl Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Severity::Warning => write!(f, "warning"),
+            Severity::Error => write!(f, "error"),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub enum Diagnosis {
@@ -41,9 +66,50 @@ pub enum Diagnosis {
     DuplicateDeclaration(SymbolKind, Name),
 }
 
+impl Diagnosis {
+    #[rustfmt::skip]
+    pub fn severity(&self) -> Severity {
+        match self {
+            Diagnosis::SyntaxError => Severity::Error,
+            Diagnosis::InvalidSizeof => Severity::Error,
+            Diagnosis::UndeclaredIdentifier(_) => Severity::Error,
+            Diagnosis::NonConstantExpression => Severity::Error,
+            Diagnosis::NonIntegerConstantExpression => Severity::Error,
+            Diagnosis::CastToNonScalar => Severity::Error,
+            Diagnosis::MultipleStorageSpecifiers => Severity::Error,
+            Diagnosis::BlockScopeNotExtern => Severity::Error,
+            Diagnosis::InvalidTypeSpecifer => Severity::Error,
+            Diagnosis::DuplicateTypeQualifers => Severity::Error,
+            Diagnosis::NonIntBitFieldType => Severity::Error,
+            Diagnosis::VariantBadValue => Severity::Error,
+            Diagnosis::AutoRegisterExternal => Severity::Error,
+            Diagnosis::NotFunctionTypeDeclarator => Severity::Error,
+            Diagnosis::FunctionAutoExtern => Severity::Error,
+            Diagnosis::ParameterOldStyleListLenMismatch => Severity::Error,
+            Diagnosis::ParameterTypeListWithList => Severity::Error,
+            Diagnosis::ParameterNotRegister => Severity::Error,
+            Diagnosis::AbstractParameterDeclaration => Severity::Error,
+            Diagnosis::MissingDeclarationInOldStyle => Severity::Error,
+            Diagnosis::DuplicateParameterName => Severity::Error,
+            Diagnosis::MissingParameterInOldStyle => Severity::Error,
+            Diagnosis::TypedefInOldStyle => Severity::Error,
+            Diagnosis::LabelOutsideFunction => Severity::Error,
+            Diagnosis::DuplicateDeclaration(_, _) => Severity::Error,
+        }
+    }
+}
+
 impl DiagnosisNode {
     pub fn new(inner: Diagnosis, span: Span) -> Self {
         Self { inner, span }
+    }
+
+    pub fn severity(&self) -> Severity {
+        self.inner.severity()
+    }
+
+    pub fn is_error(&self) -> bool {
+        self.severity() == Severity::Error
     }
 
     pub fn print(&self, ctx: &Context) -> io::Result<()> {
@@ -51,7 +117,7 @@ impl DiagnosisNode {
     }
 
     pub fn write<W: Write>(&self, w: &mut W, ctx: &Context) -> io::Result<()> {
-        report(w, ctx, self.span, self.message(ctx))
+        report(w, ctx, self.span, self.severity(), self.message(ctx))
     }
 
     #[rustfmt::skip]

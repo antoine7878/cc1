@@ -1,5 +1,6 @@
 use cc1::ast::print::AstPrinter;
 use cc1::parser::{Context, YYLex, Yacc};
+use cc1::pipeline::Pipeline;
 use cc1::semantic::Analyzer;
 
 use std::env::args;
@@ -26,16 +27,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = Context::new(file_name);
     let lexer = YYLex::new(BufReader::new(file), || None, ctx);
     let mut yacc = Yacc::new(lexer);
-    let status = yacc.yyparse();
+    yacc.yyparse();
     let ctx = yacc.lexer.ctx;
     AstPrinter::print(&ctx)?;
     println!("------------------------------------------------");
-    let ctx = match status {
-        0 => Analyzer::analyze(ctx),
-        _ => ctx,
-    };
+    let (ctx, stopped) = Pipeline::new(ctx).then(Analyzer::analyze).finish();
     ctx.report();
-    if status != 0 || !ctx.diagnosis.is_empty() {
+    if stopped {
         exit(1);
     }
     Ok(())

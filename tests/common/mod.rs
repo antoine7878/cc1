@@ -5,6 +5,7 @@ use std::process::{Command, Stdio};
 
 use cc1::ast::{Expression, Name};
 use cc1::parser::{Context, YYLex, Yacc};
+use cc1::pipeline::Pipeline;
 use cc1::semantic::{Analyzer, Diagnosis, DiagnosisNode, SymbolKind};
 
 fn needs_preprocessing(src: &str) -> bool {
@@ -54,11 +55,12 @@ impl Unit {
     }
 
     pub fn compile(src: &str) -> Self {
-        let mut unit = Self::parse(src);
-        if unit.parsed() {
-            unit.ctx = Analyzer::analyze(unit.ctx);
+        let unit = Self::parse(src);
+        let (ctx, _) = Pipeline::new(unit.ctx).then(Analyzer::analyze).finish();
+        Self {
+            ctx,
+            status: unit.status,
         }
-        unit
     }
 
     pub fn parsed(&self) -> bool {

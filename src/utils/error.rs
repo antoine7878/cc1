@@ -4,15 +4,15 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 
 use crate::parser::{Context, Span, Yacc};
-use crate::semantic::{Diagnosis, DiagnosisNode};
-use crate::utils::{BLUE, GRAY, RESET};
+use crate::semantic::{Diagnosis, DiagnosisNode, Severity};
+use crate::utils::{GRAY, RESET};
 
 pub fn yyerror<D: Display, R: Read>(_msg: D, yacc: &mut Yacc<R>) {
     let span = yacc.lexer.span;
     yacc.lexer.ctx.diagnosis.push(DiagnosisNode::new(Diagnosis::SyntaxError, span));
 }
 
-pub fn report<W: Write, D: Display>(w: &mut W, ctx: &Context, span: Span, msg: D) -> io::Result<()> {
+pub fn report<W: Write, D: Display>(w: &mut W, ctx: &Context, span: Span, severity: Severity, msg: D) -> io::Result<()> {
     const CONTEXT: usize = 3;
     const ELLIPSIS: &str = "...";
 
@@ -21,8 +21,9 @@ pub fn report<W: Write, D: Display>(w: &mut W, ctx: &Context, span: Span, msg: D
     let start = err_line_no.saturating_sub(CONTEXT);
     let end = err_line_no.saturating_add(CONTEXT);
     let padding = end.to_string().len();
+    let color = severity.color();
 
-    writeln!(w, "{path}:{err_line_no}:{}: {BLUE}{msg}{RESET}", span.start.col)?;
+    writeln!(w, "{path}:{err_line_no}:{}: {color}{severity}: {msg}{RESET}", span.start.col)?;
 
     let Ok(file) = File::open(path) else { return Ok(()) };
     let lines = BufReader::new(file).lines();
@@ -38,7 +39,7 @@ pub fn report<W: Write, D: Display>(w: &mut W, ctx: &Context, span: Span, msg: D
             let col_no = caret_end(span, &line);
             writeln!(
                 w,
-                "{:>padding$} {BLUE}{:>col_no$} {msg}{RESET} ",
+                "{:>padding$} {color}{:>col_no$} {msg}{RESET} ",
                 "",
                 "^".repeat(col_no + 1 - span.start.col)
             )?;
