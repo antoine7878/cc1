@@ -17,6 +17,8 @@ pub enum Diagnosis {
     BlockScopeNotExtern,
     InvalidTypeSpecifer,
     DuplicateTypeQualifers,
+    /// 6.5.2.1 Structure and union specifiers
+    NonIntegerBitFieldType,
     // 6.5.2.2 Enumeration specifiers
     VariantBadValue,
     // 6.7
@@ -73,6 +75,8 @@ impl DiagnosisNode {
             Diagnosis::TypedefInOldStyle => writeln!(w, "Typedef unsed in old style function"),
             Diagnosis::LabelOutsideFunction => writeln!(w, "Label outside function"),
             Diagnosis::DuplicateDeclaration(kind, name) => writeln!(w, "duplicate declaration of {} `{}'", kind, name.id.resolve(ctx)),
+            Diagnosis::NonIntegerBitFieldType => writeln!(w, "Bit-field has non-integral type" ),
+            
         }
     }
 }
@@ -92,6 +96,12 @@ pub trait DiagCollector {
 pub struct Diag<T> {
     pub res: T,
     pub diagnosis: Option<Diagnosis>,
+}
+
+impl Diag<()> {
+    pub fn only_diag(diagnosis: Diagnosis) -> Self {
+        Self::new((), Some(diagnosis))
+    }
 }
 
 impl<T> Diag<T> {
@@ -132,6 +142,6 @@ impl<T> Diag<Option<T>> {
 
 #[derive(Debug, Clone, Copy)]
 pub struct DiagnosisNode {
-    span: Span,
-    inner: Diagnosis,
+    pub span: Span,
+    pub inner: Diagnosis,
 }

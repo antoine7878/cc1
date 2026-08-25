@@ -1,5 +1,7 @@
 mod common;
 
+use cc1::semantic::Diagnosis;
+
 // ---- 6.5.2.3 tags name one type across all their mentions ----------------
 
 case!(tag_reference_after_definition, "struct S { int a; }; struct S x;");
@@ -113,22 +115,22 @@ case!(identifier_used_before_declaration, "int f(void) { return v; }");
 recover!(
     enum_recovers_after_undeclared_variant,
     "enum e { A = Z, B = 2, C = B + 1 }; enum e v; int f(void) { return B + C; }",
-    1,
-    &["'B'", "'C'"]
+    [Diagnosis::UndeclaredIdentifier(_), Diagnosis::NonConstantExpression],
+    &["B", "C"]
 );
 
 recover!(
     enum_recovers_after_non_integer_variant,
     "enum g { P = 1.5, Q = 2, R = 3 }; int f(void) { return Q + R; }",
-    1,
-    &["'Q'", "'R'"]
+    [Diagnosis::NonIntegerConstantExpression],
+    &["Q", "R"]
 );
 
 recover!(
     enum_recovers_after_out_of_range_variant,
     "enum h { M = 2147483647, N, O = 5 }; int g(void) { return O; }",
-    1,
-    &["'O'"]
+    [Diagnosis::VariantBadValue],
+    &["O"]
 );
 
 // case!(identifier_implicit_function_declaration, "int f(void) { return g(); }");
@@ -155,25 +157,42 @@ case!(cast_to_floating_rejected, "enum e { A = (double)1 };");
 
 case!(cast_through_floating_rejected, "enum e { A = (int)(double)1 };");
 
-case!(cast_non_immediate_float_operand_rejected, "enum e { A = (int)(1.5 + 1) };");
+case!(
+    cast_non_immediate_float_operand_rejected,
+    "enum e { A = (int)(1.5 + 1) };"
+);
 
 case!(cast_to_pointer_rejected, "enum e { A = (int *)0 };");
 
 case!(cast_to_void_rejected, "enum e { A = (void)0 };");
 
-case!(cast_to_struct_rejected, "struct s { int a; }; enum e { A = (int)(struct s)1 };");
+case!(
+    cast_to_struct_rejected,
+    "struct s { int a; }; enum e { A = (int)(struct s)1 };"
+);
 
 case!(cast_of_object_rejected, "int x; enum e { A = (int)x };");
 
-case!(cast_unsigned_wraparound_exceeds_int_range, "enum e { A = (unsigned int)-1 };");
+case!(
+    cast_unsigned_wraparound_exceeds_int_range,
+    "enum e { A = (unsigned int)-1 };"
+);
 
-value!(cast_value_float_truncates_toward_zero, "enum e { A = (int)1.5 };", &[("A", "1")]);
+value!(
+    cast_value_float_truncates_toward_zero,
+    "enum e { A = (int)1.5 };",
+    &[("A", "1")]
+);
 
 value!(cast_value_char_wraps, "enum e { A = (char)300 };", &[("A", "44")]);
 
 value!(cast_value_char_is_signed, "enum e { A = (char)-1 };", &[("A", "-1")]);
 
-value!(cast_value_unsigned_char_wraps, "enum e { A = (unsigned char)-1 };", &[("A", "255")]);
+value!(
+    cast_value_unsigned_char_wraps,
+    "enum e { A = (unsigned char)-1 };",
+    &[("A", "255")]
+);
 
 value!(cast_value_short_wraps, "enum e { A = (short)70000 };", &[("A", "4464")]);
 

@@ -8,7 +8,7 @@ pub mod tag_def;
 
 pub mod constrain;
 
-pub use diagnosis::{Diag, DiagCollector, DiagnosisNode};
+pub use diagnosis::{Diag, DiagCollector, Diagnosis, DiagnosisNode};
 pub use resolution::Analyzer;
 pub use resolved_type::{QualifiedType, ResolvedType, ResolvedTypeArena, ResolvedTypeId, TypeSpecifierCounter};
 pub use scope::{ScopeKind, Scopes};

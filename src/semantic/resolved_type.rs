@@ -29,6 +29,23 @@ pub struct QualifiedType {
     pub is_volatile: bool,
 }
 
+impl ResolvedType {
+    pub fn is_integer(&self) -> bool {
+        matches!(
+            self,
+            ResolvedType::Char
+                | ResolvedType::SignedChar
+                | ResolvedType::UnsignedChar
+                | ResolvedType::Short
+                | ResolvedType::UnsignedShort
+                | ResolvedType::Int
+                | ResolvedType::UnsignedInt
+                | ResolvedType::Long
+                | ResolvedType::UnsignedLong
+        )
+    }
+}
+
 impl ResolvedTypeArena {
     pub fn int(&mut self) -> ResolvedTypeId {
         self.alloc(ResolvedType::Int)

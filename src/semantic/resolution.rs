@@ -7,10 +7,9 @@ use crate::ast::visit::{
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, Expression,
     ExpressionId, ExpressionNode, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, JumpStatement,
-    JumpStatementNode, Labeled, LabeledStatementNode, Name, ParameterDeclaration, StructDeclaration, Tag, Value,
-    Variant,
+    JumpStatementNode, Labeled, LabeledStatementNode, Name, ParameterDeclaration, Storage, StructDeclaration, Tag,
+    Value,
 };
-use crate::ast::{Storage, VariantId};
 use crate::parser::{Context, Span};
 use crate::semantic::diagnosis::Diagnosis;
 use crate::semantic::symbol::Symbol;
@@ -22,12 +21,12 @@ use crate::semantic::{
 #[derive(Default, Debug)]
 pub struct SymbolResolver {
     scopes: Scopes,
-    pub(super) diagnosis: Vec<DiagnosisNode>,
-    pub(super) symbols: SymbolArena,
+    pub diagnosis: Vec<DiagnosisNode>,
+    pub symbols: SymbolArena,
     pub types: ResolvedTypeArena,
-    pub(super) tags: TagDefArena,
-    bindings: HashMap<ExpressionId, Option<SymbolId>>,
-    const_expr: HashMap<ExpressionId, Option<Value>>,
+    pub tags: TagDefArena,
+    pub bindings: HashMap<ExpressionId, Option<SymbolId>>,
+    pub const_values: HashMap<ExpressionId, Option<Value>>,
 }
 
 impl DiagCollector for SymbolResolver {
@@ -96,14 +95,11 @@ impl SymbolResolver {
         let sym_id = self.scopes.lookup_ordinary(name.id)?;
         let sym = self.symbols.get(sym_id);
         if sym.kind != SymbolKind::Typedef {
-            self.diagnosis
-                .push(DiagnosisNode::new(Diagnosis::UndeclaredIdentifier(name), *span));
-            return None;
+            return self.add_diag(Diag::none_diag(Diagnosis::UndeclaredIdentifier(name)), span);
         }
         let base = sym.ty?;
         if (is_const && base.is_const) || (is_volatile && base.is_volatile) {
-            self.diagnosis
-                .push(DiagnosisNode::new(Diagnosis::DuplicateTypeQualifers, *span));
+            self.add_diag(Diag::only_diag(Diagnosis::DuplicateTypeQualifers), span)
         }
         Some(QualifiedType::new(
             base.ty,
@@ -153,9 +149,7 @@ impl SymbolResolver {
         if let Some(id) = self.scopes.lookup_tag(name.id, is_definition) {
             let def = self.tags.get(id);
             if def.kind != kind || (is_definition && def.is_complete) {
-                let kind = def.kind();
-                self.diagnosis
-                    .push(DiagnosisNode::new(Diagnosis::DuplicateDeclaration(kind, name), *span));
+                self.add_diag(Diag::only_diag(Diagnosis::DuplicateDeclaration(def.kind(), name)), span)
             }
             return id;
         }
@@ -188,29 +182,39 @@ impl SymbolResolver {
                 let Some(name) = node.ident(ctx) else { continue };
                 if members.iter().any(|&m| self.symbols.get(m).name.id == name.id) {
                     self.add_diag(
-                        Diag::with_diag((), Diagnosis::DuplicateDeclaration(SymbolKind::Member, name)),
+                        Diag::only_diag(Diagnosis::DuplicateDeclaration(SymbolKind::Member, name)),
                         &decl.span,
                     );
                     continue;
                 }
-                members.push(self.symbols.with_size(
-                    name,
-                    Some(ty),
-                    None,
-                    SymbolKind::Member,
-                    declarator.bit_width.clone(),
-                ));
+                if let Some(expr) = &declarator.bit_width {
+                    self.visit_expression(ctx, expr);
+                    constrain::declaration::check_bit_width(
+                        self.types.get(ty.ty),
+                        self.const_values.get(&expr.id).cloned().flatten(),
+                    )
+                    .collect(self, span);
+                }
+                let bit_width = declarator
+                    .bit_width
+                    .clone()
+                    .and_then(|e| self.const_values.get(&e.id))
+                    .cloned()
+                    .flatten()
+                    .and_then(|v| v.get_integer_value())
+                    .unwrap_or(ctx.target.scalar(self.types.get(ty.ty)).map(|l| l.size).unwrap_or(4) as u64);
+                let memb = Symbol::member(name, ty, bit_width as i32);
+                members.push(self.symbols.alloc(memb))
             }
         }
         self.tags.complete(tag, members);
         tag
     }
 
-    fn gougou(&mut self, ctx: &Context, expr: &ExpressionNode) -> Diag<Option<i64>> {
+    fn variant_value(&mut self, ctx: &Context, expr: &ExpressionNode) -> Diag<Option<i64>> {
         self.visit_expression(ctx, expr);
-        let Some(val) = self.const_expr.get(&expr.id).cloned().flatten() else {
-            return Diag::none_diag(Diagnosis::NonConstantExpression);
-        };
+
+        let Some(val) = self.const_values.get(&expr.id).cloned().flatten() else { return Diag::none() };
         match val.get_integer_value() {
             Some(v) => Diag::some(v as i64),
             None => Diag::none_diag(Diagnosis::NonIntegerConstantExpression),
@@ -231,12 +235,12 @@ impl SymbolResolver {
         for variant_id in &enum_node.variants {
             let variant = variant_id.resolve(ctx);
             if let Some(expr) = &variant.value
-                && let Some(v) = self.gougou(ctx, expr).collect(self, &expr.span)
+                && let Some(v) = self.variant_value(ctx, expr).collect(self, &expr.span)
             {
                 value = v;
             }
             if value < i32::MIN as i64 || value > i32::MAX as i64 {
-                self.add_diag(Diag::with_diag((), Diagnosis::VariantBadValue), &variant.span);
+                self.add_diag(Diag::only_diag(Diagnosis::VariantBadValue), &variant.span);
                 value = 0
             }
             let ty = QualifiedType::new(self.types.int(), false, false);
@@ -283,7 +287,7 @@ impl SymbolResolver {
                 return;
             }
             return self.add_diag(
-                Diag::with_diag((), Diagnosis::DuplicateDeclaration(SymbolKind::Label, name)),
+                Diag::only_diag(Diagnosis::DuplicateDeclaration(SymbolKind::Label, name)),
                 span,
             );
         };
@@ -318,8 +322,7 @@ impl SymbolResolver {
 
     fn param_empty(&mut self, lst: &[DeclarationNode], span: &Span) {
         if !lst.is_empty() {
-            self.diagnosis
-                .push(DiagnosisNode::new(Diagnosis::ParameterTypeListWithList, *span))
+            self.add_diag(Diag::only_diag(Diagnosis::ParameterTypeListWithList), span)
         }
     }
 
@@ -569,22 +572,26 @@ impl Visitor for SymbolResolver {
     }
 
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
-        if self.bindings.contains_key(&node.id) {
+        if self.const_values.contains_key(&node.id) || self.bindings.contains_key(&node.id) {
             return;
         }
+        walk_expression(self, ctx, node);
         match node.id.resolve(ctx) {
             Expression::ConstantExpression(expr) => {
                 let value = self.const_eval(ctx, expr);
-                self.const_expr.insert(node.id, value);
+                if value.is_none() {
+                    self.add_diag(Diag::only_diag(Diagnosis::NonConstantExpression), &node.span);
+                }
+                self.const_values.insert(node.id, value);
             }
             Expression::Identifier(name) => {
                 let sym = self.scopes.lookup_ordinary(name.id);
                 if sym.is_none() {
-                    self.add_diag(Diag::with_diag((), Diagnosis::UndeclaredIdentifier(*name)), &node.span);
+                    self.add_diag(Diag::only_diag(Diagnosis::UndeclaredIdentifier(*name)), &node.span);
                 }
                 self.bindings.insert(node.id, sym);
             }
-            _ => walk_expression(self, ctx, node),
+            _ => (),
         }
     }
 }
@@ -592,17 +599,32 @@ impl Visitor for SymbolResolver {
 pub struct Analyzer;
 
 impl Analyzer {
-    pub fn analyze(ctx: Context) -> Context {
-        Self::resolve_names(&ctx);
+    pub fn analyze(mut ctx: Context) -> Context {
+        let resolver = Self::resolve_names(&ctx);
+        let SymbolResolver {
+            scopes: _,
+            diagnosis,
+            symbols,
+            types,
+            tags,
+            bindings,
+            const_values,
+        } = resolver;
+        ctx.arenas.symbols = symbols;
+        ctx.arenas.resolved_type = types;
+        ctx.arenas.tags = tags;
+        ctx.bindings = bindings;
+        ctx.const_values = const_values;
+        ctx.diagnosis = diagnosis;
         ctx
     }
 
-    fn resolve_names(ctx: &Context) {
+    fn resolve_names(ctx: &Context) -> SymbolResolver {
         let mut collector = SymbolResolver::default();
         collector.scopes.push(ScopeKind::File);
         walk_translation_unit(&mut collector, ctx, &ctx.ast);
         collector.scopes.pop();
         assert!(collector.scopes.is_empty());
-        collector.report(ctx);
+        collector
     }
 }

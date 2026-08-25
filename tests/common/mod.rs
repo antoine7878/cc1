@@ -1,7 +1,11 @@
 #![allow(dead_code)]
 
-use std::fs;
-use std::process::Command;
+use std::io::{Cursor, Write};
+use std::process::{Command, Stdio};
+
+use cc1::ast::{Expression, Name};
+use cc1::parser::{Context, YYLex, Yacc};
+use cc1::semantic::{Analyzer, Diagnosis, DiagnosisNode, SymbolKind};
 
 pub const GCC_FLAGS: &[&str] = &[
     "-m32",
@@ -14,95 +18,188 @@ pub const GCC_FLAGS: &[&str] = &[
     "-fno-builtin",
 ];
 
-pub fn gcc_accepts(path: &str) -> bool {
-    let out = Command::new("gcc")
-        .args(GCC_FLAGS)
-        .arg(path)
-        .output()
-        .expect("run gcc (is gcc installed?)");
-    out.status.success()
+fn pipe(program: &str, args: &[&str], input: &str) -> (bool, String) {
+    let mut child = Command::new(program)
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|e| panic!("run {program} ({e}) — is it installed?"));
+
+    child
+        .stdin
+        .take()
+        .expect("stdin")
+        .write_all(input.as_bytes())
+        .expect("write source");
+
+    let out = child.wait_with_output().expect("wait");
+    (out.status.success(), String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
-pub struct Cc1Out {
-    pub stdout: String,
-    pub stderr: String,
+pub fn gcc_accepts(src: &str) -> bool {
+    let mut args = GCC_FLAGS.to_vec();
+    args.extend_from_slice(&["-xc", "-"]);
+    pipe("gcc", &args, &format!("{src}\n")).0
 }
 
-pub fn cc1(path: &str) -> Cc1Out {
-    let out = Command::new(env!("CARGO_BIN_EXE_cc1"))
-        .arg(path)
-        .output()
-        .expect("run cc1 binary");
-    Cc1Out {
-        stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
-        stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+pub fn preprocess(src: &str) -> String {
+    let (ok, out) = pipe("clang", &["-E", "-std=c89", "-xc", "-"], &format!("{src}\n"));
+    assert!(ok, "clang -E failed on:\n{src}");
+    out
+}
+
+pub struct Unit {
+    pub ctx: Context,
+    pub status: i32,
+}
+
+impl Unit {
+    pub fn parse(src: &str) -> Self {
+        let ctx = Context::new("<test>".to_string());
+        let lexer = YYLex::new(Cursor::new(preprocess(src)), || None, ctx);
+        let mut yacc = Yacc::new(lexer);
+        let status = yacc.yyparse();
+        Self {
+            ctx: yacc.lexer.ctx,
+            status,
+        }
     }
-}
 
-pub struct Case {
-    pub src: String,
-    pub pp: String,
-}
-
-impl Drop for Case {
-    fn drop(&mut self) {
-        fs::remove_file(&self.src).ok();
-        fs::remove_file(&self.pp).ok();
+    pub fn compile(src: &str) -> Self {
+        let mut unit = Self::parse(src);
+        if unit.parsed() {
+            unit.ctx = Analyzer::analyze(unit.ctx);
+        }
+        unit
     }
-}
 
-pub fn write_case(name: &str, src: &str) -> Case {
-    let dir = std::env::temp_dir().join(format!("cc1-tests-{}", std::process::id()));
-    fs::create_dir_all(&dir).expect("create temp dir");
+    pub fn parsed(&self) -> bool {
+        self.status == 0
+    }
 
-    let src_path = dir.join(format!("{name}.c"));
-    fs::write(&src_path, format!("{src}\n")).expect("write case");
+    pub fn diagnosis(&self) -> &[DiagnosisNode] {
+        &self.ctx.diagnosis
+    }
 
-    let pp_path = dir.join(format!("{name}.i"));
-    let out = Command::new("clang")
-        .args(["-E", "-std=c89"])
-        .arg(&src_path)
-        .output()
-        .expect("run clang -E (is clang installed?)");
-    assert!(
-        out.status.success(),
-        "clang -E failed for `{name}`:\n{src}\n{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-    fs::write(&pp_path, &out.stdout).expect("write preprocessed case");
+    pub fn accepts(&self) -> bool {
+        self.parsed() && self.ctx.diagnosis.is_empty()
+    }
 
-    Case {
-        src: src_path.to_string_lossy().into_owned(),
-        pp: pp_path.to_string_lossy().into_owned(),
+    pub fn variants(&self) -> Vec<(String, String)> {
+        self.ctx
+            .arenas
+            .symbols
+            .data
+            .iter()
+            .filter(|symbol| symbol.kind == SymbolKind::Variant)
+            .map(|symbol| {
+                (
+                    symbol.name.id.resolve(&self.ctx).clone(),
+                    symbol.value.map(|v| v.to_string()).unwrap_or_default(),
+                )
+            })
+            .collect()
+    }
+
+    pub fn string_literals(&self) -> Vec<String> {
+        self.ctx
+            .arenas
+            .expressions
+            .data
+            .iter()
+            .filter_map(|expression| match expression {
+                Expression::StringLiteral(name) => Some(name.id.resolve(&self.ctx).clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn render(&self) -> String {
+        let mut out = String::new();
+        for diag in self.diagnosis() {
+            let mut buf = Vec::new();
+            let _ = diag.write(&mut buf, &self.ctx);
+            out.push_str(&String::from_utf8_lossy(&buf));
+        }
+        out
     }
 }
 
 pub fn run_syntax(name: &str, src: &str) {
-    let case = write_case(name, src);
-    let gcc = gcc_accepts(&case.src);
-    let out = cc1(&case.pp);
+    let unit = Unit::parse(src);
 
-    assert!(gcc, "`{name}` invalid — gcc rejected:\n{src}");
-    assert!(
-        !out.stderr.contains("syntax error"),
-        "cc1 failed to parse `{name}`:\n{src}\n{}",
-        out.stderr
-    );
+    assert!(gcc_accepts(src), "`{name}` invalid — gcc rejected:\n{src}");
+    assert!(unit.parsed(), "cc1 failed to parse `{name}`:\n{src}");
 }
 
 pub fn run_case(name: &str, src: &str) {
-    let case = write_case(name, src);
-
-    let gcc = gcc_accepts(&case.src);
-    let cc1_ok = cc1(&case.pp).stderr.is_empty();
+    let unit = Unit::compile(src);
+    let gcc = gcc_accepts(src);
 
     assert_eq!(
-        cc1_ok,
+        unit.accepts(),
         gcc,
-        "failed `{name}`: gcc {} but cc1 {}\nsource:\n{src}",
+        "failed `{name}`: gcc {} but cc1 {}\nsource:\n{src}\n{}",
         if gcc { "accepts" } else { "rejects" },
-        if cc1_ok { "accepts" } else { "rejects" },
+        if unit.accepts() { "accepts" } else { "rejects" },
+        unit.render(),
     );
+}
+
+pub fn run_value(name: &str, src: &str, expected: &[(&str, &str)]) {
+    let unit = Unit::compile(src);
+
+    assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
+    assert!(
+        unit.diagnosis().is_empty(),
+        "`{name}` unexpected diagnosis:\n{src}\n{}",
+        unit.render()
+    );
+
+    let variants = unit.variants();
+    for (variant, value) in expected {
+        let found = variants.iter().find(|(name, _)| name == variant);
+        assert_eq!(
+            found.map(|(_, value)| value.as_str()),
+            Some(*value),
+            "`{name}` variant `{variant}` should be {value}:\n{src}\n{variants:?}"
+        );
+    }
+}
+
+pub fn run_literal(name: &str, src: &str, expected: &str) {
+    let unit = Unit::parse(src);
+
+    assert!(gcc_accepts(src), "`{name}` invalid — gcc rejected:\n{src}");
+    assert!(unit.parsed(), "cc1 failed to parse `{name}`:\n{src}");
+    assert_eq!(
+        unit.string_literals(),
+        vec![expected.to_string()],
+        "wrong string literal value for `{name}`:\n{src}"
+    );
+}
+
+fn diagnosis_name(diagnosis: &Diagnosis) -> Option<Name> {
+    match diagnosis {
+        Diagnosis::UndeclaredIdentifier(name) => Some(*name),
+        Diagnosis::DuplicateDeclaration(_, name) => Some(*name),
+        _ => None,
+    }
+}
+
+pub fn assert_unmentioned(name: &str, src: &str, unit: &Unit, forbidden: &[&str]) {
+    for word in forbidden {
+        for diag in unit.diagnosis() {
+            let mentioned = diagnosis_name(&diag.inner).map(|n| n.id.resolve(&unit.ctx).as_str() == *word);
+            assert!(
+                mentioned != Some(true),
+                "`{name}` cascading diagnosis mentions {word}:\n{src}\n{}",
+                unit.render()
+            );
+        }
+    }
 }
 
 #[macro_export]
@@ -125,73 +222,60 @@ macro_rules! syntax {
     };
 }
 
-pub fn run_recover(name: &str, src: &str, expected: usize, forbidden: &[&str]) {
-    let case = write_case(name, src);
-    let out = cc1(&case.pp);
-
-    assert!(!gcc_accepts(&case.src), "`{name}` should be rejected by gcc:\n{src}");
-
-    let diagnosis: Vec<&str> = out.stderr.lines().filter(|line| !line.trim().is_empty()).collect();
-    assert_eq!(
-        diagnosis.len(),
-        expected,
-        "`{name}` expected {expected} diagnosis, got {}:\n{src}\n{}",
-        diagnosis.len(),
-        out.stderr
-    );
-
-    for word in forbidden {
-        assert!(
-            !out.stderr.contains(word),
-            "`{name}` cascading diagnosis mentions {word}:\n{src}\n{}",
-            out.stderr
-        );
-    }
-}
-
-#[macro_export]
-macro_rules! recover {
-    ($name:ident, $src:expr, $expected:expr, $forbidden:expr) => {
-        #[test]
-        fn $name() {
-            $crate::common::run_recover(stringify!($name), $src, $expected, $forbidden);
-        }
-    };
-}
-
-pub fn run_value(name: &str, src: &str, expected: &[(&str, &str)]) {
-    let case = write_case(name, src);
-    let out = cc1(&case.pp);
-
-    assert!(
-        out.stderr.is_empty(),
-        "`{name}` unexpected diagnosis:\n{src}\n{}",
-        out.stderr
-    );
-
-    for (variant, value) in expected {
-        let found = out.stdout.lines().find_map(|line| {
-            let mut fields = line.split_whitespace();
-            if fields.next()? != "variant" || fields.next()? != *variant {
-                return None;
-            }
-            fields.next()
-        });
-        assert_eq!(
-            found,
-            Some(*value),
-            "`{name}` variant `{variant}` should be {value}:\n{src}\n{}",
-            out.stdout
-        );
-    }
-}
-
 #[macro_export]
 macro_rules! value {
     ($name:ident, $src:expr, $expected:expr) => {
         #[test]
         fn $name() {
             $crate::common::run_value(stringify!($name), $src, $expected);
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! literal {
+    ($name:ident, $src:expr, $expected:expr) => {
+        #[test]
+        fn $name() {
+            $crate::common::run_literal(stringify!($name), $src, $expected);
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! recover {
+    ($name:ident, $src:expr, [$($diag:pat),* $(,)?], $forbidden:expr) => {
+        #[test]
+        fn $name() {
+            let name = stringify!($name);
+            let unit = $crate::common::Unit::compile($src);
+
+            assert!(
+                !$crate::common::gcc_accepts($src),
+                "`{name}` should be rejected by gcc:\n{}",
+                $src
+            );
+
+            let mut got = unit.diagnosis().iter();
+            $(
+                let next = got.next().map(|diag| diag.inner);
+                assert!(
+                    matches!(next, Some($diag)),
+                    "`{name}` expected {}, got {next:?}:\n{}\n{}",
+                    stringify!($diag),
+                    $src,
+                    unit.render()
+                );
+            )*
+            let extra: Vec<_> = got.map(|diag| diag.inner).collect();
+            assert!(
+                extra.is_empty(),
+                "`{name}` unexpected extra diagnosis {extra:?}:\n{}\n{}",
+                $src,
+                unit.render()
+            );
+
+            $crate::common::assert_unmentioned(name, $src, &unit, $forbidden);
         }
     };
 }

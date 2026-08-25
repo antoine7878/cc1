@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::ast::{ExpressionNode, Name, Storage};
+use crate::ast::{Name, Storage};
 use crate::define_arena;
 use crate::semantic::QualifiedType;
 
@@ -12,8 +12,6 @@ pub struct Symbol {
     pub ty: Option<QualifiedType>,
     pub storage: Option<Storage>,
     pub kind: SymbolKind,
-    pub bit_width: Option<ExpressionNode>,
-    // pub bit_width: Option<u8>,
     pub value: Option<i32>,
     pub is_complete: bool,
     pub is_init: bool,
@@ -32,23 +30,29 @@ impl Symbol {
             ty,
             storage,
             kind,
-            bit_width: None,
             value: None,
             is_complete: true,
             is_init,
         }
     }
 
-    pub fn variant(name: Name, ty: QualifiedType, value: i32) -> Self {
+    fn with_value(name: Name, ty: QualifiedType, value: i32, kind: SymbolKind) -> Self {
         Self {
             value: Some(value),
-            ..Self::new(name, Some(ty), None, SymbolKind::Variant, true)
+            ..Self::new(name, Some(ty), None, kind, true)
         }
+    }
+
+    pub fn member(name: Name, ty: QualifiedType, value: i32) -> Self {
+        Self::with_value(name, ty, value, SymbolKind::Member)
+    }
+
+    pub fn variant(name: Name, ty: QualifiedType, value: i32) -> Self {
+        Self::with_value(name, ty, value, SymbolKind::Variant)
     }
 
     pub fn is_compatible(&self, other: &Self) -> bool {
         self.name.id == other.name.id && self.ty == other.ty && self.storage == other.storage && self.kind == other.kind
-        // && self.bit_width == other.bit_width
     }
 }
 
@@ -62,26 +66,6 @@ impl SymbolArena {
         is_init: bool,
     ) -> SymbolId {
         self.alloc(Symbol::new(name, ty, storage, kind, is_init))
-    }
-
-    pub fn with_size(
-        &mut self,
-        name: Name,
-        ty: Option<QualifiedType>,
-        storage: Option<Storage>,
-        kind: SymbolKind,
-        size: Option<ExpressionNode>,
-    ) -> SymbolId {
-        self.alloc(Symbol {
-            name,
-            ty,
-            storage,
-            kind,
-            bit_width: size,
-            value: None,
-            is_complete: true,
-            is_init: true,
-        })
     }
 }
 

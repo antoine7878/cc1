@@ -1,10 +1,9 @@
 use crate::parser::Context;
-use crate::semantic::resolution::SymbolResolver;
 use crate::semantic::{QualifiedType, ResolvedType};
 use crate::utils::{BLUE, RESET};
 
-impl SymbolResolver {
-    fn describe(&self, ctx: &Context, qt: QualifiedType) -> String {
+impl Context {
+    pub fn describe(&self, qt: QualifiedType) -> String {
         let mut out = String::new();
         if qt.is_const {
             out.push_str("const ");
@@ -12,7 +11,7 @@ impl SymbolResolver {
         if qt.is_volatile {
             out.push_str("volatile ");
         }
-        match *self.types.get(qt.ty) {
+        match *self.arenas.resolved_type.get(qt.ty) {
             ResolvedType::Void => out.push_str("void"),
             ResolvedType::Char => out.push_str("char"),
             ResolvedType::SignedChar => out.push_str("signed char"),
@@ -28,11 +27,11 @@ impl SymbolResolver {
             ResolvedType::LongDouble => out.push_str("long double"),
             ResolvedType::Pointer(inner) => {
                 out.push_str("pointer to ");
-                out.push_str(&self.describe(ctx, inner));
+                out.push_str(&self.describe(inner));
             }
             ResolvedType::Tag(id) => {
-                let def = self.tags.get(id);
-                let name = def.name.map(|n| n.id.resolve(ctx).as_str()).unwrap_or("<anonymous>");
+                let def = self.arenas.tags.get(id);
+                let name = def.name.map(|n| n.id.resolve(self).as_str()).unwrap_or("<anonymous>");
                 out.push_str(&format!("{} {}", def.kind(), name));
                 if !def.is_complete {
                     out.push_str(" (incomplete)");
@@ -40,7 +39,7 @@ impl SymbolResolver {
             }
             ResolvedType::Array { elem, len } => {
                 out.push_str("array");
-                out.push_str(&self.describe(ctx, elem));
+                out.push_str(&self.describe(elem));
                 if let Some(len) = len {
                     out.push('[');
                     out.push_str(&len.to_string());
@@ -51,18 +50,19 @@ impl SymbolResolver {
         out
     }
 
-    pub(super) fn report(&self, ctx: &Context) {
+    pub fn report(&self) {
         let rows: Vec<[String; 5]> = self
+            .arenas
             .symbols
             .data
             .iter()
             .map(|symbol| {
                 [
                     symbol.kind.to_string(),
-                    symbol.name.id.resolve(ctx).clone(),
+                    symbol.name.id.resolve(self).clone(),
                     symbol.storage.map(|s| s.to_string()).unwrap_or_default(),
                     symbol.value.map(|v| v.to_string()).unwrap_or("-".to_string()),
-                    symbol.ty.map(|ty| self.describe(ctx, ty)).unwrap_or_default(),
+                    symbol.ty.map(|ty| self.describe(ty)).unwrap_or_default(),
                 ]
             })
             .collect();
@@ -72,7 +72,7 @@ impl SymbolResolver {
 
         println!("Diagnosis:");
         for diag in &self.diagnosis {
-            let _ = diag.print(ctx);
+            let _ = diag.print(self);
         }
     }
 }

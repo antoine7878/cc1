@@ -28,7 +28,10 @@ impl AstPrinter {
     }
 
     pub fn write_ast<W: Write>(mut w: W, ctx: &Context) -> io::Result<()> {
-        let mut printer = Self { depth: 0, lines: Vec::new() };
+        let mut printer = Self {
+            depth: 0,
+            lines: Vec::new(),
+        };
         printer.visit_translation_unit(ctx, &ctx.ast);
         printer.render(&mut w)
     }

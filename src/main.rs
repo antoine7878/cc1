@@ -26,6 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ctx = yacc.lexer.ctx;
     AstPrinter::print(&ctx)?;
     println!("------------------------------------------------");
-    let _ctx = Analyzer::analyze(ctx);
+    let ctx = Analyzer::analyze(ctx);
+    ctx.report();
     Ok(())
 }

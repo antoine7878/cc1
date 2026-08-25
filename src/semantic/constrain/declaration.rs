@@ -1,4 +1,4 @@
-use crate::ast::{DeclarationSpecifier, Qualifier, Storage, Tag, TypeSpecifier};
+use crate::ast::{DeclarationSpecifier, Qualifier, Storage, Tag, TypeSpecifier, Value};
 use crate::parser::{Context, Span};
 use crate::semantic::diagnosis::{Diag, Diagnosis};
 use crate::semantic::resolution::SymbolResolver;
@@ -107,6 +107,21 @@ fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
         [0, 0, 0, 0, 0, 0, 1, 0, 1] => Diag::some(ResolvedType::LongDouble),
         _ => Diag::with_diag(None, Diagnosis::InvalidTypeSpecifer),
     }
+}
+
+/// 6.5.2.1 Structure and union specifiers
+/// A bit-field shall have a type that is a qualified or unqualified version of one of int.
+/// unsigned int. or s igned int.
+pub fn check_bit_width(ty: &ResolvedType, value: Option<Value>) -> Diag<Option<i32>> {
+    if !ty.is_integer() {
+        return Diag::none_diag(Diagnosis::NonIntegerBitFieldType);
+    };
+    let Some(value) = value else { return Diag::none() };
+    let Some(int_value) = value.get_integer_value() else {
+        return Diag::none_diag(Diagnosis::NonIntegerConstantExpression);
+    };
+
+    Diag::some(int_value as i32)
 }
 
 /// 6.5.3 Type qualifiers

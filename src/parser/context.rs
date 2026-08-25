@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use crate::ast::{DeclarationSpecifier, DeclaratorArena, Name, Storage};
+use crate::ast::{DeclarationSpecifier, DeclaratorArena, ExpressionId, Name, Storage, Value};
 use crate::ast::{EnumArena, ExpressionArena, StatementArena, StringArena, StringId, StructArena};
 use crate::ast::{StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena};
 use crate::parser::{Span, YYToken};
-use crate::semantic::{ResolvedTypeArena, SymbolArena, SymbolKind, TagDefArena};
+use crate::semantic::{DiagnosisNode, ResolvedTypeArena, SymbolArena, SymbolId, SymbolKind, TagDefArena};
 use crate::target::Target;
 
 #[derive(Debug, Default)]
@@ -37,6 +37,9 @@ pub struct Context {
     identifier_ok: bool,
     stashed: Option<HashMap<StringId, SymbolKind>>,
     pub target: Target,
+    pub bindings: HashMap<ExpressionId, Option<SymbolId>>,
+    pub const_values: HashMap<ExpressionId, Option<Value>>,
+    pub diagnosis: Vec<DiagnosisNode>,
 }
 
 impl Context {
@@ -55,6 +58,9 @@ impl Context {
             stashed: None,
             file_name,
             target: Target::default(),
+            bindings: HashMap::default(),
+            const_values: HashMap::default(),
+            diagnosis: Vec::new(),
         }
     }
 
