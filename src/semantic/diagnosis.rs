@@ -32,6 +32,7 @@ impl Display for Severity {
 
 #[derive(Clone, Copy, Debug)]
 pub enum Diagnosis {
+    BadArgumentsCount,
     SyntaxError,
     InvalidSizeof,
     UndeclaredIdentifier(Name),
@@ -71,6 +72,7 @@ impl Diagnosis {
     #[rustfmt::skip]
     pub fn severity(&self) -> Severity {
         match self {
+            Diagnosis::BadArgumentsCount => Severity::Error,
             Diagnosis::SyntaxError => Severity::Error,
             Diagnosis::InvalidSizeof => Severity::Error,
             Diagnosis::UndeclaredIdentifier(_) => Severity::Error,
@@ -124,7 +126,9 @@ impl DiagnosisNode {
 
     #[rustfmt::skip]
     fn message(&self, ctx: &Context) -> String {
+
         match &self.inner {
+            Diagnosis::BadArgumentsCount => "wrong argument count".to_string(),
             Diagnosis::SyntaxError => "syntax error".to_string(),
             Diagnosis::InvalidSizeof => "invalid application of sizeof".to_string(),
             Diagnosis::UndeclaredIdentifier(name) => format!("Use of undeclared identifier '{}'", name.id.resolve(ctx)),
