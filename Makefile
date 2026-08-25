@@ -38,7 +38,7 @@ test: $(NAME)
 	./$(NAME) test/hello.i
 
 ctest: $(NAME)
-	cargo test
+	cargo nextest run
 
 CCF = -std=iso9899:1990 -pedantic-errors -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
 
