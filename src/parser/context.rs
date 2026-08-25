@@ -110,6 +110,14 @@ impl Context {
         specs
     }
 
+    pub fn recover_to_file_scope(&mut self) {
+        self.typedefs.truncate(1);
+        self.in_typedef_stack.clear();
+        self.in_typedef = false;
+        self.struct_depth = 0;
+        self.stashed = None;
+    }
+
     pub fn enter_struct(&mut self) {
         self.struct_depth += 1;
     }

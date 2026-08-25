@@ -31,7 +31,7 @@ reject!(
     "typedef int T; void f(void) { if (1) { typedef char U; } } U u;"
 );
 
-// reject!(enumerator_conflicts_with_typedef, "typedef int T; enum E { T };");
+reject!(enumerator_conflicts_with_typedef, "typedef int T; enum E { T };");
 
 reject!(knr_param_named_as_typedef, "typedef int a; f(a) int a; { return a; }");
 

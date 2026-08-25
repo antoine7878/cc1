@@ -78,8 +78,8 @@ impl Context {
         if self.diagnosis.is_empty() {
             return;
         }
-        println!();
         for diag in &self.diagnosis {
+            println!();
             let _ = diag.print(self);
         }
     }

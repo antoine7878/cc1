@@ -138,6 +138,13 @@ translation_unit /* (TranslationUnitNode) */
 external_declaration_list /* Vec<ExternalDeclarationNode> */
 	: external_declaration                                                                  { vec![$1] }
 	| external_declaration_list external_declaration                                        { push!($<mut>1, $2) }
+	| error_declaration                                                                     { vec![] }
+	| external_declaration_list error_declaration                                           { $<mut>1 }
+	;
+
+error_declaration
+	: error ';'                                                                             { self.yyerrok(); self.lexer.ctx.recover_to_file_scope(); }
+	| error '}'                                                                             { self.yyerrok(); self.lexer.ctx.recover_to_file_scope(); }
 	;
 
 external_declaration /* ExternalDeclarationNode */
@@ -442,6 +449,7 @@ statement /* StatementNode */
 	| selection_statement                                                                   { node_span!(self, statements, selection, $1) }
 	| iteration_statement                                                                   { node_span!(self, statements, iteration, $1) }
 	| jump_statement                                                                        { node_span!(self, statements, jump, $1) }
+	| error ';'                                                                             { self.yyerrok(); node_span!(self, statements, expression, with_span!(self, ExpressionStatementNode::new, None)) }
 	;
 
 labeled_statement /* LabeledStatementNode */

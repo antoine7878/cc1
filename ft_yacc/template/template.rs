@@ -73,12 +73,13 @@ impl<R: Read> Yacc<R> {
 
     /* FEEDBACK */
     fn yy_accepts_at(state_stack: &[usize], token_id: usize) -> bool {
+        let goto_table = &Self::YY_GOTO_TABLE;
         let mut stack = state_stack.to_vec();
         for _ in 0..Self::YY_PROBE_LIMIT {
             let &state = stack.last().unwrap();
             let mut act = Self::YY_DEFAULT_ACT[state];
             if act == 0 {
-                act = Self::YY_GOTO_TABLE[state][token_id];
+                act = goto_table[state][token_id];
             }
             if act == 0 {
                 act = Self::YY_DEFAULT_REDUCE_ACT[state];
@@ -96,7 +97,7 @@ impl<R: Read> Yacc<R> {
             }
             stack.truncate(stack.len() - len);
             let &top = stack.last().unwrap();
-            let goto = Self::YY_GOTO_TABLE[top][Self::YY_PRODUCT_TABLE[rule]];
+            let goto = goto_table[top][Self::YY_PRODUCT_TABLE[rule]];
             if goto >= 0 {
                 return false;
             }
@@ -117,7 +118,7 @@ impl<R: Read> Yacc<R> {
         if self.lookahead.is_none() {
             self.read_token();
         }
-        dflt = Self::YY_GOTO_TABLE[state_id][self.lookahead_id];
+        dflt = (&Self::YY_GOTO_TABLE)[state_id][self.lookahead_id];
         if dflt != 0 {
             return dflt;
         }
@@ -161,10 +162,11 @@ impl<R: Read> Yacc<R> {
     }
 
     fn unwind(&mut self) {
+        let goto_table = &Self::YY_GOTO_TABLE;
         yyerror(self.error_message(), self);
         let start = self.span_stack.last().cloned().unwrap_or_default().start;
         while let Some(i) = self.state_stack.last()
-            && Self::YY_GOTO_TABLE[*i][Self::YY_ERROR_TOKEN_ID] == 0
+            && goto_table[*i][Self::YY_ERROR_TOKEN_ID] == 0
         {
             self.state_stack.pop();
             self.span_stack.pop();
@@ -181,7 +183,7 @@ impl<R: Read> Yacc<R> {
             return;
         };
         self.is_recovering = true;
-        let act = Self::YY_GOTO_TABLE[*i][Self::YY_ERROR_TOKEN_ID] + 1;
+        let act = goto_table[*i][Self::YY_ERROR_TOKEN_ID] + 1;
 
         /* DEBUGGING */
         yylog!(self, "Shifting token {:?}", YYToken::error);
@@ -191,14 +193,14 @@ impl<R: Read> Yacc<R> {
         self.token_since_error = 0;
 
         let top = (-act) as usize;
-        self.act = Self::YY_GOTO_TABLE[top][self.lookahead_id];
+        self.act = goto_table[top][self.lookahead_id];
         while self.act == 0 {
             self.yyclearin();
             self.read_token();
             if matches!(self.lookahead, Some(YYToken::yyeof)) {
                 return;
             }
-            self.act = Self::YY_GOTO_TABLE[top][self.lookahead_id];
+            self.act = goto_table[top][self.lookahead_id];
         }
     }
 
@@ -301,7 +303,7 @@ impl<R: Read> Yacc<R> {
         }
 
         let &top = self.state_stack.last().unwrap();
-        self.push_statcks(-(Self::YY_GOTO_TABLE[top][product] + 1) as usize, yyval, self.span);
+        self.push_statcks(-((&Self::YY_GOTO_TABLE)[top][product] + 1) as usize, yyval, self.span);
     }
 
     #[allow(unused_braces, clippy::let_and_return)]

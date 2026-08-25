@@ -34,6 +34,11 @@ impl Pipeline {
         exit(self.exit_code)
     }
 
+    pub fn finish(self) -> (Context, bool) {
+        let stopped = self.stopped();
+        (self.ctx, stopped)
+    }
+
     pub fn stopped(&self) -> bool {
         self.exit_code > 0
     }

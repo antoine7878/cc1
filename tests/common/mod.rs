@@ -82,7 +82,7 @@ impl Unit {
     }
 
     pub fn parsed(&self) -> bool {
-        self.status == 0
+        self.status == 0 && !self.diagnosis().iter().any(|diag| matches!(diag.inner, Diagnosis::SyntaxError))
     }
 
     pub fn diagnosis(&self) -> &[DiagnosisNode] {
