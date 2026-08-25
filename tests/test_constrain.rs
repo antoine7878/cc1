@@ -75,11 +75,20 @@ fn a_function_declared_in_a_block_must_be_extern() {
         "BlockScopeNotExtern"
     );
     assert_eq!(
-        reported(&extern_function_only(ScopeKind::File, Storage::Static)),
+        reported(&extern_function_only(ScopeKind::Function, Storage::Auto)),
+        "BlockScopeNotExtern"
+    );
+    assert_eq!(
+        reported(&extern_function_only(ScopeKind::Function, Storage::Extern)),
         "None"
     );
     assert_eq!(
-        reported(&extern_function_only(ScopeKind::Function, Storage::Auto)),
+        reported(&extern_function_only(ScopeKind::File, Storage::Static)),
+        "None"
+    );
+    assert_eq!(reported(&extern_function_only(ScopeKind::File, Storage::Auto)), "None");
+    assert_eq!(
+        reported(&extern_function_only(ScopeKind::Prototype, Storage::Auto)),
         "None"
     );
 }
@@ -367,11 +376,11 @@ fn unimplemented_external_constraints_report_nothing() {
     assert_eq!(reported(&tentative_defintion_init_zero()), "None");
 
     let diag = no_internal_incomplete_type();
-    assert_eq!(diag.res, true);
+    assert!(diag.res);
     assert_eq!(reported(&diag), "None");
 
     let diag = check_typedef(&ctx, &name);
-    assert_eq!(diag.res, true);
+    assert!(diag.res);
     assert_eq!(reported(&diag), "None");
 }
 

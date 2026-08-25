@@ -101,7 +101,7 @@ fn integral_types_are_the_integer_types() {
 
 #[test]
 fn plain_char_signedness_follows_the_target() {
-    assert!(I386.char_signed);
+    const { assert!(I386.char_signed) }
     assert!(I386.is_signed(&ResolvedType::Char));
     assert!(I386.is_signed(&ResolvedType::SignedChar));
     assert!(!I386.is_signed(&ResolvedType::UnsignedChar));

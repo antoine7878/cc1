@@ -9,10 +9,19 @@ use crate::utils::{GRAY, RESET};
 
 pub fn yyerror<D: Display, R: Read>(_msg: D, yacc: &mut Yacc<R>) {
     let span = yacc.lexer.span;
-    yacc.lexer.ctx.diagnosis.push(DiagnosisNode::new(Diagnosis::SyntaxError, span));
+    yacc.lexer
+        .ctx
+        .diagnosis
+        .push(DiagnosisNode::new(Diagnosis::SyntaxError, span));
 }
 
-pub fn report<W: Write, D: Display>(w: &mut W, ctx: &Context, span: Span, severity: Severity, msg: D) -> io::Result<()> {
+pub fn report<W: Write, D: Display>(
+    w: &mut W,
+    ctx: &Context,
+    span: Span,
+    severity: Severity,
+    msg: D,
+) -> io::Result<()> {
     const CONTEXT: usize = 3;
     const ELLIPSIS: &str = "...";
 
@@ -23,7 +32,11 @@ pub fn report<W: Write, D: Display>(w: &mut W, ctx: &Context, span: Span, severi
     let padding = end.to_string().len();
     let color = severity.color();
 
-    writeln!(w, "{path}:{err_line_no}:{}: {color}{severity}: {msg}{RESET}", span.start.col)?;
+    writeln!(
+        w,
+        "{path}:{err_line_no}:{}: {color}{severity}: {msg}{RESET}",
+        span.start.col
+    )?;
 
     let Ok(file) = File::open(path) else { return Ok(()) };
     let lines = BufReader::new(file).lines();

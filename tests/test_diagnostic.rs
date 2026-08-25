@@ -99,3 +99,21 @@ fn a_report_names_the_file_and_position() {
     let message = &unit.messages()[0];
     assert!(message.starts_with("<test>:1:16: "), "{message}");
 }
+
+reports!(
+    report_empty_declaration,
+    "int ;",
+    ["<test>:1:1: error: Declaration declares nothing"]
+);
+
+reports!(
+    report_external_register,
+    "register int x;",
+    ["<test>:1:1: error: External declaration auto of register"]
+);
+
+reports!(
+    report_block_function_not_extern,
+    "void f(void) { auto int g(void); }",
+    ["<test>:1:25: error: Function in block not declared as extern"]
+);

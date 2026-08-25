@@ -1,17 +1,13 @@
 use crate::parser::Context;
 use crate::semantic::DiagnosisNode;
 
+#[derive(Default)]
 pub struct Pipeline {
     ctx: Context,
     stopped: bool,
 }
 
 impl Pipeline {
-    pub fn new(ctx: Context) -> Self {
-        let stopped = ctx.diagnosis.iter().any(DiagnosisNode::is_error);
-        Self { ctx, stopped }
-    }
-
     pub fn then(mut self, pass: fn(Context) -> Context) -> Self {
         if self.stopped {
             return self;

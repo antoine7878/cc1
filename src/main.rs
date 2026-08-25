@@ -8,7 +8,8 @@ use std::fs::File;
 use std::io::BufReader;
 use std::process::exit;
 
-fn parse_args() -> String {
+fn parse_args(mut ctx: Context) -> Context {
+    println!();
     let mut args = args();
     let Some(prog_name) = args.next() else {
         eprintln!("Error: wrong argument count");
@@ -19,7 +20,8 @@ fn parse_args() -> String {
         eprintln!("Usage: {} file.c", prog_name);
         exit(2);
     };
-    file_name
+    ctx.file_name = file_name;
+    ctx
 }
 
 fn parse(ctx: Context) -> Context {
@@ -31,11 +33,8 @@ fn parse(ctx: Context) -> Context {
 }
 
 fn main() {
-    let file_name = parse_args();
-    let ctx = Context::new(file_name);
-    println!();
-    println!();
-    let (_ctx, stopped) = Pipeline::new(ctx)
+    let (_, stopped) = Pipeline::default()
+        .then(parse_args)
         .then(parse)
         .tap(AstPrinter::print)
         .then(Analyzer::analyze)

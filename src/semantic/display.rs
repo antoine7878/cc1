@@ -51,6 +51,10 @@ impl Context {
     }
 
     pub fn dump_symbols(&self) {
+        if self.arenas.symbols.is_empty() {
+            return;
+        }
+        println!();
         let rows: Vec<[String; 5]> = self
             .arenas
             .symbols
@@ -67,12 +71,14 @@ impl Context {
             })
             .collect();
 
-        println!("Symbols:");
         print_table(&["KIND", "NAME", "STORAGE", "VALUE", "TYPE"], &rows);
-        println!();
     }
 
     pub fn dump_diagnostics(&self) {
+        if self.diagnosis.is_empty() {
+            return;
+        }
+        println!();
         for diag in &self.diagnosis {
             let _ = diag.print(self);
         }

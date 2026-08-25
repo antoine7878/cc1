@@ -22,7 +22,7 @@ pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>>
 /// 6.5.1 Storage-class specifiers
 /// The declaration of an identifier for a function that has block scope shall have no explicit storage-class specifier other than extern.
 pub fn extern_function_only(scope_type: ScopeKind, storage: Storage) -> Diag<()> {
-    if scope_type == ScopeKind::Block && storage != Storage::Extern {
+    if matches!(scope_type, ScopeKind::Block | ScopeKind::Function) && storage != Storage::Extern {
         Diag::with_diag((), Diagnosis::BlockScopeNotExtern)
     } else {
         Diag::res(())

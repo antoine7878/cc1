@@ -42,14 +42,11 @@ pub struct Context {
     pub diagnosis: Vec<DiagnosisNode>,
 }
 
-impl Context {
-    pub fn new(file_name: String) -> Self {
-        let mut arenas = Arenas::default();
-        arenas.names.alloc(file_name.clone());
-
+impl Default for Context {
+    fn default() -> Self {
         Self {
             typedefs: vec![HashMap::default()],
-            arenas,
+            arenas: Arenas::default(),
             ast: TranslationUnitNode::default(),
             in_typedef: false,
             in_typedef_stack: Vec::new(),
@@ -59,14 +56,15 @@ impl Context {
             type_name_ok: false,
             identifier_ok: true,
             stashed: None,
-            file_name,
+            file_name: String::default(),
             target: Target::default(),
             bindings: HashMap::default(),
             const_values: HashMap::default(),
             diagnosis: Vec::new(),
         }
     }
-
+}
+impl Context {
     pub fn file_of(&self, span: Span) -> &String {
         self.arenas.names.get(StringId::from(span.start.file))
     }

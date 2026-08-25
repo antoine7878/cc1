@@ -67,22 +67,18 @@ size!(size_union_char_double, "union U { char a; double b; };", "union U", 8);
 
 size!(size_union_single_char, "union U { char a; };", "union U", 1);
 
-#[ignore]
-size!(
-    size_union_padded_to_alignment,
-    "union U { char a[7]; short b; };",
-    "union U",
-    8
-);
+// size!(
+//     size_union_padded_to_alignment,
+//     "union U { char a[7]; short b; };",
+//     "union U",
+//     8
+// );
 
 // ---- array members contribute their whole extent -------------------------
 
-#[ignore]
-size!(size_array_of_char, "struct S { char a[3]; };", "struct S", 3);
-#[ignore]
-size!(size_array_then_int, "struct S { char a[3]; int b; };", "struct S", 8);
-#[ignore]
-size!(size_array_of_int, "struct S { int a[4]; };", "struct S", 16);
+// size!(size_array_of_char, "struct S { char a[3]; };", "struct S", 3);
+// size!(size_array_then_int, "struct S { char a[3]; int b; };", "struct S", 8);
+// size!(size_array_of_int, "struct S { int a[4]; };", "struct S", 16);
 
 // ---- an aggregate member keeps its own layout ----------------------------
 

@@ -213,3 +213,83 @@ value!(
     "enum e { A = (int)(1 + 2), B, C = (char)-1, D };",
     &[("A", "3"), ("B", "4"), ("C", "-1"), ("D", "0")]
 );
+
+reject!(empty_declaration_of_a_basic_type, "int ;");
+
+reject!(empty_declaration_of_a_qualified_type, "const int;");
+
+reject!(empty_declaration_of_a_typedef_name, "typedef int T; T;");
+
+reject!(empty_declaration_of_an_unnamed_struct, "struct { int a; };");
+
+reject!(empty_declaration_of_an_unnamed_union, "union { int a; };");
+
+accept!(declaration_of_a_struct_tag, "struct S;");
+
+accept!(definition_of_a_struct_tag, "struct S { int a; };");
+
+accept!(definition_of_a_union_tag, "union U { int a; };");
+
+accept!(definition_of_an_enumeration, "enum E { A };");
+
+accept!(definition_of_an_unnamed_enumeration, "enum { A };");
+
+reject!(external_declaration_with_register, "register int x;");
+
+reject!(external_declaration_with_auto, "auto int x;");
+
+reject!(external_definition_with_register, "register int f(void) { return 0; }");
+
+accept!(external_declaration_with_static, "static int x;");
+
+accept!(external_declaration_with_extern, "extern int x;");
+
+accept!(external_declaration_with_typedef, "typedef int T;");
+
+accept!(block_declaration_with_register, "void f(void) { register int x; }");
+
+accept!(block_declaration_with_auto, "void f(void) { auto int x; }");
+
+reject!(
+    block_function_declaration_with_auto,
+    "void f(void) { auto int g(void); }"
+);
+
+reject!(
+    block_function_declaration_with_static,
+    "void f(void) { static int g(void); }"
+);
+
+reject!(
+    block_function_declaration_with_register,
+    "void f(void) { register int g(); }"
+);
+
+reject!(
+    nested_block_function_declaration_with_static,
+    "void f(void) { { static int g(void); } }"
+);
+
+accept!(
+    block_function_declaration_with_extern,
+    "void f(void) { extern int g(void); }"
+);
+
+accept!(
+    block_function_declaration_without_storage,
+    "void f(void) { int g(void); }"
+);
+
+accept!(
+    block_declaration_of_a_pointer_to_function,
+    "void f(void) { auto int (*fp)(void); }"
+);
+
+accept!(
+    block_typedef_of_a_function_type,
+    "void f(void) { typedef int T(void); }"
+);
+
+accept!(external_function_declaration_with_static, "static int g(void);");
+
+accept!(external_function_declaration_returning_pointer, "static int *g(void);");

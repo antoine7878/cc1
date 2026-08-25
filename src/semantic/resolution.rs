@@ -8,7 +8,7 @@ use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, Expression,
     ExpressionId, ExpressionNode, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, JumpStatement,
     JumpStatementNode, Labeled, LabeledStatementNode, Name, ParameterDeclaration, Storage, StructDeclaration, Tag,
-    Value,
+    TypeSpecifier, Value,
 };
 use crate::parser::{Context, Span};
 use crate::semantic::diagnosis::Diagnosis;
@@ -549,6 +549,22 @@ impl SymbolResolver {
     }
 }
 
+fn is_function_declarator(ctx: &Context, decl: &DeclaratorNode) -> bool {
+    match decl.id.resolve(ctx) {
+        Declarator::Function { declarator, .. } => matches!(declarator.id.resolve(ctx), Declarator::Ident(_)),
+        _ => false,
+    }
+}
+
+fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
+    specifiers.iter().any(|specifier| match specifier {
+        DeclarationSpecifier::Type(TypeSpecifier::Struct(id)) => id.resolve(ctx).name.is_some(),
+        DeclarationSpecifier::Type(TypeSpecifier::Union(id)) => id.resolve(ctx).name.is_some(),
+        DeclarationSpecifier::Type(TypeSpecifier::Enum(_)) => true,
+        _ => false,
+    })
+}
+
 impl Visitor for SymbolResolver {
     fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
         let Some(parameters) = self.add_function(ctx, node) else { return };
@@ -570,14 +586,26 @@ impl Visitor for SymbolResolver {
     fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode) {
         let specifiers = &node.specifiers;
         let span = &node.span;
+        if self.scopes.kind() == ScopeKind::File {
+            constrain::external::check_external_specifiers(specifiers).collect(self, span);
+        }
+        if node.init_declarators.is_empty() && !declares_tag(ctx, specifiers) {
+            self.add_diag(Diag::only_diag(Diagnosis::EmptyDeclaration), span);
+        }
+        let declared_storage = constrain::declaration::get_storage(specifiers).collect(self, span);
         let qualif = constrain::declaration::resolve_type(self, ctx, specifiers, span);
         for init_declarator in &node.init_declarators {
             let decl = &init_declarator.declarator;
             let Some((ty, decl)) = self.make_qualified_type(ctx, qualif, decl) else { continue };
             let Some(name) = decl.ident(ctx) else { continue };
-            let storage = constrain::declaration::get_storage(&node.specifiers)
-                .collect(self, span)
-                .unwrap_or(Storage::Auto);
+            if let Some(declared_storage) = declared_storage
+                && declared_storage != Storage::Typedef
+                && is_function_declarator(ctx, &decl)
+            {
+                constrain::declaration::extern_function_only(self.scopes.kind(), declared_storage)
+                    .collect(self, &decl.span);
+            }
+            let storage = declared_storage.unwrap_or(Storage::Auto);
             let kind = if storage == Storage::Typedef { SymbolKind::Typedef } else { SymbolKind::Variable };
             let is_init = init_declarator.initializer.is_some();
             self.declare(Symbol::new(name, Some(ty), Some(storage), kind, is_init), &decl.span);
