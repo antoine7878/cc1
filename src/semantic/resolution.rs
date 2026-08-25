@@ -17,7 +17,6 @@ use crate::semantic::{
     Diag, DiagCollector, DiagnosisNode, QualifiedType, ResolvedType, ResolvedTypeArena, ScopeKind, Scopes, SymbolArena,
     SymbolId, SymbolKind, TagDefArena, TagDefId, constrain,
 };
-use crate::target::Layout;
 
 #[derive(Default, Debug)]
 pub struct SymbolResolver {
@@ -37,16 +36,47 @@ impl DiagCollector for SymbolResolver {
 }
 
 impl SymbolResolver {
+    // ----- Alignment --------------------
+
+    fn symbol_alignement(&mut self, ctx: &Context, id: SymbolId) -> Option<u64> {
+        let symbol = self.symbols.get(id);
+        self.type_alignement(ctx, symbol.ty?)
+    }
+
+    #[allow(unused)]
+    fn type_alignement(&mut self, ctx: &Context, qualified_type: QualifiedType) -> Option<u64> {
+        match self.types.get(qualified_type.ty) {
+            ResolvedType::Tag(id) => self.tag_alignement(ctx, *id),
+            ty => Some(ctx.target.scalar(ty)?.align as u64),
+        }
+    }
+
+    fn tag_alignement(&mut self, ctx: &Context, id: TagDefId) -> Option<u64> {
+        let tag = self.tags.get(id).clone();
+        if !tag.is_complete {
+            return self.add_diag(Diag::none_diag(Diagnosis::InvalidSizeof), &Span::default());
+        }
+        match tag.kind {
+            Tag::Struct | Tag::Union => tag
+                .members
+                .iter()
+                .filter_map(|id| self.symbol_alignement(ctx, *id))
+                .max(),
+            Tag::Enum => Some(ctx.target.int.align.into()),
+        }
+    }
+
+    // ----- Size --------------------
+
     fn symbol_size(&mut self, ctx: &Context, id: SymbolId) -> Option<u64> {
         let symbol = self.symbols.get(id);
         self.type_size(ctx, symbol.ty?)
     }
 
     fn type_size(&mut self, ctx: &Context, qualified_type: QualifiedType) -> Option<u64> {
-        let ty = self.types.get(qualified_type.ty);
-        match ty {
+        match self.types.get(qualified_type.ty) {
             ResolvedType::Tag(id) => self.tag_size(ctx, *id),
-            _ => Some(ctx.target.scalar(ty)?.size as u64),
+            ty => Some(ctx.target.scalar(ty)?.size as u64),
         }
     }
 
@@ -65,19 +95,17 @@ impl SymbolResolver {
     fn struct_size(&mut self, ctx: &Context, members: &[SymbolId]) -> Option<u64> {
         let members_layouts: Vec<(u32, u32)> = members
             .iter()
-            .map(|id| {
-                let sym = self.symbols.get(*id);
+            .map(|&id| {
+                let sym = self.symbols.get(id);
                 if !sym.is_complete {
                     return None;
                 }
-                let bit_width = sym.value;
-                let t = self.types.get(sym.ty?.ty);
-                let opt = ctx.target.scalar(t);
-                match (bit_width, opt) {
-                    (Some(size), Some(Layout { align, .. })) => Some((size as u32, align)),
-                    (None, Some(Layout { size, align, .. })) => Some((size, align)),
-                    _ => None,
-                }
+
+                let bit_width = sym.value.map(|b| b as u32);
+                let sym_size = self.symbol_size(ctx, id).map(|b| b as u32);
+                let align = self.symbol_alignement(ctx, id)? as u32;
+                let size = bit_width.or(sym_size)?;
+                Some((size, align))
             })
             .collect::<Option<Vec<_>>>()?;
         let align = members_layouts.iter().map(|&(_, align)| align).max()?;
@@ -91,6 +119,8 @@ impl SymbolResolver {
         size += (align - size % align) % align;
         Some(size as u64)
     }
+
+    // ----- Resolution --------------------
 
     pub fn resolve_typedef(
         &mut self,
@@ -209,8 +239,8 @@ impl SymbolResolver {
                     .cloned()
                     .flatten()
                     .and_then(|v| v.get_integer_value())
-                    .unwrap_or(ctx.target.scalar(self.types.get(ty.ty)).map(|l| l.size).unwrap_or(4) as u64);
-                let memb = Symbol::member(name, ty, bit_width as i32);
+                    .map(|v| v as i32);
+                let memb = Symbol::member(name, ty, bit_width);
                 members.push(self.symbols.alloc(memb))
             }
         }
@@ -478,7 +508,7 @@ impl SymbolResolver {
                     self.const_eval(ctx, e2)
                 }
             }
-            Expression::SizeofExpr(_expr) => None,
+            Expression::SizeofExpr(_expr) => unimplemented!(),
             Expression::SizeofType(ty) => {
                 let qualif = constrain::declaration::resolve_type(self, ctx, &ty.specifiers, &expr.span)?;
                 Some(Value::UnsignedLong(self.type_size(ctx, qualif)?))

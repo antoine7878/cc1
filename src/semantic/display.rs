@@ -70,7 +70,8 @@ impl Context {
         println!("Symbols:");
         print_table(&["KIND", "NAME", "STORAGE", "VALUE", "TYPE"], &rows);
 
-        println!("Diagnosis:");
+        println!();
+        println!();
         for diag in &self.diagnosis {
             let _ = diag.print(self);
         }

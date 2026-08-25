@@ -1,20 +1,12 @@
 
-struct I {
-	char a;
-	int b;
-};
 
-struct S {
-	char x;
-	struct I i;
-};
-
-enum { PROBE = sizeof(struct S) };
+int f(void) {
+	return L"x"[0];
+}
 
 // #include <stdio.h>
-//
 // int main(void) {
-// 	printf("size: %zu\n", sizeof(struct S));
+// 	printf("size: %i\n", PROBE);
 // 	return 0;
 // 	;
 // }

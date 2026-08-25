@@ -36,19 +36,19 @@ impl Symbol {
         }
     }
 
-    fn with_value(name: Name, ty: QualifiedType, value: i32, kind: SymbolKind) -> Self {
+    fn with_value(name: Name, ty: QualifiedType, value: Option<i32>, kind: SymbolKind) -> Self {
         Self {
-            value: Some(value),
+            value,
             ..Self::new(name, Some(ty), None, kind, true)
         }
     }
 
-    pub fn member(name: Name, ty: QualifiedType, value: i32) -> Self {
+    pub fn member(name: Name, ty: QualifiedType, value: Option<i32>) -> Self {
         Self::with_value(name, ty, value, SymbolKind::Member)
     }
 
     pub fn variant(name: Name, ty: QualifiedType, value: i32) -> Self {
-        Self::with_value(name, ty, value, SymbolKind::Variant)
+        Self::with_value(name, ty, Some(value), SymbolKind::Variant)
     }
 
     pub fn is_compatible(&self, other: &Self) -> bool {

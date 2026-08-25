@@ -39,6 +39,7 @@ test: $(NAME)
 
 ctest: $(NAME)
 	cargo test
+	# cargo test --no-fail-fast
 
 CCF = -std=iso9899:1990 -pedantic-errors -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
 
