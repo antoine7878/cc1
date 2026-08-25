@@ -55,6 +55,10 @@ impl ResolvedTypeArena {
         self.alloc(ResolvedType::Pointer(inner))
     }
 
+    pub fn array(&mut self, elem: QualifiedType, len: Option<u32>) -> ResolvedTypeId {
+        self.alloc(ResolvedType::Array { elem, len })
+    }
+
     pub fn tag(&mut self, id: TagDefId) -> ResolvedTypeId {
         self.alloc(ResolvedType::Tag(id))
     }

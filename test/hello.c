@@ -1,13 +1,10 @@
+int arr[12];
+int brr[sizeof(arr)];
 
-
-int f(void) {
-	return return L" x "[0];
-	return return L" x "[0];
-}
+enum { OUI = sizeof(arr) };
 
 // #include <stdio.h>
 // int main(void) {
-// 	printf("size: %i\n", PROBE);
+// 	printf("%zu\n", OUI);
 // 	return 0;
-// 	;
 // }

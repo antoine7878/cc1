@@ -76,9 +76,9 @@ size!(size_union_single_char, "union U { char a; };", "union U", 1);
 
 // ---- array members contribute their whole extent -------------------------
 
-// size!(size_array_of_char, "struct S { char a[3]; };", "struct S", 3);
-// size!(size_array_then_int, "struct S { char a[3]; int b; };", "struct S", 8);
-// size!(size_array_of_int, "struct S { int a[4]; };", "struct S", 16);
+size!(size_array_of_char, "struct S { char a[3]; };", "struct S", 3);
+size!(size_array_then_int, "struct S { char a[3]; int b; };", "struct S", 8);
+size!(size_array_of_int, "struct S { int a[4]; };", "struct S", 16);
 
 // ---- an aggregate member keeps its own layout ----------------------------
 

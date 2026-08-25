@@ -46,7 +46,8 @@ impl SymbolResolver {
     #[allow(unused)]
     fn type_alignement(&mut self, ctx: &Context, qualified_type: QualifiedType) -> Option<u64> {
         match self.types.get(qualified_type.ty) {
-            ResolvedType::Tag(id) => self.tag_alignement(ctx, *id),
+            &ResolvedType::Tag(id) => self.tag_alignement(ctx, id),
+            &ResolvedType::Array { elem, len } => self.type_size(ctx, elem),
             ty => Some(ctx.target.scalar(ty)?.align as u64),
         }
     }
@@ -75,7 +76,8 @@ impl SymbolResolver {
 
     fn type_size(&mut self, ctx: &Context, qualified_type: QualifiedType) -> Option<u64> {
         match self.types.get(qualified_type.ty) {
-            ResolvedType::Tag(id) => self.tag_size(ctx, *id),
+            &ResolvedType::Tag(id) => self.tag_size(ctx, id),
+            &ResolvedType::Array { elem, len } => self.type_size(ctx, elem).map(|s| s * len.unwrap_or(0) as u64),
             ty => Some(ctx.target.scalar(ty)?.size as u64),
         }
     }
@@ -151,7 +153,7 @@ impl SymbolResolver {
         inner_most: Option<QualifiedType>,
         decl: &DeclaratorNode,
     ) -> Option<(QualifiedType, DeclaratorNode)> {
-        let (ty, decl) = self.extract_pointer(ctx, decl, inner_most?);
+        let (ty, decl) = self.extract_declarator(ctx, decl, inner_most?);
         // match decl.id.resolve(ctx) {
         //     Declarator::Ident(name) => (),
         //     Declarator::Abstract => (),
@@ -162,7 +164,7 @@ impl SymbolResolver {
         Some((ty, decl))
     }
 
-    fn extract_pointer(
+    fn extract_declarator(
         &mut self,
         ctx: &Context,
         declarator: &DeclaratorNode,
@@ -170,11 +172,23 @@ impl SymbolResolver {
     ) -> (QualifiedType, DeclaratorNode) {
         match declarator.id.resolve(ctx) {
             Declarator::Pointer { qualifiers, inner } => {
-                let (qty, decl) = self.extract_pointer(ctx, inner, inner_most);
+                let (qty, decl) = self.extract_declarator(ctx, inner, inner_most);
                 let (is_const, is_volatile) =
                     constrain::declaration::check_qualifier(qualifiers).collect(self, &declarator.span);
                 let id = self.types.pointer(qty);
                 (QualifiedType::new(id, is_const, is_volatile), decl)
+            }
+            Declarator::Array { declarator, size } => {
+                let len = size.as_ref().and_then(|e| {
+                    self.visit_expression(ctx, e);
+                    match self.const_values[&e.id]?.get_integer_value() {
+                        Some(v) => Some(v as u32),
+                        None => self.add_diag(Diag::none_diag(Diagnosis::NonIntegerConstantExpression), &e.span)?,
+                    }
+                });
+                let (qty, decl) = self.extract_declarator(ctx, declarator, inner_most);
+                let id = self.types.array(qty, len);
+                (QualifiedType::new(id, false, false), decl)
             }
             _ => (inner_most, declarator.clone()),
         }

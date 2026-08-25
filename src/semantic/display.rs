@@ -38,13 +38,12 @@ impl Context {
                 }
             }
             ResolvedType::Array { elem, len } => {
-                out.push_str("array");
                 out.push_str(&self.describe(elem));
+                out.push('[');
                 if let Some(len) = len {
-                    out.push('[');
                     out.push_str(&len.to_string());
-                    out.push('[');
                 }
+                out.push(']');
             }
         }
         out

@@ -48,6 +48,7 @@ pub enum Diagnosis {
     DuplicateTypeQualifers,
     /// 6.5.2.1 Structure and union specifiers
     NonIntBitFieldType,
+    NonIntArraySize,
     // 6.5.2.2 Enumeration specifiers
     VariantBadValue,
     // 6.7
@@ -85,6 +86,7 @@ impl Diagnosis {
             Diagnosis::InvalidTypeSpecifer => Severity::Error,
             Diagnosis::DuplicateTypeQualifers => Severity::Error,
             Diagnosis::NonIntBitFieldType => Severity::Error,
+            Diagnosis::NonIntArraySize => Severity::Error,
             Diagnosis::VariantBadValue => Severity::Error,
             Diagnosis::AutoRegisterExternal => Severity::Error,
             Diagnosis::NotFunctionTypeDeclarator => Severity::Error,
@@ -155,6 +157,7 @@ impl DiagnosisNode {
             Diagnosis::LabelOutsideFunction => "Label outside function".to_string(),
             Diagnosis::DuplicateDeclaration(kind, name) => format!("duplicate declaration of {} `{}'", kind, name.id.resolve(ctx)),
             Diagnosis::NonIntBitFieldType => "Bit-field has non-integral type".to_string(),
+            Diagnosis::NonIntArraySize => "Array len has non-integral type".to_string(),
         }
     }
 }

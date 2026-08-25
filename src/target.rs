@@ -89,8 +89,8 @@ impl Target {
             ResolvedType::Float => self.float,
             ResolvedType::Double => self.double,
             ResolvedType::LongDouble => self.long_double,
-            ResolvedType::Array { .. } | ResolvedType::Pointer(_) => self.pointer,
-            ResolvedType::Void | ResolvedType::Tag(_) => return None,
+            ResolvedType::Pointer(_) => self.pointer,
+            ResolvedType::Array { .. } | ResolvedType::Void | ResolvedType::Tag(_) => return None,
         };
         Some(layout)
     }
