@@ -2,95 +2,95 @@ mod common;
 
 // ---- 6.5.6 typedef and lexerhack -----------------------
 
-case!(typedef_then_use, "typedef int T; T x;");
+accept!(typedef_then_use, "typedef int T; T x;");
 
-case!(typedef_use_in_block, "typedef int T; void f(void) { T x; x = 1; }");
+accept!(typedef_use_in_block, "typedef int T; void f(void) { T x; x = 1; }");
 
-case!(typedef_chain, "typedef int A; typedef A B; B x;");
+accept!(typedef_chain, "typedef int A; typedef A B; B x;");
 
-case!(typedef_of_struct_tag, "struct S { int x; }; typedef struct S S; S v;");
+accept!(typedef_of_struct_tag, "struct S { int x; }; typedef struct S S; S v;");
 
-case!(forward_struct_typedef, "typedef struct S *SP; struct S { SP p; };");
+accept!(forward_struct_typedef, "typedef struct S *SP; struct S { SP p; };");
 
-case!(cast_to_typedef, "typedef int T; void f(void) { int x; x = (T)1; }");
+accept!(cast_to_typedef, "typedef int T; void f(void) { int x; x = (T)1; }");
 
-case!(
+accept!(
     typedef_redef_in_block,
     "typedef int T; void f(void) { typedef T T; T x; x = 1; }"
 );
 
-case!(
+accept!(
     knr_definition_with_typedef_param_type,
     "typedef int T; f(a) T a; { return a; }"
 );
 
-case!(block_typedef_no_leak, "void f(void) { typedef int T; } int T;");
+accept!(block_typedef_no_leak, "void f(void) { typedef int T; } int T;");
 
-case!(
+reject!(
     nested_block_typedef_no_leak,
     "typedef int T; void f(void) { if (1) { typedef char U; } } U u;"
 );
 
-// case!(enumerator_conflicts_with_typedef, "typedef int T; enum E { T };");
+// reject!(enumerator_conflicts_with_typedef, "typedef int T; enum E { T };");
 
-case!(knr_param_named_as_typedef, "typedef int a; f(a) int a; { return a; }");
+reject!(knr_param_named_as_typedef, "typedef int a; f(a) int a; { return a; }");
 
-case!(
+accept!(
     sizeof_shadowed_verdict,
     "typedef int T; int main(void) { int T; return sizeof(T); }"
 );
 
-case!(
+accept!(
     local_var_shadows_typedef,
     "typedef int T; int main(void) { int T; T = 1; return T; }"
 );
 
-case!(param_shadows_typedef, "typedef int T; T f(T T) { return T; }");
+accept!(param_shadows_typedef, "typedef int T; T f(T T) { return T; }");
 
-case!(
+accept!(
     paren_expr_of_shadowed_typedef,
     "typedef int T; int main(void) { int T; return (T); }"
 );
 
-case!(
+accept!(
     sizeof_expr_on_shadowed_typedef,
     "typedef int T; int main(void) { int T; return sizeof T; }"
 );
 
-case!(label_named_as_typedef, "typedef int T; void f(void) { T: ; goto T; }");
+accept!(label_named_as_typedef, "typedef int T; void f(void) { T: ; goto T; }");
 
-case!(struct_tag_named_as_typedef, "typedef int S; struct S { int x; };");
+accept!(struct_tag_named_as_typedef, "typedef int S; struct S { int x; };");
 
-case!(union_tag_named_as_typedef, "typedef int S; union S { int x; };");
+accept!(union_tag_named_as_typedef, "typedef int S; union S { int x; };");
 
-case!(member_named_as_typedef, "typedef int T; struct S { T T; };");
+accept!(member_named_as_typedef, "typedef int T; struct S { T T; };");
 
-case!(
+accept!(
     member_access_named_as_typedef,
     "typedef int x; struct S { int x; }; void f(void) { struct S s; s.x = 1; }"
 );
 
-case!(typedef_redeclared_as_var, "typedef int T; int T;");
+reject!(typedef_redeclared_as_var, "typedef int T; int T;");
 
-case!(
+accept!(
     knr_struct_def_in_declaration_list,
     "f(a) struct S { int x; } *a; { return 0; }"
 );
 
-case!(member_shadows_outer_typedef, "typedef int T; struct S { int T; }; T x;");
+accept!(member_shadows_outer_typedef, "typedef int T; struct S { int T; }; T x;");
 
-case!(enum_tag_named_as_typedef, "typedef int E; enum E { A };");
+accept!(enum_tag_named_as_typedef, "typedef int E; enum E { A };");
 
-case!(struct_body_then_typedef_decl, "typedef struct { int x; } S; S s;");
+accept!(struct_body_then_typedef_decl, "typedef struct { int x; } S; S s;");
 
-case!(multiword_type_then_typedef, "typedef unsigned long UL; UL u;");
+accept!(multiword_type_then_typedef, "typedef unsigned long UL; UL u;");
 
-case!(
+accept!(
     typedef_after_nontypedef_decl,
     "typedef int T; int y; void f(void) { y = 1; }"
 );
 
-case!(pointer_declarator_typedef, "typedef int T; int *T;");
+reject!(pointer_declarator_typedef, "typedef int T; int *T;");
 
 // ---- 6.3.1 primary expressions ------------------------------------------
 

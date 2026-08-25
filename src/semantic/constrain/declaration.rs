@@ -113,8 +113,8 @@ fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
 /// A bit-field shall have a type that is a qualified or unqualified version of one of int.
 /// unsigned int. or s igned int.
 pub fn check_bit_width(ty: &ResolvedType, value: Option<Value>) -> Diag<Option<i32>> {
-    if !ty.is_integer() {
-        return Diag::none_diag(Diagnosis::NonIntegerBitFieldType);
+    if !matches!(ty, ResolvedType::Int) {
+        return Diag::none_diag(Diagnosis::NonIntBitFieldType);
     };
     let Some(value) = value else { return Diag::none() };
     let Some(int_value) = value.get_integer_value() else {

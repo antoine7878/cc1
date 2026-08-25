@@ -68,7 +68,7 @@ impl Context {
             .collect();
 
         println!("Symbols:");
-        print_table(&["KIND", "NAME", "STORAGE", "INIT", "TYPE"], &rows);
+        print_table(&["KIND", "NAME", "STORAGE", "VALUE", "TYPE"], &rows);
 
         println!("Diagnosis:");
         for diag in &self.diagnosis {

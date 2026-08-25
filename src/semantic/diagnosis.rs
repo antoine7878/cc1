@@ -18,7 +18,7 @@ pub enum Diagnosis {
     InvalidTypeSpecifer,
     DuplicateTypeQualifers,
     /// 6.5.2.1 Structure and union specifiers
-    NonIntegerBitFieldType,
+    NonIntBitFieldType,
     // 6.5.2.2 Enumeration specifiers
     VariantBadValue,
     // 6.7
@@ -75,7 +75,7 @@ impl DiagnosisNode {
             Diagnosis::TypedefInOldStyle => writeln!(w, "Typedef unsed in old style function"),
             Diagnosis::LabelOutsideFunction => writeln!(w, "Label outside function"),
             Diagnosis::DuplicateDeclaration(kind, name) => writeln!(w, "duplicate declaration of {} `{}'", kind, name.id.resolve(ctx)),
-            Diagnosis::NonIntegerBitFieldType => writeln!(w, "Bit-field has non-integral type" ),
+            Diagnosis::NonIntBitFieldType => writeln!(w, "Bit-field has non-integral type" ),
             
         }
     }

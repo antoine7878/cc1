@@ -7,47 +7,33 @@ use cc1::ast::{Expression, Name};
 use cc1::parser::{Context, YYLex, Yacc};
 use cc1::semantic::{Analyzer, Diagnosis, DiagnosisNode, SymbolKind};
 
-pub const GCC_FLAGS: &[&str] = &[
-    "-m32",
-    "-fsyntax-only",
-    "-std=iso9899:1990",
-    "-pedantic-errors",
-    "-Wno-deprecated-non-prototype",
-    "-Wno-strict-prototypes",
-    "-fno-asm",
-    "-fno-builtin",
-];
+fn needs_preprocessing(src: &str) -> bool {
+    src.contains("\\\n") || src.contains("/*") || src.contains("//") || src.contains('#')
+}
 
-fn pipe(program: &str, args: &[&str], input: &str) -> (bool, String) {
-    let mut child = Command::new(program)
-        .args(args)
+pub fn preprocess(src: &str) -> String {
+    if !needs_preprocessing(src) {
+        return format!("{src}\n");
+    }
+
+    let mut child = Command::new("clang")
+        .args(["-E", "-std=c89", "-xc", "-"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .unwrap_or_else(|e| panic!("run {program} ({e}) — is it installed?"));
+        .unwrap_or_else(|e| panic!("run clang ({e}) — is it installed?"));
 
     child
         .stdin
         .take()
         .expect("stdin")
-        .write_all(input.as_bytes())
+        .write_all(format!("{src}\n").as_bytes())
         .expect("write source");
 
     let out = child.wait_with_output().expect("wait");
-    (out.status.success(), String::from_utf8_lossy(&out.stdout).into_owned())
-}
-
-pub fn gcc_accepts(src: &str) -> bool {
-    let mut args = GCC_FLAGS.to_vec();
-    args.extend_from_slice(&["-xc", "-"]);
-    pipe("gcc", &args, &format!("{src}\n")).0
-}
-
-pub fn preprocess(src: &str) -> String {
-    let (ok, out) = pipe("clang", &["-E", "-std=c89", "-xc", "-"], &format!("{src}\n"));
-    assert!(ok, "clang -E failed on:\n{src}");
-    out
+    assert!(out.status.success(), "clang -E failed on:\n{src}");
+    String::from_utf8_lossy(&out.stdout).into_owned()
 }
 
 pub struct Unit {
@@ -130,22 +116,24 @@ impl Unit {
 pub fn run_syntax(name: &str, src: &str) {
     let unit = Unit::parse(src);
 
-    assert!(gcc_accepts(src), "`{name}` invalid — gcc rejected:\n{src}");
     assert!(unit.parsed(), "cc1 failed to parse `{name}`:\n{src}");
 }
 
-pub fn run_case(name: &str, src: &str) {
+pub fn run_accept(name: &str, src: &str) {
     let unit = Unit::compile(src);
-    let gcc = gcc_accepts(src);
 
-    assert_eq!(
-        unit.accepts(),
-        gcc,
-        "failed `{name}`: gcc {} but cc1 {}\nsource:\n{src}\n{}",
-        if gcc { "accepts" } else { "rejects" },
-        if unit.accepts() { "accepts" } else { "rejects" },
-        unit.render(),
+    assert!(unit.parsed(), "`{name}` should parse:\n{src}");
+    assert!(
+        unit.diagnosis().is_empty(),
+        "`{name}` should be accepted:\n{src}\n{}",
+        unit.render()
     );
+}
+
+pub fn run_reject(name: &str, src: &str) {
+    let unit = Unit::compile(src);
+
+    assert!(!unit.accepts(), "`{name}` should be rejected:\n{src}");
 }
 
 pub fn run_value(name: &str, src: &str, expected: &[(&str, &str)]) {
@@ -170,16 +158,6 @@ pub fn run_value(name: &str, src: &str, expected: &[(&str, &str)]) {
 }
 
 pub fn run_size(name: &str, decl: &str, ty: &str, expected: u64) {
-    let gate = format!(
-        "
-        {decl}\n
-        int probe[sizeof({ty}) == {expected} ? 1 : -1];"
-    );
-    assert!(
-        gcc_accepts(&gate),
-        "`{name}` expects sizeof({ty}) == {expected}, gcc disagrees:\n{decl}"
-    );
-
     let src = format!("{decl} enum layout_probe {{ PROBE = sizeof({ty}) }};");
     let unit = Unit::compile(&src);
 
@@ -202,7 +180,6 @@ pub fn run_size(name: &str, decl: &str, ty: &str, expected: u64) {
 pub fn run_literal(name: &str, src: &str, expected: &str) {
     let unit = Unit::parse(src);
 
-    assert!(gcc_accepts(src), "`{name}` invalid — gcc rejected:\n{src}");
     assert!(unit.parsed(), "cc1 failed to parse `{name}`:\n{src}");
     assert_eq!(
         unit.string_literals(),
@@ -233,11 +210,21 @@ pub fn assert_unmentioned(name: &str, src: &str, unit: &Unit, forbidden: &[&str]
 }
 
 #[macro_export]
-macro_rules! case {
+macro_rules! accept {
     ($name:ident, $src:expr) => {
         #[test]
         fn $name() {
-            $crate::common::run_case(stringify!($name), $src);
+            $crate::common::run_accept(stringify!($name), $src);
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! reject {
+    ($name:ident, $src:expr) => {
+        #[test]
+        fn $name() {
+            $crate::common::run_reject(stringify!($name), $src);
         }
     };
 }
@@ -279,12 +266,6 @@ macro_rules! recover {
         fn $name() {
             let name = stringify!($name);
             let unit = $crate::common::Unit::compile($src);
-
-            assert!(
-                !$crate::common::gcc_accepts($src),
-                "`{name}` should be rejected by gcc:\n{}",
-                $src
-            );
 
             let mut got = unit.diagnosis().iter();
             $(

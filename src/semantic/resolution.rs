@@ -17,6 +17,7 @@ use crate::semantic::{
     Diag, DiagCollector, DiagnosisNode, QualifiedType, ResolvedType, ResolvedTypeArena, ScopeKind, Scopes, SymbolArena,
     SymbolId, SymbolKind, TagDefArena, TagDefId, constrain,
 };
+use crate::target::Layout;
 
 #[derive(Default, Debug)]
 pub struct SymbolResolver {
@@ -62,26 +63,32 @@ impl SymbolResolver {
     }
 
     fn struct_size(&mut self, ctx: &Context, members: &[SymbolId]) -> Option<u64> {
-        let layouts = members
+        let members_layouts: Vec<(u32, u32)> = members
             .iter()
             .map(|id| {
                 let sym = self.symbols.get(*id);
                 if !sym.is_complete {
                     return None;
                 }
+                let bit_width = sym.value;
                 let t = self.types.get(sym.ty?.ty);
-                ctx.target.scalar(t)
+                let opt = ctx.target.scalar(t);
+                match (bit_width, opt) {
+                    (Some(size), Some(Layout { align, .. })) => Some((size as u32, align)),
+                    (None, Some(Layout { size, align, .. })) => Some((size, align)),
+                    _ => None,
+                }
             })
             .collect::<Option<Vec<_>>>()?;
-        let align = layouts.iter().map(|l| l.align).max()?;
+        let align = members_layouts.iter().map(|&(_, align)| align).max()?;
         let mut size = 0;
-        for l in &layouts {
-            if l.size > align - size % align {
-                size += size % align
+        for &(member_size, _) in &members_layouts {
+            if member_size > align - size % align {
+                size += (align - size % align) % align;
             }
-            size += l.size;
+            size += member_size;
         }
-        size += size % align;
+        size += (align - size % align) % align;
         Some(size as u64)
     }
 
