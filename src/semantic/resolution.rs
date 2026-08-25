@@ -652,7 +652,7 @@ impl Analyzer {
         ctx.arenas.tags = tags;
         ctx.bindings = bindings;
         ctx.const_values = const_values;
-        ctx.diagnosis = diagnosis;
+        ctx.diagnosis.extend(diagnosis);
         ctx
     }
 

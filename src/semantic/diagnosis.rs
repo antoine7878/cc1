@@ -7,6 +7,7 @@ use crate::semantic::SymbolKind;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Diagnosis {
+    SyntaxError,
     InvalidSizeof,
     UndeclaredIdentifier(Name),
     // 6.4
@@ -56,6 +57,7 @@ impl DiagnosisNode {
     #[rustfmt::skip]
     fn message(&self, ctx: &Context) -> String {
         match &self.inner {
+            Diagnosis::SyntaxError => "syntax error".to_string(),
             Diagnosis::InvalidSizeof => "invalid application of sizeof".to_string(),
             Diagnosis::UndeclaredIdentifier(name) => format!("Use of undeclared identifier '{}'", name.id.resolve(ctx)),
             Diagnosis::NonConstantExpression => "Non constant expression".to_string(),

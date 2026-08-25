@@ -4,12 +4,12 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 
 use crate::parser::{Context, Span, Yacc};
+use crate::semantic::{Diagnosis, DiagnosisNode};
 use crate::utils::{BLUE, GRAY, RESET};
 
-pub fn yyerror<D: Display, R: Read>(msg: D, yacc: &Yacc<R>) {
-    let mut buf = Vec::new();
-    let _ = report(&mut buf, &yacc.lexer.ctx, yacc.lexer.span, msg);
-    eprint!("{}", String::from_utf8_lossy(&buf));
+pub fn yyerror<D: Display, R: Read>(_msg: D, yacc: &mut Yacc<R>) {
+    let span = yacc.lexer.span;
+    yacc.lexer.ctx.diagnosis.push(DiagnosisNode::new(Diagnosis::SyntaxError, span));
 }
 
 pub fn report<W: Write, D: Display>(w: &mut W, ctx: &Context, span: Span, msg: D) -> io::Result<()> {
