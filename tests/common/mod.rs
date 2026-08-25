@@ -169,6 +169,36 @@ pub fn run_value(name: &str, src: &str, expected: &[(&str, &str)]) {
     }
 }
 
+pub fn run_size(name: &str, decl: &str, ty: &str, expected: u64) {
+    let gate = format!(
+        "
+        {decl}\n
+        int probe[sizeof({ty}) == {expected} ? 1 : -1];"
+    );
+    assert!(
+        gcc_accepts(&gate),
+        "`{name}` expects sizeof({ty}) == {expected}, gcc disagrees:\n{decl}"
+    );
+
+    let src = format!("{decl} enum layout_probe {{ PROBE = sizeof({ty}) }};");
+    let unit = Unit::compile(&src);
+
+    assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
+    assert!(
+        unit.diagnosis().is_empty(),
+        "`{name}` unexpected diagnosis:\n{src}\n{}",
+        unit.render()
+    );
+
+    let variants = unit.variants();
+    let got = variants.iter().find(|(name, _)| name == "PROBE");
+    assert_eq!(
+        got.map(|(_, value)| value.as_str()),
+        Some(expected.to_string().as_str()),
+        "`{name}` sizeof({ty}) should be {expected}:\n{decl}"
+    );
+}
+
 pub fn run_literal(name: &str, src: &str, expected: &str) {
     let unit = Unit::parse(src);
 
@@ -276,6 +306,16 @@ macro_rules! recover {
             );
 
             $crate::common::assert_unmentioned(name, $src, &unit, $forbidden);
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! size {
+    ($name:ident, $decl:expr, $ty:expr, $expected:expr) => {
+        #[test]
+        fn $name() {
+            $crate::common::run_size(stringify!($name), $decl, $ty, $expected);
         }
     };
 }
