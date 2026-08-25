@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::cell::{Cell, RefCell};
 use std::io::{Cursor, Write};
 use std::process::{Command, Stdio};
 
@@ -43,24 +44,40 @@ pub struct Unit {
     pub status: i32,
 }
 
+thread_local! {
+    static SOURCE: RefCell<String> = const { RefCell::new(String::new()) };
+    static STATUS: Cell<i32> = const { Cell::new(0) };
+}
+
+fn name(mut ctx: Context) -> Context {
+    ctx.set_file_name("<test>".to_string());
+    ctx
+}
+
+fn parse(ctx: Context) -> Context {
+    let src = SOURCE.with(|source| source.borrow().clone());
+    let lexer = YYLex::new(Cursor::new(src), || None, ctx);
+    let mut yacc = Yacc::new(lexer);
+    STATUS.set(yacc.yyparse());
+    yacc.lexer.ctx
+}
+
 impl Unit {
     pub fn parse(src: &str) -> Self {
-        let ctx = Context::new("<test>".to_string());
-        let lexer = YYLex::new(Cursor::new(preprocess(src)), || None, ctx);
-        let mut yacc = Yacc::new(lexer);
-        let status = yacc.yyparse();
+        SOURCE.set(preprocess(src));
+        let (ctx, _) = Pipeline::default().then(name).then(parse).finish();
         Self {
-            ctx: yacc.lexer.ctx,
-            status,
+            ctx,
+            status: STATUS.get(),
         }
     }
 
     pub fn compile(src: &str) -> Self {
-        let unit = Self::parse(src);
-        let (ctx, _) = Pipeline::new(unit.ctx).then(Analyzer::analyze).finish();
+        SOURCE.set(preprocess(src));
+        let (ctx, _) = Pipeline::default().then(name).then(parse).then(Analyzer::analyze).finish();
         Self {
             ctx,
-            status: unit.status,
+            status: STATUS.get(),
         }
     }
 

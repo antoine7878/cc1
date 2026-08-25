@@ -368,7 +368,7 @@ fn symbols_are_compatible_when_name_type_storage_and_kind_agree() {
 
 #[test]
 fn unimplemented_external_constraints_report_nothing() {
-    let ctx = Context::new("<test>".to_string());
+    let ctx = Context::default();
     let name = Name::new(StringId::from(0usize), Span::default());
 
     assert_eq!(reported(&check_unique_internal_linkage()), "None");

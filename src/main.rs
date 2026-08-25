@@ -20,7 +20,7 @@ fn parse_args(mut ctx: Context) -> Context {
         eprintln!("Usage: {} file.c", prog_name);
         exit(2);
     };
-    ctx.file_name = file_name;
+    ctx.set_file_name(file_name);
     ctx
 }
 

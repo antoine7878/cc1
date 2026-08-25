@@ -65,6 +65,11 @@ impl Default for Context {
     }
 }
 impl Context {
+    pub fn set_file_name(&mut self, file_name: String) {
+        self.arenas.names.alloc(file_name.clone());
+        self.file_name = file_name;
+    }
+
     pub fn file_of(&self, span: Span) -> &String {
         self.arenas.names.get(StringId::from(span.start.file))
     }
