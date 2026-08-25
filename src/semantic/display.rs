@@ -50,7 +50,7 @@ impl Context {
         out
     }
 
-    pub fn report(&self) {
+    pub fn dump_symbols(&self) {
         let rows: Vec<[String; 5]> = self
             .arenas
             .symbols
@@ -69,9 +69,10 @@ impl Context {
 
         println!("Symbols:");
         print_table(&["KIND", "NAME", "STORAGE", "VALUE", "TYPE"], &rows);
+        println!();
+    }
 
-        println!();
-        println!();
+    pub fn dump_diagnostics(&self) {
         for diag in &self.diagnosis {
             let _ = diag.print(self);
         }

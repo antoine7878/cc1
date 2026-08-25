@@ -23,8 +23,8 @@ pub struct AstPrinter {
 }
 
 impl AstPrinter {
-    pub fn print(ctx: &Context) -> io::Result<()> {
-        Self::write_ast(stdout(), ctx)
+    pub fn print(ctx: &Context) {
+        let _ = Self::write_ast(stdout(), ctx);
     }
 
     pub fn write_ast<W: Write>(mut w: W, ctx: &Context) -> io::Result<()> {

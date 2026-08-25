@@ -23,6 +23,11 @@ impl Pipeline {
         self
     }
 
+    pub fn tap(self, observe: fn(&Context)) -> Self {
+        observe(&self.ctx);
+        self
+    }
+
     pub fn stopped(&self) -> bool {
         self.stopped
     }

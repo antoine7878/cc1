@@ -21,20 +21,26 @@ fn parse_args() -> String {
     };
     file_name
 }
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let file_name = parse_args();
-    let file: File = File::open(&file_name)?;
-    let ctx = Context::new(file_name);
+
+fn parse(ctx: Context) -> Context {
+    let file: File = File::open(&ctx.file_name).unwrap();
     let lexer = YYLex::new(BufReader::new(file), || None, ctx);
     let mut yacc = Yacc::new(lexer);
     yacc.yyparse();
-    let ctx = yacc.lexer.ctx;
-    AstPrinter::print(&ctx)?;
-    println!("------------------------------------------------");
-    let (ctx, stopped) = Pipeline::new(ctx).then(Analyzer::analyze).finish();
-    ctx.report();
-    if stopped {
-        exit(1);
-    }
-    Ok(())
+    yacc.lexer.ctx
+}
+
+fn main() {
+    let file_name = parse_args();
+    let ctx = Context::new(file_name);
+    println!();
+    println!();
+    let (_ctx, stopped) = Pipeline::new(ctx)
+        .then(parse)
+        .tap(AstPrinter::print)
+        .then(Analyzer::analyze)
+        .tap(Context::dump_symbols)
+        .tap(Context::dump_diagnostics)
+        .finish();
+    exit(if stopped { 1 } else { 0 });
 }
