@@ -126,8 +126,8 @@ pub fn check_typedef(_ctx: &Context, _name: &Name) -> Diag<bool> {
 /// A declaration of an identifier for an object that has file scope without an initializer and
 /// without a storage-clash specitier or with the storage-class specifier static,
 /// constitutes a tentative definition
-pub fn is_tentative_definition(init_declarator: &InitDeclaratorNode, storage: Storage) -> bool {
-    init_declarator.initializer.is_some() && storage == Storage::Static
+pub fn is_tentative_definition(init_declarator: &InitDeclaratorNode, storage: Option<Storage>) -> bool {
+    init_declarator.initializer.is_none() && matches!(storage, None | Some(Storage::Static))
 }
 
 /// 6.7.2 External object definitions

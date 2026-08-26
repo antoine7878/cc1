@@ -394,21 +394,29 @@ fn initializer() -> InitializerNode {
 }
 
 #[test]
-#[ignore]
 fn a_tentative_definition_has_no_initializer() {
-    assert!(is_tentative_definition(&init_declarator(None), Storage::Static));
+    assert!(is_tentative_definition(&init_declarator(None), Some(Storage::Static)));
     assert!(!is_tentative_definition(
         &init_declarator(Some(initializer())),
-        Storage::Static
+        Some(Storage::Static)
     ));
 }
 
 #[test]
 fn a_tentative_definition_is_static_or_unqualified() {
-    assert!(!is_tentative_definition(&init_declarator(None), Storage::Extern));
+    assert!(is_tentative_definition(&init_declarator(None), None));
+    assert!(!is_tentative_definition(&init_declarator(Some(initializer())), None));
+    assert!(!is_tentative_definition(&init_declarator(None), Some(Storage::Extern)));
     assert!(!is_tentative_definition(
         &init_declarator(Some(initializer())),
-        Storage::Extern
+        Some(Storage::Extern)
     ));
     assert_eq!(init_declarator(None).span(), Span::default());
+}
+
+#[test]
+fn a_tentative_definition_is_not_typedef_auto_or_register() {
+    assert!(!is_tentative_definition(&init_declarator(None), Some(Storage::Typedef)));
+    assert!(!is_tentative_definition(&init_declarator(None), Some(Storage::Auto)));
+    assert!(!is_tentative_definition(&init_declarator(None), Some(Storage::Register)));
 }
