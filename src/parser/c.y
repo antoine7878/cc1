@@ -413,6 +413,7 @@ struct_declaration_list /* Vec<StructDeclaration> */
 
 struct_declaration /* StructDeclaration */
 	: specifier_qualifier_list struct_declarator_list ';'                                   { with_span!(self, StructDeclaration::new, $1, $2)  }
+	| specifier_qualifier_list ';'                                                          { with_span!(self, StructDeclaration::new, $1, vec![])  }
 	;
 
 struct_declarator_list /* Vec<StructMemberDeclarator> */

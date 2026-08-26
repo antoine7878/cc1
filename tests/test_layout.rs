@@ -118,19 +118,44 @@ size!(
 
 // ---- an array is aligned like its element, not like its extent ------------
 
-size!(size_char_then_double_array, "struct S { char c; double a[2]; };", "struct S", 20);
+size!(
+    size_char_then_double_array,
+    "struct S { char c; double a[2]; };",
+    "struct S",
+    20
+);
 
-size!(size_double_array_then_char, "struct S { double a[3]; char c; };", "struct S", 28);
+size!(
+    size_double_array_then_char,
+    "struct S { double a[3]; char c; };",
+    "struct S",
+    28
+);
 
 // ---- 6.5.2.1 bit-fields are packed in bits inside an int allocation unit --
 
 size!(size_bitfield_single, "struct S { int a:3; };", "struct S", 4);
 
-size!(size_bitfields_share_a_unit, "struct S { int a:3; int b:2; };", "struct S", 4);
+size!(
+    size_bitfields_share_a_unit,
+    "struct S { int a:3; int b:2; };",
+    "struct S",
+    4
+);
 
-size!(size_bitfield_does_not_straddle, "struct S { int a:3; int b:30; };", "struct S", 8);
+size!(
+    size_bitfield_does_not_straddle,
+    "struct S { int a:3; int b:30; };",
+    "struct S",
+    8
+);
 
-size!(size_bitfield_fills_a_unit, "struct S { int a:32; int b:1; };", "struct S", 8);
+size!(
+    size_bitfield_fills_a_unit,
+    "struct S { int a:32; int b:1; };",
+    "struct S",
+    8
+);
 
 size!(size_char_then_bitfield, "struct S { char c; int a:1; };", "struct S", 4);
 

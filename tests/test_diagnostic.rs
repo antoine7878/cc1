@@ -107,6 +107,12 @@ reports!(
 );
 
 reports!(
+    report_empty_struct_declaration,
+    "struct s { int a; int; };",
+    ["<test>:1:19: error: Declaration declares nothing"]
+);
+
+reports!(
     report_external_register,
     "register int x;",
     ["<test>:1:1: error: External declaration auto of register"]

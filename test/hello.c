@@ -1,8 +1,13 @@
-#include "stdio.h"
+#include <stdio.h>
 
-enum { OUI = 3 };
+struct a {
+	int a : 1;
+	: 0;
+	int : 3;
+	int b : 1;
+};
 
 int main(void) {
-	printf("%zu\n", OUI);
+	printf("%i\n", sizeof(struct a));
 	return 0;
 }

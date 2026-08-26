@@ -106,10 +106,17 @@ pub fn resolve_struct_or_union(
 
     let mut members = Vec::new();
     for field in fields {
+        if field.struct_declarators.is_empty() {
+            sema.add_diag(Diag::only_diag(Diagnosis::EmptyDeclaration), &field.span);
+        }
         let qual = resolve_type(sema, ctx, &field.specifiers, &field.span);
         for declarator in &field.struct_declarators {
             let decl = &declarator.declarator;
             let Some((ty, node)) = make_qualified_type(sema, ctx, qual, decl) else { continue };
+            let bit_width = declarator.bit_width.as_ref().and_then(|e| {
+                let value = ice::eval_constant(sema, ctx, e);
+                constrain::declaration::check_bit_width(sema.types.get(ty.ty), value).collect(sema, span)
+            });
             let Some(name) = node.ident(ctx) else { continue };
             if members.iter().any(|&m| sema.symbols.get(m).name.id == name.id) {
                 sema.add_diag(
@@ -118,13 +125,6 @@ pub fn resolve_struct_or_union(
                 );
                 continue;
             }
-            let bit_width = match &declarator.bit_width {
-                Some(expr) => {
-                    let value = ice::eval_constant(sema, ctx, expr);
-                    constrain::declaration::check_bit_width(sema.types.get(ty.ty), value).collect(sema, span)
-                }
-                None => None,
-            };
             let memb = Symbol::member(name, ty, bit_width);
             members.push(sema.symbols.alloc(memb))
         }
