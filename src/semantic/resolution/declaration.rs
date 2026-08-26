@@ -10,7 +10,7 @@ use crate::semantic::{
 
 /// 6.5.2 Type specifiers
 /// Each list of type specifiers shall be one of the following sets...
-pub fn resolve_type(
+pub fn base_type(
     sema: &mut Sema,
     ctx: &Context,
     specifiers: &[DeclarationSpecifier],
@@ -29,16 +29,16 @@ pub fn resolve_type(
     let id = match types.as_slice() {
         [TypeSpecifier::Struct(t)] => {
             let node = t.resolve(ctx);
-            let tag = resolve_struct_or_union(sema, ctx, Tag::Struct, node.name, &node.fields, &node.span);
+            let tag = struct_or_union_tag(sema, ctx, Tag::Struct, node.name, &node.fields, &node.span);
             sema.types.tag(tag)
         }
         [TypeSpecifier::Union(t)] => {
             let node = t.resolve(ctx);
-            let tag = resolve_struct_or_union(sema, ctx, Tag::Union, node.name, &node.fields, &node.span);
+            let tag = struct_or_union_tag(sema, ctx, Tag::Union, node.name, &node.fields, &node.span);
             sema.types.tag(tag)
         }
         [TypeSpecifier::Enum(t)] => {
-            let tag = resolve_enum(sema, ctx, *t)?;
+            let tag = enum_tag(sema, ctx, *t)?;
             sema.types.tag(tag)
         }
         [TypeSpecifier::TypedefName(t)] => return sema.resolve_typedef(*t, is_const, is_volatile, span),
@@ -50,7 +50,7 @@ pub fn resolve_type(
     Some(QualifiedType::new(id, is_const, is_volatile))
 }
 
-pub fn make_qualified_type(
+pub fn declared_type(
     sema: &mut Sema,
     ctx: &Context,
     inner_most: Option<QualifiedType>,
@@ -60,7 +60,7 @@ pub fn make_qualified_type(
     Some((ty, declarator))
 }
 
-pub fn make_function_type(
+pub fn declared_function(
     sema: &mut Sema,
     ctx: &Context,
     inner_most: Option<QualifiedType>,
@@ -147,8 +147,8 @@ fn resolve_prototype(
 
 fn resolve_parameter(sema: &mut Sema, ctx: &Context, param: &ParameterDeclaration) -> Option<ParamInfo> {
     let span = &param.span;
-    let qualif = resolve_type(sema, ctx, &param.specifiers, span);
-    let (ty, decl) = make_qualified_type(sema, ctx, qualif, &param.declarator)?;
+    let qualif = base_type(sema, ctx, &param.specifiers, span);
+    let (ty, decl) = declared_type(sema, ctx, qualif, &param.declarator)?;
     let ty = sema.types.adjust_parameter(ty);
     let storage = constrain::declaration::get_storage(&param.specifiers).collect(sema, span);
     if let Some(storage) = storage {
@@ -170,7 +170,7 @@ fn array_length(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option
     }
 }
 
-pub fn resolve_struct_or_union(
+pub fn struct_or_union_tag(
     sema: &mut Sema,
     ctx: &Context,
     kind: Tag,
@@ -189,10 +189,10 @@ pub fn resolve_struct_or_union(
         if field.struct_declarators.is_empty() {
             sema.add_diag(Diag::only_diag(Diagnosis::EmptyDeclaration), &field.span);
         }
-        let qual = resolve_type(sema, ctx, &field.specifiers, &field.span);
+        let qual = base_type(sema, ctx, &field.specifiers, &field.span);
         for declarator in &field.struct_declarators {
             let decl = &declarator.declarator;
-            let Some((ty, node)) = make_qualified_type(sema, ctx, qual, decl) else { continue };
+            let Some((ty, node)) = declared_type(sema, ctx, qual, decl) else { continue };
             let bit_width = declarator.bit_width.as_ref().and_then(|e| {
                 let value = ice::eval_constant(sema, ctx, e);
                 constrain::declaration::check_bit_width(sema.types.get(ty.ty), value).collect(sema, span)
@@ -216,7 +216,7 @@ pub fn resolve_struct_or_union(
     tag
 }
 
-pub fn resolve_enum(sema: &mut Sema, ctx: &Context, id: EnumId) -> Option<TagDefId> {
+pub fn enum_tag(sema: &mut Sema, ctx: &Context, id: EnumId) -> Option<TagDefId> {
     let enum_node = id.resolve(ctx);
     let is_definition = !enum_node.variants.is_empty();
     let tag = sema.declare_tag(Tag::Enum, enum_node.name, is_definition, &enum_node.span);

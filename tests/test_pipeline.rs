@@ -12,14 +12,13 @@ fn mark(mut ctx: Context) -> Context {
 }
 
 fn fail(mut ctx: Context) -> Context {
-    ctx.diagnosis
-        .push(DiagnosisNode::new(
-            Diagnosis::SyntaxError {
-                found: "';'",
-                expected: ExpectedTokens::new("';'", &[]),
-            },
-            Span::default(),
-        ));
+    ctx.diagnosis.push(DiagnosisNode::new(
+        Diagnosis::SyntaxError {
+            found: "';'",
+            expected: ExpectedTokens::new("';'", &[]),
+        },
+        Span::default(),
+    ));
     ctx
 }
 

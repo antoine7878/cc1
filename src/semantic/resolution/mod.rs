@@ -1,9 +1,8 @@
+pub mod declaration;
 pub mod scope;
-pub mod ty;
 
 use crate::ast::visit::{
-    Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_jump_statement,
-    walk_labeled_statement,
+    Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_jump_statement, walk_labeled_statement,
 };
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Expression, ExpressionNode,
@@ -40,8 +39,8 @@ impl<'a> SymbolResolver<'a> {
         let span = &node.span;
         let decl_span = &node.declarator.span;
 
-        let qualif = ty::resolve_type(self.sema, ctx, &node.specifiers, span);
-        let (ty, decl, params) = ty::make_function_type(self.sema, ctx, qualif, &node.declarator)?;
+        let qualif = declaration::base_type(self.sema, ctx, &node.specifiers, span);
+        let (ty, decl, params) = declaration::declared_function(self.sema, ctx, qualif, &node.declarator)?;
         let params = constrain::external::extract_function_declarator(params).collect(self, decl_span)?;
 
         let storage = constrain::declaration::get_storage(&node.specifiers)
@@ -132,8 +131,8 @@ impl<'a> SymbolResolver<'a> {
         decl: &DeclaratorNode,
         span: &Span,
     ) -> Option<SymbolId> {
-        let qualif = ty::resolve_type(self.sema, ctx, specifiers, span);
-        let (ty, decl) = ty::make_qualified_type(self.sema, ctx, qualif, decl)?;
+        let qualif = declaration::base_type(self.sema, ctx, specifiers, span);
+        let (ty, decl) = declaration::declared_type(self.sema, ctx, qualif, decl)?;
         let ty = self.sema.types.adjust_parameter(ty);
         let declared_storage = constrain::declaration::get_storage(specifiers).collect(self, span);
         if let Some(storage) = declared_storage {
@@ -201,10 +200,10 @@ impl Visitor for SymbolResolver<'_> {
             self.add_diag(Diag::only_diag(Diagnosis::EmptyDeclaration), span);
         }
         let declared_storage = constrain::declaration::get_storage(specifiers).collect(self, span);
-        let qualif = ty::resolve_type(self.sema, ctx, specifiers, span);
+        let qualif = declaration::base_type(self.sema, ctx, specifiers, span);
         for init_declarator in &node.init_declarators {
             let decl = &init_declarator.declarator;
-            let Some((ty, decl)) = ty::make_qualified_type(self.sema, ctx, qualif, decl) else { continue };
+            let Some((ty, decl)) = declaration::declared_type(self.sema, ctx, qualif, decl) else { continue };
             let Some(name) = decl.ident(ctx) else { continue };
             let is_function = matches!(self.sema.types.get(ty.ty), ResolvedType::Function { .. });
             if let Some(declared_storage) = declared_storage

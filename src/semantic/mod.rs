@@ -14,7 +14,7 @@ pub use model::function_def::{DeclaredParams, FunctionDef, FunctionDefArena, Fun
 pub use model::resolved_type::{QualifiedType, ResolvedType, ResolvedTypeArena, ResolvedTypeId, TypeSpecifierCounter};
 pub use model::symbol::{Symbol, SymbolArena, SymbolId, SymbolKind};
 pub use model::tag_def::{TagDef, TagDefArena, TagDefId};
-pub use resolution::scope::{ScopeKind, Scopes};
-pub use resolution::ty;
 pub use resolution::SymbolResolver;
+pub use resolution::declaration;
+pub use resolution::scope::{ScopeKind, Scopes};
 pub use sema::Sema;

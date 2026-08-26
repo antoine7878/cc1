@@ -3,7 +3,7 @@ use crate::ast::{Expression, ExpressionNode, Tag, Value};
 use crate::parser::{Context, Span};
 use crate::semantic::diagnosis::Diagnosis;
 use crate::semantic::sema::Sema;
-use crate::semantic::{Diag, DiagCollector, QualifiedType, ResolvedType, SymbolKind, layout, ty};
+use crate::semantic::{Diag, DiagCollector, QualifiedType, ResolvedType, SymbolKind, declaration, layout};
 
 pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<Value> {
     if let Some(&cached) = sema.const_values.get(&expr.id) {
@@ -91,15 +91,15 @@ pub fn eval(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<Val
         }
         Expression::SizeofExpr(_) => Err(Diagnosis::InvalidSizeof),
         Expression::SizeofType(ty_node) => {
-            let qualif =
-                ty::resolve_type(sema, ctx, &ty_node.specifiers, &expr.span).ok_or(Diagnosis::NonConstantExpression)?;
-            let (qualif, _) = ty::make_qualified_type(sema, ctx, Some(qualif), &ty_node.declarator)
+            let qualif = declaration::base_type(sema, ctx, &ty_node.specifiers, &expr.span)
+                .ok_or(Diagnosis::NonConstantExpression)?;
+            let (qualif, _) = declaration::declared_type(sema, ctx, Some(qualif), &ty_node.declarator)
                 .ok_or(Diagnosis::NonConstantExpression)?;
             Ok(Value::UnsignedLong(layout::of(sema, qualif.ty)?.size.into()))
         }
         Expression::Cast(ty_node, operand) => {
-            let base = ty::resolve_type(sema, ctx, &ty_node.specifiers, &expr.span);
-            let (qualif, _) = ty::make_qualified_type(sema, ctx, base, &ty_node.declarator)
+            let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &expr.span);
+            let (qualif, _) = declaration::declared_type(sema, ctx, base, &ty_node.declarator)
                 .ok_or(Diagnosis::NonConstantExpression)?;
             let val = eval(sema, ctx, operand)?;
             if val.is_floating() && !matches!(operand.id.resolve(ctx), Expression::Constant(_)) {

@@ -418,5 +418,8 @@ fn a_tentative_definition_is_static_or_unqualified() {
 fn a_tentative_definition_is_not_typedef_auto_or_register() {
     assert!(!is_tentative_definition(&init_declarator(None), Some(Storage::Typedef)));
     assert!(!is_tentative_definition(&init_declarator(None), Some(Storage::Auto)));
-    assert!(!is_tentative_definition(&init_declarator(None), Some(Storage::Register)));
+    assert!(!is_tentative_definition(
+        &init_declarator(None),
+        Some(Storage::Register)
+    ));
 }

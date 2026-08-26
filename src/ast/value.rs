@@ -261,11 +261,7 @@ impl Value {
 
     pub fn truncate(self, bits: u32, signed: bool) -> Value {
         if bits == 0 || bits >= 64 {
-            return if signed {
-                Value::Long(self.to_i64())
-            } else {
-                Value::UnsignedLong(self.to_u64())
-            };
+            return if signed { Value::Long(self.to_i64()) } else { Value::UnsignedLong(self.to_u64()) };
         }
         let mask = (1u64 << bits) - 1;
         let raw = if signed { self.to_i64() as u64 } else { self.to_u64() } & mask;
