@@ -1,10 +1,8 @@
-int arr[12];
-int brr[sizeof(arr)];
+#include "stdio.h"
 
-enum { OUI = sizeof(arr) };
+enum { OUI = 3 };
 
-// #include <stdio.h>
-// int main(void) {
-// 	printf("%zu\n", OUI);
-// 	return 0;
-// }
+int main(void) {
+	printf("%zu\n", OUI);
+	return 0;
+}

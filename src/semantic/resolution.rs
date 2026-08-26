@@ -676,7 +676,6 @@ impl Visitor for SymbolResolver {
 }
 
 pub struct Analyzer;
-
 impl Analyzer {
     pub fn analyze(mut ctx: Context) -> Context {
         let resolver = Self::resolve_names(&ctx);
