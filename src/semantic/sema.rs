@@ -1,13 +1,11 @@
 use std::collections::HashMap;
 
-use crate::ast::visit::{Visitor, walk_expression};
-use crate::ast::{Expression, ExpressionId, ExpressionNode, Name, Tag, Value};
+use crate::ast::visit::walk_expression;
+use crate::ast::{Expression, ExpressionId, ExpressionNode, Name, Tag, Value, Visitor};
 use crate::parser::{Context, Span};
-use crate::semantic::diagnosis::Diagnosis;
-use crate::semantic::symbol::Symbol;
 use crate::semantic::{
-    Diag, DiagCollector, DiagnosisNode, QualifiedType, ResolvedTypeArena, ResolvedTypeId, ScopeKind, Scopes,
-    SymbolArena, SymbolId, SymbolKind, TagDefArena, TagDefId,
+    Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedTypeArena, ResolvedTypeId, ScopeKind, Scopes,
+    Symbol, SymbolArena, SymbolId, SymbolKind, TagDefArena, TagDefId,
 };
 use crate::target::{Layout, Target};
 
@@ -100,6 +98,16 @@ impl Sema {
         id
     }
 
+    pub fn declare(&mut self, sym: Symbol, span: &Span) -> SymbolId {
+        let (name, kind) = (sym.name, sym.kind);
+        let sym_id = match self.dedup(&sym, span) {
+            Some(id) => id,
+            None => self.symbols.alloc(sym),
+        };
+        self.scopes.insert(kind, name.id, sym_id);
+        sym_id
+    }
+
     fn dedup(&mut self, sym: &Symbol, span: &Span) -> Option<SymbolId> {
         let old_id = self.scopes.current(sym.kind, sym.name.id)?;
         let old_symbol = self.symbols.get(old_id);
@@ -113,16 +121,6 @@ impl Sema {
             Diag::some_diag(old_id, Diagnosis::DuplicateDeclaration(sym.kind, sym.name)),
             span,
         )
-    }
-
-    pub fn declare(&mut self, sym: Symbol, span: &Span) -> SymbolId {
-        let (name, kind) = (sym.name, sym.kind);
-        let sym_id = match self.dedup(&sym, span) {
-            Some(id) => id,
-            None => self.symbols.alloc(sym),
-        };
-        self.scopes.insert(kind, name.id, sym_id);
-        sym_id
     }
 
     pub fn add_label_symbol(&mut self, name: Name, span: &Span, is_init: bool) {

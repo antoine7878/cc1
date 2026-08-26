@@ -1,8 +1,7 @@
 use crate::ast::visit::{Visitor, walk_expression, walk_translation_unit};
 use crate::ast::{Expression, ExpressionNode};
 use crate::parser::Context;
-use crate::semantic::sema::Sema;
-use crate::semantic::ice;
+use crate::semantic::{Sema, ice};
 
 struct ConstChecker<'a> {
     sema: &'a mut Sema,

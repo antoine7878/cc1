@@ -3,10 +3,9 @@ use crate::ast::{
     TypeSpecifier,
 };
 use crate::parser::{Context, Span};
-use crate::semantic::diagnosis::Diagnosis;
-use crate::semantic::sema::Sema;
-use crate::semantic::symbol::Symbol;
-use crate::semantic::{Diag, DiagCollector, QualifiedType, SymbolKind, TagDefId, constrain, ice};
+use crate::semantic::{
+    Diag, DiagCollector, Diagnosis, QualifiedType, Sema, Symbol, SymbolKind, TagDefId, constrain, ice,
+};
 
 /// 6.5.2 Type specifiers
 /// Each list of type specifiers shall be one of the following sets...

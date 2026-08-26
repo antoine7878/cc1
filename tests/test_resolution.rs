@@ -91,7 +91,6 @@ folds!(fold_bit_field_width, "struct S { int a : 2 + 1; };", ["Int(3)"]);
 folds!(fold_array_size, "int a[2 + 3];", ["Int(5)"]);
 
 #[test]
-#[ignore]
 fn fold_sizeof_of_a_pointer_type() {
     assert_eq!(folded("enum E { A = sizeof(char *) };"), ["UnsignedLong(4)"]);
     assert_eq!(folded("enum E { A = sizeof(int *) };"), ["UnsignedLong(4)"]);

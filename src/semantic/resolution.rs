@@ -7,10 +7,10 @@ use crate::ast::{
     LabeledStatementNode, Name, ParameterDeclaration, Storage, TypeSpecifier,
 };
 use crate::parser::{Context, Span};
-use crate::semantic::diagnosis::Diagnosis;
-use crate::semantic::sema::Sema;
-use crate::semantic::symbol::Symbol;
-use crate::semantic::{Diag, DiagCollector, DiagnosisNode, QualifiedType, ScopeKind, SymbolId, SymbolKind, constrain, ice, ty};
+use crate::semantic::{
+    Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind,
+    constrain, ice, ty,
+};
 
 #[derive(Debug)]
 pub struct SymbolResolver<'a> {
