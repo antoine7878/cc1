@@ -166,7 +166,6 @@ size!(size_bitfield_then_char, "struct S { int a:1; char c; };", "struct S", 4);
 macro_rules! unnamed_size {
     ($name:ident, $decl:expr, $ty:expr, $expected:expr) => {
         #[test]
-        #[ignore = "unnamed bit-fields are dropped in struct_or_union_tag: Symbol requires a Name"]
         fn $name() {
             common::run_size(stringify!($name), $decl, $ty, $expected);
         }

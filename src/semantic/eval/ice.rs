@@ -95,7 +95,10 @@ pub fn eval(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<Val
                 .ok_or(Diagnosis::NonConstantExpression)?;
             let (qualif, _) = declaration::declared_type(sema, ctx, Some(qualif), &ty_node.declarator)
                 .ok_or(Diagnosis::NonConstantExpression)?;
-            Ok(Value::UnsignedLong(layout::of(sema, qualif.ty)?.size.into()))
+            match layout::of(sema, qualif.ty) {
+                Some(layout) => Ok(Value::UnsignedLong(layout.size.into())),
+                None => Err(Diagnosis::InvalidSizeof),
+            }
         }
         Expression::Cast(ty_node, operand) => {
             let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &expr.span);

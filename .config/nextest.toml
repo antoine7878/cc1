@@ -1,5 +1,5 @@
 [profile.default]
 status-level = "fail"
-final-status-level = "fail"
-failure-output = "immediate-final"
+final-status-level = "none"
+failure-output = "immediate"
 fail-fast = false

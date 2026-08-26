@@ -43,13 +43,14 @@ ctest: $(NAME)
 coverage: $(NAME)
 	cargo llvm-cov nextest
 
-CCF = -std=iso9899:1990 -pedantic-errors -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
+CFF = -std=iso9899:1990 -pedantic-errors -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
+# CFF = -pedantic-errors
 
 c:
-	gcc -c $(CCF) test/hello.c -o /dev/null
+	gcc -c $(CFF) test/hello.c -o /dev/null
 
 cc:
-	gcc $(CCF) test/hello.c
+	gcc $(CFF) test/hello.c
 	./a.out
 	rm ./a.out
 

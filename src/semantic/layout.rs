@@ -1,7 +1,5 @@
 use crate::ast::Tag;
-use crate::semantic::diagnosis::Diagnosis;
-use crate::semantic::sema::Sema;
-use crate::semantic::{Member, ResolvedType, ResolvedTypeId, TagDefId};
+use crate::semantic::{Member, ResolvedType, ResolvedTypeId, Sema, TagDefId};
 use crate::target::Layout;
 
 fn round_up(value: u64, multiple: u64) -> u64 {
@@ -11,9 +9,9 @@ fn round_up(value: u64, multiple: u64) -> u64 {
     }
 }
 
-pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Result<Layout, Diagnosis> {
+pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Option<Layout> {
     if let Some(&layout) = sema.layouts.get(&qualified_type) {
-        return Ok(layout);
+        return Some(layout);
     }
     let layout = match sema.types.get(qualified_type) {
         ResolvedType::Tag(id) => of_tag(sema, *id)?,
@@ -22,50 +20,52 @@ pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Result<Layout, Dia
             let elem = of(sema, elem.ty)?;
             Layout::new(elem.size * len.unwrap_or(0), elem.align)
         }
-        ty => sema.target.scalar(ty).ok_or(Diagnosis::InvalidSizeof)?,
+        ty => sema.target.scalar(ty)?,
     };
     sema.layouts.insert(qualified_type, layout);
-    Ok(layout)
+    Some(layout)
 }
 
-pub fn of_tag(sema: &mut Sema, id: TagDefId) -> Result<Layout, Diagnosis> {
+pub fn of_tag(sema: &mut Sema, id: TagDefId) -> Option<Layout> {
     let tag = sema.tags.get(id).clone();
     if !tag.is_complete {
-        return Err(Diagnosis::InvalidSizeof);
+        return None;
     }
     match tag.kind {
         Tag::Struct => struct_layout(sema, &tag.members),
         Tag::Union => union_layout(sema, &tag.members),
-        Tag::Enum => Ok(sema.target.int),
+        Tag::Enum => Some(sema.target.int),
     }
 }
 
-fn member(sema: &mut Sema, mem: Member) -> Result<(Layout, Option<u64>), Diagnosis> {
+fn member(sema: &mut Sema, mem: Member) -> Option<(Layout, Option<u64>)> {
     match mem {
         Member::Symbol(id) => {
             let symbol = sema.symbols.get(id);
             if !symbol.is_complete {
-                return Err(Diagnosis::InvalidSizeof);
+                return None;
             }
             let width = symbol.value.map(|width| width.max(0) as u64);
-            let ty = symbol.ty.ok_or(Diagnosis::InvalidSizeof)?;
-            Ok((of(sema, ty.ty)?, width))
+            let ty = symbol.ty?;
+            Some((of(sema, ty.ty)?, width))
         }
         Member::Bitfield(i) => {
             let ty = sema.types.int();
-            Ok((of(sema, ty)?, Some(i as u64)))
+            Some((of(sema, ty)?, Some(i as u64)))
         }
     }
 }
 
-fn struct_layout(sema: &mut Sema, members: &[Member]) -> Result<Layout, Diagnosis> {
+fn struct_layout(sema: &mut Sema, members: &[Member]) -> Option<Layout> {
     let mut bits: u64 = 0;
     let mut align: u32 = 1;
 
-    for &id in members {
-        let (layout, width) = member(sema, id)?;
+    for &m in members {
+        let (layout, width) = member(sema, m)?;
         let unit = u64::from(layout.align) * 8;
-        align = align.max(layout.align);
+        if matches!(m, Member::Symbol(_)) {
+            align = align.max(layout.align);
+        }
         match width {
             Some(0) => bits = round_up(bits, unit),
             Some(width) => {
@@ -83,21 +83,23 @@ fn struct_layout(sema: &mut Sema, members: &[Member]) -> Result<Layout, Diagnosi
     }
 
     let size = round_up(bits, u64::from(align) * 8) / 8;
-    Ok(Layout::new(size as u32, align))
+    Some(Layout::new(size as u32, align))
 }
 
-fn union_layout(sema: &mut Sema, members: &[Member]) -> Result<Layout, Diagnosis> {
+fn union_layout(sema: &mut Sema, members: &[Member]) -> Option<Layout> {
     let mut size: u64 = 0;
     let mut align: u32 = 1;
 
-    for &id in members {
-        let (layout, width) = member(sema, id)?;
-        align = align.max(layout.align);
+    for &m in members {
+        let (layout, width) = member(sema, m)?;
+        if matches!(m, Member::Symbol(_)) {
+            align = align.max(layout.align);
+        }
         size = size.max(match width {
             Some(width) => width.div_ceil(8),
             None => u64::from(layout.size),
         });
     }
 
-    Ok(Layout::new(round_up(size, u64::from(align)) as u32, align))
+    Some(Layout::new(round_up(size, u64::from(align)) as u32, align))
 }

@@ -218,10 +218,7 @@ pub fn struct_or_union_tag(
             }
         }
     }
-    if members.is_empty() {
-        sema.add_diag(Diag::only_diag(Diagnosis::TagWithoutMember(kind.symbol_kind())), span);
-    }
-    if members.iter().all(|m| matches!(m, Member::Bitfield(_))) {
+    if members.is_empty() || members.iter().all(|m| matches!(m, Member::Bitfield(_))) {
         sema.add_diag(Diag::only_diag(Diagnosis::TagWithoutMember(kind.symbol_kind())), span);
     }
     sema.tags.complete(tag, members);

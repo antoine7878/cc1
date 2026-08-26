@@ -8,7 +8,7 @@
 "("             printf("OPEN PARENTHESIS\n");
 ")"             printf("CLOSED PARENTHESIS\n");
 "\n"            printf("NEWLINE\n");
-[[:blank:]]     // ignore whitespaces
+[[:blank:]]
 
 .               printf("Invalid character: %c\n", *yytext);
 %% 

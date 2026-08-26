@@ -66,8 +66,7 @@ pub fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
 }
 
 /// 6.5.2.1 Structure and union specifiers
-/// A bit-field shall have a type that is a qualified or unqualified version of one of int.
-/// unsigned int. or s igned int.
+/// A bit-field is declared with a type other than int, signed int, or unsigned int (6.5.2.1).
 pub fn check_bit_width(ty: &ResolvedType, value: Option<Value>) -> Diag<Option<i32>> {
     if !matches!(ty, ResolvedType::Int) {
         return Diag::none_diag(Diagnosis::NonIntBitFieldType);
