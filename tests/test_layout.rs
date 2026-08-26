@@ -162,7 +162,7 @@ size!(size_char_then_bitfield, "struct S { char c; int a:1; };", "struct S", 4);
 size!(size_bitfield_then_char, "struct S { int a:1; char c; };", "struct S", 4);
 
 #[test]
-#[ignore = "unnamed bit-fields are dropped in resolve_struct_or_union: Symbol requires a Name"]
+#[ignore = "unnamed bit-fields are dropped in struct_or_union_tag: Symbol requires a Name"]
 fn size_zero_width_bitfield_closes_the_unit() {
     common::run_size(
         "size_zero_width_bitfield_closes_the_unit",
