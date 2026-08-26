@@ -65,7 +65,7 @@ fn parse(ctx: Context) -> Context {
 impl Unit {
     pub fn parse(src: &str) -> Self {
         SOURCE.set(preprocess(src));
-        let (ctx, _) = Pipeline::default().then(name).then(parse).finish();
+        let (ctx, _) = Pipeline::default().pass(name).pass(parse).finish();
         Self {
             ctx,
             status: STATUS.get(),
@@ -74,7 +74,11 @@ impl Unit {
 
     pub fn compile(src: &str) -> Self {
         SOURCE.set(preprocess(src));
-        let (ctx, _) = Pipeline::default().then(name).then(parse).then(Analyzer::analyze).finish();
+        let (ctx, _) = Pipeline::default()
+            .pass(name)
+            .pass(parse)
+            .pass(Analyzer::analyze)
+            .finish();
         Self {
             ctx,
             status: STATUS.get(),
@@ -82,7 +86,11 @@ impl Unit {
     }
 
     pub fn parsed(&self) -> bool {
-        self.status == 0 && !self.diagnosis().iter().any(|diag| matches!(diag.inner, Diagnosis::SyntaxError))
+        self.status == 0
+            && !self
+                .diagnosis()
+                .iter()
+                .any(|diag| matches!(diag.inner, Diagnosis::SyntaxError))
     }
 
     pub fn diagnosis(&self) -> &[DiagnosisNode] {

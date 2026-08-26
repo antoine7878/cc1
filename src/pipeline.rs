@@ -10,7 +10,7 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    pub fn then(mut self, pass: fn(Context) -> Context) -> Self {
+    pub fn pass(mut self, pass: fn(Context) -> Context) -> Self {
         if self.stopped() {
             return self;
         }
@@ -21,11 +21,11 @@ impl Pipeline {
         self
     }
 
-    pub fn peek(self, observe: fn(&Context)) -> Self {
+    pub fn report(self, obse: fn(&Context)) -> Self {
         if self.stopped() {
             return self;
         }
-        observe(&self.ctx);
+        obse(&self.ctx);
         self
     }
 

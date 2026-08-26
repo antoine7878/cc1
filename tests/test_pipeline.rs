@@ -23,16 +23,16 @@ fn tap(ctx: &Context) {
 
 #[test]
 fn a_clean_pipeline_runs_every_pass_in_order() {
-    let (ctx, stopped) = Pipeline::default().then(mark).then(mark).then(mark).finish();
+    let (ctx, stopped) = Pipeline::default().pass(mark).pass(mark).pass(mark).finish();
     assert_eq!(ctx.file_name, "mmm");
     assert!(!stopped);
 }
 
 #[test]
 fn a_pass_that_reports_an_error_stops_the_pipeline() {
-    let pipeline = Pipeline::default().then(mark).then(fail);
+    let pipeline = Pipeline::default().pass(mark).pass(fail);
     assert!(pipeline.stopped());
-    let (ctx, stopped) = pipeline.then(mark).then(mark).finish();
+    let (ctx, stopped) = pipeline.pass(mark).pass(mark).finish();
     assert_eq!(ctx.file_name, "m");
     assert_eq!(ctx.diagnosis.len(), 1);
     assert!(stopped);
@@ -40,7 +40,7 @@ fn a_pass_that_reports_an_error_stops_the_pipeline() {
 
 #[test]
 fn a_pass_that_reports_nothing_leaves_the_pipeline_running() {
-    let pipeline = Pipeline::default().then(mark);
+    let pipeline = Pipeline::default().pass(mark);
     assert!(!pipeline.stopped());
     let (_, stopped) = pipeline.finish();
     assert!(!stopped);
@@ -49,7 +49,7 @@ fn a_pass_that_reports_nothing_leaves_the_pipeline_running() {
 #[test]
 fn tap_observes_the_context_without_stopping_it() {
     TAPPED.store(0, Ordering::SeqCst);
-    let (ctx, stopped) = Pipeline::default().then(mark).peek(tap).then(mark).finish();
+    let (ctx, stopped) = Pipeline::default().pass(mark).report(tap).pass(mark).finish();
     assert_eq!(TAPPED.load(Ordering::SeqCst), 2);
     assert_eq!(ctx.file_name, "mm");
     assert!(!stopped);

@@ -5,10 +5,10 @@ use cc1::semantic::Analyzer;
 
 fn main() {
     Pipeline::default()
-        .then(parser::parse_args)
-        .then(parser::parse_source)
-        .peek(AstPrinter::print)
-        .then(Analyzer::analyze)
-        .peek(Context::dump_symbols)
+        .pass(parser::parse_args)
+        .pass(parser::parse_source)
+        .report(AstPrinter::print)
+        .pass(Analyzer::analyze)
+        .report(Context::dump_symbols)
         .finally(Context::dump_diagnostics);
 }
