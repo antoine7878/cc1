@@ -8,10 +8,10 @@ use crate::parser::{Context, Span};
 use crate::semantic::diagnosis::Diagnosis;
 use crate::semantic::symbol::Symbol;
 use crate::semantic::{
-    Diag, DiagCollector, DiagnosisNode, QualifiedType, ResolvedType, ResolvedTypeArena, ScopeKind, Scopes, SymbolArena,
-    SymbolId, SymbolKind, TagDefArena, TagDefId, constrain,
+    Diag, DiagCollector, DiagnosisNode, QualifiedType, ResolvedType, ResolvedTypeArena, ResolvedTypeId, ScopeKind,
+    Scopes, SymbolArena, SymbolId, SymbolKind, TagDefArena, TagDefId, constrain, layout,
 };
-use crate::target::Target;
+use crate::target::{Layout, Target};
 
 #[derive(Default, Debug)]
 pub struct Sema {
@@ -22,6 +22,7 @@ pub struct Sema {
     pub tags: TagDefArena,
     pub bindings: HashMap<ExpressionId, Option<SymbolId>>,
     pub const_values: HashMap<ExpressionId, Option<Value>>,
+    pub layouts: HashMap<ResolvedTypeId, Layout>,
     pub target: Target,
 }
 
@@ -48,6 +49,7 @@ impl Sema {
             tags,
             bindings,
             const_values,
+            layouts: _,
             target: _,
         } = self;
         ctx.arenas.symbols = symbols;
@@ -57,88 +59,6 @@ impl Sema {
         ctx.const_values = const_values;
         ctx.diagnosis.extend(diagnosis);
         ctx
-    }
-
-    // ----- Alignment --------------------
-
-    fn symbol_alignement(&mut self, id: SymbolId) -> Option<u64> {
-        let symbol = self.symbols.get(id);
-        self.type_alignement(symbol.ty?)
-    }
-
-    #[allow(unused)]
-    fn type_alignement(&mut self, qualified_type: QualifiedType) -> Option<u64> {
-        match self.types.get(qualified_type.ty) {
-            &ResolvedType::Tag(id) => self.tag_alignement(id),
-            &ResolvedType::Array { elem, len } => self.type_size(elem),
-            ty => Some(self.target.scalar(ty)?.align as u64),
-        }
-    }
-
-    fn tag_alignement(&mut self, id: TagDefId) -> Option<u64> {
-        let tag = self.tags.get(id).clone();
-        if !tag.is_complete {
-            return self.add_diag(Diag::none_diag(Diagnosis::InvalidSizeof), &Span::default());
-        }
-        match tag.kind {
-            Tag::Struct | Tag::Union => tag.members.iter().filter_map(|id| self.symbol_alignement(*id)).max(),
-            Tag::Enum => Some(self.target.int.align.into()),
-        }
-    }
-
-    // ----- Size --------------------
-
-    fn symbol_size(&mut self, id: SymbolId) -> Option<u64> {
-        let symbol = self.symbols.get(id);
-        self.type_size(symbol.ty?)
-    }
-
-    pub fn type_size(&mut self, qualified_type: QualifiedType) -> Option<u64> {
-        match self.types.get(qualified_type.ty) {
-            &ResolvedType::Tag(id) => self.tag_size(id),
-            &ResolvedType::Array { elem, len } => self.type_size(elem).map(|s| s * len.unwrap_or(0) as u64),
-            ty => Some(self.target.scalar(ty)?.size as u64),
-        }
-    }
-
-    fn tag_size(&mut self, id: TagDefId) -> Option<u64> {
-        let tag = self.tags.get(id).clone();
-        if !tag.is_complete {
-            return self.add_diag(Diag::none_diag(Diagnosis::InvalidSizeof), &Span::default());
-        }
-        match tag.kind {
-            Tag::Struct => self.struct_size(&tag.members),
-            Tag::Union => tag.members.iter().filter_map(|id| self.symbol_size(*id)).max(),
-            Tag::Enum => Some(self.target.int.size.into()),
-        }
-    }
-
-    fn struct_size(&mut self, members: &[SymbolId]) -> Option<u64> {
-        let members_layouts: Vec<(u32, u32)> = members
-            .iter()
-            .map(|&id| {
-                let sym = self.symbols.get(id);
-                if !sym.is_complete {
-                    return None;
-                }
-
-                let bit_width = sym.value.map(|b| b as u32);
-                let sym_size = self.symbol_size(id).map(|b| b as u32);
-                let align = self.symbol_alignement(id)? as u32;
-                let size = bit_width.or(sym_size)?;
-                Some((size, align))
-            })
-            .collect::<Option<Vec<_>>>()?;
-        let align = members_layouts.iter().map(|&(_, align)| align).max()?;
-        let mut size = 0;
-        for &(member_size, _) in &members_layouts {
-            if member_size > align - size % align {
-                size += (align - size % align) % align;
-            }
-            size += member_size;
-        }
-        size += (align - size % align) % align;
-        Some(size as u64)
     }
 
     // ----- Resolution --------------------
@@ -422,7 +342,10 @@ impl Sema {
             Expression::SizeofExpr(_expr) => unimplemented!(),
             Expression::SizeofType(ty) => {
                 let qualif = constrain::declaration::resolve_type(self, ctx, &ty.specifiers, &expr.span)?;
-                Some(Value::UnsignedLong(self.type_size(qualif)?))
+                match layout::of(self, qualif) {
+                    Ok(layout) => Some(Value::UnsignedLong(layout.size.into())),
+                    Err(diagnosis) => self.add_diag(Diag::none_diag(diagnosis), &expr.span),
+                }
             }
             Expression::Cast(ty, operand) => {
                 let base = constrain::declaration::resolve_type(self, ctx, &ty.specifiers, &expr.span);

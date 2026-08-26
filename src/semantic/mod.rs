@@ -1,6 +1,7 @@
 pub mod diagnosis;
 pub mod display;
 pub mod ice;
+pub mod layout;
 pub mod resolution;
 pub mod sema;
 pub mod resolved_type;
