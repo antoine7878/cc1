@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
-use crate::ast::{ExpressionId, Name, Tag, Value};
+use crate::ast::{DeclaratorId, ExpressionId, Name, Tag};
 use crate::parser::{Context, Span};
 use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, QualifiedType, ResolvedTypeArena, ResolvedTypeId,
-    ScopeKind, Scopes, Symbol, SymbolArena, SymbolId, SymbolKind, TagDefArena, TagDefId,
+    Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, QualifiedType, ResolvedExpression,
+    ResolvedTypeArena, ResolvedTypeId, ScopeKind, Scopes, Symbol, SymbolArena, SymbolId, SymbolKind, TagDefArena,
+    TagDefId,
 };
 use crate::target::{Layout, Target};
 
@@ -12,12 +13,15 @@ use crate::target::{Layout, Target};
 pub struct Sema {
     pub scopes: Scopes,
     pub diagnosis: Vec<DiagnosisNode>,
+
     pub symbols: SymbolArena,
     pub types: ResolvedTypeArena,
     pub tags: TagDefArena,
     pub functions: FunctionDefArena,
-    pub bindings: HashMap<ExpressionId, Option<SymbolId>>,
-    pub const_values: HashMap<ExpressionId, Option<Value>>,
+
+    pub expressions: HashMap<ExpressionId, ResolvedExpression>,
+    pub declarations: HashMap<DeclaratorId, Option<SymbolId>>,
+
     pub layouts: HashMap<ResolvedTypeId, Layout>,
     pub target: Target,
 }
@@ -44,8 +48,8 @@ impl Sema {
             types,
             tags,
             functions,
-            bindings,
-            const_values,
+            expressions,
+            declarations,
             layouts: _,
             target: _,
         } = self;
@@ -53,8 +57,8 @@ impl Sema {
         ctx.arenas.resolved_type = types;
         ctx.arenas.tags = tags;
         ctx.arenas.functions = functions;
-        ctx.bindings = bindings;
-        ctx.const_values = const_values;
+        ctx.expressions = expressions;
+        ctx.declarations = declarations;
         ctx.diagnosis.extend(diagnosis);
         ctx
     }

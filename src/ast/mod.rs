@@ -10,16 +10,22 @@ pub mod unit;
 pub mod value;
 pub mod visit;
 
-pub use declaration::{DeclarationNode, Declarator, DeclaratorArena};
-pub use declaration::{DeclaratorNode, InitDeclaratorNode, Initializer, InitializerNode};
+pub use declaration::{
+    DeclarationNode, Declarator, DeclaratorArena, DeclaratorId, DeclaratorNode, InitDeclaratorNode, Initializer,
+    InitializerNode,
+};
 pub use expression::{Expression, ExpressionArena, ExpressionId, ExpressionNode, Type};
 pub use function::{FunctionParameters, FunctionParametersNode, ParameterDeclaration};
 pub use name::{Name, StringArena, StringId};
-pub use statement::{CompoundStatementNode, ExpressionStatementNode, IterationStatement};
-pub use statement::{IterationStatementNode, JumpStatement, Labeled, LabeledStatementNode, StatementArena};
-pub use statement::{JumpStatementNode, SelectionStatement, SelectionStatementNode, Statement, StatementNode};
-pub use tag::{Enum, EnumArena, EnumId, Struct, StructArena, StructDeclaration, StructId, StructMemberDeclarator};
-pub use tag::{Tag, Union, UnionArena, UnionId, Variant, VariantArena, VariantId};
+pub use statement::{
+    CompoundStatementNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, JumpStatement,
+    JumpStatementNode, Labeled, LabeledStatementNode, SelectionStatement, SelectionStatementNode, Statement,
+    StatementArena, StatementNode,
+};
+pub use tag::{
+    Enum, EnumArena, EnumId, Struct, StructArena, StructDeclaration, StructId, StructMemberDeclarator, Tag, Union,
+    UnionArena, UnionId, Variant, VariantArena, VariantId,
+};
 pub use type_specifier::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier};
 pub use unit::{ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode};
 pub use value::{Value, ValueNode};

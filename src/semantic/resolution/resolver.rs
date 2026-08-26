@@ -153,7 +153,7 @@ fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
 
 impl Visitor for Sema {
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
-        if self.bindings.contains_key(&node.id) {
+        if self.expressions.contains_key(&node.id) {
             return;
         }
         walk_expression(self, ctx, node);
@@ -162,7 +162,7 @@ impl Visitor for Sema {
             if sym.is_none() {
                 self.add_diag(Diag::only_diag(Diagnosis::UndeclaredIdentifier(*name)), &node.span);
             }
-            self.bindings.insert(node.id, sym);
+            self.expressions.entry(node.id).or_default().sym = sym;
         }
     }
 }

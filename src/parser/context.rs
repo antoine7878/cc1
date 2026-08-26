@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 
-use crate::ast::{DeclarationSpecifier, DeclaratorArena, ExpressionId, Name, Storage, Value};
-use crate::ast::{EnumArena, ExpressionArena, StatementArena, StringArena, StringId, StructArena};
-use crate::ast::{StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena};
+use crate::ast::{
+    DeclarationSpecifier, DeclaratorArena, DeclaratorId, EnumArena, ExpressionArena, ExpressionId, Name,
+    StatementArena, Storage, StringArena, StringId, StructArena, StructDeclaration, Tag, TranslationUnitNode,
+    TypeSpecifier, UnionArena, VariantArena,
+};
 use crate::parser::{Span, YYToken};
 use crate::semantic::{
-    DiagnosisNode, FunctionDefArena, ResolvedTypeArena, SymbolArena, SymbolId, SymbolKind, TagDefArena,
+    DiagnosisNode, FunctionDefArena, ResolvedExpression, ResolvedTypeArena, SymbolArena, SymbolId, SymbolKind,
+    TagDefArena,
 };
 use crate::target::Target;
 
@@ -40,9 +43,9 @@ pub struct Context {
     identifier_ok: bool,
     stashed: Option<HashMap<StringId, SymbolKind>>,
     pub target: Target,
-    pub bindings: HashMap<ExpressionId, Option<SymbolId>>,
-    pub const_values: HashMap<ExpressionId, Option<Value>>,
     pub diagnosis: Vec<DiagnosisNode>,
+    pub expressions: HashMap<ExpressionId, ResolvedExpression>,
+    pub declarations: HashMap<DeclaratorId, Option<SymbolId>>,
 }
 
 impl Default for Context {
@@ -61,8 +64,8 @@ impl Default for Context {
             stashed: None,
             file_name: String::default(),
             target: Target::default(),
-            bindings: HashMap::default(),
-            const_values: HashMap::default(),
+            expressions: HashMap::default(),
+            declarations: HashMap::default(),
             diagnosis: Vec::new(),
         }
     }

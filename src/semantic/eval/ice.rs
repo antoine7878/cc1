@@ -6,7 +6,7 @@ use crate::semantic::sema::Sema;
 use crate::semantic::{Diag, DiagCollector, QualifiedType, ResolvedType, SymbolKind, declaration, layout};
 
 pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<Value> {
-    if let Some(&cached) = sema.const_values.get(&expr.id) {
+    if let Some(cached) = sema.expressions.get(&expr.id).and_then(|re| re.const_value) {
         return cached;
     }
     sema.visit_expression(ctx, expr);
@@ -14,7 +14,7 @@ pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> O
         Ok(value) => Some(value),
         Err(diagnosis) => sema.add_diag(Diag::none_diag(diagnosis), &expr.span),
     };
-    sema.const_values.insert(expr.id, value);
+    sema.expressions.entry(expr.id).or_default().const_value = Some(value);
     value
 }
 
@@ -44,10 +44,9 @@ pub fn eval(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<Val
         Expression::ConstantExpression(expr) => eval(sema, ctx, expr),
         Expression::Identifier(_) => {
             let id = sema
-                .bindings
+                .expressions
                 .get(&expr.id)
-                .copied()
-                .flatten()
+                .and_then(|re| re.sym)
                 .ok_or(Diagnosis::NonConstantExpression)?;
             let symbol = sema.symbols.get(id);
             if symbol.kind != SymbolKind::Variant {

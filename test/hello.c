@@ -1,15 +1,7 @@
-union U {
-	char a;
-	int : 0;
-};
-
-/*
-...|...|...|...|...|
-ss..bbb.aaaa
-*/
-
-// on veut 1
-enum s { OUI = sizeof(union U) };
+void f(void) {
+	int a;
+	a = 1 + 2;
+}
 
 // #include <stdalign.h>
 // #include <stdio.h>

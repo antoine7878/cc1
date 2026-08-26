@@ -133,12 +133,12 @@ impl Unit {
     pub fn const_values(&self) -> Vec<Option<Value>> {
         let mut entries: Vec<_> = self
             .ctx
-            .const_values
+            .expressions
             .iter()
-            .map(|(id, value)| (usize::from(*id), *value))
+            .map(|(id, re)| (usize::from(*id), re.const_value))
             .collect();
         entries.sort_by_key(|(id, _)| *id);
-        entries.into_iter().map(|(_, value)| value).collect()
+        entries.into_iter().filter_map(|(_, value)| value).collect()
     }
 
     pub fn folded(&self) -> Vec<String> {
@@ -154,9 +154,9 @@ impl Unit {
     pub fn bindings(&self) -> Vec<(String, Option<usize>)> {
         let mut entries: Vec<_> = self
             .ctx
-            .bindings
+            .expressions
             .iter()
-            .map(|(id, symbol)| (usize::from(*id), symbol.map(usize::from)))
+            .map(|(id, re)| (usize::from(*id), re.sym.map(usize::from)))
             .collect();
         entries.sort_by_key(|(id, _)| *id);
         entries
