@@ -42,9 +42,6 @@ fn member(sema: &mut Sema, mem: Member) -> Option<(Layout, Option<u64>)> {
     match mem {
         Member::Symbol(id) => {
             let symbol = sema.symbols.get(id);
-            if !symbol.is_complete {
-                return None;
-            }
             let width = symbol.value.map(|width| width.max(0) as u64);
             let ty = symbol.ty?;
             Some((of(sema, ty.ty)?, width))

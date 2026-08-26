@@ -13,7 +13,6 @@ pub struct Symbol {
     pub storage: Option<Storage>,
     pub kind: SymbolKind,
     pub value: Option<i32>,
-    pub is_complete: bool,
     pub is_init: bool,
 }
 
@@ -31,7 +30,6 @@ impl Symbol {
             storage,
             kind,
             value: None,
-            is_complete: true,
             is_init,
         }
     }
