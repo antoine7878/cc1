@@ -62,7 +62,10 @@ impl ExpectedTokens {
     fn from_slice(names: &[&'static str]) -> Self {
         let mut buf = [""; MAX_EXPECTED];
         buf[..names.len()].copy_from_slice(names);
-        Self { names: buf, len: names.len() }
+        Self {
+            names: buf,
+            len: names.len(),
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -86,7 +89,10 @@ impl Display for ExpectedTokens {
 #[derive(Clone, Copy, Debug)]
 pub enum Diagnosis {
     BadArgumentsCount,
-    SyntaxError { found: &'static str, expected: ExpectedTokens },
+    SyntaxError {
+        found: &'static str,
+        expected: ExpectedTokens,
+    },
     InvalidSizeof,
     UndeclaredIdentifier(Name),
     // 6.4

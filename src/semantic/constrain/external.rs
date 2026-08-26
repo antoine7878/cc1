@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::ast::{DeclarationNode, DeclarationSpecifier, InitDeclaratorNode, Name, Storage, StringId};
 use crate::parser::Context;
-use crate::semantic::{Diag, ParamInfo, ParamList, diagnosis::Diagnosis};
+use crate::semantic::{DeclaredParams, Diag, ParamInfo, diagnosis::Diagnosis};
 
 /// 6.7 External definitions
 /// The storage-class specifiers auto and register shall not appear in the declaration specifiers in an external declaration.
@@ -43,7 +43,7 @@ pub fn check_function_storage(storage: Storage) -> Diag<()> {
 /// 6.7.1 Function definitions
 /// The identifier declared in a function definition (which is the name of the function) shall have
 /// a function type, as specifed by the declarator portion of the function definition.
-pub fn extract_function_declarator(params: Option<ParamList>) -> Diag<Option<ParamList>> {
+pub fn extract_function_declarator(params: Option<DeclaredParams>) -> Diag<Option<DeclaredParams>> {
     match params {
         Some(params) => Diag::some(params),
         None => Diag::none_diag(Diagnosis::NotFunctionTypeDeclarator),

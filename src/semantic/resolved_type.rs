@@ -1,7 +1,7 @@
 use crate::{
     ast::TypeSpecifier,
     define_interner,
-    semantic::{Params, TagDefId},
+    semantic::{ParamTypes, TagDefId},
 };
 
 define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, resolved_type);
@@ -22,7 +22,7 @@ pub enum ResolvedType {
     Double,
     LongDouble,
     Array { elem: QualifiedType, len: Option<u32> },
-    Function { ret: QualifiedType, params: Params },
+    Function { ret: QualifiedType, params: ParamTypes },
     Pointer(QualifiedType),
     Tag(TagDefId),
 }
@@ -64,10 +64,10 @@ impl ResolvedTypeArena {
         self.alloc(ResolvedType::Array { elem, len })
     }
 
-    pub fn function(&mut self, ret: QualifiedType, params: Params) -> ResolvedTypeId {
+    pub fn function(&mut self, ret: QualifiedType, params: ParamTypes) -> ResolvedTypeId {
         let params = match params {
-            Params::Unspecified => Params::Unspecified,
-            Params::Prototype { params, is_variadic } => Params::Prototype {
+            ParamTypes::Unspecified => ParamTypes::Unspecified,
+            ParamTypes::Prototype { params, is_variadic } => ParamTypes::Prototype {
                 params: params.into_iter().map(|param| self.parameter(param)).collect(),
                 is_variadic,
             },

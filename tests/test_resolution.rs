@@ -250,7 +250,19 @@ describes!(
     "p",
     "*(int(void))[3]"
 );
-describes!(describe_array_of_array, "int a[3][5];", "a", "int[5][3]");
+describes!(describe_array, "int a[3];", "a", "int[3]");
+describes!(describe_array_of_array, "int a[3][5];", "a", "int[3][5]");
+describes!(describe_array_of_array_of_array, "int a[3][5][7];", "a", "int[3][5][7]");
+describes!(describe_incomplete_array, "int a[];", "a", "int[]");
+describes!(describe_incomplete_array_of_array, "int a[][5];", "a", "int[][5]");
+describes!(describe_array_of_pointer, "int *a[3];", "a", "*int[3]");
+describes!(describe_pointer_to_array, "int (*p)[3];", "p", "*(int[3])");
+describes!(
+    describe_pointer_to_array_of_array,
+    "int (*p)[3][5];",
+    "p",
+    "*(int[3][5])"
+);
 describes!(describe_array_parameter, "void f(int a[3]) { }", "a", "*int");
 describes!(
     describe_function_parameter,

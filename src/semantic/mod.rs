@@ -17,7 +17,7 @@ pub mod constrain;
 
 pub use analyzer::Analyzer;
 pub use diagnosis::{Diag, DiagCollector, Diagnosis, DiagnosisNode, ExpectedTokens, Severity};
-pub use function_def::{FunctionDef, FunctionDefArena, FunctionDefId, ParamInfo, ParamList, Params};
+pub use function_def::{DeclaredParams, FunctionDef, FunctionDefArena, FunctionDefId, ParamInfo, ParamTypes};
 pub use resolution::SymbolResolver;
 pub use resolved_type::{QualifiedType, ResolvedType, ResolvedTypeArena, ResolvedTypeId, TypeSpecifierCounter};
 pub use scope::{ScopeKind, Scopes};

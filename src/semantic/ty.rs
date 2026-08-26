@@ -4,7 +4,7 @@ use crate::ast::{
 };
 use crate::parser::{Context, Span};
 use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, ParamInfo, ParamList, QualifiedType, ResolvedType, Sema, Symbol, SymbolKind,
+    DeclaredParams, Diag, DiagCollector, Diagnosis, ParamInfo, QualifiedType, ResolvedType, Sema, Symbol, SymbolKind,
     TagDefId, constrain, ice,
 };
 
@@ -65,7 +65,7 @@ pub fn make_function_type(
     ctx: &Context,
     inner_most: Option<QualifiedType>,
     decl: &DeclaratorNode,
-) -> Option<(QualifiedType, DeclaratorNode, Option<ParamList>)> {
+) -> Option<(QualifiedType, DeclaratorNode, Option<DeclaredParams>)> {
     Some(extract_declarator(sema, ctx, decl, inner_most?))
 }
 
@@ -74,7 +74,7 @@ fn extract_declarator(
     ctx: &Context,
     declarator: &DeclaratorNode,
     inner_most: QualifiedType,
-) -> (QualifiedType, DeclaratorNode, Option<ParamList>) {
+) -> (QualifiedType, DeclaratorNode, Option<DeclaredParams>) {
     match declarator.id.resolve(ctx) {
         Declarator::Pointer { qualifiers, inner } => {
             let (is_const, is_volatile) =
@@ -106,10 +106,10 @@ fn extract_declarator(
     }
 }
 
-fn resolve_params(sema: &mut Sema, ctx: &Context, params: &FunctionParametersNode) -> ParamList {
+fn resolve_params(sema: &mut Sema, ctx: &Context, params: &FunctionParametersNode) -> DeclaredParams {
     match &params.param {
-        FunctionParameters::Empty => ParamList::Unspecified,
-        FunctionParameters::OldStyle(names) => ParamList::Names(names.clone()),
+        FunctionParameters::Empty => DeclaredParams::Unspecified,
+        FunctionParameters::OldStyle(names) => DeclaredParams::Names(names.clone()),
         FunctionParameters::ParameterTypeList(params) => resolve_prototype(sema, ctx, params, false),
         FunctionParameters::Variadic(params) => resolve_prototype(sema, ctx, params, true),
     }
@@ -118,12 +118,17 @@ fn resolve_params(sema: &mut Sema, ctx: &Context, params: &FunctionParametersNod
 /// 6.5.4.3 Function declarators
 /// The special case of an unnamed parameter of type void as the only item in the list specifies
 /// that the function has no parameters.
-fn resolve_prototype(sema: &mut Sema, ctx: &Context, params: &[ParameterDeclaration], is_variadic: bool) -> ParamList {
+fn resolve_prototype(
+    sema: &mut Sema,
+    ctx: &Context,
+    params: &[ParameterDeclaration],
+    is_variadic: bool,
+) -> DeclaredParams {
     if let [only] = params
         && !is_variadic
         && only.is_abstract_void(ctx)
     {
-        return ParamList::Prototype {
+        return DeclaredParams::Prototype {
             params: Vec::new(),
             is_variadic,
         };
@@ -137,7 +142,7 @@ fn resolve_prototype(sema: &mut Sema, ctx: &Context, params: &[ParameterDeclarat
         let is_special_case = params.len() == 1 && param.name.is_some();
         constrain::external::check_void_parameter(is_void && !is_special_case).collect(sema, &param.span);
     }
-    ParamList::Prototype { params, is_variadic }
+    DeclaredParams::Prototype { params, is_variadic }
 }
 
 fn resolve_parameter(sema: &mut Sema, ctx: &Context, param: &ParameterDeclaration) -> Option<ParamInfo> {

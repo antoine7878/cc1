@@ -8,8 +8,8 @@ use crate::ast::{
 };
 use crate::parser::{Context, Span};
 use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo, ParamList, QualifiedType, ResolvedType,
-    ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, ice, ty,
+    DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo, QualifiedType,
+    ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, ice, ty,
 };
 
 #[derive(Debug)]
@@ -28,7 +28,11 @@ impl<'a> SymbolResolver<'a> {
         Self { sema }
     }
 
-    fn add_function(&mut self, ctx: &Context, node: &FunctionDefinitionNode) -> Option<(FunctionDefId, ParamList)> {
+    fn add_function(
+        &mut self,
+        ctx: &Context,
+        node: &FunctionDefinitionNode,
+    ) -> Option<(FunctionDefId, DeclaredParams)> {
         let span = &node.span;
         let decl_span = &node.declarator.span;
 
@@ -155,12 +159,12 @@ impl Visitor for SymbolResolver<'_> {
         let lst = &node.old_style_declarations;
         let span = &node.declarator.span;
         let parameters = match &params {
-            ParamList::Unspecified => {
+            DeclaredParams::Unspecified => {
                 self.param_empty(lst, span);
                 Vec::new()
             }
-            ParamList::Names(names) => self.param_old_style(ctx, names, lst, span),
-            ParamList::Prototype { params, .. } => self.param_prototype(params, lst, span),
+            DeclaredParams::Names(names) => self.param_old_style(ctx, names, lst, span),
+            DeclaredParams::Prototype { params, .. } => self.param_prototype(params, lst, span),
         };
         self.sema.functions.complete(def, parameters);
 

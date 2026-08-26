@@ -1,5 +1,5 @@
 use crate::parser::Context;
-use crate::semantic::{Params, QualifiedType, ResolvedType};
+use crate::semantic::{ParamTypes, QualifiedType, ResolvedType};
 use crate::utils::{BLUE, RESET};
 
 impl Context {
@@ -28,7 +28,9 @@ impl Context {
             ResolvedType::Pointer(inner) => {
                 out.push('*');
                 match self.arenas.resolved_type.get(inner.ty) {
-                    ResolvedType::Function { .. } => out.push_str(&format!("({})", self.describe(inner))),
+                    ResolvedType::Function { .. } | ResolvedType::Array { .. } => {
+                        out.push_str(&format!("({})", self.describe(inner)))
+                    }
                     _ => out.push_str(&self.describe(inner)),
                 }
             }
@@ -41,17 +43,26 @@ impl Context {
                 }
             }
             ResolvedType::Array { elem, len } => {
-                out.push_str(&self.describe(elem));
-                out.push('[');
-                if let Some(len) = len {
-                    out.push_str(&len.to_string());
+                let (mut elem, mut len) = (elem, len);
+                let mut dimensions = String::new();
+                loop {
+                    dimensions.push('[');
+                    if let Some(len) = len {
+                        dimensions.push_str(&len.to_string());
+                    }
+                    dimensions.push(']');
+                    let ResolvedType::Array { elem: inner, len: size } = self.arenas.resolved_type.get(elem.ty) else {
+                        break;
+                    };
+                    (elem, len) = (inner, size);
                 }
-                out.push(']');
+                out.push_str(&self.describe(elem));
+                out.push_str(&dimensions);
             }
             ResolvedType::Function { ret, params } => {
                 out.push_str(&self.describe(ret));
                 out.push('(');
-                if let Params::Prototype { params, is_variadic } = params {
+                if let ParamTypes::Prototype { params, is_variadic } = params {
                     let described: Vec<String> = params.iter().map(|param| self.describe(param)).collect();
                     match described.is_empty() {
                         true => out.push_str("void"),

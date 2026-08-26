@@ -33,7 +33,7 @@ impl FunctionDefArena {
 }
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
-pub enum Params {
+pub enum ParamTypes {
     Unspecified,
     Prototype {
         params: Vec<QualifiedType>,
@@ -50,17 +50,17 @@ pub struct ParamInfo {
 }
 
 #[derive(Clone, Debug)]
-pub enum ParamList {
+pub enum DeclaredParams {
     Unspecified,
     Names(Vec<Name>),
     Prototype { params: Vec<ParamInfo>, is_variadic: bool },
 }
 
-impl ParamList {
-    pub fn types(&self) -> Params {
+impl DeclaredParams {
+    pub fn types(&self) -> ParamTypes {
         match self {
-            ParamList::Unspecified | ParamList::Names(_) => Params::Unspecified,
-            ParamList::Prototype { params, is_variadic } => Params::Prototype {
+            DeclaredParams::Unspecified | DeclaredParams::Names(_) => ParamTypes::Unspecified,
+            DeclaredParams::Prototype { params, is_variadic } => ParamTypes::Prototype {
                 params: params.iter().map(|param| param.ty).collect(),
                 is_variadic: *is_variadic,
             },
