@@ -8,8 +8,14 @@ define_arena!(TagDef, TagDefArena, TagDefId, tags);
 pub struct TagDef {
     pub kind: Tag,
     pub name: Option<Name>,
-    pub members: Vec<SymbolId>,
+    pub members: Vec<Member>,
     pub is_complete: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Member {
+    Symbol(SymbolId),
+    Bitfield(i32),
 }
 
 impl Tag {
@@ -38,7 +44,7 @@ impl TagDefArena {
         })
     }
 
-    pub fn complete(&mut self, id: TagDefId, members: Vec<SymbolId>) {
+    pub fn complete(&mut self, id: TagDefId, members: Vec<Member>) {
         let def = self.get_mut(id);
         def.members = members;
         def.is_complete = true;

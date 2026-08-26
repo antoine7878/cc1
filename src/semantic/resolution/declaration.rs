@@ -4,8 +4,8 @@ use crate::ast::{
 };
 use crate::parser::{Context, Span};
 use crate::semantic::{
-    DeclaredParams, Diag, DiagCollector, Diagnosis, ParamInfo, QualifiedType, ResolvedType, Sema, Symbol, SymbolKind,
-    TagDefId, constrain, ice,
+    DeclaredParams, Diag, DiagCollector, Diagnosis, Member, ParamInfo, QualifiedType, ResolvedType, Sema, Symbol,
+    SymbolKind, TagDefId, constrain, ice,
 };
 
 /// 6.5.2 Type specifiers
@@ -184,7 +184,7 @@ pub fn struct_or_union_tag(
         return tag;
     }
 
-    let mut members = Vec::new();
+    let mut members: Vec<Member> = Vec::new();
     for field in fields {
         if field.struct_declarators.is_empty() {
             sema.add_diag(Diag::only_diag(Diagnosis::EmptyDeclaration), &field.span);
@@ -197,19 +197,31 @@ pub fn struct_or_union_tag(
                 let value = ice::eval_constant(sema, ctx, e);
                 constrain::declaration::check_bit_width(sema.types.get(ty.ty), value).collect(sema, span)
             });
-            let Some(name) = node.ident(ctx) else { continue };
-            if members.iter().any(|&m| sema.symbols.get(m).name.id == name.id) {
-                sema.add_diag(
-                    Diag::only_diag(Diagnosis::DuplicateDeclaration(SymbolKind::Member, name)),
-                    &decl.span,
-                );
-                continue;
+            match (node.ident(ctx), bit_width) {
+                (Some(name), _) => {
+                    if members
+                        .iter()
+                        .any(|&m| matches!(m, Member::Symbol(id) if sema.symbols.get(id).name.id == name.id ))
+                    {
+                        sema.add_diag(
+                            Diag::only_diag(Diagnosis::DuplicateDeclaration(SymbolKind::Member, name)),
+                            &decl.span,
+                        );
+                        continue;
+                    }
+                    let memb = Symbol::member(name, ty, bit_width);
+                    let id = sema.symbols.alloc(memb);
+                    members.push(Member::Symbol(id))
+                }
+                (None, Some(i)) if bit_width.is_some() => members.push(Member::Bitfield(i)),
+                _ => (),
             }
-            let memb = Symbol::member(name, ty, bit_width);
-            members.push(sema.symbols.alloc(memb))
         }
     }
     if members.is_empty() {
+        sema.add_diag(Diag::only_diag(Diagnosis::TagWithoutMember(kind.symbol_kind())), span);
+    }
+    if members.iter().all(|m| matches!(m, Member::Bitfield(_))) {
         sema.add_diag(Diag::only_diag(Diagnosis::TagWithoutMember(kind.symbol_kind())), span);
     }
     sema.tags.complete(tag, members);
@@ -239,7 +251,9 @@ pub fn enum_tag(sema: &mut Sema, ctx: &Context, id: EnumId) -> Option<TagDefId> 
             value = 0
         }
         let ty = QualifiedType::new(sema.types.int(), false, false);
-        members.push(sema.declare(Symbol::variant(variant.name, ty, value as i32), &variant.span));
+        members.push(Member::Symbol(
+            sema.declare(Symbol::variant(variant.name, ty, value as i32), &variant.span),
+        ));
         value += 1;
     }
     sema.tags.complete(tag, members);

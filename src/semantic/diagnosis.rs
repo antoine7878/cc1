@@ -109,6 +109,7 @@ pub enum Diagnosis {
     /// 6.5.2.1 Structure and union specifiers
     NonIntBitFieldType,
     NonIntArraySize,
+    NoNamedMember,
     // 6.5.2.2 Enumeration specifiers
     VariantBadValue,
     // 6.7
@@ -150,6 +151,7 @@ impl Diagnosis {
             Diagnosis::DuplicateTypeQualifers => Severity::Error,
             Diagnosis::NonIntBitFieldType => Severity::Error,
             Diagnosis::NonIntArraySize => Severity::Error,
+            Diagnosis::NoNamedMember => Severity::Error,
             Diagnosis::VariantBadValue => Severity::Error,
             Diagnosis::AutoRegisterExternal => Severity::Error,
             Diagnosis::NotFunctionTypeDeclarator => Severity::Error,
@@ -225,6 +227,7 @@ impl DiagnosisNode {
             Diagnosis::DuplicateDeclaration(kind, name) => format!("duplicate declaration of {} `{}'", kind, name.id.resolve(ctx)),
             Diagnosis::NonIntBitFieldType => "Bit-field has non-integral type".to_string(),
             Diagnosis::NonIntArraySize => "Array len has non-integral type".to_string(),
+            Diagnosis::NoNamedMember => "tag has no named members".to_string()
         }
     }
 }

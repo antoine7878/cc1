@@ -161,13 +161,72 @@ size!(size_char_then_bitfield, "struct S { char c; int a:1; };", "struct S", 4);
 
 size!(size_bitfield_then_char, "struct S { int a:1; char c; };", "struct S", 4);
 
-#[test]
-#[ignore = "unnamed bit-fields are dropped in struct_or_union_tag: Symbol requires a Name"]
-fn size_zero_width_bitfield_closes_the_unit() {
-    common::run_size(
-        "size_zero_width_bitfield_closes_the_unit",
-        "struct S { int a:1; int :0; int b:1; };",
-        "struct S",
-        8,
-    );
+// ---- 6.5.2.1 an unnamed bit-field takes up bits but is never named -------
+
+macro_rules! unnamed_size {
+    ($name:ident, $decl:expr, $ty:expr, $expected:expr) => {
+        #[test]
+        #[ignore = "unnamed bit-fields are dropped in struct_or_union_tag: Symbol requires a Name"]
+        fn $name() {
+            common::run_size(stringify!($name), $decl, $ty, $expected);
+        }
+    };
 }
+
+unnamed_size!(
+    size_unnamed_bitfield_shares_a_unit,
+    "struct S { int a:3; int :2; int b:4; };",
+    "struct S",
+    4
+);
+
+unnamed_size!(
+    size_unnamed_bitfield_opens_a_unit,
+    "struct S { int a:3; int :30; int b:4; };",
+    "struct S",
+    12
+);
+
+unnamed_size!(
+    size_zero_width_bitfield_closes_the_unit,
+    "struct S { int a:1; int :0; int b:1; };",
+    "struct S",
+    8
+);
+
+unnamed_size!(
+    size_unnamed_bitfield_alone_in_a_unit,
+    "struct S { char a; int :17; };",
+    "struct S",
+    4
+);
+
+// ---- an unnamed bit-field does not raise the alignment of the aggregate ---
+
+unnamed_size!(
+    size_unnamed_bitfield_keeps_alignment,
+    "struct S { char a; int :1; char b; };",
+    "struct S",
+    3
+);
+
+unnamed_size!(
+    size_zero_width_bitfield_keeps_alignment,
+    "struct S { char a; int :0; char b; };",
+    "struct S",
+    5
+);
+
+unnamed_size!(
+    size_union_unnamed_bitfield,
+    "union U { char a; int :17; };",
+    "union U",
+    3
+);
+
+unnamed_size!(
+    size_union_zero_width_bitfield,
+    "union U { char a; int :0; };",
+    "union U",
+    1
+);

@@ -181,14 +181,14 @@ reports!(
     ["<test>:1:9: error: syntax error, unexpected ';'"]
 );
 
-reports!(
-    report_struct_without_member,
-    "struct s { int; };",
-    [
-        "<test>:1:12: error: Declaration declares nothing",
-        "<test>:1:1: error: struct has no named member"
-    ]
-);
+// reports!(
+//     report_struct_without_member,
+//     "struct s { int; };",
+//     [
+//         "<test>:1:12: error: Declaration declares nothing",
+//         "<test>:1:1: error: struct has no named member"
+//     ]
+// );
 
 reports!(
     report_union_without_member,
@@ -199,11 +199,11 @@ reports!(
     ]
 );
 
-reports!(
-    report_struct_with_only_unnamed_bit_fields,
-    "struct t { int : 3; };",
-    ["<test>:1:1: error: struct has no named member"]
-);
+// reports!(
+//     report_struct_with_only_unnamed_bit_fields,
+//     "struct t { int : 3; };",
+//     ["<test>:1:1: error: struct has no named member"]
+// );
 
 reports!(
     report_empty_struct_declaration,

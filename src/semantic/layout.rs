@@ -1,7 +1,7 @@
 use crate::ast::Tag;
 use crate::semantic::diagnosis::Diagnosis;
 use crate::semantic::sema::Sema;
-use crate::semantic::{ResolvedType, ResolvedTypeId, SymbolId, TagDefId};
+use crate::semantic::{Member, ResolvedType, ResolvedTypeId, TagDefId};
 use crate::target::Layout;
 
 fn round_up(value: u64, multiple: u64) -> u64 {
@@ -40,17 +40,25 @@ pub fn of_tag(sema: &mut Sema, id: TagDefId) -> Result<Layout, Diagnosis> {
     }
 }
 
-fn member(sema: &mut Sema, id: SymbolId) -> Result<(Layout, Option<u64>), Diagnosis> {
-    let symbol = sema.symbols.get(id);
-    if !symbol.is_complete {
-        return Err(Diagnosis::InvalidSizeof);
+fn member(sema: &mut Sema, mem: Member) -> Result<(Layout, Option<u64>), Diagnosis> {
+    match mem {
+        Member::Symbol(id) => {
+            let symbol = sema.symbols.get(id);
+            if !symbol.is_complete {
+                return Err(Diagnosis::InvalidSizeof);
+            }
+            let width = symbol.value.map(|width| width.max(0) as u64);
+            let ty = symbol.ty.ok_or(Diagnosis::InvalidSizeof)?;
+            Ok((of(sema, ty.ty)?, width))
+        }
+        Member::Bitfield(i) => {
+            let ty = sema.types.int();
+            Ok((of(sema, ty)?, Some(i as u64)))
+        }
     }
-    let width = symbol.value.map(|width| width.max(0) as u64);
-    let ty = symbol.ty.ok_or(Diagnosis::InvalidSizeof)?;
-    Ok((of(sema, ty.ty)?, width))
 }
 
-fn struct_layout(sema: &mut Sema, members: &[SymbolId]) -> Result<Layout, Diagnosis> {
+fn struct_layout(sema: &mut Sema, members: &[Member]) -> Result<Layout, Diagnosis> {
     let mut bits: u64 = 0;
     let mut align: u32 = 1;
 
@@ -78,7 +86,7 @@ fn struct_layout(sema: &mut Sema, members: &[SymbolId]) -> Result<Layout, Diagno
     Ok(Layout::new(size as u32, align))
 }
 
-fn union_layout(sema: &mut Sema, members: &[SymbolId]) -> Result<Layout, Diagnosis> {
+fn union_layout(sema: &mut Sema, members: &[Member]) -> Result<Layout, Diagnosis> {
     let mut size: u64 = 0;
     let mut align: u32 = 1;
 

@@ -7,4 +7,4 @@ pub mod tag_def;
 pub use function_def::{DeclaredParams, FunctionDef, FunctionDefArena, FunctionDefId, ParamInfo, ParamTypes};
 pub use resolved_type::{QualifiedType, ResolvedType, ResolvedTypeArena, ResolvedTypeId, TypeSpecifierCounter};
 pub use symbol::{Symbol, SymbolArena, SymbolId, SymbolKind};
-pub use tag_def::{TagDef, TagDefArena, TagDefId};
+pub use tag_def::{Member, TagDef, TagDefArena, TagDefId};
