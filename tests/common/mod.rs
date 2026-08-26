@@ -181,7 +181,7 @@ impl Unit {
                 (
                     symbol.name.id.resolve(&self.ctx).clone(),
                     symbol.kind.to_string(),
-                    symbol.ty.map(|ty| self.ctx.describe(ty)).unwrap_or_default(),
+                    symbol.ty.map(|ty| self.ctx.describe(&ty)).unwrap_or_default(),
                 )
             })
             .collect()

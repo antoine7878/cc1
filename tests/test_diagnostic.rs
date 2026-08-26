@@ -89,7 +89,7 @@ fn a_report_is_colored_by_severity() {
     let unit = Unit::compile("void f(void) { x = 1; }");
     let rendered = unit.render();
     assert!(rendered.contains("\x1b[0;31m"), "{rendered:?}");
-    assert!(rendered.contains("error: "), "{rendered:?}");
+    assert!(strip_ansi(&rendered).contains("error: "), "{rendered:?}");
     assert_eq!(strip_ansi(&rendered).trim_end(), unit.messages()[0]);
 }
 

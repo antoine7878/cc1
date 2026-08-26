@@ -24,24 +24,25 @@ pub fn report<W: Write, D: Display>(
     severity: Severity,
     msg: D,
 ) -> io::Result<()> {
-    let err_line_no = span.start.line - 1;
-    let padding = err_line_no.to_string().len();
+    let line_no = span.start.line;
+    let padding = line_no.to_string().len();
     let mid_pad = 9 - padding;
 
     let path = ctx.file_of(span);
-    let Ok(file) = File::open(path) else { return Ok(()) };
-    let Some(Ok(line)) = BufReader::new(file).lines().nth(err_line_no) else { return Ok(()) };
-    let line = line.replace('\t', " ");
     let color = severity.color();
-
-    let col_no = caret_end(span, &line);
 
     writeln!(
         w,
-        "{path}:{err_line_no}:{}: {color}{severity}:{RESET} {msg}",
+        "{path}:{line_no}:{}: {color}{severity}:{RESET} {msg}",
         span.start.col
     )?;
-    writeln!(w, "     {:>padding$}|{:>mid_pad$}{line}", err_line_no, "")?;
+
+    let Ok(file) = File::open(path) else { return Ok(()) };
+    let Some(Ok(line)) = BufReader::new(file).lines().nth(line_no - 1) else { return Ok(()) };
+    let line = line.replace('\t', " ");
+    let col_no = caret_end(span, &line);
+
+    writeln!(w, "     {:>padding$}|{:>mid_pad$}{line}", line_no, "")?;
     writeln!(
         w,
         "     {:>padding$}|{:>mid_pad$}{color}{:>col_no$}{RESET} ",

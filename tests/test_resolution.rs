@@ -184,15 +184,10 @@ describes!(
     "x",
     "const volatile int"
 );
-describes!(describe_pointer, "char *p;", "p", "pointer to char");
-describes!(
-    describe_pointer_to_pointer,
-    "int **p;",
-    "p",
-    "pointer to pointer to int"
-);
-describes!(describe_pointer_to_const, "const int *p;", "p", "pointer to const int");
-describes!(describe_const_pointer, "int *const p;", "p", "const pointer to int");
+describes!(describe_pointer, "char *p;", "p", "*char");
+describes!(describe_pointer_to_pointer, "int **p;", "p", "**int");
+describes!(describe_pointer_to_const, "const int *p;", "p", "*const int");
+describes!(describe_const_pointer, "int *const p;", "p", "const *int");
 describes!(describe_struct, "struct S { int a; } s;", "s", "struct S");
 describes!(describe_union, "union U { int a; } u;", "u", "union U");
 describes!(describe_enum, "enum E { A } e;", "e", "enum E");
@@ -200,15 +195,10 @@ describes!(
     describe_incomplete_struct,
     "struct S; struct S *p;",
     "p",
-    "pointer to struct S (incomplete)"
+    "*struct S (incomplete)"
 );
 describes!(describe_typedef_target, "typedef unsigned int T;", "T", "unsigned int");
-describes!(
-    describe_through_typedef,
-    "typedef char *S; S s;",
-    "s",
-    "pointer to char"
-);
+describes!(describe_through_typedef, "typedef char *S; S s;", "s", "*char");
 describes!(
     describe_qualified_typedef,
     "typedef int T; const T x;",
@@ -216,8 +206,13 @@ describes!(
     "const int"
 );
 describes!(describe_member, "struct S { double a; };", "a", "double");
-describes!(describe_anonymous_struct_typedef, "typedef struct { int a; } T; T x;", "x", "struct <anonymous>");
-describes!(describe_parameter, "void f(char *s) { }", "s", "pointer to char");
+describes!(
+    describe_anonymous_struct_typedef,
+    "typedef struct { int a; } T; T x;",
+    "x",
+    "struct <anonymous>"
+);
+describes!(describe_parameter, "void f(char *s) { }", "s", "*char");
 describes!(describe_function_returns, "long f(void) { return 0; }", "f", "long");
 
 #[test]

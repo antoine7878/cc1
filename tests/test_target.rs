@@ -215,7 +215,7 @@ fn value_size_follows_the_value_type() {
 fn abi_types_follow_the_target() {
     assert_eq!(I386.size_t, ResolvedType::UnsignedInt);
     assert_eq!(I386.ptrdiff_t, ResolvedType::Int);
-    assert_eq!(I386.wchar_t, ResolvedType::Int);
+    assert_eq!(I386.wchar_t, ResolvedType::Long);
     assert_eq!(X86_64.size_t, ResolvedType::UnsignedLong);
     assert_eq!(X86_64.ptrdiff_t, ResolvedType::Long);
     assert_eq!(X86_64.wchar_t, ResolvedType::Int);

@@ -78,27 +78,27 @@ fn extract_declarator(
             let id = sema.types.array(qty, len);
             (QualifiedType::new(id, false, false), decl)
         }
-        Declarator::Function { declarator, params } => {
-            let params = match &params.param {
-                FunctionParameters::OldStyle(names) => {
-                    print!("params: ");
-                    for name in names {
-                        print!("{}, ", name.id.resolve(ctx));
-                    }
-                }
-                _ => (),
-            };
-            // let params = match &params.param {
-            //     FunctionParameters::Empty => Vec::new(),
-            //     FunctionParameters::ParameterTypeList(params) => unimplemented!("param list"),
-            //     FunctionParameters::OldStyle(names) => unimplemented!("old"),
-            //     FunctionParameters::Variadic(_) => unimplemented!("variadic"),
-            // };
-            // let (qty, decl) = extract_declarator(sema, ctx, declarator, inner_most);
-            // let id = sema.types.function(qty, params);
-            // (QualifiedType::new(id, false, false), decl)
-            (inner_most, declarator.clone())
-        }
+        // Declarator::Function { declarator, params } => {
+        // let params = match &params.param {
+        //     FunctionParameters::OldStyle(names) => {
+        //         print!("params: ");
+        //         for name in names {
+        //             print!("{}, ", name.id.resolve(ctx));
+        //         }
+        //     }
+        //     _ => (),
+        // };
+        // let params = match &params.param {
+        //     FunctionParameters::Empty => Vec::new(),
+        //     FunctionParameters::ParameterTypeList(params) => unimplemented!("param list"),
+        //     FunctionParameters::OldStyle(names) => unimplemented!("old"),
+        //     FunctionParameters::Variadic(_) => unimplemented!("variadic"),
+        // };
+        // let (qty, decl) = extract_declarator(sema, ctx, declarator, inner_most);
+        // let id = sema.types.function(qty, params);
+        // (QualifiedType::new(id, false, false), decl)
+        //     (inner_most, declarator.clone())
+        // }
         _ => (inner_most, declarator.clone()),
     }
 }
