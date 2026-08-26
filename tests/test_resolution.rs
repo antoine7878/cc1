@@ -216,6 +216,7 @@ describes!(
     "const int"
 );
 describes!(describe_member, "struct S { double a; };", "a", "double");
+describes!(describe_anonymous_struct_typedef, "typedef struct { int a; } T; T x;", "x", "struct <anonymous>");
 describes!(describe_parameter, "void f(char *s) { }", "s", "pointer to char");
 describes!(describe_function_returns, "long f(void) { return 0; }", "f", "long");
 

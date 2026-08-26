@@ -113,9 +113,27 @@ reports!(
 );
 
 reports!(
+    report_struct_error_recovers_at_the_next_member,
+    "struct s { int a; : 0; int b; };",
+    ["<test>:1:19: error: syntax error, unexpected ':'"]
+);
+
+reports!(
+    report_struct_error_recovers_on_a_leading_member,
+    "struct s { : 0; int a; };",
+    ["<test>:1:12: error: syntax error, unexpected ':'"]
+);
+
+reports!(
     report_syntax_error_at_end_of_file,
     "int f(void) { return 0; } }",
     ["<test>:1:27: error: syntax error, unexpected '}', expecting end of file"]
+);
+
+reports!(
+    report_unterminated_block_expects_a_closing_brace,
+    "int f(void) { return 0;",
+    ["<test>:1:24: error: syntax error, unexpected end of file, expecting ';' or '}'"]
 );
 
 reports!(

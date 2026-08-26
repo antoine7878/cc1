@@ -38,7 +38,7 @@ pub struct ExpectedTokens {
     len: usize,
 }
 
-const STRUCTURAL: [&str; 6] = ["';'", "','", "')'", "']'", "'}'", "':'"];
+const STRUCTURAL: [&str; 5] = ["';'", "','", "')'", "']'", "'}'"];
 
 fn token_label(name: &str) -> &str {
     match name {
@@ -48,15 +48,15 @@ fn token_label(name: &str) -> &str {
 }
 
 impl ExpectedTokens {
-    pub fn new(names: &[&'static str]) -> Self {
+    pub fn new(found: &'static str, names: &[&'static str]) -> Self {
         if names.len() <= MAX_EXPECTED {
             return Self::from_slice(names);
         }
         let structural: Vec<&'static str> = names.iter().copied().filter(|n| STRUCTURAL.contains(n)).collect();
-        match structural.len() <= MAX_EXPECTED {
-            true => Self::from_slice(&structural),
-            false => Self::from_slice(&[]),
+        if structural.len() > MAX_EXPECTED || (structural == ["'}'"] && found != "yyeof") {
+            return Self::from_slice(&[]);
         }
+        Self::from_slice(&structural)
     }
 
     fn from_slice(names: &[&'static str]) -> Self {

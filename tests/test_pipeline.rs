@@ -16,7 +16,7 @@ fn fail(mut ctx: Context) -> Context {
         .push(DiagnosisNode::new(
             Diagnosis::SyntaxError {
                 found: "';'",
-                expected: ExpectedTokens::new(&[]),
+                expected: ExpectedTokens::new("';'", &[]),
             },
             Span::default(),
         ));

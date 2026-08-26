@@ -396,8 +396,8 @@ direct_abstract_declarator /* DeclaratorNode */
 	;
 
 struct_or_union_specifier /* TypeSpecifier */
-	: struct_or_union '{' enter_struct struct_declaration_list exit_struct '}'              { let s = self.span; self.lexer.ctx.struct_or_union($1, None, $4, s) }
-	| struct_or_union IDENTIFIER '{' enter_struct struct_declaration_list exit_struct '}'   { let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), $5, s) }
+	: struct_or_union '{' enter_struct struct_declaration_list '}' exit_struct              { let s = self.span; self.lexer.ctx.struct_or_union($1, None, $4, s) }
+	| struct_or_union IDENTIFIER '{' enter_struct struct_declaration_list '}' exit_struct   { let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), $5, s) }
 	| struct_or_union IDENTIFIER                                                            { let s = self.span; self.lexer.ctx.struct_or_union($1, Some($2), vec![], s) }
 	;
 
@@ -409,6 +409,8 @@ struct_or_union /* Tag */
 struct_declaration_list /* Vec<StructDeclaration> */
 	: struct_declaration                                                                    { vec![$1] }
 	| struct_declaration_list struct_declaration                                            { push!($<mut>1, $2) }
+	| struct_declaration_list error ';'                                                     { self.yyerrok(); $<mut>1 }
+	| error ';'                                                                             { self.yyerrok(); vec![] }
 	;
 
 struct_declaration /* StructDeclaration */
