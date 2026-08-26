@@ -19,9 +19,9 @@ pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> O
 }
 
 fn cast(sema: &mut Sema, qualif: QualifiedType, val: Value, span: &Span) -> Result<Value, Diagnosis> {
-    let ty = *sema.types.get(qualif.ty);
+    let ty = sema.types.get(qualif.ty);
     if let ResolvedType::Tag(id) = ty {
-        return match sema.tags.get(id).kind {
+        return match sema.tags.get(*id).kind {
             Tag::Enum => sema
                 .target
                 .cast(&ResolvedType::Int, val)
@@ -29,7 +29,7 @@ fn cast(sema: &mut Sema, qualif: QualifiedType, val: Value, span: &Span) -> Resu
             _ => Err(Diagnosis::CastToNonScalar),
         };
     }
-    if let Some(casted) = sema.target.cast(&ty, val) {
+    if let Some(casted) = sema.target.cast(ty, val) {
         return Ok(casted);
     }
     let _ = span;
@@ -95,7 +95,7 @@ pub fn eval(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<Val
                 ty::resolve_type(sema, ctx, &ty_node.specifiers, &expr.span).ok_or(Diagnosis::NonConstantExpression)?;
             let (qualif, _) = ty::make_qualified_type(sema, ctx, Some(qualif), &ty_node.declarator)
                 .ok_or(Diagnosis::NonConstantExpression)?;
-            Ok(Value::UnsignedLong(layout::of(sema, qualif)?.size.into()))
+            Ok(Value::UnsignedLong(layout::of(sema, qualif.ty)?.size.into()))
         }
         Expression::Cast(ty_node, operand) => {
             let base = ty::resolve_type(sema, ctx, &ty_node.specifiers, &expr.span);

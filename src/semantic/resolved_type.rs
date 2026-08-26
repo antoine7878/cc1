@@ -2,7 +2,7 @@ use crate::{ast::TypeSpecifier, define_interner, semantic::TagDefId};
 
 define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, resolved_type);
 
-#[derive(Debug, PartialEq, Clone, Copy, Hash, Eq)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum ResolvedType {
     Void,
     Char,
@@ -17,7 +17,14 @@ pub enum ResolvedType {
     Float,
     Double,
     LongDouble,
-    Array { elem: QualifiedType, len: Option<u32> },
+    Array {
+        elem: QualifiedType,
+        len: Option<u32>,
+    },
+    Function {
+        elem: QualifiedType,
+        parameters: Vec<QualifiedType>,
+    },
     Pointer(QualifiedType),
     Tag(TagDefId),
 }
@@ -57,6 +64,10 @@ impl ResolvedTypeArena {
 
     pub fn array(&mut self, elem: QualifiedType, len: Option<u32>) -> ResolvedTypeId {
         self.alloc(ResolvedType::Array { elem, len })
+    }
+
+    pub fn function(&mut self, elem: QualifiedType, parameters: Vec<QualifiedType>) -> ResolvedTypeId {
+        self.alloc(ResolvedType::Function { elem, parameters })
     }
 
     pub fn tag(&mut self, id: TagDefId) -> ResolvedTypeId {

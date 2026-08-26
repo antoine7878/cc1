@@ -143,6 +143,30 @@ reports!(
 );
 
 reports!(
+    report_struct_without_member,
+    "struct s { int; };",
+    [
+        "<test>:1:12: error: Declaration declares nothing",
+        "<test>:1:1: error: struct has no named member"
+    ]
+);
+
+reports!(
+    report_union_without_member,
+    "union u { int; };",
+    [
+        "<test>:1:11: error: Declaration declares nothing",
+        "<test>:1:1: error: union has no named member"
+    ]
+);
+
+reports!(
+    report_struct_with_only_unnamed_bit_fields,
+    "struct t { int : 3; };",
+    ["<test>:1:1: error: struct has no named member"]
+);
+
+reports!(
     report_empty_struct_declaration,
     "struct s { int a; int; };",
     ["<test>:1:19: error: Declaration declares nothing"]

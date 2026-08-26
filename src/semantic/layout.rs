@@ -1,7 +1,7 @@
 use crate::ast::Tag;
 use crate::semantic::diagnosis::Diagnosis;
 use crate::semantic::sema::Sema;
-use crate::semantic::{QualifiedType, ResolvedType, SymbolId, TagDefId};
+use crate::semantic::{ResolvedType, ResolvedTypeId, SymbolId, TagDefId};
 use crate::target::Layout;
 
 fn round_up(value: u64, multiple: u64) -> u64 {
@@ -11,19 +11,20 @@ fn round_up(value: u64, multiple: u64) -> u64 {
     }
 }
 
-pub fn of(sema: &mut Sema, qualified_type: QualifiedType) -> Result<Layout, Diagnosis> {
-    if let Some(&layout) = sema.layouts.get(&qualified_type.ty) {
+pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Result<Layout, Diagnosis> {
+    if let Some(&layout) = sema.layouts.get(&qualified_type) {
         return Ok(layout);
     }
-    let layout = match *sema.types.get(qualified_type.ty) {
-        ResolvedType::Tag(id) => of_tag(sema, id)?,
+    let layout = match sema.types.get(qualified_type) {
+        ResolvedType::Tag(id) => of_tag(sema, *id)?,
         ResolvedType::Array { elem, len } => {
-            let elem = of(sema, elem)?;
+            let len = *len;
+            let elem = of(sema, elem.ty)?;
             Layout::new(elem.size * len.unwrap_or(0), elem.align)
         }
-        ty => sema.target.scalar(&ty).ok_or(Diagnosis::InvalidSizeof)?,
+        ty => sema.target.scalar(ty).ok_or(Diagnosis::InvalidSizeof)?,
     };
-    sema.layouts.insert(qualified_type.ty, layout);
+    sema.layouts.insert(qualified_type, layout);
     Ok(layout)
 }
 
@@ -46,7 +47,7 @@ fn member(sema: &mut Sema, id: SymbolId) -> Result<(Layout, Option<u64>), Diagno
     }
     let width = symbol.value.map(|width| width.max(0) as u64);
     let ty = symbol.ty.ok_or(Diagnosis::InvalidSizeof)?;
-    Ok((of(sema, ty)?, width))
+    Ok((of(sema, ty.ty)?, width))
 }
 
 fn struct_layout(sema: &mut Sema, members: &[SymbolId]) -> Result<Layout, Diagnosis> {

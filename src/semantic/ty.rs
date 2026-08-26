@@ -1,6 +1,6 @@
 use crate::ast::{
-    DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, ExpressionNode, Name, StructDeclaration, Tag,
-    TypeSpecifier,
+    DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, ExpressionNode, FunctionParameters, Name,
+    StructDeclaration, Tag, TypeSpecifier,
 };
 use crate::parser::{Context, Span};
 use crate::semantic::{
@@ -78,6 +78,27 @@ fn extract_declarator(
             let id = sema.types.array(qty, len);
             (QualifiedType::new(id, false, false), decl)
         }
+        Declarator::Function { declarator, params } => {
+            let params = match &params.param {
+                FunctionParameters::OldStyle(names) => {
+                    print!("params: ");
+                    for name in names {
+                        print!("{}, ", name.id.resolve(ctx));
+                    }
+                }
+                _ => (),
+            };
+            // let params = match &params.param {
+            //     FunctionParameters::Empty => Vec::new(),
+            //     FunctionParameters::ParameterTypeList(params) => unimplemented!("param list"),
+            //     FunctionParameters::OldStyle(names) => unimplemented!("old"),
+            //     FunctionParameters::Variadic(_) => unimplemented!("variadic"),
+            // };
+            // let (qty, decl) = extract_declarator(sema, ctx, declarator, inner_most);
+            // let id = sema.types.function(qty, params);
+            // (QualifiedType::new(id, false, false), decl)
+            (inner_most, declarator.clone())
+        }
         _ => (inner_most, declarator.clone()),
     }
 }
@@ -128,6 +149,9 @@ pub fn resolve_struct_or_union(
             let memb = Symbol::member(name, ty, bit_width);
             members.push(sema.symbols.alloc(memb))
         }
+    }
+    if members.is_empty() {
+        sema.add_diag(Diag::only_diag(Diagnosis::TagWithoutMember(kind.symbol_kind())), span);
     }
     sema.tags.complete(tag, members);
     tag

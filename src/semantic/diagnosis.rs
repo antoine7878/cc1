@@ -120,6 +120,7 @@ pub enum Diagnosis {
 
     LabelOutsideFunction,
     DuplicateDeclaration(SymbolKind, Name),
+    TagWithoutMember(SymbolKind),
 }
 
 impl Diagnosis {
@@ -134,6 +135,7 @@ impl Diagnosis {
             Diagnosis::NonIntegerConstantExpression => Severity::Error,
             Diagnosis::CastToNonScalar => Severity::Error,
             Diagnosis::EmptyDeclaration => Severity::Error,
+            Diagnosis::TagWithoutMember(_) => Severity::Error,
             Diagnosis::MultipleStorageSpecifiers => Severity::Error,
             Diagnosis::BlockScopeNotExtern => Severity::Error,
             Diagnosis::InvalidTypeSpecifer => Severity::Error,
@@ -193,6 +195,7 @@ impl DiagnosisNode {
             Diagnosis::CastToNonScalar => "Conversion to non scalar type requested".to_string(),
             Diagnosis::VariantBadValue => "Variant value should be in int range".to_string(),
             Diagnosis::EmptyDeclaration => "Declaration declares nothing".to_string(),
+            Diagnosis::TagWithoutMember(kind) => format!("{kind} has no named member"),
             Diagnosis::MultipleStorageSpecifiers => "Multiple storage class declaration".to_string(),
             Diagnosis::BlockScopeNotExtern => "Function in block not declared as extern".to_string(),
             Diagnosis::InvalidTypeSpecifer => "Invalid type specifer or combination thereof".to_string(),

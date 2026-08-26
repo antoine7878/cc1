@@ -318,8 +318,7 @@ direct_declarator /* DeclaratorNode */
 	| direct_declarator '[' ']'                                                             { node_span!(self, declarators, array, $1, None) }
 	| direct_declarator '(' enter_scope parameter_type_list exit_scope ')'                  { node_span!(self, declarators, function, $1, $4) }
 	| direct_declarator '(' enter_scope identifier_list exit_scope ')'                      { let a = with_span!(self, FunctionParametersNode::old_style, $4); node_span!(self, declarators, function, $1, a) }
-	| direct_declarator '(' enter_scope exit_scope ')'                                      { let a = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, $1, a) }
-	;
+	| direct_declarator '(' enter_scope exit_scope ')'                                      { let a = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, $1, a) } ;
 
 
 pointer  /* Vec<Vec<Qualifier>> */

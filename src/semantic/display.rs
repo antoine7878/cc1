@@ -3,7 +3,7 @@ use crate::semantic::{QualifiedType, ResolvedType};
 use crate::utils::{BLUE, RESET};
 
 impl Context {
-    pub fn describe(&self, qt: QualifiedType) -> String {
+    pub fn describe(&self, qt: &QualifiedType) -> String {
         let mut out = String::new();
         if qt.is_const {
             out.push_str("const ");
@@ -11,7 +11,7 @@ impl Context {
         if qt.is_volatile {
             out.push_str("volatile ");
         }
-        match *self.arenas.resolved_type.get(qt.ty) {
+        match self.arenas.resolved_type.get(qt.ty) {
             ResolvedType::Void => out.push_str("void"),
             ResolvedType::Char => out.push_str("char"),
             ResolvedType::SignedChar => out.push_str("signed char"),
@@ -26,11 +26,11 @@ impl Context {
             ResolvedType::Double => out.push_str("double"),
             ResolvedType::LongDouble => out.push_str("long double"),
             ResolvedType::Pointer(inner) => {
-                out.push_str("pointer to ");
+                out.push('*');
                 out.push_str(&self.describe(inner));
             }
             ResolvedType::Tag(id) => {
-                let def = self.arenas.tags.get(id);
+                let def = self.arenas.tags.get(*id);
                 let name = def.name.map(|n| n.id.resolve(self).as_str()).unwrap_or("<anonymous>");
                 out.push_str(&format!("{} {}", def.kind(), name));
                 if !def.is_complete {
@@ -44,6 +44,15 @@ impl Context {
                     out.push_str(&len.to_string());
                 }
                 out.push(']');
+            }
+            ResolvedType::Function { elem, parameters } => {
+                out.push_str(&format!("{}(*)", self.describe(elem)));
+                out.push('(');
+                for param in parameters {
+                    out.push_str(&self.describe(param));
+                    out.push_str(", ");
+                }
+                out.push(')');
             }
         }
         out
@@ -65,7 +74,7 @@ impl Context {
                     symbol.name.id.resolve(self).clone(),
                     symbol.storage.map(|s| s.to_string()).unwrap_or_default(),
                     symbol.value.map(|v| v.to_string()).unwrap_or("-".to_string()),
-                    symbol.ty.map(|ty| self.describe(ty)).unwrap_or_default(),
+                    symbol.ty.map(|ty| self.describe(&ty)).unwrap_or_default(),
                 ]
             })
             .collect();

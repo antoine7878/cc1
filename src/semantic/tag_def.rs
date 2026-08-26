@@ -12,13 +12,19 @@ pub struct TagDef {
     pub is_complete: bool,
 }
 
-impl TagDef {
-    pub fn kind(&self) -> SymbolKind {
-        match self.kind {
+impl Tag {
+    pub fn symbol_kind(self) -> SymbolKind {
+        match self {
             Tag::Struct => SymbolKind::Struct,
             Tag::Union => SymbolKind::Union,
             Tag::Enum => SymbolKind::Enum,
         }
+    }
+}
+
+impl TagDef {
+    pub fn kind(&self) -> SymbolKind {
+        self.kind.symbol_kind()
     }
 }
 

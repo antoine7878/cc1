@@ -12,7 +12,7 @@ impl Layout {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Target {
     pub name: &'static str,
     pub char: Layout,
@@ -89,7 +89,7 @@ impl Target {
             ResolvedType::Float => self.float,
             ResolvedType::Double => self.double,
             ResolvedType::LongDouble => self.long_double,
-            ResolvedType::Pointer(_) => self.pointer,
+            ResolvedType::Function { .. } | ResolvedType::Pointer(_) => self.pointer,
             ResolvedType::Array { .. } | ResolvedType::Void | ResolvedType::Tag(_) => return None,
         };
         Some(layout)

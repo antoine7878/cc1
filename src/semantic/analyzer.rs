@@ -6,7 +6,7 @@ pub struct Analyzer;
 
 impl Analyzer {
     pub fn analyze(ctx: Context) -> Context {
-        let mut sema = Sema::new(ctx.target);
+        let mut sema = Sema::new(ctx.target.clone());
         Self::resolve_names(&mut sema, &ctx);
         check::run(&mut sema, &ctx);
         sema.into_context(ctx)

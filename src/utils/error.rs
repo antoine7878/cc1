@@ -5,7 +5,7 @@ use std::io::{self, BufRead, BufReader, Read, Write};
 
 use crate::parser::{Context, Span, Yacc};
 use crate::semantic::{Diagnosis, DiagnosisNode, ExpectedTokens, Severity};
-use crate::utils::{GRAY, RESET};
+use crate::utils::RESET;
 
 pub fn yyerror<D: Display, R: Read>(_msg: D, yacc: &mut Yacc<R>) {
     let span = yacc.lexer.span;
@@ -24,43 +24,31 @@ pub fn report<W: Write, D: Display>(
     severity: Severity,
     msg: D,
 ) -> io::Result<()> {
-    const CONTEXT: usize = 3;
-    const ELLIPSIS: &str = "...";
+    let err_line_no = span.start.line - 1;
+    let padding = err_line_no.to_string().len();
+    let mid_pad = 9 - padding;
 
     let path = ctx.file_of(span);
-    let err_line_no = span.start.line;
-    let start = err_line_no.saturating_sub(CONTEXT);
-    let end = err_line_no.saturating_add(CONTEXT);
-    let padding = end.to_string().len();
+    let Ok(file) = File::open(path) else { return Ok(()) };
+    let Some(Ok(line)) = BufReader::new(file).lines().nth(err_line_no) else { return Ok(()) };
+    let line = line.replace('\t', " ");
     let color = severity.color();
+
+    let col_no = caret_end(span, &line);
 
     writeln!(
         w,
-        "{path}:{err_line_no}:{}: {color}{severity}: {msg}{RESET}",
+        "{path}:{err_line_no}:{}: {color}{severity}:{RESET} {msg}",
         span.start.col
     )?;
-
-    let Ok(file) = File::open(path) else { return Ok(()) };
-    let lines = BufReader::new(file).lines();
-
-    writeln!(w, "{ELLIPSIS}")?;
-    for (line_no, line) in lines.enumerate().skip(start).take(end - start) {
-        let Ok(line) = line else { break };
-        let line = line.replace('\t', " ");
-
-        writeln!(w, "{GRAY}{:>padding$}{RESET} {line}", line_no + 1)?;
-
-        if line_no + 1 == err_line_no {
-            let col_no = caret_end(span, &line);
-            writeln!(
-                w,
-                "{:>padding$} {color}{:>col_no$} {msg}{RESET} ",
-                "",
-                "^".repeat(col_no + 1 - span.start.col)
-            )?;
-        }
-    }
-    writeln!(w, "{ELLIPSIS}")
+    writeln!(w, "     {:>padding$}|{:>mid_pad$}{line}", err_line_no, "")?;
+    writeln!(
+        w,
+        "     {:>padding$}|{:>mid_pad$}{color}{:>col_no$}{RESET} ",
+        "",
+        "",
+        "^".repeat(col_no + 1 - span.start.col)
+    )
 }
 
 fn caret_end(span: Span, line: &str) -> usize {
