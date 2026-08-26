@@ -64,16 +64,16 @@ fn x86_64_scalar_layouts() {
 }
 
 #[test]
-fn pointers_and_arrays_use_the_pointer_layout() {
+fn pointers_use_the_pointer_layout() {
     assert_eq!(layout(&I386, &pointer_to_int()), Some((4, 4)));
-    assert_eq!(layout(&I386, &array_of_int()), Some((4, 4)));
     assert_eq!(layout(&X86_64, &pointer_to_int()), Some((8, 8)));
-    assert_eq!(layout(&X86_64, &array_of_int()), Some((8, 8)));
 }
 
 #[test]
-fn void_and_tags_have_no_scalar_layout() {
+fn void_arrays_and_tags_have_no_scalar_layout() {
     assert!(layout(&I386, &ResolvedType::Void).is_none());
+    assert!(layout(&I386, &array_of_int()).is_none());
+    assert!(layout(&X86_64, &array_of_int()).is_none());
     assert!(layout(&I386, &tag()).is_none());
     assert!(I386.bits(&ResolvedType::Void).is_none());
 }
