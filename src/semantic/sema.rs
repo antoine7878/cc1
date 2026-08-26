@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::visit::walk_expression;
-use crate::ast::{Expression, ExpressionId, ExpressionNode, Name, Tag, Value, Visitor};
+use crate::ast::{ExpressionId, Name, Tag, Value};
 use crate::parser::{Context, Span};
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, QualifiedType, ResolvedTypeArena, ResolvedTypeId,
@@ -143,21 +142,5 @@ impl Sema {
         };
         let sym_id = self.symbols.add(name, None, None, SymbolKind::Label, is_init);
         self.scopes.insert(SymbolKind::Label, name.id, sym_id);
-    }
-}
-
-impl Visitor for Sema {
-    fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
-        if self.bindings.contains_key(&node.id) {
-            return;
-        }
-        walk_expression(self, ctx, node);
-        if let Expression::Identifier(name) = node.id.resolve(ctx) {
-            let sym = self.scopes.lookup_ordinary(name.id);
-            if sym.is_none() {
-                self.add_diag(Diag::only_diag(Diagnosis::UndeclaredIdentifier(*name)), &node.span);
-            }
-            self.bindings.insert(node.id, sym);
-        }
     }
 }

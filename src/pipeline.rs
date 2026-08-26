@@ -1,7 +1,8 @@
+use std::env::args;
 use std::process::exit;
 
-use crate::parser::Context;
-use crate::semantic::DiagnosisNode;
+use crate::parser::{Context, Span};
+use crate::semantic::{Diagnosis, DiagnosisNode};
 
 #[derive(Default)]
 pub struct Pipeline {
@@ -42,4 +43,21 @@ impl Pipeline {
     pub fn stopped(&self) -> bool {
         self.exit_code > 0
     }
+}
+
+pub fn parse_args(mut ctx: Context) -> Context {
+    println!();
+    let mut args = args();
+    if args.next().is_none() {
+        ctx.diagnosis
+            .push(DiagnosisNode::new(Diagnosis::BadArgumentsCount, Span::default()));
+        return ctx;
+    };
+    let Some(file_name) = args.next() else {
+        ctx.diagnosis
+            .push(DiagnosisNode::new(Diagnosis::BadArgumentsCount, Span::default()));
+        return ctx;
+    };
+    ctx.set_file_name(file_name);
+    ctx
 }

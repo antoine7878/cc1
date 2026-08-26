@@ -1,15 +1,19 @@
+pub mod scope;
+pub mod ty;
+
 use crate::ast::visit::{
-    Visitor, walk_compound_statement, walk_declaration, walk_jump_statement, walk_labeled_statement,
+    Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_jump_statement,
+    walk_labeled_statement,
 };
 use crate::ast::{
-    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, ExpressionNode,
+    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Expression, ExpressionNode,
     FunctionDefinitionNode, JumpStatement, JumpStatementNode, Labeled, LabeledStatementNode, Name, Storage,
     TypeSpecifier,
 };
 use crate::parser::{Context, Span};
 use crate::semantic::{
     DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo, QualifiedType,
-    ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, ice, ty,
+    ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, ice,
 };
 
 #[derive(Debug)]
@@ -149,6 +153,22 @@ fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
         DeclarationSpecifier::Type(TypeSpecifier::Enum(_)) => true,
         _ => false,
     })
+}
+
+impl Visitor for Sema {
+    fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
+        if self.bindings.contains_key(&node.id) {
+            return;
+        }
+        walk_expression(self, ctx, node);
+        if let Expression::Identifier(name) = node.id.resolve(ctx) {
+            let sym = self.scopes.lookup_ordinary(name.id);
+            if sym.is_none() {
+                self.add_diag(Diag::only_diag(Diagnosis::UndeclaredIdentifier(*name)), &node.span);
+            }
+            self.bindings.insert(node.id, sym);
+        }
+    }
 }
 
 impl Visitor for SymbolResolver<'_> {

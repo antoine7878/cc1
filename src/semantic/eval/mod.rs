@@ -1,7 +1,9 @@
+pub mod ice;
+
 use crate::ast::visit::{Visitor, walk_expression, walk_translation_unit};
 use crate::ast::{Expression, ExpressionNode};
 use crate::parser::Context;
-use crate::semantic::{Sema, ice};
+use crate::semantic::Sema;
 
 struct ConstChecker<'a> {
     sema: &'a mut Sema,

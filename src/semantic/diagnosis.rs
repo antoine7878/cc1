@@ -1,10 +1,11 @@
 use std::fmt::{self, Display};
-use std::io::{self, Write, stderr};
+use std::fs::File;
+use std::io::{self, BufRead, BufReader, Write, stderr};
 
 use crate::ast::Name;
 use crate::parser::{Context, Span};
 use crate::semantic::SymbolKind;
-use crate::utils::{RED, YELLOW, report};
+use crate::utils::{RED, RESET, YELLOW};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Severity {
@@ -291,4 +292,46 @@ impl<T> Diag<Option<T>> {
 pub struct DiagnosisNode {
     pub span: Span,
     pub inner: Diagnosis,
+}
+
+pub fn report<W: Write, D: Display>(
+    w: &mut W,
+    ctx: &Context,
+    span: Span,
+    severity: Severity,
+    msg: D,
+) -> io::Result<()> {
+    let line_no = span.start.line;
+    let padding = line_no.to_string().len();
+    let mid_pad = 9 - padding;
+
+    let path = ctx.file_of(span);
+    let color = severity.color();
+
+    writeln!(
+        w,
+        "{path}:{line_no}:{}: {color}{severity}:{RESET} {msg}",
+        span.start.col
+    )?;
+
+    let Ok(file) = File::open(path) else { return Ok(()) };
+    let Some(Ok(line)) = BufReader::new(file).lines().nth(line_no - 1) else { return Ok(()) };
+    let line = line.replace('\t', " ");
+    let col_no = caret_end(span, &line);
+
+    writeln!(w, "     {:>padding$}|{:>mid_pad$}{line}", line_no, "")?;
+    writeln!(
+        w,
+        "     {:>padding$}|{:>mid_pad$}{color}{:>col_no$}{RESET} ",
+        "",
+        "",
+        "^".repeat(col_no + 1 - span.start.col)
+    )
+}
+
+fn caret_end(span: Span, line: &str) -> usize {
+    match span.start.line == span.end.line {
+        true => span.end.col.max(span.start.col),
+        false => line.len().max(span.start.col),
+    }
 }
