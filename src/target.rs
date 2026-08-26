@@ -41,7 +41,7 @@ pub const I386: Target = Target {
     pointer: Layout::new(4, 4),
     size_t: ResolvedType::UnsignedInt,
     ptrdiff_t: ResolvedType::Int,
-    wchar_t: ResolvedType::Int,
+    wchar_t: ResolvedType::Long,
     char_signed: true,
 };
 
