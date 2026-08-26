@@ -2,14 +2,14 @@ use crate::ast::visit::{
     Visitor, walk_compound_statement, walk_declaration, walk_jump_statement, walk_labeled_statement,
 };
 use crate::ast::{
-    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, ExpressionNode,
-    FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, JumpStatement, JumpStatementNode, Labeled,
-    LabeledStatementNode, Name, ParameterDeclaration, Storage, TypeSpecifier,
+    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, ExpressionNode,
+    FunctionDefinitionNode, JumpStatement, JumpStatementNode, Labeled, LabeledStatementNode, Name, Storage,
+    TypeSpecifier,
 };
 use crate::parser::{Context, Span};
 use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind,
-    constrain, ice, ty,
+    Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo, ParamList, QualifiedType, ResolvedType,
+    ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, ice, ty,
 };
 
 #[derive(Debug)]
@@ -28,17 +28,13 @@ impl<'a> SymbolResolver<'a> {
         Self { sema }
     }
 
-    fn add_function<'ctx>(
-        &mut self,
-        ctx: &'ctx Context,
-        node: &FunctionDefinitionNode,
-    ) -> Option<&'ctx FunctionParametersNode> {
+    fn add_function(&mut self, ctx: &Context, node: &FunctionDefinitionNode) -> Option<(FunctionDefId, ParamList)> {
         let span = &node.span;
+        let decl_span = &node.declarator.span;
 
         let qualif = ty::resolve_type(self.sema, ctx, &node.specifiers, span);
-        let (ty, fn_decl) = ty::make_qualified_type(self.sema, ctx, qualif, &node.declarator)?;
-        let (decl, parameters) =
-            constrain::external::extract_function_declarator(fn_decl.id.resolve(ctx)).collect(self, span)?;
+        let (ty, decl, params) = ty::make_function_type(self.sema, ctx, qualif, &node.declarator)?;
+        let params = constrain::external::extract_function_declarator(params).collect(self, decl_span)?;
 
         let storage = constrain::declaration::get_storage(&node.specifiers)
             .collect(self, span)
@@ -49,8 +45,8 @@ impl<'a> SymbolResolver<'a> {
 
         let name = decl.ident(ctx)?;
         let sym = Symbol::new(name, Some(ty), Some(storage), SymbolKind::Function, true);
-        self.sema.declare(sym, &node.declarator.span);
-        Some(parameters)
+        let sym = self.sema.declare(sym, decl_span);
+        Some((self.sema.functions.declare(sym), params))
     }
 
     fn param_empty(&mut self, lst: &[DeclarationNode], span: &Span) {
@@ -59,32 +55,31 @@ impl<'a> SymbolResolver<'a> {
         }
     }
 
-    #[rustfmt::skip]
-    fn param_ident_style(
-        &mut self,
-        ctx: &Context,
-        params: &[ParameterDeclaration],
-        lst: &[DeclarationNode],
-        span: &Span,
-    ) {
-        let a = constrain::external::is_valid_parameter_style(ctx, params, lst);
-        match a {
-            Diag { res: true, diagnosis: None, } => (),
-            Diag { res: false, diagnosis: None, } => return,
-            _ => { let _ = a.collect(self, span); }
+    fn param_prototype(&mut self, params: &[ParamInfo], lst: &[DeclarationNode], span: &Span) -> Vec<SymbolId> {
+        if !constrain::external::is_valid_parameter_style(params, lst).collect(self, span) {
+            return Vec::new();
         }
-
-        for param in params {
-            let ParameterDeclaration {
-                span,
-                specifiers,
-                declarator,
-            } = param;
-            self.add_parameter_declarator(ctx, specifiers, declarator, span);
+        if let [only] = params {
+            let is_void = matches!(self.sema.types.get(only.ty.ty), ResolvedType::Void);
+            constrain::external::check_void_parameter(is_void).collect(self, &only.span);
         }
+        params.iter().filter_map(|param| self.add_parameter(param)).collect()
     }
 
-    fn param_old_style(&mut self, ctx: &Context, names: &[Name], lst: &[DeclarationNode], span: &Span) {
+    fn add_parameter(&mut self, param: &ParamInfo) -> Option<SymbolId> {
+        let name = param.name?;
+        let storage = param.storage.unwrap_or(Storage::Auto);
+        let sym = Symbol::new(name, Some(param.ty), Some(storage), SymbolKind::Parameter, false);
+        Some(self.sema.declare(sym, &name.span))
+    }
+
+    fn param_old_style(
+        &mut self,
+        ctx: &Context,
+        names: &[Name],
+        lst: &[DeclarationNode],
+        span: &Span,
+    ) -> Vec<SymbolId> {
         let declarations: Vec<_> = lst
             .iter()
             .flat_map(
@@ -108,14 +103,18 @@ impl<'a> SymbolResolver<'a> {
 
         let Some(missing_id) = constrain::external::is_valid_old_style(&names_id, declarations).collect(self, span)
         else {
-            return;
+            return Vec::new();
         };
         for string_id in missing_id {
             let ty = QualifiedType::new(self.sema.types.int(), false, false);
             let name = Name::new(string_id, Span::default());
-            let sym = Symbol::new(name, Some(ty), Some(Storage::Register), SymbolKind::Parameter, false);
+            let sym = Symbol::new(name, Some(ty), Some(Storage::Auto), SymbolKind::Parameter, false);
             self.sema.declare(sym, &Span::default());
         }
+        names
+            .iter()
+            .filter_map(|name| self.sema.scopes.lookup_ordinary(name.id))
+            .collect()
     }
 
     fn add_parameter_declarator(
@@ -127,20 +126,15 @@ impl<'a> SymbolResolver<'a> {
     ) -> Option<SymbolId> {
         let qualif = ty::resolve_type(self.sema, ctx, specifiers, span);
         let (ty, decl) = ty::make_qualified_type(self.sema, ctx, qualif, decl)?;
-        let storage = constrain::declaration::get_storage(specifiers)
-            .collect(self, span)
-            .unwrap_or(Storage::Register);
-        constrain::external::param_storage_only_register(storage).collect(self, span)?;
+        let ty = self.sema.types.adjust_parameter(ty);
+        let declared_storage = constrain::declaration::get_storage(specifiers).collect(self, span);
+        if let Some(storage) = declared_storage {
+            constrain::external::param_storage_only_register(storage).collect(self, span)?;
+        }
         let name = decl.ident(ctx)?;
+        let storage = declared_storage.unwrap_or(Storage::Auto);
         let sym = Symbol::new(name, Some(ty), Some(storage), SymbolKind::Parameter, false);
         Some(self.sema.declare(sym, &decl.span))
-    }
-}
-
-fn is_function_declarator(ctx: &Context, decl: &DeclaratorNode) -> bool {
-    match decl.id.resolve(ctx) {
-        Declarator::Function { declarator, .. } => matches!(declarator.id.resolve(ctx), Declarator::Ident(_)),
-        _ => false,
     }
 }
 
@@ -155,18 +149,20 @@ fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
 
 impl Visitor for SymbolResolver<'_> {
     fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
-        let Some(parameters) = self.add_function(ctx, node) else { return };
+        let Some((def, params)) = self.add_function(ctx, node) else { return };
 
         self.sema.scopes.push(ScopeKind::Prototype);
-        let span = &parameters.span;
-        match &parameters.param {
-            FunctionParameters::Empty => self.param_empty(&node.old_style_declarations, span),
-            FunctionParameters::ParameterTypeList(params) => {
-                self.param_ident_style(ctx, params, &node.old_style_declarations, span)
+        let lst = &node.old_style_declarations;
+        let span = &node.declarator.span;
+        let parameters = match &params {
+            ParamList::Unspecified => {
+                self.param_empty(lst, span);
+                Vec::new()
             }
-            FunctionParameters::OldStyle(names) => self.param_old_style(ctx, names, &node.old_style_declarations, span),
-            FunctionParameters::Variadic(_) => unimplemented!(),
-        }
+            ParamList::Names(names) => self.param_old_style(ctx, names, lst, span),
+            ParamList::Prototype { params, .. } => self.param_prototype(params, lst, span),
+        };
+        self.sema.functions.complete(def, parameters);
 
         self.visit_compound_statement(ctx, &node.body);
     }
@@ -186,15 +182,21 @@ impl Visitor for SymbolResolver<'_> {
             let decl = &init_declarator.declarator;
             let Some((ty, decl)) = ty::make_qualified_type(self.sema, ctx, qualif, decl) else { continue };
             let Some(name) = decl.ident(ctx) else { continue };
+            let is_function = matches!(self.sema.types.get(ty.ty), ResolvedType::Function { .. });
             if let Some(declared_storage) = declared_storage
                 && declared_storage != Storage::Typedef
-                && is_function_declarator(ctx, &decl)
+                && is_function
             {
                 constrain::declaration::extern_function_only(self.sema.scopes.kind(), declared_storage)
                     .collect(self, &decl.span);
             }
-            let storage = declared_storage.unwrap_or(Storage::Auto);
-            let kind = if storage == Storage::Typedef { SymbolKind::Typedef } else { SymbolKind::Variable };
+            let default_storage = if is_function { Storage::Extern } else { Storage::Auto };
+            let storage = declared_storage.unwrap_or(default_storage);
+            let kind = match storage {
+                Storage::Typedef => SymbolKind::Typedef,
+                _ if is_function => SymbolKind::Function,
+                _ => SymbolKind::Variable,
+            };
             let is_init = init_declarator.initializer.is_some();
             self.sema
                 .declare(Symbol::new(name, Some(ty), Some(storage), kind, is_init), &decl.span);

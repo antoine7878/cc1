@@ -1,4 +1,8 @@
-use crate::{ast::TypeSpecifier, define_interner, semantic::TagDefId};
+use crate::{
+    ast::TypeSpecifier,
+    define_interner,
+    semantic::{Params, TagDefId},
+};
 
 define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, resolved_type);
 
@@ -17,14 +21,8 @@ pub enum ResolvedType {
     Float,
     Double,
     LongDouble,
-    Array {
-        elem: QualifiedType,
-        len: Option<u32>,
-    },
-    Function {
-        elem: QualifiedType,
-        parameters: Vec<QualifiedType>,
-    },
+    Array { elem: QualifiedType, len: Option<u32> },
+    Function { ret: QualifiedType, params: Params },
     Pointer(QualifiedType),
     Tag(TagDefId),
 }
@@ -66,8 +64,29 @@ impl ResolvedTypeArena {
         self.alloc(ResolvedType::Array { elem, len })
     }
 
-    pub fn function(&mut self, elem: QualifiedType, parameters: Vec<QualifiedType>) -> ResolvedTypeId {
-        self.alloc(ResolvedType::Function { elem, parameters })
+    pub fn function(&mut self, ret: QualifiedType, params: Params) -> ResolvedTypeId {
+        let params = match params {
+            Params::Unspecified => Params::Unspecified,
+            Params::Prototype { params, is_variadic } => Params::Prototype {
+                params: params.into_iter().map(|param| self.parameter(param)).collect(),
+                is_variadic,
+            },
+        };
+        self.alloc(ResolvedType::Function { ret, params })
+    }
+
+    pub fn adjust_parameter(&mut self, param: QualifiedType) -> QualifiedType {
+        let id = match self.get(param.ty).clone() {
+            ResolvedType::Array { elem, .. } => self.pointer(elem),
+            ResolvedType::Function { .. } => self.pointer(QualifiedType::new(param.ty, false, false)),
+            _ => return param,
+        };
+        QualifiedType::new(id, param.is_const, param.is_volatile)
+    }
+
+    fn parameter(&mut self, param: QualifiedType) -> QualifiedType {
+        let param = self.adjust_parameter(param);
+        QualifiedType::new(param.ty, false, false)
     }
 
     pub fn tag(&mut self, id: TagDefId) -> ResolvedTypeId {

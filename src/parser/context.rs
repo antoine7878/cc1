@@ -4,7 +4,9 @@ use crate::ast::{DeclarationSpecifier, DeclaratorArena, ExpressionId, Name, Stor
 use crate::ast::{EnumArena, ExpressionArena, StatementArena, StringArena, StringId, StructArena};
 use crate::ast::{StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena};
 use crate::parser::{Span, YYToken};
-use crate::semantic::{DiagnosisNode, ResolvedTypeArena, SymbolArena, SymbolId, SymbolKind, TagDefArena};
+use crate::semantic::{
+    DiagnosisNode, FunctionDefArena, ResolvedTypeArena, SymbolArena, SymbolId, SymbolKind, TagDefArena,
+};
 use crate::target::Target;
 
 #[derive(Debug, Default)]
@@ -20,6 +22,7 @@ pub struct Arenas {
     pub symbols: SymbolArena,
     pub resolved_type: ResolvedTypeArena,
     pub tags: TagDefArena,
+    pub functions: FunctionDefArena,
 }
 
 #[derive(Debug)]

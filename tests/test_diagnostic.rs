@@ -66,6 +66,45 @@ reports!(
     ]
 );
 
+reports!(
+    report_void_is_not_the_only_parameter,
+    "void f(void, int) { }",
+    [
+        "<test>:1:8: error: Parameter shall not have void type",
+        "<test>:1:6: error: Absctract declaration in old style function",
+    ]
+);
+
+reports!(
+    report_named_void_parameter,
+    "void f(void x) { }",
+    ["<test>:1:8: error: Parameter shall not have void type"]
+);
+
+reports!(
+    report_parameter_storage_class,
+    "void f(static int a) { }",
+    ["<test>:1:8: error: Parameter shall only by declared with register storage"]
+);
+
+reports!(
+    report_prototype_with_declaration_list,
+    "int f(int a) int b; { return a; }",
+    ["<test>:1:5: error: Parameter style function declration shall not be followed by a declaration list"]
+);
+
+reports!(
+    report_duplicate_parameter,
+    "int f(int a, int a) { return a; }",
+    ["<test>:1:18: error: duplicate declaration of parameter `a'"]
+);
+
+reports!(
+    report_declarator_is_not_a_function,
+    "int (*f)(void) { return 0; }",
+    ["<test>:1:5: error: Declarator shall be function type"]
+);
+
 #[test]
 fn an_accepted_unit_reports_nothing() {
     let unit = Unit::compile("int main(void) { return 0; }");

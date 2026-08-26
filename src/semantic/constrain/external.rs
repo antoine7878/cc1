@@ -1,11 +1,8 @@
 use std::collections::HashSet;
 
-use crate::ast::{
-    DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, FunctionParametersNode, InitDeclaratorNode,
-    Name, ParameterDeclaration, Storage, StringId,
-};
+use crate::ast::{DeclarationNode, DeclarationSpecifier, InitDeclaratorNode, Name, Storage, StringId};
 use crate::parser::Context;
-use crate::semantic::{Diag, diagnosis::Diagnosis};
+use crate::semantic::{Diag, ParamInfo, ParamList, diagnosis::Diagnosis};
 
 /// 6.7 External definitions
 /// The storage-class specifiers auto and register shall not appear in the declaration specifiers in an external declaration.
@@ -46,12 +43,10 @@ pub fn check_function_storage(storage: Storage) -> Diag<()> {
 /// 6.7.1 Function definitions
 /// The identifier declared in a function definition (which is the name of the function) shall have
 /// a function type, as specifed by the declarator portion of the function definition.
-pub fn extract_function_declarator(
-    declarator: &Declarator,
-) -> Diag<Option<(&DeclaratorNode, &FunctionParametersNode)>> {
-    match declarator {
-        Declarator::Function { declarator, params } => Diag::res(Some((declarator, params))),
-        _ => Diag::with_diag(None, Diagnosis::NotFunctionTypeDeclarator),
+pub fn extract_function_declarator(params: Option<ParamList>) -> Diag<Option<ParamList>> {
+    match params {
+        Some(params) => Diag::some(params),
+        None => Diag::none_diag(Diagnosis::NotFunctionTypeDeclarator),
     }
 }
 
@@ -63,29 +58,26 @@ pub fn extract_function_declarator(
 ///     false -> valid function no parameter symbol
 ///     true -> valid function with parameter symbol
 ///     Diagnosis -> invalid function
-pub fn is_valid_parameter_style(
-    ctx: &Context,
-    params: &[ParameterDeclaration],
-    old_style_declarations: &[DeclarationNode],
-) -> Diag<bool> {
+pub fn is_valid_parameter_style(params: &[ParamInfo], old_style_declarations: &[DeclarationNode]) -> Diag<bool> {
+    let is_named = params.iter().all(|param| param.name.is_some());
     if !old_style_declarations.is_empty() {
-        return Diag::with_diag(false, Diagnosis::ParameterTypeListWithList);
+        return Diag::with_diag(is_named, Diagnosis::ParameterTypeListWithList);
     }
-    // case fn()
     if params.is_empty() {
         return Diag::res(false);
     }
-    // case fn(void)
-    if let Some(f) = params.first()
-        && f.is_abstract_void(ctx)
-    {
-        return Diag::res(false);
+    match is_named {
+        true => Diag::res(true),
+        false => Diag::with_diag(false, Diagnosis::AbstractParameterDeclaration),
     }
+}
 
-    if params.iter().all(|p| p.declarator.ident(ctx).is_some()) {
-        Diag::res(true)
-    } else {
-        Diag::with_diag(false, Diagnosis::AbstractParameterDeclaration)
+/// 6.7.1 Function definitions
+/// The resulting parameter type shall be an object type.
+pub fn check_void_parameter(is_void: bool) -> Diag<()> {
+    match is_void {
+        true => Diag::only_diag(Diagnosis::VoidParameter),
+        false => Diag::res(()),
     }
 }
 

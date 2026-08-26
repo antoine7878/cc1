@@ -4,8 +4,8 @@ use crate::ast::visit::walk_expression;
 use crate::ast::{Expression, ExpressionId, ExpressionNode, Name, Tag, Value, Visitor};
 use crate::parser::{Context, Span};
 use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedTypeArena, ResolvedTypeId, ScopeKind, Scopes,
-    Symbol, SymbolArena, SymbolId, SymbolKind, TagDefArena, TagDefId,
+    Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, QualifiedType, ResolvedTypeArena, ResolvedTypeId,
+    ScopeKind, Scopes, Symbol, SymbolArena, SymbolId, SymbolKind, TagDefArena, TagDefId,
 };
 use crate::target::{Layout, Target};
 
@@ -16,6 +16,7 @@ pub struct Sema {
     pub symbols: SymbolArena,
     pub types: ResolvedTypeArena,
     pub tags: TagDefArena,
+    pub functions: FunctionDefArena,
     pub bindings: HashMap<ExpressionId, Option<SymbolId>>,
     pub const_values: HashMap<ExpressionId, Option<Value>>,
     pub layouts: HashMap<ResolvedTypeId, Layout>,
@@ -43,6 +44,7 @@ impl Sema {
             symbols,
             types,
             tags,
+            functions,
             bindings,
             const_values,
             layouts: _,
@@ -51,6 +53,7 @@ impl Sema {
         ctx.arenas.symbols = symbols;
         ctx.arenas.resolved_type = types;
         ctx.arenas.tags = tags;
+        ctx.arenas.functions = functions;
         ctx.bindings = bindings;
         ctx.const_values = const_values;
         ctx.diagnosis.extend(diagnosis);

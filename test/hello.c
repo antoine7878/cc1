@@ -1,4 +1,1 @@
-int max(a, b)
-int a;
-int b;
-{ return a > b ? a : b; }
+int a[1][2];

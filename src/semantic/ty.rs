@@ -1,10 +1,11 @@
 use crate::ast::{
-    DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, ExpressionNode, FunctionParameters, Name,
-    StructDeclaration, Tag, TypeSpecifier,
+    DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, ExpressionNode, FunctionParameters,
+    FunctionParametersNode, Name, ParameterDeclaration, StructDeclaration, Tag, TypeSpecifier,
 };
 use crate::parser::{Context, Span};
 use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, QualifiedType, Sema, Symbol, SymbolKind, TagDefId, constrain, ice,
+    Diag, DiagCollector, Diagnosis, ParamInfo, ParamList, QualifiedType, ResolvedType, Sema, Symbol, SymbolKind,
+    TagDefId, constrain, ice,
 };
 
 /// 6.5.2 Type specifiers
@@ -55,6 +56,16 @@ pub fn make_qualified_type(
     inner_most: Option<QualifiedType>,
     decl: &DeclaratorNode,
 ) -> Option<(QualifiedType, DeclaratorNode)> {
+    let (ty, declarator, _) = extract_declarator(sema, ctx, decl, inner_most?);
+    Some((ty, declarator))
+}
+
+pub fn make_function_type(
+    sema: &mut Sema,
+    ctx: &Context,
+    inner_most: Option<QualifiedType>,
+    decl: &DeclaratorNode,
+) -> Option<(QualifiedType, DeclaratorNode, Option<ParamList>)> {
     Some(extract_declarator(sema, ctx, decl, inner_most?))
 }
 
@@ -63,44 +74,87 @@ fn extract_declarator(
     ctx: &Context,
     declarator: &DeclaratorNode,
     inner_most: QualifiedType,
-) -> (QualifiedType, DeclaratorNode) {
+) -> (QualifiedType, DeclaratorNode, Option<ParamList>) {
     match declarator.id.resolve(ctx) {
         Declarator::Pointer { qualifiers, inner } => {
-            let (qty, decl) = extract_declarator(sema, ctx, inner, inner_most);
             let (is_const, is_volatile) =
                 constrain::declaration::check_qualifier(qualifiers).collect(sema, &declarator.span);
-            let id = sema.types.pointer(qty);
-            (QualifiedType::new(id, is_const, is_volatile), decl)
+            let id = sema.types.pointer(inner_most);
+            extract_declarator(sema, ctx, inner, QualifiedType::new(id, is_const, is_volatile))
         }
-        Declarator::Array { declarator, size } => {
+        Declarator::Array {
+            declarator: inner,
+            size,
+        } => {
             let len = size.as_ref().and_then(|e| array_length(sema, ctx, e));
-            let (qty, decl) = extract_declarator(sema, ctx, declarator, inner_most);
-            let id = sema.types.array(qty, len);
-            (QualifiedType::new(id, false, false), decl)
+            let id = sema.types.array(inner_most, len);
+            extract_declarator(sema, ctx, inner, QualifiedType::new(id, false, false))
         }
-        // Declarator::Function { declarator, params } => {
-        // let params = match &params.param {
-        //     FunctionParameters::OldStyle(names) => {
-        //         print!("params: ");
-        //         for name in names {
-        //             print!("{}, ", name.id.resolve(ctx));
-        //         }
-        //     }
-        //     _ => (),
-        // };
-        // let params = match &params.param {
-        //     FunctionParameters::Empty => Vec::new(),
-        //     FunctionParameters::ParameterTypeList(params) => unimplemented!("param list"),
-        //     FunctionParameters::OldStyle(names) => unimplemented!("old"),
-        //     FunctionParameters::Variadic(_) => unimplemented!("variadic"),
-        // };
-        // let (qty, decl) = extract_declarator(sema, ctx, declarator, inner_most);
-        // let id = sema.types.function(qty, params);
-        // (QualifiedType::new(id, false, false), decl)
-        //     (inner_most, declarator.clone())
-        // }
-        _ => (inner_most, declarator.clone()),
+        Declarator::Function {
+            declarator: inner,
+            params,
+        } => {
+            let list = resolve_params(sema, ctx, params);
+            let id = sema.types.function(inner_most, list.types());
+            let (ty, leaf, inner_list) = extract_declarator(sema, ctx, inner, QualifiedType::new(id, false, false));
+            match inner.id.resolve(ctx) {
+                Declarator::Ident(_) | Declarator::Abstract => (ty, leaf, Some(list)),
+                _ => (ty, leaf, inner_list),
+            }
+        }
+        _ => (inner_most, declarator.clone(), None),
     }
+}
+
+fn resolve_params(sema: &mut Sema, ctx: &Context, params: &FunctionParametersNode) -> ParamList {
+    match &params.param {
+        FunctionParameters::Empty => ParamList::Unspecified,
+        FunctionParameters::OldStyle(names) => ParamList::Names(names.clone()),
+        FunctionParameters::ParameterTypeList(params) => resolve_prototype(sema, ctx, params, false),
+        FunctionParameters::Variadic(params) => resolve_prototype(sema, ctx, params, true),
+    }
+}
+
+/// 6.5.4.3 Function declarators
+/// The special case of an unnamed parameter of type void as the only item in the list specifies
+/// that the function has no parameters.
+fn resolve_prototype(sema: &mut Sema, ctx: &Context, params: &[ParameterDeclaration], is_variadic: bool) -> ParamList {
+    if let [only] = params
+        && !is_variadic
+        && only.is_abstract_void(ctx)
+    {
+        return ParamList::Prototype {
+            params: Vec::new(),
+            is_variadic,
+        };
+    }
+    let params: Vec<ParamInfo> = params
+        .iter()
+        .filter_map(|param| resolve_parameter(sema, ctx, param))
+        .collect();
+    for param in &params {
+        let is_void = matches!(sema.types.get(param.ty.ty), ResolvedType::Void);
+        let is_special_case = params.len() == 1 && param.name.is_some();
+        constrain::external::check_void_parameter(is_void && !is_special_case).collect(sema, &param.span);
+    }
+    ParamList::Prototype { params, is_variadic }
+}
+
+fn resolve_parameter(sema: &mut Sema, ctx: &Context, param: &ParameterDeclaration) -> Option<ParamInfo> {
+    let span = &param.span;
+    let qualif = resolve_type(sema, ctx, &param.specifiers, span);
+    let (ty, decl) = make_qualified_type(sema, ctx, qualif, &param.declarator)?;
+    let ty = sema.types.adjust_parameter(ty);
+    let storage = constrain::declaration::get_storage(&param.specifiers).collect(sema, span);
+    if let Some(storage) = storage {
+        constrain::external::param_storage_only_register(storage).collect(sema, span);
+    }
+    Some(ParamInfo {
+        name: decl.ident(ctx),
+        ty,
+        storage,
+        span: *span,
+    })
 }
 
 fn array_length(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<u32> {

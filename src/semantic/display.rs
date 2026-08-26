@@ -1,5 +1,5 @@
 use crate::parser::Context;
-use crate::semantic::{QualifiedType, ResolvedType};
+use crate::semantic::{Params, QualifiedType, ResolvedType};
 use crate::utils::{BLUE, RESET};
 
 impl Context {
@@ -27,7 +27,10 @@ impl Context {
             ResolvedType::LongDouble => out.push_str("long double"),
             ResolvedType::Pointer(inner) => {
                 out.push('*');
-                out.push_str(&self.describe(inner));
+                match self.arenas.resolved_type.get(inner.ty) {
+                    ResolvedType::Function { .. } => out.push_str(&format!("({})", self.describe(inner))),
+                    _ => out.push_str(&self.describe(inner)),
+                }
             }
             ResolvedType::Tag(id) => {
                 let def = self.arenas.tags.get(*id);
@@ -45,12 +48,18 @@ impl Context {
                 }
                 out.push(']');
             }
-            ResolvedType::Function { elem, parameters } => {
-                out.push_str(&format!("{}(*)", self.describe(elem)));
+            ResolvedType::Function { ret, params } => {
+                out.push_str(&self.describe(ret));
                 out.push('(');
-                for param in parameters {
-                    out.push_str(&self.describe(param));
-                    out.push_str(", ");
+                if let Params::Prototype { params, is_variadic } = params {
+                    let described: Vec<String> = params.iter().map(|param| self.describe(param)).collect();
+                    match described.is_empty() {
+                        true => out.push_str("void"),
+                        false => out.push_str(&described.join(", ")),
+                    }
+                    if *is_variadic {
+                        out.push_str(", ...");
+                    }
                 }
                 out.push(')');
             }

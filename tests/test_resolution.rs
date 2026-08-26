@@ -1,6 +1,6 @@
 mod common;
 
-use cc1::semantic::Diagnosis;
+use cc1::semantic::{Diagnosis, FunctionDefId, SymbolKind};
 use common::Unit;
 
 fn folded(src: &str) -> Vec<String> {
@@ -213,7 +213,161 @@ describes!(
     "struct <anonymous>"
 );
 describes!(describe_parameter, "void f(char *s) { }", "s", "*char");
-describes!(describe_function_returns, "long f(void) { return 0; }", "f", "long");
+describes!(
+    describe_function_returns,
+    "long f(void) { return 0; }",
+    "f",
+    "long(void)"
+);
+describes!(
+    describe_function_returning_pointer,
+    "int *f(void) { return 0; }",
+    "f",
+    "*int(void)"
+);
+describes!(
+    describe_function_without_prototype,
+    "int f() { return 0; }",
+    "f",
+    "int()"
+);
+describes!(
+    describe_function_parameters,
+    "void f(int a, char *s) { }",
+    "f",
+    "void(int, *char)"
+);
+describes!(
+    describe_variadic_function,
+    "int f(char *s, ...) { return 0; }",
+    "f",
+    "int(*char, ...)"
+);
+describes!(describe_pointer_to_function, "int (*p)(void);", "p", "*(int(void))");
+describes!(
+    describe_array_of_pointer_to_function,
+    "int (*p[3])(void);",
+    "p",
+    "*(int(void))[3]"
+);
+describes!(describe_array_of_array, "int a[3][5];", "a", "int[5][3]");
+describes!(describe_array_parameter, "void f(int a[3]) { }", "a", "*int");
+describes!(
+    describe_function_parameter,
+    "void f(int g(void)) { }",
+    "g",
+    "*(int(void))"
+);
+describes!(
+    describe_adjusted_parameter_types,
+    "void f(int a[3], int g(void)) { }",
+    "f",
+    "void(*int, *(int(void)))"
+);
+describes!(
+    describe_old_style_array_parameter,
+    "int f(a) int a[3]; { return 0; }",
+    "a",
+    "*int"
+);
+describes!(
+    describe_qualified_parameter,
+    "void f(const int a) { }",
+    "a",
+    "const int"
+);
+describes!(
+    describe_unqualified_parameter_type,
+    "void f(const int a) { }",
+    "f",
+    "void(int)"
+);
+describes!(
+    describe_old_style_function,
+    "int f(a, b) int a; char b; { return a; }",
+    "f",
+    "int()"
+);
+
+#[test]
+fn a_prototype_and_its_definition_declare_one_function() {
+    let unit = accepted("int f(int a); int f(int a) { return a; }");
+    let functions: Vec<_> = unit
+        .symbols()
+        .into_iter()
+        .filter(|(_, kind, _)| kind == "function")
+        .collect();
+    assert_eq!(
+        functions,
+        [("f".to_string(), "function".to_string(), "int(int)".to_string())]
+    );
+}
+
+#[test]
+fn identical_function_types_share_one_interned_type() {
+    let unit = accepted("int f(int a); int g(int b); int h(char c);");
+    let types: Vec<_> = unit
+        .ctx
+        .arenas
+        .symbols
+        .data
+        .iter()
+        .filter(|symbol| symbol.kind == SymbolKind::Function)
+        .map(|symbol| symbol.ty.expect("function type").ty)
+        .collect();
+    assert_eq!(types[0], types[1]);
+    assert_ne!(types[0], types[2]);
+}
+
+#[test]
+fn a_function_definition_records_its_parameters_in_order() {
+    let unit = accepted("int f(int a, char b) { return a; }");
+    let names: Vec<_> = unit
+        .ctx
+        .arenas
+        .functions
+        .data
+        .iter()
+        .map(|def| {
+            let parameters: Vec<_> = def
+                .parameters
+                .iter()
+                .map(|&id| unit.ctx.arenas.symbols.get(id).name.id.resolve(&unit.ctx).clone())
+                .collect();
+            (
+                unit.ctx.arenas.symbols.get(def.sym).name.id.resolve(&unit.ctx).clone(),
+                parameters,
+                def.is_complete,
+            )
+        })
+        .collect();
+    assert_eq!(names, [("f".to_string(), vec!["a".to_string(), "b".to_string()], true)]);
+}
+
+#[test]
+fn a_function_definition_takes_its_type_from_its_symbol() {
+    let unit = accepted("int f(int a, char b) { return a; }");
+    let id = FunctionDefId::from(0);
+    let ty = unit
+        .ctx
+        .arenas
+        .functions
+        .ty(id, &unit.ctx.arenas.symbols)
+        .expect("function type");
+    assert_eq!(unit.ctx.describe(&ty), "int(int, char)");
+}
+
+#[test]
+fn an_old_style_definition_records_its_parameters_in_declarator_order() {
+    let unit = accepted("int f(a, b) char b; { return a; }");
+    let def = unit.ctx.arenas.functions.data.first().expect("function definition");
+    let parameters: Vec<_> = def
+        .parameters
+        .iter()
+        .map(|&id| unit.ctx.arenas.symbols.get(id).name.id.resolve(&unit.ctx).clone())
+        .collect();
+    assert_eq!(parameters, ["a", "b"]);
+}
 
 #[test]
 fn symbols_are_recorded_in_declaration_order_with_their_kind() {
