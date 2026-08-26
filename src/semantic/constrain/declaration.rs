@@ -1,7 +1,7 @@
 use crate::ast::{DeclarationSpecifier, Qualifier, Storage, Tag, TypeSpecifier, Value};
 use crate::parser::{Context, Span};
 use crate::semantic::diagnosis::{Diag, Diagnosis};
-use crate::semantic::resolution::SymbolResolver;
+use crate::semantic::sema::Sema;
 use crate::semantic::{QualifiedType, ResolvedType, ScopeKind, TypeSpecifierCounter};
 
 /// 6.5.1 Storage-class specifiers
@@ -32,12 +32,12 @@ pub fn extern_function_only(scope_type: ScopeKind, storage: Storage) -> Diag<()>
 /// 6.5.2 Type specifiers
 /// Each list of type specifiers shall be one of the following sets...
 pub fn resolve_type(
-    resolver: &mut SymbolResolver,
+    sema: &mut Sema,
     ctx: &Context,
     specifiers: &[DeclarationSpecifier],
     span: &Span,
 ) -> Option<QualifiedType> {
-    let (is_const, is_volatile) = get_qualifier(specifiers).collect(resolver, span);
+    let (is_const, is_volatile) = get_qualifier(specifiers).collect(sema, span);
 
     let types: Vec<_> = specifiers
         .iter()
@@ -50,22 +50,22 @@ pub fn resolve_type(
     let id = match types.as_slice() {
         [TypeSpecifier::Struct(t)] => {
             let node = t.resolve(ctx);
-            let tag = resolver.resolve_struct_or_union(ctx, Tag::Struct, node.name, &node.fields, &node.span);
-            resolver.types.tag(tag)
+            let tag = sema.resolve_struct_or_union(ctx, Tag::Struct, node.name, &node.fields, &node.span);
+            sema.types.tag(tag)
         }
         [TypeSpecifier::Union(t)] => {
             let node = t.resolve(ctx);
-            let tag = resolver.resolve_struct_or_union(ctx, Tag::Union, node.name, &node.fields, &node.span);
-            resolver.types.tag(tag)
+            let tag = sema.resolve_struct_or_union(ctx, Tag::Union, node.name, &node.fields, &node.span);
+            sema.types.tag(tag)
         }
         [TypeSpecifier::Enum(t)] => {
-            let tag = resolver.resolve_enum(ctx, *t)?;
-            resolver.types.tag(tag)
+            let tag = sema.resolve_enum(ctx, *t)?;
+            sema.types.tag(tag)
         }
-        [TypeSpecifier::TypedefName(t)] => return resolver.resolve_typedef(*t, is_const, is_volatile, span),
+        [TypeSpecifier::TypedefName(t)] => return sema.resolve_typedef(*t, is_const, is_volatile, span),
         s => {
-            let ty = basic_type(s).collect(resolver, span)?;
-            resolver.types.alloc(ty)
+            let ty = basic_type(s).collect(sema, span)?;
+            sema.types.alloc(ty)
         }
     };
     Some(QualifiedType::new(id, is_const, is_volatile))
