@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 struct a {
 	int a : 1;
 	: 0;

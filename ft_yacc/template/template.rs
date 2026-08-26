@@ -208,6 +208,20 @@ impl<R: Read> Yacc<R> {
         "syntax error".to_string()
     }
 
+    pub fn yy_lookahead_name(&self) -> &'static str {
+        Self::YY_TOKEN_NAMES[self.lookahead_id]
+    }
+
+    pub fn yy_expected(&self) -> Vec<&'static str> {
+        let &state = self.state_stack.last().unwrap();
+        (0..Self::YY_TOKEN_NAMES.len())
+            .filter(|&t| !Self::YY_TERMINAL_TABLE[t])
+            .filter(|&t| t != Self::YY_ERROR_TOKEN_ID && t != Self::YY_ACCEPT_TOKEN_ID)
+            .filter(|&t| Self::YY_GOTO_TABLE[state][t] != 0)
+            .map(|t| Self::YY_TOKEN_NAMES[t])
+            .collect()
+    }
+
     pub fn yyerrok(&mut self) {
         self.is_recovering = false;
     }

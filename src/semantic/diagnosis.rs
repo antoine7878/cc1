@@ -30,10 +30,63 @@ impl Display for Severity {
     }
 }
 
+pub const MAX_EXPECTED: usize = 5;
+
+#[derive(Clone, Copy, Debug)]
+pub struct ExpectedTokens {
+    names: [&'static str; MAX_EXPECTED],
+    len: usize,
+}
+
+const STRUCTURAL: [&str; 6] = ["';'", "','", "')'", "']'", "'}'", "':'"];
+
+fn token_label(name: &str) -> &str {
+    match name {
+        "yyeof" => "end of file",
+        name => name,
+    }
+}
+
+impl ExpectedTokens {
+    pub fn new(names: &[&'static str]) -> Self {
+        if names.len() <= MAX_EXPECTED {
+            return Self::from_slice(names);
+        }
+        let structural: Vec<&'static str> = names.iter().copied().filter(|n| STRUCTURAL.contains(n)).collect();
+        match structural.len() <= MAX_EXPECTED {
+            true => Self::from_slice(&structural),
+            false => Self::from_slice(&[]),
+        }
+    }
+
+    fn from_slice(names: &[&'static str]) -> Self {
+        let mut buf = [""; MAX_EXPECTED];
+        buf[..names.len()].copy_from_slice(names);
+        Self { names: buf, len: names.len() }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+}
+
+impl Display for ExpectedTokens {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, name) in self.names[..self.len].iter().map(|n| token_label(n)).enumerate() {
+            match i {
+                0 => write!(f, "{name}")?,
+                i if i + 1 == self.len => write!(f, " or {name}")?,
+                _ => write!(f, ", {name}")?,
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum Diagnosis {
     BadArgumentsCount,
-    SyntaxError,
+    SyntaxError { found: &'static str, expected: ExpectedTokens },
     InvalidSizeof,
     UndeclaredIdentifier(Name),
     // 6.4
@@ -74,7 +127,7 @@ impl Diagnosis {
     pub fn severity(&self) -> Severity {
         match self {
             Diagnosis::BadArgumentsCount => Severity::Error,
-            Diagnosis::SyntaxError => Severity::Error,
+            Diagnosis::SyntaxError { .. } => Severity::Error,
             Diagnosis::InvalidSizeof => Severity::Error,
             Diagnosis::UndeclaredIdentifier(_) => Severity::Error,
             Diagnosis::NonConstantExpression => Severity::Error,
@@ -131,7 +184,8 @@ impl DiagnosisNode {
 
         match &self.inner {
             Diagnosis::BadArgumentsCount => "wrong argument count".to_string(),
-            Diagnosis::SyntaxError => "syntax error".to_string(),
+            Diagnosis::SyntaxError { found, expected } if expected.is_empty() => format!("syntax error, unexpected {}", token_label(found)),
+            Diagnosis::SyntaxError { found, expected } => format!("syntax error, unexpected {}, expecting {expected}", token_label(found)),
             Diagnosis::InvalidSizeof => "invalid application of sizeof".to_string(),
             Diagnosis::UndeclaredIdentifier(name) => format!("Use of undeclared identifier '{}'", name.id.resolve(ctx)),
             Diagnosis::NonConstantExpression => "Non constant expression".to_string(),

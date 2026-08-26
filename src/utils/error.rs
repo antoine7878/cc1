@@ -4,15 +4,16 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 
 use crate::parser::{Context, Span, Yacc};
-use crate::semantic::{Diagnosis, DiagnosisNode, Severity};
+use crate::semantic::{Diagnosis, DiagnosisNode, ExpectedTokens, Severity};
 use crate::utils::{GRAY, RESET};
 
 pub fn yyerror<D: Display, R: Read>(_msg: D, yacc: &mut Yacc<R>) {
     let span = yacc.lexer.span;
-    yacc.lexer
-        .ctx
-        .diagnosis
-        .push(DiagnosisNode::new(Diagnosis::SyntaxError, span));
+    let inner = Diagnosis::SyntaxError {
+        found: yacc.yy_lookahead_name(),
+        expected: ExpectedTokens::new(&yacc.yy_expected()),
+    };
+    yacc.lexer.ctx.diagnosis.push(DiagnosisNode::new(inner, span));
 }
 
 pub fn report<W: Write, D: Display>(

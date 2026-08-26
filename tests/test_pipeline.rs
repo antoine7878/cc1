@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use cc1::parser::{Context, Span};
 use cc1::pipeline::Pipeline;
-use cc1::semantic::{Diagnosis, DiagnosisNode};
+use cc1::semantic::{Diagnosis, DiagnosisNode, ExpectedTokens};
 
 static TAPPED: AtomicUsize = AtomicUsize::new(0);
 
@@ -13,7 +13,13 @@ fn mark(mut ctx: Context) -> Context {
 
 fn fail(mut ctx: Context) -> Context {
     ctx.diagnosis
-        .push(DiagnosisNode::new(Diagnosis::SyntaxError, Span::default()));
+        .push(DiagnosisNode::new(
+            Diagnosis::SyntaxError {
+                found: "';'",
+                expected: ExpectedTokens::new(&[]),
+            },
+            Span::default(),
+        ));
     ctx
 }
 

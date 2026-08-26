@@ -107,6 +107,24 @@ reports!(
 );
 
 reports!(
+    report_syntax_error_lists_expected_tokens,
+    "struct s { int a }",
+    ["<test>:1:18: error: syntax error, unexpected '}', expecting ',' or ';'"]
+);
+
+reports!(
+    report_syntax_error_at_end_of_file,
+    "int f(void) { return 0; } }",
+    ["<test>:1:27: error: syntax error, unexpected '}', expecting end of file"]
+);
+
+reports!(
+    report_syntax_error_without_expected_tokens,
+    "int x = ;",
+    ["<test>:1:9: error: syntax error, unexpected ';'"]
+);
+
+reports!(
     report_empty_struct_declaration,
     "struct s { int a; int; };",
     ["<test>:1:19: error: Declaration declares nothing"]

@@ -90,7 +90,7 @@ impl Unit {
             && !self
                 .diagnosis()
                 .iter()
-                .any(|diag| matches!(diag.inner, Diagnosis::SyntaxError))
+                .any(|diag| matches!(diag.inner, Diagnosis::SyntaxError { .. }))
     }
 
     pub fn diagnosis(&self) -> &[DiagnosisNode] {

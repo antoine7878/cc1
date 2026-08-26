@@ -14,7 +14,7 @@ pub mod tag_def;
 
 pub mod constrain;
 
-pub use diagnosis::{Diag, DiagCollector, Diagnosis, DiagnosisNode, Severity};
+pub use diagnosis::{Diag, DiagCollector, Diagnosis, DiagnosisNode, ExpectedTokens, Severity};
 // pub use ice::const_eval;
 pub use analyzer::Analyzer;
 pub use resolution::SymbolResolver;
