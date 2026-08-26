@@ -1,4 +1,5 @@
 use crate::ast_node;
+use crate::semantic::{QualifiedType, Sema};
 use std::cmp::Ordering;
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign, Mul, MulAssign,
@@ -20,6 +21,21 @@ pub enum Value {
 ast_node! {
     pub struct ValueNode {
         pub value: Value,
+    }
+}
+
+impl ValueNode {
+    pub fn ty(&self, sema: &mut Sema) -> QualifiedType {
+        let ty = match &self.value {
+            Value::Int(_) => sema.types.int(),
+            Value::Long(_) => sema.types.long(),
+            Value::UnsignedInt(_) => sema.types.unsigned_int(),
+            Value::UnsignedLong(_) => sema.types.unsigned_long(),
+            Value::Float(_) => sema.types.flaot(),
+            Value::Double(_) => sema.types.double(),
+            Value::LongDouble(_) => sema.types.long_double(),
+        };
+        QualifiedType::new(ty, false, false)
     }
 }
 

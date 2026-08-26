@@ -56,6 +56,30 @@ impl ResolvedTypeArena {
         self.alloc(ResolvedType::Int)
     }
 
+    pub fn long(&mut self) -> ResolvedTypeId {
+        self.alloc(ResolvedType::Long)
+    }
+
+    pub fn unsigned_int(&mut self) -> ResolvedTypeId {
+        self.alloc(ResolvedType::UnsignedInt)
+    }
+
+    pub fn unsigned_long(&mut self) -> ResolvedTypeId {
+        self.alloc(ResolvedType::UnsignedLong)
+    }
+
+    pub fn flaot(&mut self) -> ResolvedTypeId {
+        self.alloc(ResolvedType::Float)
+    }
+
+    pub fn double(&mut self) -> ResolvedTypeId {
+        self.alloc(ResolvedType::Double)
+    }
+
+    pub fn long_double(&mut self) -> ResolvedTypeId {
+        self.alloc(ResolvedType::LongDouble)
+    }
+
     pub fn pointer(&mut self, inner: QualifiedType) -> ResolvedTypeId {
         self.alloc(ResolvedType::Pointer(inner))
     }
