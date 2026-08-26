@@ -1,6 +1,5 @@
 use crate::ast::visit::{
     Visitor, walk_compound_statement, walk_declaration, walk_jump_statement, walk_labeled_statement,
-    walk_translation_unit,
 };
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, ExpressionNode,
@@ -11,36 +10,33 @@ use crate::parser::{Context, Span};
 use crate::semantic::diagnosis::Diagnosis;
 use crate::semantic::sema::Sema;
 use crate::semantic::symbol::Symbol;
-use crate::semantic::{
-    Diag, DiagCollector, DiagnosisNode, QualifiedType, ScopeKind, SymbolId, SymbolKind, constrain,
-};
-use crate::target::Target;
+use crate::semantic::{Diag, DiagCollector, DiagnosisNode, QualifiedType, ScopeKind, SymbolId, SymbolKind, constrain, ice, ty};
 
-#[derive(Default, Debug)]
-pub struct SymbolResolver {
-    pub sema: Sema,
+#[derive(Debug)]
+pub struct SymbolResolver<'a> {
+    pub sema: &'a mut Sema,
 }
 
-impl DiagCollector for SymbolResolver {
+impl DiagCollector for SymbolResolver<'_> {
     fn diagnosis(&mut self) -> &mut Vec<DiagnosisNode> {
         &mut self.sema.diagnosis
     }
 }
 
-impl SymbolResolver {
-    pub fn new(target: Target) -> Self {
-        Self { sema: Sema::new(target) }
+impl<'a> SymbolResolver<'a> {
+    pub fn new(sema: &'a mut Sema) -> Self {
+        Self { sema }
     }
 
-    fn add_function<'a>(
+    fn add_function<'ctx>(
         &mut self,
-        ctx: &'a Context,
+        ctx: &'ctx Context,
         node: &FunctionDefinitionNode,
-    ) -> Option<&'a FunctionParametersNode> {
+    ) -> Option<&'ctx FunctionParametersNode> {
         let span = &node.span;
 
-        let qualif = constrain::declaration::resolve_type(&mut self.sema, ctx, &node.specifiers, span);
-        let (ty, fn_decl) = self.sema.make_qualified_type(ctx, qualif, &node.declarator)?;
+        let qualif = ty::resolve_type(self.sema, ctx, &node.specifiers, span);
+        let (ty, fn_decl) = ty::make_qualified_type(self.sema, ctx, qualif, &node.declarator)?;
         let (decl, parameters) =
             constrain::external::extract_function_declarator(fn_decl.id.resolve(ctx)).collect(self, span)?;
 
@@ -129,8 +125,8 @@ impl SymbolResolver {
         decl: &DeclaratorNode,
         span: &Span,
     ) -> Option<SymbolId> {
-        let qualif = constrain::declaration::resolve_type(&mut self.sema, ctx, specifiers, span);
-        let (ty, decl) = self.sema.make_qualified_type(ctx, qualif, decl)?;
+        let qualif = ty::resolve_type(self.sema, ctx, specifiers, span);
+        let (ty, decl) = ty::make_qualified_type(self.sema, ctx, qualif, decl)?;
         let storage = constrain::declaration::get_storage(specifiers)
             .collect(self, span)
             .unwrap_or(Storage::Register);
@@ -157,7 +153,7 @@ fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
     })
 }
 
-impl Visitor for SymbolResolver {
+impl Visitor for SymbolResolver<'_> {
     fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
         let Some(parameters) = self.add_function(ctx, node) else { return };
 
@@ -185,10 +181,10 @@ impl Visitor for SymbolResolver {
             self.add_diag(Diag::only_diag(Diagnosis::EmptyDeclaration), span);
         }
         let declared_storage = constrain::declaration::get_storage(specifiers).collect(self, span);
-        let qualif = constrain::declaration::resolve_type(&mut self.sema, ctx, specifiers, span);
+        let qualif = ty::resolve_type(self.sema, ctx, specifiers, span);
         for init_declarator in &node.init_declarators {
             let decl = &init_declarator.declarator;
-            let Some((ty, decl)) = self.sema.make_qualified_type(ctx, qualif, decl) else { continue };
+            let Some((ty, decl)) = ty::make_qualified_type(self.sema, ctx, qualif, decl) else { continue };
             let Some(name) = decl.ident(ctx) else { continue };
             if let Some(declared_storage) = declared_storage
                 && declared_storage != Storage::Typedef
@@ -207,8 +203,12 @@ impl Visitor for SymbolResolver {
     }
 
     fn visit_labeled_statement(&mut self, ctx: &Context, node: &LabeledStatementNode) {
-        if let Labeled::Identifier(name, _) = node.inner {
-            self.sema.add_label_symbol(name, &node.span, true);
+        match &node.inner {
+            Labeled::Identifier(name, _) => self.sema.add_label_symbol(*name, &node.span, true),
+            Labeled::Case(expr, _) => {
+                ice::eval_constant(self.sema, ctx, expr);
+            }
+            Labeled::Default(_) => (),
         }
         walk_labeled_statement(self, ctx, node);
     }
@@ -231,22 +231,5 @@ impl Visitor for SymbolResolver {
 
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
         self.sema.visit_expression(ctx, node);
-    }
-}
-
-pub struct Analyzer;
-impl Analyzer {
-    pub fn analyze(ctx: Context) -> Context {
-        let sema = Self::resolve_names(&ctx);
-        sema.into_context(ctx)
-    }
-
-    fn resolve_names(ctx: &Context) -> Sema {
-        let mut resolver = SymbolResolver::new(ctx.target);
-        resolver.sema.scopes.push(ScopeKind::File);
-        walk_translation_unit(&mut resolver, ctx, &ctx.ast);
-        resolver.sema.scopes.pop();
-        assert!(resolver.sema.scopes.is_empty());
-        resolver.sema
     }
 }

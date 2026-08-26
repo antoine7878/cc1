@@ -1,5 +1,6 @@
 mod common;
 
+use cc1::semantic::Diagnosis;
 use common::Unit;
 
 fn folded(src: &str) -> Vec<String> {
@@ -235,3 +236,40 @@ fn symbols_are_recorded_in_declaration_order_with_their_kind() {
         ]
     );
 }
+
+// ---- 6.4 a failed constant expression names why it failed ----------------
+
+recover!(
+    array_size_is_not_constant,
+    "int x; int a[x];",
+    [Diagnosis::NonConstantExpression],
+    &[]
+);
+
+recover!(
+    array_size_is_not_an_integer,
+    "int a[1.5];",
+    [Diagnosis::NonIntArraySize],
+    &[]
+);
+
+recover!(
+    sizeof_of_an_incomplete_tag,
+    "struct S; enum E { A = sizeof(struct S) };",
+    [Diagnosis::InvalidSizeof],
+    &[]
+);
+
+recover!(
+    sizeof_of_void,
+    "enum E { A = sizeof(void) };",
+    [Diagnosis::InvalidSizeof],
+    &[]
+);
+
+recover!(
+    cast_to_a_non_scalar_type,
+    "struct S { int a; }; enum E { A = (struct S)1 };",
+    [Diagnosis::CastToNonScalar],
+    &[]
+);

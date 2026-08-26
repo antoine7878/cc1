@@ -1,8 +1,6 @@
-use crate::ast::{DeclarationSpecifier, Qualifier, Storage, Tag, TypeSpecifier, Value};
-use crate::parser::{Context, Span};
+use crate::ast::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier, Value};
 use crate::semantic::diagnosis::{Diag, Diagnosis};
-use crate::semantic::sema::Sema;
-use crate::semantic::{QualifiedType, ResolvedType, ScopeKind, TypeSpecifierCounter};
+use crate::semantic::{ResolvedType, ScopeKind, TypeSpecifierCounter};
 
 /// 6.5.1 Storage-class specifiers
 /// At most, one storage-class specifier may be given in the declaration specifiers in a declaration
@@ -29,50 +27,8 @@ pub fn extern_function_only(scope_type: ScopeKind, storage: Storage) -> Diag<()>
     }
 }
 
-/// 6.5.2 Type specifiers
-/// Each list of type specifiers shall be one of the following sets...
-pub fn resolve_type(
-    sema: &mut Sema,
-    ctx: &Context,
-    specifiers: &[DeclarationSpecifier],
-    span: &Span,
-) -> Option<QualifiedType> {
-    let (is_const, is_volatile) = get_qualifier(specifiers).collect(sema, span);
-
-    let types: Vec<_> = specifiers
-        .iter()
-        .filter_map(|s| match s {
-            DeclarationSpecifier::Type(t) => Some(t),
-            _ => None,
-        })
-        .collect();
-
-    let id = match types.as_slice() {
-        [TypeSpecifier::Struct(t)] => {
-            let node = t.resolve(ctx);
-            let tag = sema.resolve_struct_or_union(ctx, Tag::Struct, node.name, &node.fields, &node.span);
-            sema.types.tag(tag)
-        }
-        [TypeSpecifier::Union(t)] => {
-            let node = t.resolve(ctx);
-            let tag = sema.resolve_struct_or_union(ctx, Tag::Union, node.name, &node.fields, &node.span);
-            sema.types.tag(tag)
-        }
-        [TypeSpecifier::Enum(t)] => {
-            let tag = sema.resolve_enum(ctx, *t)?;
-            sema.types.tag(tag)
-        }
-        [TypeSpecifier::TypedefName(t)] => return sema.resolve_typedef(*t, is_const, is_volatile, span),
-        s => {
-            let ty = basic_type(s).collect(sema, span)?;
-            sema.types.alloc(ty)
-        }
-    };
-    Some(QualifiedType::new(id, is_const, is_volatile))
-}
-
 #[rustfmt::skip]
-fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
+pub fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
     if types.is_empty() {
         return Diag::some(ResolvedType::Int);
     }
