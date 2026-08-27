@@ -39,7 +39,7 @@ macro_rules! push {
 
 macro_rules! spec {
     ($self:expr, $specs:expr) => {{
-        $self.lexer.ctx.note_specifiers($specs)
+        $self.lexer.ctx.parse.note_specifiers($specs)
     }};
 }
 
@@ -125,11 +125,11 @@ macro_rules! spec {
 
 %%
 
-enter_scope:                                                                                { self.lexer.ctx.push_scope(); } ;
-exit_scope:                                                                                 { self.lexer.ctx.pop_scope(); } ;
-reopen_params:                                                                              { self.lexer.ctx.unstash_scope(); } ;
-enter_struct:                                                                               { self.lexer.ctx.enter_struct(); } ;
-exit_struct:                                                                                { self.lexer.ctx.exit_struct(); } ;
+enter_scope:                                                                                { self.lexer.ctx.parse.push_scope(); } ;
+exit_scope:                                                                                 { self.lexer.ctx.parse.pop_scope(); } ;
+reopen_params:                                                                              { self.lexer.ctx.parse.unstash_scope(); } ;
+enter_struct:                                                                               { self.lexer.ctx.parse.enter_struct(); } ;
+exit_struct:                                                                                { self.lexer.ctx.parse.exit_struct(); } ;
 
 translation_unit /* (TranslationUnitNode) */
 	: external_declaration_list                                                             { let ast = with_span!(self, TranslationUnitNode::new, $1); self.lexer.ctx.ast = ast; }
@@ -143,8 +143,8 @@ external_declaration_list /* Vec<ExternalDeclarationNode> */
 	;
 
 error_declaration
-	: error ';'                                                                             { self.yyerrok(); self.lexer.ctx.recover_to_file_scope(); }
-	| error '}'                                                                             { self.yyerrok(); self.lexer.ctx.recover_to_file_scope(); }
+	: error ';'                                                                             { self.yyerrok(); self.lexer.ctx.parse.recover_to_file_scope(); }
+	| error '}'                                                                             { self.yyerrok(); self.lexer.ctx.parse.recover_to_file_scope(); }
 	;
 
 external_declaration /* ExternalDeclarationNode */
@@ -153,10 +153,10 @@ external_declaration /* ExternalDeclarationNode */
 	;
 
 function_definition /* FunctionDefinitionNode */
-	: declaration_specifiers declarator reopen_params declaration_list compound_statement   { self.lexer.ctx.pop_scope(); with_span!(self, FunctionDefinitionNode::new, $1, $2, $4, $5) }
-	| declaration_specifiers declarator reopen_params compound_statement                    { self.lexer.ctx.pop_scope(); with_span!(self, FunctionDefinitionNode::new, $1, $2, vec![], $4) }
-	| declarator reopen_params declaration_list compound_statement                          { self.lexer.ctx.pop_scope(); with_span!(self, FunctionDefinitionNode::new, vec![], $1, $3, $4) }
-	| declarator reopen_params compound_statement                                           { self.lexer.ctx.pop_scope(); with_span!(self, FunctionDefinitionNode::new, vec![], $1, vec![], $3) }
+	: declaration_specifiers declarator reopen_params declaration_list compound_statement   { self.lexer.ctx.parse.pop_scope(); with_span!(self, FunctionDefinitionNode::new, $1, $2, $4, $5) }
+	| declaration_specifiers declarator reopen_params compound_statement                    { self.lexer.ctx.parse.pop_scope(); with_span!(self, FunctionDefinitionNode::new, $1, $2, vec![], $4) }
+	| declarator reopen_params declaration_list compound_statement                          { self.lexer.ctx.parse.pop_scope(); with_span!(self, FunctionDefinitionNode::new, vec![], $1, $3, $4) }
+	| declarator reopen_params compound_statement                                           { self.lexer.ctx.parse.pop_scope(); with_span!(self, FunctionDefinitionNode::new, vec![], $1, vec![], $3) }
 	;
 
 constant_expression /* ExpressionNode */
@@ -312,7 +312,7 @@ declarator /* DeclaratorNode */
 	;
 
 direct_declarator /* DeclaratorNode */
-	: IDENTIFIER                                                                            { self.lexer.ctx.add_symbol($1.id); node_span!(self, declarators, ident, $1) }
+	: IDENTIFIER                                                                            { self.lexer.ctx.parse.add_symbol($1.id); node_span!(self, declarators, ident, $1) }
 	| '(' declarator ')'                                                                    { $2 }
 	| direct_declarator '[' constant_expression ']'                                         { node_span!(self, declarators, array, $1, Some($3)) }
 	| direct_declarator '[' ']'                                                             { node_span!(self, declarators, array, $1, None) }

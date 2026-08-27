@@ -54,7 +54,7 @@ IS			(u|U|l|L|ul|UL|Ul|uL|lu|LU|lU|Lu)
 "volatile"		            { return YYToken::VOLATILE; }
 "while"			            { return YYToken::WHILE; }
 
-{L}({L}|{D})*		        { let name = alloc_name(self); return self.ctx.check_type(name); }
+{L}({L}|{D})*		        { let name = alloc_name(self); return self.ctx.parse.check_type(name); }
 
 L?'(\\.|[^\\'])+'	        { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
 0[xX]{H}+{IS}?		        { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
@@ -120,7 +120,7 @@ L\"(\\.|[^\\"])*\"	        { let len = self.yytext.len(); return YYToken::STRING
 
 impl<R: Read> YYFeedback for YYLex<R> {
     fn yy_feedback(&mut self, accepts: &dyn Fn(usize) -> bool) {
-        self.ctx.feedback(accepts);
+        self.ctx.parse.feedback(accepts);
     }
 }
 
