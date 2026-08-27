@@ -50,9 +50,7 @@ impl Context {
                         dimensions.push_str(&len.to_string());
                     }
                     dimensions.push(']');
-                    let ResolvedType::Array { elem: inner, len: size } = elem.ty.resolve(self) else {
-                        break;
-                    };
+                    let ResolvedType::Array { elem: inner, len: size } = elem.ty.resolve(self) else { break };
                     (elem, len) = (inner, size);
                 }
                 out.push_str(&self.describe(elem));
@@ -68,7 +66,7 @@ impl Context {
                         false => out.push_str(&described.join(", ")),
                     }
                     if *is_variadic {
-                        out.push_str(", ...");
+                        out.push_str(", ...")
                     }
                 }
                 out.push(')');
