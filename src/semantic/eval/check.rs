@@ -3,11 +3,11 @@ use crate::ast::{Expression, ExpressionNode};
 use crate::parser::Context;
 use crate::semantic::{Sema, ice};
 
-struct ConstEvaluator<'a> {
+struct ConstChecker<'a> {
     sema: &'a mut Sema,
 }
 
-impl Visitor for ConstEvaluator<'_> {
+impl Visitor for ConstChecker<'_> {
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
         walk_expression(self, ctx, node);
         if matches!(node.id.resolve(ctx), Expression::ConstantExpression(_)) {
@@ -17,6 +17,6 @@ impl Visitor for ConstEvaluator<'_> {
 }
 
 pub fn run(sema: &mut Sema, ctx: &Context) {
-    let mut checker = ConstEvaluator { sema };
+    let mut checker = ConstChecker { sema };
     walk_translation_unit(&mut checker, ctx, &ctx.ast);
 }

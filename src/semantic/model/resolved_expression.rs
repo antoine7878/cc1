@@ -1,6 +1,4 @@
-use crate::ast::Value;
-use crate::semantic::model::ImplicitCast;
-use crate::semantic::{QualifiedType, SymbolId};
+use crate::semantic::{ImplicitCast, QualifiedType};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ExpressionKind {
@@ -8,17 +6,23 @@ pub enum ExpressionKind {
     LValue,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct ResolvedExpression {
-    pub sym: Option<SymbolId>,
-    pub ty: Option<QualifiedType>,
-    pub const_value: Option<Option<Value>>,
-    pub kind: Option<ExpressionKind>,
+    pub ty: QualifiedType,
+    pub kind: ExpressionKind,
     pub casts: Vec<ImplicitCast>,
 }
 
 impl ResolvedExpression {
     pub fn value_ty(&self) -> Option<QualifiedType> {
-        self.casts.last().map(|c| c.to).or(self.ty)
+        self.casts.last().map(|c| c.to).or(Some(self.ty))
+    }
+
+    pub fn new(ty: QualifiedType, kind: ExpressionKind) -> Self {
+        Self {
+            ty,
+            kind,
+            casts: Vec::new(),
+        }
     }
 }

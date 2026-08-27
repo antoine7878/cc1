@@ -1,7 +1,4 @@
-void f(void) {
-	int a;
-	a = 1 + 2;
-}
+enum e { A = 0, B = 2, C = B + 1 };
 
 // #include <stdalign.h>
 // #include <stdio.h>

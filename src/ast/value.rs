@@ -247,13 +247,24 @@ impl Rank {
         self >= Rank::Float
     }
 
-    /// The rank an operand is converted to before an operation that only accepts integers.
     pub fn to_integer(self) -> Rank {
         Rank::min(self, Rank::UnsignedLong)
     }
 }
 
 impl Value {
+    pub fn is_zero(&self) -> bool {
+        match *self {
+            Value::Int(i) => i == 0,
+            Value::UnsignedInt(i) => i == 0,
+            Value::Long(i) => i == 0,
+            Value::UnsignedLong(i) => i == 0,
+            Value::Float(i) => i == 0.,
+            Value::Double(i) => i == 0.,
+            Value::LongDouble(i) => i == 0.,
+        }
+    }
+
     fn rank(self) -> Rank {
         match self {
             Value::Int(_) => Rank::Int,

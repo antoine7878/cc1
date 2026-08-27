@@ -134,12 +134,12 @@ impl Unit {
         let mut entries: Vec<_> = self
             .ctx
             .sema
-            .expressions
+            .constants
             .iter()
-            .map(|(id, re)| (usize::from(*id), re.const_value))
+            .map(|(id, value)| (usize::from(*id), *value))
             .collect();
         entries.sort_by_key(|(id, _)| *id);
-        entries.into_iter().filter_map(|(_, value)| value).collect()
+        entries.into_iter().map(|(_, value)| value).collect()
     }
 
     pub fn folded(&self) -> Vec<String> {
@@ -156,15 +156,15 @@ impl Unit {
         let mut entries: Vec<_> = self
             .ctx
             .sema
-            .expressions
+            .bindings
             .iter()
-            .map(|(id, re)| (*id, re.sym.map(usize::from)))
+            .map(|(id, symbol)| (usize::from(*id), symbol.map(usize::from)))
             .collect();
-        entries.sort_by_key(|(id, _)| usize::from(*id));
+        entries.sort_by_key(|(id, _)| *id);
         entries
             .into_iter()
             .map(|(id, symbol)| {
-                let name = match id.resolve(&self.ctx) {
+                let name = match &self.ctx.arenas.expressions.data[id] {
                     Expression::Identifier(name) => name.id.resolve(&self.ctx).clone(),
                     other => format!("{other:?}"),
                 };

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{DeclaratorId, ExpressionId, Name, Tag};
+use crate::ast::{DeclaratorId, ExpressionId, Name, Tag, Value};
 use crate::parser::Span;
 use crate::semantic::{
     Builtins, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, QualifiedType, ResolvedExpression,
@@ -21,7 +21,9 @@ pub struct Sema {
     pub functions: FunctionDefArena,
 
     pub expressions: HashMap<ExpressionId, ResolvedExpression>,
-    pub declarations: HashMap<DeclaratorId, Option<SymbolId>>,
+    pub bindings: HashMap<ExpressionId, Option<SymbolId>>,
+    pub constants: HashMap<ExpressionId, Option<Value>>,
+    pub declarations: HashMap<DeclaratorId, SymbolId>,
 
     pub layouts: HashMap<ResolvedTypeId, Layout>,
     pub target: Target,
@@ -39,8 +41,12 @@ impl Default for Sema {
             builtins,
             tags: TagDefArena::default(),
             functions: FunctionDefArena::default(),
+
             expressions: HashMap::default(),
+            bindings: HashMap::default(),
             declarations: HashMap::default(),
+            constants: HashMap::default(),
+
             layouts: HashMap::default(),
             target: Target::default(),
         }
@@ -145,4 +151,21 @@ impl Sema {
         let sym_id = self.symbols.add(name, None, None, SymbolKind::Label, is_init);
         self.scopes.insert(SymbolKind::Label, name.id, sym_id);
     }
+
+    // pub fn push_cast(&mut self, expr: &mut Typed, kind: CastKind, to: QualifiedType) {
+    //     self.expressions
+    //         .entry(expr.id)
+    //         .or_default()
+    //         .casts
+    //         .push(ImplicitCast { kind, to });
+    //     expr.ty = to;
+    //     expr.kind = ExpressionKind::RValue;
+    // }
+
+    // pub fn record(&mut self, id: ExpressionId, ty: QualifiedType, kind: ExpressionKind) -> Typed {
+    //     let e = self.expressions.entry(id).or_default();
+    //     e.ty = Some(ty);
+    //     e.kind = Some(kind);
+    //     Typed { id, ty, kind }
+    // }
 }

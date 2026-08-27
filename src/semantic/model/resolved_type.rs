@@ -51,7 +51,6 @@ impl ResolvedType {
     }
 }
 
-/// The primitive types, interned once so that naming one needs no mutable access to the arena.
 #[derive(Clone, Copy, Debug)]
 pub struct Builtins {
     pub void: ResolvedTypeId,

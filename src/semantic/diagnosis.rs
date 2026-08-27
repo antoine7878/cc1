@@ -89,6 +89,7 @@ impl Display for ExpectedTokens {
 
 #[derive(Clone, Copy, Debug)]
 pub enum Diagnosis {
+    DivisionByZero,
     BadArgumentsCount,
     SyntaxError {
         found: &'static str,
@@ -135,6 +136,7 @@ impl Diagnosis {
     #[rustfmt::skip]
     pub fn severity(&self) -> Severity {
         match self {
+            Diagnosis::DivisionByZero => Severity:: Error,
             Diagnosis::BadArgumentsCount => Severity::Error,
             Diagnosis::SyntaxError { .. } => Severity::Error,
             Diagnosis::InvalidSizeof => Severity::Error,
@@ -194,6 +196,7 @@ impl DiagnosisNode {
     fn message(&self, ctx: &Context) -> String {
 
         match &self.inner {
+            Diagnosis::DivisionByZero => "Division by zero".to_string(),
             Diagnosis::BadArgumentsCount => "wrong argument count".to_string(),
             Diagnosis::SyntaxError { found, expected } if expected.is_empty() => format!("syntax error, unexpected {}", token_label(found)),
             Diagnosis::SyntaxError { found, expected } => format!("syntax error, unexpected {}, expecting {expected}", token_label(found)),

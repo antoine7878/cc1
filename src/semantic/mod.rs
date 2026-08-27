@@ -10,6 +10,8 @@ pub mod sema;
 pub use analyzer::Analyzer;
 pub use diagnosis::{Diag, DiagCollector, Diagnosis, DiagnosisNode, ExpectedTokens, Severity};
 pub use eval::ice;
+
+pub use model::cast::{CastKind, ImplicitCast};
 pub use model::function_def::{DeclaredParams, FunctionDef, FunctionDefArena, FunctionDefId, ParamInfo, ParamTypes};
 pub use model::resolved_expression::{ExpressionKind, ResolvedExpression};
 pub use model::resolved_type::{

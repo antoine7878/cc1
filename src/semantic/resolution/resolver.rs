@@ -8,8 +8,9 @@ use crate::ast::{
 };
 use crate::parser::{Context, Span};
 use crate::semantic::{
-    DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo, QualifiedType,
-    ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, declaration, ice,
+    DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, ExpressionKind, FunctionDefId, ParamInfo,
+    QualifiedType, ResolvedExpression, ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain,
+    declaration, ice,
 };
 
 #[derive(Debug)]
@@ -153,17 +154,41 @@ fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
 
 impl Visitor for Sema {
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
-        if self.expressions.contains_key(&node.id) {
+        walk_expression(self, ctx, node);
+        if self.bindings.contains_key(&node.id) {
             return;
         }
-        walk_expression(self, ctx, node);
         if let Expression::Identifier(name) = node.id.resolve(ctx) {
             let sym = self.scopes.lookup_ordinary(name.id);
             if sym.is_none() {
                 self.add_diag(Diag::only_diag(Diagnosis::UndeclaredIdentifier(*name)), &node.span);
             }
-            self.expressions.entry(node.id).or_default().sym = sym;
+            self.bindings.insert(node.id, sym);
         }
+        let ty = type_of(self, ctx, node).unwrap();
+        self.expressions
+            .entry(node.id)
+            .or_insert(ResolvedExpression::new(ty, ExpressionKind::RValue))
+            .ty = ty;
+    }
+}
+
+fn type_of(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<QualifiedType, Diagnosis> {
+    match expr.id.resolve(ctx) {
+        Expression::ConstantExpression(expr) => type_of(sema, ctx, expr),
+        Expression::Identifier(name) => {
+            let id = sema
+                .bindings
+                .get(&expr.id)
+                .copied()
+                .flatten()
+                .ok_or(Diagnosis::UndeclaredIdentifier(*name))?;
+            let symbol = sema.symbols.get(id);
+            Ok(symbol.ty.unwrap())
+        }
+        Expression::Constant(value) => Ok(value.ty(sema)),
+        Expression::Add(_e1, _e2) => type_of(sema, ctx, expr),
+        _ => todo!(),
     }
 }
 

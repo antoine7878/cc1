@@ -8,7 +8,7 @@ impl Context {
             out.push_str("const ");
         }
         if qt.is_volatile {
-            out.push_str("volatile ");
+            out.push_str("volatile ")
         }
         match qt.ty.resolve(self) {
             ResolvedType::Void => out.push_str("void"),

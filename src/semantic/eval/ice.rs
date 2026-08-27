@@ -6,7 +6,7 @@ use crate::semantic::sema::Sema;
 use crate::semantic::{Diag, DiagCollector, QualifiedType, ResolvedType, SymbolKind, declaration, layout};
 
 pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<Value> {
-    if let Some(cached) = sema.expressions.get(&expr.id).and_then(|re| re.const_value) {
+    if let Some(&cached) = sema.constants.get(&expr.id) {
         return cached;
     }
     sema.visit_expression(ctx, expr);
@@ -14,7 +14,7 @@ pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> O
         Ok(value) => Some(value),
         Err(diagnosis) => sema.add_diag(Diag::none_diag(diagnosis), &expr.span),
     };
-    sema.expressions.entry(expr.id).or_default().const_value = Some(value);
+    sema.constants.insert(expr.id, value);
     value
 }
 
@@ -44,9 +44,10 @@ pub fn eval(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<Val
         Expression::ConstantExpression(expr) => eval(sema, ctx, expr),
         Expression::Identifier(_) => {
             let id = sema
-                .expressions
+                .bindings
                 .get(&expr.id)
-                .and_then(|re| re.sym)
+                .copied()
+                .flatten()
                 .ok_or(Diagnosis::NonConstantExpression)?;
             let symbol = sema.symbols.get(id);
             if symbol.kind != SymbolKind::Variant {
@@ -62,7 +63,11 @@ pub fn eval(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<Val
         Expression::Add(e1, e2) => Ok(eval(sema, ctx, e1)? + eval(sema, ctx, e2)?),
         Expression::Sub(e1, e2) => Ok(eval(sema, ctx, e1)? - eval(sema, ctx, e2)?),
         Expression::Mul(e1, e2) => Ok(eval(sema, ctx, e1)? * eval(sema, ctx, e2)?),
-        Expression::Div(e1, e2) => Ok(eval(sema, ctx, e1)? / eval(sema, ctx, e2)?),
+        Expression::Div(e1, e2) => {
+            let v1 = eval(sema, ctx, e1)?;
+            let v2 = eval(sema, ctx, e2)?;
+            if v2.is_zero() { Err(Diagnosis::DivisionByZero) } else { Ok(v1 / v2) }
+        }
         Expression::Mod(e1, e2) => Ok(eval(sema, ctx, e1)? % eval(sema, ctx, e2)?),
         Expression::Left(e1, e2) => Ok(eval(sema, ctx, e1)? << eval(sema, ctx, e2)?),
         Expression::Right(e1, e2) => Ok(eval(sema, ctx, e1)? >> eval(sema, ctx, e2)?),

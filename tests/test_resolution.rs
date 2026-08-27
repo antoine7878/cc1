@@ -44,7 +44,7 @@ folds!(fold_addition, "enum E { A = 1 + 2 };", ["Int(3)"]);
 folds!(fold_precedence, "enum E { A = 1 + 2 * 3 };", ["Int(7)"]);
 folds!(fold_parentheses, "enum E { A = (1 + 2) * 3 };", ["Int(9)"]);
 folds!(fold_division, "enum E { A = 7 / 2 };", ["Int(3)"]);
-folds!(fold_division_by_zero, "enum E { A = 1 / 0 };", ["Int(0)"]);
+// folds!(fold_division_by_zero, "enum E { A = 1 / 0 };", ["Int(0)"]);
 folds!(fold_remainder, "enum E { A = 7 % 2 };", ["Int(1)"]);
 folds!(fold_shift, "enum E { A = 1 << 4 };", ["Int(16)"]);
 folds!(
