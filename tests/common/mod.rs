@@ -158,13 +158,13 @@ impl Unit {
             .sema
             .expressions
             .iter()
-            .map(|(id, re)| (usize::from(*id), re.sym.map(usize::from)))
+            .map(|(id, re)| (*id, re.sym.map(usize::from)))
             .collect();
-        entries.sort_by_key(|(id, _)| *id);
+        entries.sort_by_key(|(id, _)| usize::from(*id));
         entries
             .into_iter()
             .map(|(id, symbol)| {
-                let name = match &self.ctx.arenas.expressions.data[id] {
+                let name = match id.resolve(&self.ctx) {
                     Expression::Identifier(name) => name.id.resolve(&self.ctx).clone(),
                     other => format!("{other:?}"),
                 };

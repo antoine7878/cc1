@@ -10,7 +10,7 @@ impl Context {
         if qt.is_volatile {
             out.push_str("volatile ");
         }
-        match self.sema.types.get(qt.ty) {
+        match qt.ty.resolve(self) {
             ResolvedType::Void => out.push_str("void"),
             ResolvedType::Char => out.push_str("char"),
             ResolvedType::SignedChar => out.push_str("signed char"),
@@ -26,7 +26,7 @@ impl Context {
             ResolvedType::LongDouble => out.push_str("long double"),
             ResolvedType::Pointer(inner) => {
                 out.push('*');
-                match self.sema.types.get(inner.ty) {
+                match inner.ty.resolve(self) {
                     ResolvedType::Function { .. } | ResolvedType::Array { .. } => {
                         out.push_str(&format!("({})", self.describe(inner)))
                     }
@@ -34,7 +34,7 @@ impl Context {
                 }
             }
             ResolvedType::Tag(id) => {
-                let def = self.sema.tags.get(*id);
+                let def = id.resolve(self);
                 let name = def.name.map(|n| n.id.resolve(self).as_str()).unwrap_or("<anonymous>");
                 out.push_str(&format!("{} {}", def.kind(), name));
                 if !def.is_complete {
@@ -50,7 +50,7 @@ impl Context {
                         dimensions.push_str(&len.to_string());
                     }
                     dimensions.push(']');
-                    let ResolvedType::Array { elem: inner, len: size } = self.sema.types.get(elem.ty) else {
+                    let ResolvedType::Array { elem: inner, len: size } = elem.ty.resolve(self) else {
                         break;
                     };
                     (elem, len) = (inner, size);

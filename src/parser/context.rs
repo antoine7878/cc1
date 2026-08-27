@@ -36,7 +36,7 @@ impl Context {
     }
 
     pub fn file_of(&self, span: Span) -> &String {
-        self.arenas.names.get(StringId::from(span.start.file))
+        StringId::from(span.start.file).resolve(self)
     }
 
     pub fn struct_or_union(

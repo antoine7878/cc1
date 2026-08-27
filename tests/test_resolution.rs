@@ -344,10 +344,10 @@ fn a_function_definition_records_its_parameters_in_order() {
             let parameters: Vec<_> = def
                 .parameters
                 .iter()
-                .map(|&id| unit.ctx.sema.symbols.get(id).name.id.resolve(&unit.ctx).clone())
+                .map(|&id| id.resolve(&unit.ctx).name.id.resolve(&unit.ctx).clone())
                 .collect();
             (
-                unit.ctx.sema.symbols.get(def.sym).name.id.resolve(&unit.ctx).clone(),
+                def.sym.resolve(&unit.ctx).name.id.resolve(&unit.ctx).clone(),
                 parameters,
                 def.is_complete,
             )
@@ -376,7 +376,7 @@ fn an_old_style_definition_records_its_parameters_in_declarator_order() {
     let parameters: Vec<_> = def
         .parameters
         .iter()
-        .map(|&id| unit.ctx.sema.symbols.get(id).name.id.resolve(&unit.ctx).clone())
+        .map(|&id| id.resolve(&unit.ctx).name.id.resolve(&unit.ctx).clone())
         .collect();
     assert_eq!(parameters, ["a", "b"]);
 }
