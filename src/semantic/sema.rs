@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ast::{DeclaratorId, ExpressionId, Name, Tag};
-use crate::parser::{Context, Span};
+use crate::parser::Span;
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, QualifiedType, ResolvedExpression,
     ResolvedTypeArena, ResolvedTypeId, ScopeKind, Scopes, Symbol, SymbolArena, SymbolId, SymbolKind, TagDefArena,
@@ -38,29 +38,6 @@ impl Sema {
             target,
             ..Self::default()
         }
-    }
-
-    pub fn into_context(self, mut ctx: Context) -> Context {
-        let Sema {
-            scopes: _,
-            diagnosis,
-            symbols,
-            types,
-            tags,
-            functions,
-            expressions,
-            declarations,
-            layouts: _,
-            target: _,
-        } = self;
-        ctx.arenas.symbols = symbols;
-        ctx.arenas.resolved_type = types;
-        ctx.arenas.tags = tags;
-        ctx.arenas.functions = functions;
-        ctx.expressions = expressions;
-        ctx.declarations = declarations;
-        ctx.diagnosis.extend(diagnosis);
-        ctx
     }
 
     // ----- Resolution --------------------

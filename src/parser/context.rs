@@ -1,13 +1,9 @@
-use std::collections::HashMap;
-
 use crate::ast::{
-    DeclaratorArena, DeclaratorId, EnumArena, ExpressionArena, ExpressionId, Name, StatementArena, StringArena,
-    StringId, StructArena, StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena,
+    DeclaratorArena, EnumArena, ExpressionArena, Name, StatementArena, StringArena, StringId, StructArena,
+    StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena,
 };
 use crate::parser::{ParseState, Span};
-use crate::semantic::{
-    DiagnosisNode, FunctionDefArena, ResolvedExpression, ResolvedTypeArena, SymbolArena, SymbolId, TagDefArena,
-};
+use crate::semantic::{DiagnosisNode, Sema};
 use crate::target::Target;
 
 #[derive(Debug, Default)]
@@ -20,10 +16,6 @@ pub struct Arenas {
     pub expressions: ExpressionArena,
     pub declarators: DeclaratorArena,
     pub statements: StatementArena,
-    pub symbols: SymbolArena,
-    pub resolved_type: ResolvedTypeArena,
-    pub tags: TagDefArena,
-    pub functions: FunctionDefArena,
 }
 
 #[derive(Debug, Default)]
@@ -32,10 +24,9 @@ pub struct Context {
     pub ast: TranslationUnitNode,
     pub file_name: String,
     pub parse: ParseState,
+    pub sema: Sema,
     pub target: Target,
     pub diagnosis: Vec<DiagnosisNode>,
-    pub expressions: HashMap<ExpressionId, ResolvedExpression>,
-    pub declarations: HashMap<DeclaratorId, Option<SymbolId>>,
 }
 
 impl Context {

@@ -5,11 +5,13 @@ use crate::semantic::{ScopeKind, Sema, SymbolResolver, eval};
 pub struct Analyzer;
 
 impl Analyzer {
-    pub fn analyze(ctx: Context) -> Context {
+    pub fn analyze(mut ctx: Context) -> Context {
         let mut sema = Sema::new(ctx.target.clone());
         Self::resolve_names(&mut sema, &ctx);
         eval::run(&mut sema, &ctx);
-        sema.into_context(ctx)
+        ctx.diagnosis.append(&mut sema.diagnosis);
+        ctx.sema = sema;
+        ctx
     }
 
     fn resolve_names(sema: &mut Sema, ctx: &Context) {

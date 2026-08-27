@@ -3,7 +3,7 @@ use crate::define_arena;
 use crate::parser::Span;
 use crate::semantic::{QualifiedType, SymbolArena, SymbolId};
 
-define_arena!(FunctionDef, FunctionDefArena, FunctionDefId, functions);
+define_arena!(FunctionDef, FunctionDefArena, FunctionDefId, sema.functions);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FunctionDef {

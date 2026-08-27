@@ -4,7 +4,7 @@ use crate::{
     semantic::{ParamTypes, TagDefId},
 };
 
-define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, resolved_type);
+define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, sema.types);
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum ResolvedType {
