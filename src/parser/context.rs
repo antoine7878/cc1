@@ -20,13 +20,13 @@ pub struct Arenas {
 
 #[derive(Debug, Default)]
 pub struct Context {
-    pub arenas: Arenas,
-    pub ast: TranslationUnitNode,
     pub file_name: String,
-    pub parse: ParseState,
-    pub sema: Sema,
     pub target: Target,
     pub diagnosis: Vec<DiagnosisNode>,
+    pub parse: ParseState,
+    pub arenas: Arenas,
+    pub ast: TranslationUnitNode,
+    pub sema: Sema,
 }
 
 impl Context {

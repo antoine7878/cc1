@@ -109,18 +109,7 @@ impl Target {
     }
 
     pub fn is_integral(&self, ty: &ResolvedType) -> bool {
-        matches!(
-            ty,
-            ResolvedType::Char
-                | ResolvedType::SignedChar
-                | ResolvedType::UnsignedChar
-                | ResolvedType::Short
-                | ResolvedType::UnsignedShort
-                | ResolvedType::Int
-                | ResolvedType::UnsignedInt
-                | ResolvedType::Long
-                | ResolvedType::UnsignedLong
-        )
+        ty.is_integer()
     }
 
     pub fn is_signed(&self, ty: &ResolvedType) -> bool {

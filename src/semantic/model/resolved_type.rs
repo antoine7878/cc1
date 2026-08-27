@@ -51,35 +51,45 @@ impl ResolvedType {
     }
 }
 
+/// The primitive types, interned once so that naming one needs no mutable access to the arena.
+#[derive(Clone, Copy, Debug)]
+pub struct Builtins {
+    pub void: ResolvedTypeId,
+    pub char: ResolvedTypeId,
+    pub signed_char: ResolvedTypeId,
+    pub unsigned_char: ResolvedTypeId,
+    pub short: ResolvedTypeId,
+    pub unsigned_short: ResolvedTypeId,
+    pub int: ResolvedTypeId,
+    pub unsigned_int: ResolvedTypeId,
+    pub long: ResolvedTypeId,
+    pub unsigned_long: ResolvedTypeId,
+    pub float: ResolvedTypeId,
+    pub double: ResolvedTypeId,
+    pub long_double: ResolvedTypeId,
+}
+
+impl Builtins {
+    pub fn new(types: &mut ResolvedTypeArena) -> Self {
+        Self {
+            void: types.alloc(ResolvedType::Void),
+            char: types.alloc(ResolvedType::Char),
+            signed_char: types.alloc(ResolvedType::SignedChar),
+            unsigned_char: types.alloc(ResolvedType::UnsignedChar),
+            short: types.alloc(ResolvedType::Short),
+            unsigned_short: types.alloc(ResolvedType::UnsignedShort),
+            int: types.alloc(ResolvedType::Int),
+            unsigned_int: types.alloc(ResolvedType::UnsignedInt),
+            long: types.alloc(ResolvedType::Long),
+            unsigned_long: types.alloc(ResolvedType::UnsignedLong),
+            float: types.alloc(ResolvedType::Float),
+            double: types.alloc(ResolvedType::Double),
+            long_double: types.alloc(ResolvedType::LongDouble),
+        }
+    }
+}
+
 impl ResolvedTypeArena {
-    pub fn int(&mut self) -> ResolvedTypeId {
-        self.alloc(ResolvedType::Int)
-    }
-
-    pub fn long(&mut self) -> ResolvedTypeId {
-        self.alloc(ResolvedType::Long)
-    }
-
-    pub fn unsigned_int(&mut self) -> ResolvedTypeId {
-        self.alloc(ResolvedType::UnsignedInt)
-    }
-
-    pub fn unsigned_long(&mut self) -> ResolvedTypeId {
-        self.alloc(ResolvedType::UnsignedLong)
-    }
-
-    pub fn flaot(&mut self) -> ResolvedTypeId {
-        self.alloc(ResolvedType::Float)
-    }
-
-    pub fn double(&mut self) -> ResolvedTypeId {
-        self.alloc(ResolvedType::Double)
-    }
-
-    pub fn long_double(&mut self) -> ResolvedTypeId {
-        self.alloc(ResolvedType::LongDouble)
-    }
-
     pub fn pointer(&mut self, inner: QualifiedType) -> ResolvedTypeId {
         self.alloc(ResolvedType::Pointer(inner))
     }

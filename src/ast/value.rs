@@ -25,15 +25,15 @@ ast_node! {
 }
 
 impl ValueNode {
-    pub fn ty(&self, sema: &mut Sema) -> QualifiedType {
+    pub fn ty(&self, sema: &Sema) -> QualifiedType {
         let ty = match &self.value {
-            Value::Int(_) => sema.types.int(),
-            Value::Long(_) => sema.types.long(),
-            Value::UnsignedInt(_) => sema.types.unsigned_int(),
-            Value::UnsignedLong(_) => sema.types.unsigned_long(),
-            Value::Float(_) => sema.types.flaot(),
-            Value::Double(_) => sema.types.double(),
-            Value::LongDouble(_) => sema.types.long_double(),
+            Value::Int(_) => sema.builtins.int,
+            Value::Long(_) => sema.builtins.long,
+            Value::UnsignedInt(_) => sema.builtins.unsigned_int,
+            Value::UnsignedLong(_) => sema.builtins.unsigned_long,
+            Value::Float(_) => sema.builtins.float,
+            Value::Double(_) => sema.builtins.double,
+            Value::LongDouble(_) => sema.builtins.long_double,
         };
         QualifiedType::new(ty, false, false)
     }
@@ -229,16 +229,40 @@ impl From<&str> for Value {
     }
 }
 
+/// 6.2.1.1 Characters and integers / 6.2.1.5 Usual arithmetic conversions
+/// The ranks are ordered so that the greater of two operand ranks is the common type.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Rank {
+    Int,
+    UnsignedInt,
+    Long,
+    UnsignedLong,
+    Float,
+    Double,
+    LongDouble,
+}
+
+impl Rank {
+    pub fn is_floating(self) -> bool {
+        self >= Rank::Float
+    }
+
+    /// The rank an operand is converted to before an operation that only accepts integers.
+    pub fn to_integer(self) -> Rank {
+        Rank::min(self, Rank::UnsignedLong)
+    }
+}
+
 impl Value {
-    fn rank(self) -> u8 {
+    fn rank(self) -> Rank {
         match self {
-            Value::Int(_) => 0,
-            Value::UnsignedInt(_) => 1,
-            Value::Long(_) => 2,
-            Value::UnsignedLong(_) => 3,
-            Value::Float(_) => 4,
-            Value::Double(_) => 5,
-            Value::LongDouble(_) => 6,
+            Value::Int(_) => Rank::Int,
+            Value::UnsignedInt(_) => Rank::UnsignedInt,
+            Value::Long(_) => Rank::Long,
+            Value::UnsignedLong(_) => Rank::UnsignedLong,
+            Value::Float(_) => Rank::Float,
+            Value::Double(_) => Rank::Double,
+            Value::LongDouble(_) => Rank::LongDouble,
         }
     }
 
@@ -289,7 +313,7 @@ impl Value {
     }
 
     pub fn is_floating(self) -> bool {
-        self.rank() >= 4
+        self.rank().is_floating()
     }
 
     pub fn is_true(self) -> bool {
@@ -300,25 +324,25 @@ impl Value {
         Value::from(!self.is_true())
     }
 
-    pub fn convert(self, rank: u8) -> Self {
+    pub fn convert(self, rank: Rank) -> Self {
         match rank {
-            0 => Value::Int(self.to_i64() as i32),
-            1 => Value::UnsignedInt(self.to_u64() as u32),
-            2 => Value::Long(self.to_i64()),
-            3 => Value::UnsignedLong(self.to_u64()),
-            4 => Value::Float(self.to_f64() as f32),
-            5 => Value::Double(self.to_f64()),
-            _ => Value::LongDouble(self.to_f64()),
+            Rank::Int => Value::Int(self.to_i64() as i32),
+            Rank::UnsignedInt => Value::UnsignedInt(self.to_u64() as u32),
+            Rank::Long => Value::Long(self.to_i64()),
+            Rank::UnsignedLong => Value::UnsignedLong(self.to_u64()),
+            Rank::Float => Value::Float(self.to_f64() as f32),
+            Rank::Double => Value::Double(self.to_f64()),
+            Rank::LongDouble => Value::LongDouble(self.to_f64()),
         }
     }
 
     fn usual(self, rhs: Value) -> (Self, Self) {
-        let rank = u8::max(self.rank(), rhs.rank());
+        let rank = Rank::max(self.rank(), rhs.rank());
         (self.convert(rank), rhs.convert(rank))
     }
 
     fn usual_integer(self, rhs: Value) -> (Self, Self) {
-        let rank = u8::min(u8::max(self.rank(), rhs.rank()), 3);
+        let rank = Rank::max(self.rank(), rhs.rank()).to_integer();
         (self.convert(rank), rhs.convert(rank))
     }
 }
@@ -389,8 +413,8 @@ macro_rules! value_shift {
             type Output = Value;
 
             fn $method(self, rhs: Value) -> Value {
-                let count = rhs.convert(rhs.rank().min(3)).to_u64() as u32;
-                match self.convert(self.rank().min(3)) {
+                let count = rhs.convert(rhs.rank().to_integer()).to_u64() as u32;
+                match self.convert(self.rank().to_integer()) {
                     Value::Int(a) => Value::Int(a.$wrapping(count)),
                     Value::UnsignedInt(a) => Value::UnsignedInt(a.$wrapping(count)),
                     Value::Long(a) => Value::Long(a.$wrapping(count)),
@@ -457,7 +481,7 @@ impl Not for Value {
     type Output = Value;
 
     fn not(self) -> Value {
-        match self.convert(self.rank().min(3)) {
+        match self.convert(self.rank().to_integer()) {
             Value::Int(v) => Value::Int(!v),
             Value::UnsignedInt(v) => Value::UnsignedInt(!v),
             Value::Long(v) => Value::Long(!v),

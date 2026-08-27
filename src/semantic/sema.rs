@@ -3,19 +3,20 @@ use std::collections::HashMap;
 use crate::ast::{DeclaratorId, ExpressionId, Name, Tag};
 use crate::parser::Span;
 use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, QualifiedType, ResolvedExpression,
+    Builtins, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, QualifiedType, ResolvedExpression,
     ResolvedTypeArena, ResolvedTypeId, ScopeKind, Scopes, Symbol, SymbolArena, SymbolId, SymbolKind, TagDefArena,
     TagDefId,
 };
 use crate::target::{Layout, Target};
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Sema {
     pub scopes: Scopes,
     pub diagnosis: Vec<DiagnosisNode>,
 
     pub symbols: SymbolArena,
     pub types: ResolvedTypeArena,
+    pub builtins: Builtins,
     pub tags: TagDefArena,
     pub functions: FunctionDefArena,
 
@@ -24,6 +25,26 @@ pub struct Sema {
 
     pub layouts: HashMap<ResolvedTypeId, Layout>,
     pub target: Target,
+}
+
+impl Default for Sema {
+    fn default() -> Self {
+        let mut types = ResolvedTypeArena::default();
+        let builtins = Builtins::new(&mut types);
+        Self {
+            scopes: Scopes::default(),
+            diagnosis: Vec::new(),
+            symbols: SymbolArena::default(),
+            types,
+            builtins,
+            tags: TagDefArena::default(),
+            functions: FunctionDefArena::default(),
+            expressions: HashMap::default(),
+            declarations: HashMap::default(),
+            layouts: HashMap::default(),
+            target: Target::default(),
+        }
+    }
 }
 
 impl DiagCollector for Sema {

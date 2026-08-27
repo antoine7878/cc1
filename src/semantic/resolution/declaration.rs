@@ -247,7 +247,7 @@ pub fn enum_tag(sema: &mut Sema, ctx: &Context, id: EnumId) -> Option<TagDefId> 
             sema.add_diag(Diag::only_diag(Diagnosis::VariantBadValue), &variant.span);
             value = 0
         }
-        let ty = QualifiedType::new(sema.types.int(), false, false);
+        let ty = QualifiedType::new(sema.builtins.int, false, false);
         members.push(Member::Symbol(
             sema.declare(Symbol::variant(variant.name, ty, value as i32), &variant.span),
         ));

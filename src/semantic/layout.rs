@@ -47,7 +47,7 @@ fn member(sema: &mut Sema, mem: Member) -> Option<(Layout, Option<u64>)> {
             Some((of(sema, ty.ty)?, width))
         }
         Member::Bitfield(i) => {
-            let ty = sema.types.int();
+            let ty = sema.builtins.int;
             Some((of(sema, ty)?, Some(i as u64)))
         }
     }

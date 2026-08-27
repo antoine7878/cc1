@@ -110,7 +110,7 @@ impl<'a> SymbolResolver<'a> {
             return Vec::new();
         };
         for string_id in missing_id {
-            let ty = QualifiedType::new(self.sema.types.int(), false, false);
+            let ty = QualifiedType::new(self.sema.builtins.int, false, false);
             let name = Name::new(string_id, Span::default());
             let sym = Symbol::new(name, Some(ty), Some(Storage::Auto), SymbolKind::Parameter, false);
             self.sema.declare(sym, &Span::default());

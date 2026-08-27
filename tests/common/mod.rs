@@ -103,7 +103,7 @@ impl Unit {
 
     pub fn variants(&self) -> Vec<(String, String)> {
         self.ctx
-            .arenas
+            .sema
             .symbols
             .data
             .iter()
@@ -133,6 +133,7 @@ impl Unit {
     pub fn const_values(&self) -> Vec<Option<Value>> {
         let mut entries: Vec<_> = self
             .ctx
+            .sema
             .expressions
             .iter()
             .map(|(id, re)| (usize::from(*id), re.const_value))
@@ -154,6 +155,7 @@ impl Unit {
     pub fn bindings(&self) -> Vec<(String, Option<usize>)> {
         let mut entries: Vec<_> = self
             .ctx
+            .sema
             .expressions
             .iter()
             .map(|(id, re)| (usize::from(*id), re.sym.map(usize::from)))
@@ -173,7 +175,7 @@ impl Unit {
 
     pub fn symbols(&self) -> Vec<(String, String, String)> {
         self.ctx
-            .arenas
+            .sema
             .symbols
             .data
             .iter()

@@ -1,4 +1,4 @@
-use cc1::ast::Value;
+use cc1::ast::{Rank, Value};
 
 fn repr(value: Value) -> String {
     format!("{value:?}")
@@ -185,15 +185,23 @@ fold!(
     "UnsignedLong(18446744073709551615)"
 );
 
-fold!(convert_to_int, Value::Long(300).convert(0), "Int(300)");
-fold!(convert_to_int_wraps, Value::Long(4294967297).convert(0), "Int(1)");
+fold!(convert_to_int, Value::Long(300).convert(Rank::Int), "Int(300)");
+fold!(
+    convert_to_int_wraps,
+    Value::Long(4294967297).convert(Rank::Int),
+    "Int(1)"
+);
 fold!(
     convert_to_unsigned_long,
-    Value::Int(-1).convert(3),
+    Value::Int(-1).convert(Rank::UnsignedLong),
     "UnsignedLong(18446744073709551615)"
 );
-fold!(convert_to_double, Value::Int(3).convert(5), "Double(3.0)");
-fold!(convert_from_double_truncates, Value::Double(3.9).convert(0), "Int(3)");
+fold!(convert_to_double, Value::Int(3).convert(Rank::Double), "Double(3.0)");
+fold!(
+    convert_from_double_truncates,
+    Value::Double(3.9).convert(Rank::Int),
+    "Int(3)"
+);
 
 fold!(logical_not_of_zero, Value::Int(0).logical_not(), "Int(1)");
 fold!(logical_not_of_nonzero, Value::Int(42).logical_not(), "Int(0)");
@@ -277,4 +285,31 @@ fn compound_assignment_matches_binary_operator() {
     assert_eq!(repr(value), "Int(1)");
     value ^= Value::Int(3);
     assert_eq!(repr(value), "Int(2)");
+}
+
+#[test]
+fn rank_is_ordered_from_int_to_long_double() {
+    assert!(Rank::Int < Rank::UnsignedInt);
+    assert!(Rank::UnsignedInt < Rank::Long);
+    assert!(Rank::Long < Rank::UnsignedLong);
+    assert!(Rank::UnsignedLong < Rank::Float);
+    assert!(Rank::Float < Rank::Double);
+    assert!(Rank::Double < Rank::LongDouble);
+}
+
+#[test]
+fn rank_is_floating_covers_the_real_ranks() {
+    assert!(Rank::Float.is_floating());
+    assert!(Rank::Double.is_floating());
+    assert!(Rank::LongDouble.is_floating());
+    assert!(!Rank::Int.is_floating());
+    assert!(!Rank::UnsignedLong.is_floating());
+}
+
+#[test]
+fn rank_to_integer_caps_at_unsigned_long() {
+    assert_eq!(Rank::Int.to_integer(), Rank::Int);
+    assert_eq!(Rank::UnsignedLong.to_integer(), Rank::UnsignedLong);
+    assert_eq!(Rank::Float.to_integer(), Rank::UnsignedLong);
+    assert_eq!(Rank::LongDouble.to_integer(), Rank::UnsignedLong);
 }

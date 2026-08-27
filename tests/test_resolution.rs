@@ -320,7 +320,7 @@ fn identical_function_types_share_one_interned_type() {
     let unit = accepted("int f(int a); int g(int b); int h(char c);");
     let types: Vec<_> = unit
         .ctx
-        .arenas
+        .sema
         .symbols
         .data
         .iter()
@@ -336,7 +336,7 @@ fn a_function_definition_records_its_parameters_in_order() {
     let unit = accepted("int f(int a, char b) { return a; }");
     let names: Vec<_> = unit
         .ctx
-        .arenas
+        .sema
         .functions
         .data
         .iter()
@@ -344,10 +344,10 @@ fn a_function_definition_records_its_parameters_in_order() {
             let parameters: Vec<_> = def
                 .parameters
                 .iter()
-                .map(|&id| unit.ctx.arenas.symbols.get(id).name.id.resolve(&unit.ctx).clone())
+                .map(|&id| unit.ctx.sema.symbols.get(id).name.id.resolve(&unit.ctx).clone())
                 .collect();
             (
-                unit.ctx.arenas.symbols.get(def.sym).name.id.resolve(&unit.ctx).clone(),
+                unit.ctx.sema.symbols.get(def.sym).name.id.resolve(&unit.ctx).clone(),
                 parameters,
                 def.is_complete,
             )
@@ -362,9 +362,9 @@ fn a_function_definition_takes_its_type_from_its_symbol() {
     let id = FunctionDefId::from(0);
     let ty = unit
         .ctx
-        .arenas
+        .sema
         .functions
-        .ty(id, &unit.ctx.arenas.symbols)
+        .ty(id, &unit.ctx.sema.symbols)
         .expect("function type");
     assert_eq!(unit.ctx.describe(&ty), "int(int, char)");
 }
@@ -372,11 +372,11 @@ fn a_function_definition_takes_its_type_from_its_symbol() {
 #[test]
 fn an_old_style_definition_records_its_parameters_in_declarator_order() {
     let unit = accepted("int f(a, b) char b; { return a; }");
-    let def = unit.ctx.arenas.functions.data.first().expect("function definition");
+    let def = unit.ctx.sema.functions.data.first().expect("function definition");
     let parameters: Vec<_> = def
         .parameters
         .iter()
-        .map(|&id| unit.ctx.arenas.symbols.get(id).name.id.resolve(&unit.ctx).clone())
+        .map(|&id| unit.ctx.sema.symbols.get(id).name.id.resolve(&unit.ctx).clone())
         .collect();
     assert_eq!(parameters, ["a", "b"]);
 }
