@@ -1,8 +1,6 @@
-use crate::{
-    ast::TypeSpecifier,
-    define_interner,
-    semantic::{ParamTypes, TagDefId},
-};
+use crate::ast::TypeSpecifier;
+use crate::define_interner;
+use crate::semantic::{ParamTypes, TagDefArena, TagDefId};
 
 define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, sema.types);
 
@@ -35,6 +33,28 @@ pub struct QualifiedType {
 }
 
 impl ResolvedType {
+    // 6.1.2.5 An array type of unknown size is an incomplete type. A structure or union type of
+    // unknown content is an incomplete type.
+    pub fn is_complete(&self, tags: &TagDefArena) -> bool {
+        match self {
+            ResolvedType::Void => false,
+            ResolvedType::Array { len, .. } => len.is_some(),
+            ResolvedType::Tag(id) => tags.get(*id).is_complete,
+            _ => true,
+        }
+    }
+
+    pub fn is_arithmetic(&self) -> bool {
+        self.is_integer() || self.is_floating()
+    }
+
+    pub fn is_floating(&self) -> bool {
+        matches!(
+            self,
+            ResolvedType::Float | ResolvedType::Double | ResolvedType::LongDouble
+        )
+    }
+
     pub fn is_integer(&self) -> bool {
         matches!(
             self,

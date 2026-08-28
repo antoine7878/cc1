@@ -97,6 +97,9 @@ pub enum Diagnosis {
     },
     InvalidSizeof,
     UndeclaredIdentifier(Name),
+    // 6.2.2.1
+    IncompleteType,
+
     // 6.4
     NonConstantExpression,
     NonIntegerConstantExpression,
@@ -137,6 +140,7 @@ impl Diagnosis {
     pub fn severity(&self) -> Severity {
         match self {
             Diagnosis::DuplicateTypeQualifers => Severity::Warning,
+            Diagnosis::IncompleteType |
             Diagnosis::DivisionByZero |
             Diagnosis::BadArgumentsCount |
             Diagnosis::SyntaxError { .. } |
@@ -196,6 +200,7 @@ impl DiagnosisNode {
     fn message(&self, ctx: &Context) -> String {
 
         match &self.inner {
+            Diagnosis::IncompleteType => "Incomplete type".to_string(),
             Diagnosis::DivisionByZero => "Division by zero".to_string(),
             Diagnosis::BadArgumentsCount => "wrong argument count".to_string(),
             Diagnosis::SyntaxError { found, expected } if expected.is_empty() => format!("syntax error, unexpected {}", token_label(found)),

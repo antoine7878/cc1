@@ -1,39 +1,38 @@
 use crate::ast::{Expression, ExpressionNode};
 use crate::parser::Context;
-use crate::semantic::{Diag, Diagnosis, DiagnosisNode, ExpressionKind, QualifiedType, ResolvedExpression, Sema};
+use crate::semantic::{Diagnosis, DiagnosisNode, ExpressionKind, QualifiedType, ResolvedExpression, Sema};
 
 pub fn run(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
-    let ty = type_of(sema, ctx, node).collect(sema, &node.span);
-    sema.expressions
-        .entry(node.id)
-        .or_insert(ResolvedExpression::new(ty, ExpressionKind::RValue))
-        .ty = ty
-    // match ty {
-    //     Ok(ty) => {
-    //         sema.expressions
-    //             .entry(node.id)
-    //             .or_insert(ResolvedExpression::new(ty, ExpressionKind::RValue))
-    //             .ty = ty
-    //     }
-    //     Err(diag) => sema.diagnosis.push(DiagnosisNode {
-    //         span: node.span,
-    //         inner: diag,
-    //     }),
-    // }
+    let ty = type_of(sema, ctx, node);
+    match ty {
+        Ok(ty) => {
+            sema.expressions
+                .entry(node.id)
+                .or_insert(ResolvedExpression::new(ty, ExpressionKind::RValue))
+                .ty = ty
+        }
+        Err(diag) => sema.diagnosis.push(DiagnosisNode {
+            span: node.span,
+            inner: diag,
+        }),
+    }
 }
 
-fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> Diag<Option<QualifiedType>> {
+fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> Result<QualifiedType, Diagnosis> {
     match node.id.resolve(ctx) {
-        Expression::Identifier(name) => {
-            let Some(id) = sema.bindings.get(&node.id).copied().flatten() else {
-                return Diag::none_diag(Diagnosis::UndeclaredIdentifier(*name));
-            };
-            Diag::res(sema.symbols.get(id).ty)
+        Expression::Identifier(_) => {
+            let id = sema
+                .bindings
+                .get(&node.id)
+                .copied()
+                .flatten()
+                .ok_or(Diagnosis::NonConstantExpression)?;
+            Ok(sema.symbols.get(id).ty.unwrap())
         }
-        Expression::Constant(value) => Diag::some(value.ty(sema)),
-        Expression::StringLiteral(value) => Diag::some(value.ty(sema, ctx)),
+        Expression::Constant(value) => Ok(value.ty(sema)),
+        Expression::StringLiteral(value) => Ok(value.ty(sema, ctx)),
         Expression::ConstantExpression(expr) => type_of(sema, ctx, expr),
-        Expression::Add(e1, e2) => Diag::none_diag(Diagnosis::DivisionByZero),
+        Expression::Add(_e1, _e2) => Err(Diagnosis::DivisionByZero),
         _ => todo!(),
     }
 }

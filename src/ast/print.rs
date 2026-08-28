@@ -1,4 +1,4 @@
-use std::fmt::{Display, Write as _};
+use std::fmt::Display;
 use std::io::{self, Write, stdout};
 
 use crate::ast::visit::{
@@ -38,6 +38,7 @@ impl AstPrinter {
     }
 
     fn put(&mut self, args: std::fmt::Arguments) {
+        use std::fmt::Write;
         let _ = self.lines.last_mut().expect("root line").1.write_fmt(args);
     }
 
@@ -60,9 +61,10 @@ impl AstPrinter {
 
     fn print_expression_type(&mut self, ctx: &Context, id: ExpressionId) {
         let Some(resolved) = ctx.sema.expressions.get(&id) else { return };
-        if let Some(ty) = &resolved.ty {
-            self.put(format_args!("{GREEN}'{}'{CYAN}", ctx.describe(ty)));
-        }
+        self.put(format_args!("{GREEN}'{}'{CYAN}", ctx.describe(&resolved.ty)));
+        // if let Some(ty) = &resolved.ty {
+        //     self.put(format_args!("{GREEN}'{}'{CYAN}", ctx.describe(ty)));
+        // }
         if matches!(resolved.kind, ExpressionKind::LValue) {
             self.put(format_args!(" lvalue"));
         }
@@ -178,7 +180,7 @@ impl Visitor for AstPrinter {
 
     fn visit_labeled_statement(&mut self, ctx: &Context, node: &LabeledStatementNode) {
         self.print_node(node, |printer| {
-            printer.put(format_args!("{} ", &node.inner));
+            printer.put(format_args!("{} ", node.inner));
             walk_labeled_statement(printer, ctx, node);
         });
     }
@@ -197,21 +199,21 @@ impl Visitor for AstPrinter {
 
     fn visit_selection_statement(&mut self, ctx: &Context, node: &SelectionStatementNode) {
         self.print_node(node, |printer| {
-            printer.put(format_args!("{} ", &node.stmt));
+            printer.put(format_args!("{} ", node.stmt));
             walk_selection_statement(printer, ctx, node);
         });
     }
 
     fn visit_iteration_statement(&mut self, ctx: &Context, node: &IterationStatementNode) {
         self.print_node(node, |printer| {
-            printer.put(format_args!("{} ", &node.stmt));
+            printer.put(format_args!("{} ", node.stmt));
             walk_iteration_statement(printer, ctx, node);
         });
     }
 
     fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode) {
         self.print_node(node, |printer| {
-            printer.put(format_args!("{} ", &node.stmt));
+            printer.put(format_args!("{} ", node.stmt));
             walk_jump_statement(printer, ctx, node);
         });
     }
