@@ -1,4 +1,8 @@
-use crate::semantic::QualifiedType;
+use crate::{
+    ast::{Expression, ExpressionId, ExpressionNode},
+    parser::Context,
+    semantic::{ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, Sema},
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct ImplicitCast {
@@ -26,27 +30,43 @@ pub enum CastKind {
     PointerConversion,  // 6.3.16.1
 }
 
-// #[derive(Clone, Copy, Debug)]
-// pub struct Typed { pub id: ExpressionId,
-//     pub ty: QualifiedType, // after the casts pushed so far
-//     pub kind: ExpressionKind,
-// }
-//
+#[derive(Clone, Copy, Debug)]
+pub struct Typed {
+    pub id: ExpressionId,
+    pub ty: QualifiedType, // after the casts pushed so far
+    pub kind: ExpressionKind,
+}
+
 // pub fn lvalue(sema: &mut Sema, expr: &mut Typed) {
 //     // 6.2.2.1
 // }
-//
-// pub fn promote(sema: &mut Sema, expr: &mut Typed) {
+
+pub fn promote_exp(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, re: &mut ResolvedExpression) {
+    use ResolvedType::*;
+    let Some(qty) = re.value_ty() else { return };
+    let ty = sema.types.get(qty.ty);
+    if matches!(ty, Char | SignedChar | UnsignedChar | Short | UnsignedShort) {
+        return;
+    }
+
+    match expr.id.resolve(ctx) {
+        Expression::Plus(expr) => (),
+        _ => todo!(),
+    }
+    // 6.2.1.1 Characters and integer
+}
+
+// pub fn promote(sema: &mut Sema, ctx: &Context, expr: &mut Typed) {
 //     // 6.2.1.1
 // }
-//
+
 // pub fn usual_arithmetic(sema: &mut Sema, lhs: &mut Typed, rhs: &mut Typed) -> QualifiedType {
 //     // 6.2.1.5
 // }
-//
+
 // // convert is the dispatcher — the only place a (from, to) pair turns into a CastKind:
 // pub fn convert(sema: &mut Sema, expr: &mut Typed, to: QualifiedType) {}
-//
+
 // // fn promote() {}
 // // fn lvalue_conversion() {} fn usual_arithmetic() {}
 // // fn assignment_conversion() {}

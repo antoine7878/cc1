@@ -61,6 +61,7 @@ L?'(\\.|[^\\'])+'	        { return YYToken::CONSTANT(ValueNode::new(Value::from(
 0{D}+{IS}?		            { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
 {D}+{IS}?		            { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
 {D}+{E}{FS}?		        { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
+
 {D}*"."{D}+({E})?{FS}?	    { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
 {D}+"."{D}*({E})?{FS}?	    { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
 

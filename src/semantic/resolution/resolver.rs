@@ -155,7 +155,7 @@ fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
 impl Visitor for Sema {
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
         walk_expression(self, ctx, node);
-        if self.bindings.contains_key(&node.id) {
+        if self.expressions.contains_key(&node.id) {
             return;
         }
         if let Expression::Identifier(name) = node.id.resolve(ctx) {
