@@ -124,7 +124,13 @@ impl Unit {
             .data
             .iter()
             .filter_map(|expression| match expression {
-                Expression::StringLiteral(name) => Some(name.id.resolve(&self.ctx).clone()),
+                Expression::StringLiteral(literal) => {
+                    let text = literal.name().id.resolve(&self.ctx);
+                    Some(match literal.is_wide() {
+                        true => format!("L{text}"),
+                        false => text.clone(),
+                    })
+                }
                 _ => None,
             })
             .collect()

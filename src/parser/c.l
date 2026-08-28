@@ -3,7 +3,7 @@
 %{
 use std::fmt;
 
-use crate::ast::{Name, ValueNode, Value};
+use crate::ast::{Name, StringLitralNode, ValueNode, Value};
 use crate::parser::{YYToken, YYFeedback, Context};
 use crate::semantic::{SymbolKind};
 
@@ -54,7 +54,7 @@ IS			(u|U|l|L|ul|UL|Ul|uL|lu|LU|lU|Lu)
 "volatile"		            { return YYToken::VOLATILE; }
 "while"			            { return YYToken::WHILE; }
 
-{L}({L}|{D})*		        { let name = alloc_name(self); return self.ctx.parse.check_type(name); }
+{L}({L}|{D})*		        { let name = alloc_ident(self); return self.ctx.parse.check_type(name); }
 
 L?'(\\.|[^\\'])+'	        { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
 0[xX]{H}+{IS}?		        { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
@@ -64,8 +64,7 @@ L?'(\\.|[^\\'])+'	        { return YYToken::CONSTANT(ValueNode::new(Value::from(
 {D}*"."{D}+({E})?{FS}?	    { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
 {D}+"."{D}*({E})?{FS}?	    { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
 
-\"(\\.|[^\\"])*\"	        { let len = self.yytext.len(); return YYToken::STRING_LITERAL(self.yytext[1..len-1].to_string()); }
-L\"(\\.|[^\\"])*\"	        { let len = self.yytext.len(); return YYToken::STRING_LITERAL(self.yytext[2..len-1].to_string()); }
+L?\"(\\.|[^\\"])*\"	        { return YYToken::STRING_LITERAL(alloc_string(self)); }
 
 "..."			            { return YYToken::ELLIPSIS; }
 ">>="			            { return YYToken::RIGHT_ASSIGN; }
@@ -137,10 +136,16 @@ fn line_marker<R: Read>(lex: &mut YYLex<R>) {
     lex.pos.col = 1;
 }
 
-fn alloc_name<R: Read>(lex: &mut YYLex<R>) -> Name {
+fn alloc_ident<R: Read>(lex: &mut YYLex<R>) -> Name {
     let span = lex.span;
     let name = lex.yytext.clone();
     lex.ctx.arenas.names.add(name, span)
+}
+
+fn alloc_string<R: Read>(lex: &mut YYLex<R>) -> StringLitralNode {
+    let span = lex.span;
+    let text = lex.yytext.clone();
+    lex.ctx.arenas.names.literal(&text, span)
 }
 
 impl fmt::Display for Span {

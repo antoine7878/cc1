@@ -1,6 +1,7 @@
 pub mod declaration;
 pub mod expression;
 pub mod function;
+pub mod literal;
 pub mod name;
 pub mod print;
 pub mod statement;
@@ -16,6 +17,7 @@ pub use declaration::{
 };
 pub use expression::{Expression, ExpressionArena, ExpressionId, ExpressionNode, Type};
 pub use function::{FunctionParameters, FunctionParametersNode, ParameterDeclaration};
+pub use literal::{StringLitral, StringLitralNode};
 pub use name::{Name, StringArena, StringId};
 pub use statement::{
     CompoundStatementNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, JumpStatement,

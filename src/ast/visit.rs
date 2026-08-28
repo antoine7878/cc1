@@ -3,8 +3,9 @@ use crate::ast::{
     ExpressionNode, ExpressionStatementNode, ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionNode,
     FunctionParameters, FunctionParametersNode, InitDeclaratorNode, Initializer, InitializerNode, IterationStatement,
     IterationStatementNode, JumpStatement, JumpStatementNode, Labeled, LabeledStatementNode, Name,
-    ParameterDeclaration, Qualifier, SelectionStatement, SelectionStatementNode, Statement, StatementNode, Struct,
-    StructDeclaration, StructMemberDeclarator, TranslationUnitNode, Type, TypeSpecifier, Union, ValueNode, Variant,
+    ParameterDeclaration, Qualifier, SelectionStatement, SelectionStatementNode, Statement, StatementNode,
+    StringLitralNode, Struct, StructDeclaration, StructMemberDeclarator, TranslationUnitNode, Type, TypeSpecifier,
+    Union, ValueNode, Variant,
 };
 use crate::parser::Context;
 
@@ -110,6 +111,14 @@ pub trait Visitor {
     fn visit_name(&mut self, _ctx: &Context, _node: &Name) {}
 
     fn visit_value(&mut self, _ctx: &Context, _node: &ValueNode) {}
+
+    fn visit_string_litral(&mut self, ctx: &Context, node: &StringLitralNode) {
+        walk_string_litral(self, ctx, node);
+    }
+}
+
+pub fn walk_string_litral<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &StringLitralNode) {
+    v.visit_name(ctx, &node.name());
 }
 
 pub fn walk_translation_unit<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &TranslationUnitNode) {
@@ -271,7 +280,8 @@ pub fn walk_jump_statement<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: 
 
 pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &ExpressionNode) {
     match node.id.resolve(ctx) {
-        Expression::Identifier(name) | Expression::StringLiteral(name) => v.visit_name(ctx, name),
+        Expression::Identifier(name) => v.visit_name(ctx, name),
+        Expression::StringLiteral(literal) => v.visit_string_litral(ctx, literal),
         Expression::Constant(value) => v.visit_value(ctx, value),
         Expression::ConstantExpression(expr)
         | Expression::PostInc(expr)

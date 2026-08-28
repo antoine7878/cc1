@@ -5,7 +5,7 @@ use crate::ast::{Qualifier, Type, ExpressionNode, Name, DeclarationSpecifier, In
 use crate::ast::{DeclarationNode, InitDeclaratorNode, DeclaratorNode, InitializerNode, Storage, FunctionParametersNode, Tag};
 use crate::ast::{StructDeclaration, StructMemberDeclarator, VariantId, EnumId, LabeledStatementNode, StatementNode, Labeled, CompoundStatementNode};
 use crate::ast::{ExpressionStatementNode, SelectionStatementNode, IterationStatementNode, JumpStatementNode, JumpStatement};
-use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode, ValueNode};
+use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode, ValueNode, StringLitralNode};
 
 use crate::parser::{YYLex, Context, Span};
 use crate::parser::yyerror;
@@ -47,7 +47,7 @@ macro_rules! spec {
 
 %token<Name> IDENTIFIER TYPE_NAME
 %token<ValueNode> CONSTANT
-%token<String> STRING_LITERAL
+%token<StringLitralNode> STRING_LITERAL
 %token TYPEDEF EXTERN STATIC AUTO REGISTER
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID
 %token STRUCT UNION ENUM ELLIPSIS
@@ -73,9 +73,8 @@ macro_rules! spec {
 %nonassoc PREC_THEN
 %nonassoc ELSE
 
-%type<String> string_literal
+%type<StringLitralNode> string_literal
 %type<Vec<Name>> identifier_list
-%type<Name> merged_literal
 
 %type<ExpressionNode> expression constant_expression
 
@@ -163,20 +162,16 @@ constant_expression /* ExpressionNode */
     : expression %prec PREC_NO_COMMA                                                        { node_span!(self, expressions, constant_expression, $1) }
     ;
 
-string_literal /* String */
+string_literal /* StringLitralNode */
       : STRING_LITERAL                                                                      { $1 }
-      | string_literal STRING_LITERAL                                                       { $<mut>1.push_str(&$2); $1 }
-      ;
-
-merged_literal /* Name */
-      : string_literal                                                                      { self.lexer.ctx.arenas.names.add($1, self.lexer.span.clone()) }
+      | string_literal STRING_LITERAL                                                       { node_span!(self, names, concat, $1, $2) }
       ;
 
 expression /* ExpressionNode */
     : '(' expression ')'                                                                    { $2 }
     | IDENTIFIER                                                                            { node_span!(self, expressions, identifier, $1) }
     | CONSTANT                                                                              { node_span!(self, expressions, constant, $1)}
-    | merged_literal                                                                        { node_span!(self, expressions, string_literal, $1) }
+    | string_literal                                                                        { node_span!(self, expressions, string_literal, $1) }
     | expression '[' expression ']'                                                         { node_span!(self, expressions, binary, $1, $2, $3) }
     | expression '(' ')'                                                                    { node_span!(self, expressions, function_call, $1, None) }
     | expression '(' expression ')'                                                         { node_span!(self, expressions, function_call, $1, Some($3)) }
