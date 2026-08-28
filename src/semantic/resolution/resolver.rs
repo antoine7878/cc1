@@ -7,6 +7,7 @@ use crate::ast::{
     TypeSpecifier,
 };
 use crate::parser::{Context, Span};
+use crate::semantic::resolution::expression;
 use crate::semantic::{
     DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo, QualifiedType,
     ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, declaration, ice,
@@ -164,6 +165,7 @@ impl Visitor for Sema {
             }
             self.bindings.insert(node.id, sym);
         }
+        expression::run(self, ctx, node);
     }
 }
 

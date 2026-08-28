@@ -1,13 +1,41 @@
 mod common;
 
 use cc1::ast::visit::{walk_declaration, walk_expression, walk_statement};
-use cc1::ast::{DeclarationNode, Expression, ExpressionNode, StatementNode, Visitor};
+use cc1::ast::{DeclarationNode, Expression, ExpressionId, ExpressionNode, StatementNode, Visitor};
 use cc1::parser::Context;
+use cc1::semantic::{CastKind, ExpressionKind, ImplicitCast, QualifiedType, ResolvedExpression};
 use common::Unit;
 
 fn dump(src: &str) -> String {
     let unit = Unit::parse(src);
     assert!(unit.parsed(), "cc1 failed to parse:\n{src}");
+    unit.ast()
+}
+
+fn dump_typed(src: &str, converted: bool) -> String {
+    let mut unit = Unit::compile(src);
+    assert!(unit.parsed(), "cc1 failed to parse:\n{src}");
+
+    let int = QualifiedType::new(unit.ctx.sema.builtins.int, false, false);
+    let char_ty = QualifiedType::new(unit.ctx.sema.builtins.char, false, false);
+    let char_ptr = QualifiedType::new(unit.ctx.sema.types.pointer(char_ty), false, false);
+
+    for index in 0..unit.ctx.arenas.expressions.len() {
+        let id = ExpressionId::from(index);
+        let (ty, kind) = match &unit.ctx.arenas.expressions.data[index] {
+            Expression::Identifier(_) => (int, ExpressionKind::LValue),
+            Expression::StringLiteral(_) => (char_ptr, ExpressionKind::LValue),
+            _ => (int, ExpressionKind::RValue),
+        };
+        let mut resolved = ResolvedExpression::new(ty, kind);
+        if converted && matches!(kind, ExpressionKind::LValue) {
+            resolved.casts.push(ImplicitCast {
+                kind: CastKind::LValueToRValue,
+                to: ty,
+            });
+        }
+        unit.ctx.sema.expressions.insert(id, resolved);
+    }
     unit.ast()
 }
 
@@ -189,4 +217,93 @@ fn a_visitor_counts_every_statement_of_a_body() {
     assert_eq!(walk.declarations, 1);
     assert_eq!(walk.statements, 4);
     assert_eq!(walk.names, vec!["i".to_string(); 4]);
+}
+
+macro_rules! prints_typed {
+    ($name:ident, $src:expr, $converted:expr, [$($line:expr),* $(,)?]) => {
+        #[test]
+        fn $name() {
+            let expected = [$($line),*].join("\n");
+            assert_eq!(dump_typed($src, $converted), expected, "{}", $src);
+        }
+    };
+}
+
+prints_typed!(
+    print_constant_type,
+    "int x = 1;",
+    false,
+    [
+        "TranslationUnitNode <1:1, 1:10>",
+        "`- DeclarationNode <1:1, 1:10>  int",
+        "  `- InitDeclaratorNode <1:5, 1:9>",
+        "    |- DeclaratorNode <1:5> Ident x",
+        "    `- InitializerNode <1:9>",
+        "      `- ExpressionNode <1:9> NumberLiteral 'int'",
+    ]
+);
+
+prints_typed!(
+    print_string_literal_type,
+    "char *p = \"a\";",
+    false,
+    [
+        "TranslationUnitNode <1:1, 1:14>",
+        "`- DeclarationNode <1:1, 1:14>  char",
+        "  `- InitDeclaratorNode <1:6, 1:13>",
+        "    |- DeclaratorNode <1:6, 1:7> Pointer",
+        "    | `- DeclaratorNode <1:7> Ident p",
+        "    `- InitializerNode <1:11, 1:13>",
+        "      `- ExpressionNode <1:11, 1:13> StringLiteral '*char' lvalue a",
+    ]
+);
+
+prints_typed!(
+    print_operand_types,
+    "int f(int a, int b) { return a + b; }",
+    false,
+    [
+        "TranslationUnitNode <1:1, 1:37>",
+        "`- FunctionDefinitionNode <1:1, 1:37> int",
+        "  |- DeclaratorNode <1:5, 1:19> Function",
+        "  | |- DeclaratorNode <1:5> Ident f",
+        "  | `- FunctionParametersNode <1:7, 1:18>",
+        "  |   |- ParameterDeclaration <1:7, 1:11>  int",
+        "  |   | `- DeclaratorNode <1:11> Ident a",
+        "  |   `- ParameterDeclaration <1:14, 1:18>  int",
+        "  |     `- DeclaratorNode <1:18> Ident b",
+        "  `- CompoundStatementNode <1:21, 1:37>",
+        "    `- JumpStatementNode <1:23, 1:35> Return",
+        "      `- ExpressionNode <1:30, 1:34> Add 'int'",
+        "        |- ExpressionNode <1:30> Identifier 'int' lvalue a",
+        "        `- ExpressionNode <1:34> Identifier 'int' lvalue b",
+    ]
+);
+
+prints_typed!(
+    print_implicit_conversions,
+    "int f(int a, int b) { return a + b; }",
+    true,
+    [
+        "TranslationUnitNode <1:1, 1:37>",
+        "`- FunctionDefinitionNode <1:1, 1:37> int",
+        "  |- DeclaratorNode <1:5, 1:19> Function",
+        "  | |- DeclaratorNode <1:5> Ident f",
+        "  | `- FunctionParametersNode <1:7, 1:18>",
+        "  |   |- ParameterDeclaration <1:7, 1:11>  int",
+        "  |   | `- DeclaratorNode <1:11> Ident a",
+        "  |   `- ParameterDeclaration <1:14, 1:18>  int",
+        "  |     `- DeclaratorNode <1:18> Ident b",
+        "  `- CompoundStatementNode <1:21, 1:37>",
+        "    `- JumpStatementNode <1:23, 1:35> Return",
+        "      `- ExpressionNode <1:30, 1:34> Add 'int'",
+        "        |- ExpressionNode <1:30> Identifier 'int' lvalue <LValueToRValue> 'int' a",
+        "        `- ExpressionNode <1:34> Identifier 'int' lvalue <LValueToRValue> 'int' b",
+    ]
+);
+
+#[test]
+fn an_untyped_expression_prints_without_annotation() {
+    let untyped = dump("int x = 1;");
+    assert!(!untyped.contains('\''), "untyped ast should carry no type:\n{untyped}");
 }

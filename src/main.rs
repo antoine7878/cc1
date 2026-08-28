@@ -7,8 +7,8 @@ fn main() {
     Pipeline::default()
         .pass(parse_args)
         .pass(parser::parse_source)
-        .report(AstPrinter::print)
         .pass(Analyzer::analyze)
+        .report(AstPrinter::print)
         .report(Context::dump_symbols)
         .finally(Context::dump_diagnostics);
 }

@@ -8,14 +8,15 @@ use crate::ast::visit::{
     walk_struct_declarator, walk_translation_unit, walk_union, walk_variant,
 };
 use crate::ast::{
-    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Enum, Expression, ExpressionNode,
-    ExpressionStatementNode, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, InitDeclaratorNode,
-    InitializerNode, IterationStatementNode, JumpStatementNode, LabeledStatementNode, Name, ParameterDeclaration,
-    Qualifier, SelectionStatementNode, Struct, StructDeclaration, StructMemberDeclarator, TranslationUnitNode, Type,
-    TypeSpecifier, Union, Variant,
+    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Enum, Expression, ExpressionId,
+    ExpressionNode, ExpressionStatementNode, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode,
+    InitDeclaratorNode, InitializerNode, IterationStatementNode, JumpStatementNode, LabeledStatementNode, Name,
+    ParameterDeclaration, Qualifier, SelectionStatementNode, Struct, StructDeclaration, StructMemberDeclarator,
+    TranslationUnitNode, Type, TypeSpecifier, Union, Variant,
 };
 use crate::parser::Context;
-use crate::utils::{CYAN, RESET};
+use crate::semantic::ExpressionKind;
+use crate::utils::{CYAN, GRAY, GREEN, RESET};
 
 pub struct AstPrinter {
     depth: usize,
@@ -55,6 +56,22 @@ impl AstPrinter {
         self.print_node(name, |printer| {
             printer.put(format_args!("{}", name.id.resolve(ctx)));
         });
+    }
+
+    fn print_expression_type(&mut self, ctx: &Context, id: ExpressionId) {
+        let Some(resolved) = ctx.sema.expressions.get(&id) else { return };
+        self.put(format_args!("{GREEN}'{}'{CYAN}", ctx.describe(&resolved.ty)));
+        if matches!(resolved.kind, ExpressionKind::LValue) {
+            self.put(format_args!(" lvalue"));
+        }
+        for cast in &resolved.casts {
+            self.put(format_args!(
+                " {GRAY}<{:?}>{CYAN} {GREEN}'{}'{CYAN}",
+                cast.kind,
+                ctx.describe(&cast.to)
+            ));
+        }
+        self.put(format_args!(" "));
     }
 
     fn print_specifier(&mut self, ctx: &Context, spec: &DeclarationSpecifier) {
@@ -201,6 +218,7 @@ impl Visitor for AstPrinter {
         self.print_node(node, |printer| {
             let expr = node.id.resolve(ctx);
             printer.put(format_args!("{} ", expr));
+            printer.print_expression_type(ctx, node.id);
             if let Expression::DotAcces(tag, ident) | Expression::PtrAcces(tag, ident) = expr {
                 printer.visit_expression(ctx, tag);
                 printer.put(format_args!(" "));

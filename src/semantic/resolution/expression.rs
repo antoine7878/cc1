@@ -2,7 +2,7 @@ use crate::ast::{Expression, ExpressionNode};
 use crate::parser::Context;
 use crate::semantic::{Diagnosis, DiagnosisNode, ExpressionKind, QualifiedType, ResolvedExpression, Sema};
 
-fn run(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
+pub fn run(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
     let ty = type_of(sema, ctx, node);
     match ty {
         Ok(ty) => {
