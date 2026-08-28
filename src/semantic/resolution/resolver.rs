@@ -8,9 +8,8 @@ use crate::ast::{
 };
 use crate::parser::{Context, Span};
 use crate::semantic::{
-    DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, ExpressionKind, FunctionDefId, ParamInfo,
-    QualifiedType, ResolvedExpression, ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain,
-    declaration, ice,
+    DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo, QualifiedType,
+    ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, declaration, ice,
 };
 
 #[derive(Debug)]
@@ -165,38 +164,6 @@ impl Visitor for Sema {
             }
             self.bindings.insert(node.id, sym);
         }
-        // let ty = type_of(self, ctx, node);
-        // match ty {
-        //     Ok(ty) => {
-        //         self.expressions
-        //             .entry(node.id)
-        //             .or_insert(ResolvedExpression::new(ty, ExpressionKind::RValue))
-        //             .ty = ty
-        //     }
-        //     Err(diag) => self.diagnosis.push(DiagnosisNode {
-        //         span: node.span,
-        //         inner: diag,
-        //     }),
-        // }
-    }
-}
-
-fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> Result<QualifiedType, Diagnosis> {
-    match node.id.resolve(ctx) {
-        Expression::ConstantExpression(expr) => type_of(sema, ctx, expr),
-        Expression::Identifier(name) => {
-            let id = sema
-                .bindings
-                .get(&node.id)
-                .copied()
-                .flatten()
-                .ok_or(Diagnosis::UndeclaredIdentifier(*name))?;
-            let symbol = sema.symbols.get(id);
-            Ok(symbol.ty.unwrap())
-        }
-        Expression::Constant(value) => Ok(value.ty(sema)),
-        Expression::Add(e1, _e2) => type_of(sema, ctx, e1),
-        _ => todo!(),
     }
 }
 

@@ -18,7 +18,7 @@ pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Option<Layout> {
         ResolvedType::Array { elem, len } => {
             let len = *len;
             let elem = of(sema, elem.ty)?;
-            Layout::new(elem.size * len.unwrap_or(0), elem.align)
+            Layout::new(elem.size * len.unwrap_or(0) as u32, elem.align)
         }
         ty => sema.target.scalar(ty)?,
     };

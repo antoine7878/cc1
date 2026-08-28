@@ -162,10 +162,10 @@ fn resolve_parameter(sema: &mut Sema, ctx: &Context, param: &ParameterDeclaratio
     })
 }
 
-fn array_length(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<u32> {
+fn array_length(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<usize> {
     let value = ice::eval_constant(sema, ctx, expr)?;
     match value.get_integer_value() {
-        Some(len) => Some(len as u32),
+        Some(len) => Some(len as usize),
         None => sema.add_diag(Diag::none_diag(Diagnosis::NonIntArraySize), &expr.span),
     }
 }

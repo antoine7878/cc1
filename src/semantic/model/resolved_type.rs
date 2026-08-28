@@ -21,7 +21,7 @@ pub enum ResolvedType {
     Float,
     Double,
     LongDouble,
-    Array { elem: QualifiedType, len: Option<u32> },
+    Array { elem: QualifiedType, len: Option<usize> },
     Function { ret: QualifiedType, params: ParamTypes },
     Pointer(QualifiedType),
     Tag(TagDefId),
@@ -93,7 +93,7 @@ impl ResolvedTypeArena {
         self.alloc(ResolvedType::Pointer(inner))
     }
 
-    pub fn array(&mut self, elem: QualifiedType, len: Option<u32>) -> ResolvedTypeId {
+    pub fn array(&mut self, elem: QualifiedType, len: Option<usize>) -> ResolvedTypeId {
         self.alloc(ResolvedType::Array { elem, len })
     }
 

@@ -1,6 +1,7 @@
 use crate::ast::{Name, StringArena};
 use crate::ast_node;
-use crate::parser::Span;
+use crate::parser::{Context, Span};
+use crate::semantic::{QualifiedType, Sema};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StringLitral {
@@ -42,6 +43,16 @@ impl StringLitralNode {
 
     pub fn is_wide(&self) -> bool {
         self.string.is_wide()
+    }
+
+    pub fn ty(&self, sema: &mut Sema, ctx: &Context) -> QualifiedType {
+        let (base_id, s) = match self.string {
+            StringLitral::String(s) => (sema.builtins.char, s),
+            StringLitral::WString(s) => (sema.builtins.int, s),
+        };
+        let len = s.id.resolve(ctx).len();
+        let base = QualifiedType::new(base_id, false, false);
+        QualifiedType::new(sema.types.array(base, Some(len)), false, false)
     }
 }
 

@@ -1,7 +1,43 @@
-// use crate::ast::{Expression, ExpressionNode};
-// use crate::parser::Context;
-// use crate::semantic::{Diagnosis, QualifiedType, Sema};
-//
+use crate::ast::{Expression, ExpressionNode};
+use crate::parser::Context;
+use crate::semantic::{Diagnosis, DiagnosisNode, ExpressionKind, QualifiedType, ResolvedExpression, Sema};
+
+fn run(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
+    let ty = type_of(sema, ctx, node);
+    match ty {
+        Ok(ty) => {
+            sema.expressions
+                .entry(node.id)
+                .or_insert(ResolvedExpression::new(ty, ExpressionKind::RValue))
+                .ty = ty
+        }
+        Err(diag) => sema.diagnosis.push(DiagnosisNode {
+            span: node.span,
+            inner: diag,
+        }),
+    }
+}
+
+fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> Result<QualifiedType, Diagnosis> {
+    match node.id.resolve(ctx) {
+        Expression::Identifier(name) => {
+            let id = sema
+                .bindings
+                .get(&node.id)
+                .copied()
+                .flatten()
+                .ok_or(Diagnosis::UndeclaredIdentifier(*name))?;
+            let symbol = sema.symbols.get(id);
+            Ok(symbol.ty.expect("identifier not found"))
+        }
+        Expression::Constant(value) => Ok(value.ty(sema)),
+        Expression::StringLiteral(value) => Ok(value.ty(sema, ctx)),
+        Expression::ConstantExpression(expr) => type_of(sema, ctx, expr),
+        Expression::Add(e1, _e2) => type_of(sema, ctx, e1),
+        _ => todo!(),
+    }
+}
+
 // pub fn type_of(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<QualifiedType, Diagnosis> {
 //     match expr.id.resolve(ctx) {
 //         Expression::ConstantExpression(expr) => type_of(sema, ctx, expr),
