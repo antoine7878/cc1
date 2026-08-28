@@ -165,21 +165,29 @@ impl Visitor for Sema {
             }
             self.bindings.insert(node.id, sym);
         }
-        let ty = type_of(self, ctx, node).unwrap();
-        self.expressions
-            .entry(node.id)
-            .or_insert(ResolvedExpression::new(ty, ExpressionKind::RValue))
-            .ty = ty;
+        // let ty = type_of(self, ctx, node);
+        // match ty {
+        //     Ok(ty) => {
+        //         self.expressions
+        //             .entry(node.id)
+        //             .or_insert(ResolvedExpression::new(ty, ExpressionKind::RValue))
+        //             .ty = ty
+        //     }
+        //     Err(diag) => self.diagnosis.push(DiagnosisNode {
+        //         span: node.span,
+        //         inner: diag,
+        //     }),
+        // }
     }
 }
 
-fn type_of(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<QualifiedType, Diagnosis> {
-    match expr.id.resolve(ctx) {
+fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> Result<QualifiedType, Diagnosis> {
+    match node.id.resolve(ctx) {
         Expression::ConstantExpression(expr) => type_of(sema, ctx, expr),
         Expression::Identifier(name) => {
             let id = sema
                 .bindings
-                .get(&expr.id)
+                .get(&node.id)
                 .copied()
                 .flatten()
                 .ok_or(Diagnosis::UndeclaredIdentifier(*name))?;
@@ -187,7 +195,7 @@ fn type_of(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<Qual
             Ok(symbol.ty.unwrap())
         }
         Expression::Constant(value) => Ok(value.ty(sema)),
-        Expression::Add(_e1, _e2) => type_of(sema, ctx, expr),
+        Expression::Add(e1, _e2) => type_of(sema, ctx, e1),
         _ => todo!(),
     }
 }

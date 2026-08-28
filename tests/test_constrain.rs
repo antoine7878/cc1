@@ -23,14 +23,6 @@ fn reported<T>(diag: &Diag<T>) -> String {
     }
 }
 
-fn storage(storage: Storage) -> DeclarationSpecifier {
-    DeclarationSpecifier::Storage(storage)
-}
-
-fn qualifier(qualifier: Qualifier) -> DeclarationSpecifier {
-    DeclarationSpecifier::Qualifier(qualifier)
-}
-
 fn name(index: usize) -> StringId {
     StringId::from(index)
 }
@@ -48,14 +40,20 @@ fn no_storage_specifier_is_not_an_error() {
 
 #[test]
 fn one_storage_specifier_is_returned() {
-    let diag = get_storage(&[storage(Storage::Static), DeclarationSpecifier::Type(TypeSpecifier::Int)]);
+    let diag = get_storage(&[
+        DeclarationSpecifier::Storage(Storage::Static),
+        DeclarationSpecifier::Type(TypeSpecifier::Int),
+    ]);
     assert_eq!(diag.res, Some(Storage::Static));
     assert_eq!(reported(&diag), "None");
 }
 
 #[test]
 fn two_storage_specifiers_are_rejected() {
-    let diag = get_storage(&[storage(Storage::Static), storage(Storage::Extern)]);
+    let diag = get_storage(&[
+        DeclarationSpecifier::Storage(Storage::Static),
+        DeclarationSpecifier::Storage(Storage::Extern),
+    ]);
     assert_eq!(diag.res, Some(Storage::Static));
     assert_eq!(reported(&diag), "MultipleStorageSpecifiers");
 }
@@ -128,8 +126,8 @@ fn a_repeated_qualifier_is_rejected() {
 #[test]
 fn qualifiers_are_picked_out_of_the_specifier_list() {
     let specifiers = [
-        storage(Storage::Static),
-        qualifier(Qualifier::Const),
+        DeclarationSpecifier::Storage(Storage::Static),
+        DeclarationSpecifier::Qualifier(Qualifier::Const),
         DeclarationSpecifier::Type(TypeSpecifier::Int),
     ];
     let diag = get_qualifier(&specifiers);
@@ -137,8 +135,8 @@ fn qualifiers_are_picked_out_of_the_specifier_list() {
     assert_eq!(reported(&diag), "None");
     assert_eq!(
         reported(&get_qualifier(&[
-            qualifier(Qualifier::Const),
-            qualifier(Qualifier::Const)
+            DeclarationSpecifier::Qualifier(Qualifier::Const),
+            DeclarationSpecifier::Qualifier(Qualifier::Const)
         ])),
         "DuplicateTypeQualifers"
     );
@@ -175,23 +173,33 @@ fn a_member_without_a_width_is_not_a_bit_field() {
 #[test]
 fn auto_and_register_are_rejected_at_file_scope() {
     assert_eq!(
-        reported(&check_external_specifiers(&[storage(Storage::Auto)])),
+        reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(
+            Storage::Auto
+        )])),
         "AutoRegisterExternal"
     );
     assert_eq!(
-        reported(&check_external_specifiers(&[storage(Storage::Register)])),
+        reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(
+            Storage::Register
+        )])),
         "AutoRegisterExternal"
     );
     assert_eq!(
-        reported(&check_external_specifiers(&[storage(Storage::Static)])),
+        reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(
+            Storage::Static
+        )])),
         "None"
     );
     assert_eq!(
-        reported(&check_external_specifiers(&[storage(Storage::Extern)])),
+        reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(
+            Storage::Extern
+        )])),
         "None"
     );
     assert_eq!(
-        reported(&check_external_specifiers(&[storage(Storage::Typedef)])),
+        reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(
+            Storage::Typedef
+        )])),
         "None"
     );
     assert_eq!(reported(&check_external_specifiers(&[])), "None");

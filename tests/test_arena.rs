@@ -18,7 +18,7 @@ fn arena_starts_empty() {
 }
 
 #[test]
-fn arena_hands_out_sequential_ids() {
+fn arena_sequential_ids() {
     let mut arena = arena();
     let first = arena.alloc("a".to_string());
     let second = arena.alloc("b".to_string());
@@ -39,7 +39,7 @@ fn arena_resolves_an_id_to_its_value() {
 }
 
 #[test]
-fn arena_keeps_duplicates_distinct() {
+fn arena_keeps_duplicates() {
     let mut arena = arena();
     let first = arena.alloc("a".to_string());
     let second = arena.alloc("a".to_string());
@@ -81,7 +81,7 @@ fn interner_gives_one_id_per_distinct_value() {
 }
 
 #[test]
-fn interner_reuses_the_id_of_an_equal_value() {
+fn interner_reuses_the_id() {
     let mut interner = interner();
     let first = interner.alloc("a".to_string());
     let other = interner.alloc("b".to_string());
@@ -92,7 +92,7 @@ fn interner_reuses_the_id_of_an_equal_value() {
 }
 
 #[test]
-fn interner_resolves_an_id_to_its_value() {
+fn interner_resolves_id() {
     let mut interner = interner();
     let first = interner.alloc("a".to_string());
     let second = interner.alloc("b".to_string());
@@ -103,7 +103,7 @@ fn interner_resolves_an_id_to_its_value() {
 }
 
 #[test]
-fn ids_are_compared_by_index() {
+fn ids_compared_by_index() {
     let mut arena = arena();
     let id = arena.alloc("a".to_string());
     assert_eq!(id, Id::from(0usize));
@@ -112,7 +112,7 @@ fn ids_are_compared_by_index() {
 }
 
 #[test]
-fn ids_are_named_after_their_value_type() {
+fn ids_format() {
     let id = Id::from(7usize);
     assert_eq!(format!("{id}"), "StringId(7)");
     assert_eq!(format!("{id:?}"), "StringId(7)");

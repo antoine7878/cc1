@@ -1,9 +1,9 @@
 use crate::ast::visit::Visitor;
 use crate::ast::{Expression, ExpressionNode, Tag, Value};
-use crate::parser::{Context, Span};
-use crate::semantic::diagnosis::Diagnosis;
-use crate::semantic::sema::Sema;
-use crate::semantic::{Diag, DiagCollector, QualifiedType, ResolvedType, SymbolKind, declaration, layout};
+use crate::parser::Context;
+use crate::semantic::{
+    Diag, DiagCollector, Diagnosis, QualifiedType, ResolvedType, Sema, SymbolKind, declaration, layout,
+};
 
 pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<Value> {
     if let Some(&cached) = sema.constants.get(&expr.id) {
@@ -18,7 +18,7 @@ pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> O
     value
 }
 
-fn cast(sema: &mut Sema, qualif: QualifiedType, val: Value, span: &Span) -> Result<Value, Diagnosis> {
+fn cast(sema: &mut Sema, qualif: QualifiedType, val: Value) -> Result<Value, Diagnosis> {
     let ty = sema.types.get(qualif.ty);
     if let ResolvedType::Tag(id) = ty {
         return match sema.tags.get(*id).kind {
@@ -32,7 +32,6 @@ fn cast(sema: &mut Sema, qualif: QualifiedType, val: Value, span: &Span) -> Resu
     if let Some(casted) = sema.target.cast(ty, val) {
         return Ok(casted);
     }
-    let _ = span;
     match ty {
         ResolvedType::Array { .. } | ResolvedType::Void => Err(Diagnosis::CastToNonScalar),
         _ => Err(Diagnosis::NonIntegerConstantExpression),
@@ -112,7 +111,7 @@ pub fn eval(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<Val
             if val.is_floating() && !matches!(operand.id.resolve(ctx), Expression::Constant(_)) {
                 return Err(Diagnosis::NonConstantExpression);
             }
-            cast(sema, qualif, val, &expr.span)
+            cast(sema, qualif, val)
         }
         Expression::StringLiteral(_)
         | Expression::PostInc(_)

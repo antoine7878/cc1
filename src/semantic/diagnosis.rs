@@ -136,36 +136,36 @@ impl Diagnosis {
     #[rustfmt::skip]
     pub fn severity(&self) -> Severity {
         match self {
-            Diagnosis::DivisionByZero => Severity:: Error,
-            Diagnosis::BadArgumentsCount => Severity::Error,
-            Diagnosis::SyntaxError { .. } => Severity::Error,
-            Diagnosis::InvalidSizeof => Severity::Error,
-            Diagnosis::UndeclaredIdentifier(_) => Severity::Error,
-            Diagnosis::NonConstantExpression => Severity::Error,
-            Diagnosis::NonIntegerConstantExpression => Severity::Error,
-            Diagnosis::CastToNonScalar => Severity::Error,
-            Diagnosis::EmptyDeclaration => Severity::Error,
-            Diagnosis::TagWithoutMember(_) => Severity::Error,
-            Diagnosis::MultipleStorageSpecifiers => Severity::Error,
-            Diagnosis::BlockScopeNotExtern => Severity::Error,
-            Diagnosis::InvalidTypeSpecifer => Severity::Error,
-            Diagnosis::DuplicateTypeQualifers => Severity::Error,
-            Diagnosis::NonIntBitFieldType => Severity::Error,
-            Diagnosis::NonIntArraySize => Severity::Error,
-            Diagnosis::VariantBadValue => Severity::Error,
-            Diagnosis::AutoRegisterExternal => Severity::Error,
-            Diagnosis::NotFunctionTypeDeclarator => Severity::Error,
-            Diagnosis::FunctionAutoExtern => Severity::Error,
-            Diagnosis::ParameterOldStyleListLenMismatch => Severity::Error,
-            Diagnosis::ParameterTypeListWithList => Severity::Error,
-            Diagnosis::ParameterNotRegister => Severity::Error,
-            Diagnosis::VoidParameter => Severity::Error,
-            Diagnosis::AbstractParameterDeclaration => Severity::Error,
-            Diagnosis::MissingDeclarationInOldStyle => Severity::Error,
-            Diagnosis::DuplicateParameterName => Severity::Error,
-            Diagnosis::MissingParameterInOldStyle => Severity::Error,
-            Diagnosis::TypedefInOldStyle => Severity::Error,
-            Diagnosis::LabelOutsideFunction => Severity::Error,
+            Diagnosis::DuplicateTypeQualifers => Severity::Warning,
+            Diagnosis::DivisionByZero |
+            Diagnosis::BadArgumentsCount |
+            Diagnosis::SyntaxError { .. } |
+            Diagnosis::InvalidSizeof |
+            Diagnosis::UndeclaredIdentifier(_) |
+            Diagnosis::NonConstantExpression |
+            Diagnosis::NonIntegerConstantExpression |
+            Diagnosis::CastToNonScalar |
+            Diagnosis::EmptyDeclaration |
+            Diagnosis::TagWithoutMember(_) |
+            Diagnosis::MultipleStorageSpecifiers |
+            Diagnosis::BlockScopeNotExtern |
+            Diagnosis::InvalidTypeSpecifer |
+            Diagnosis::NonIntBitFieldType |
+            Diagnosis::NonIntArraySize |
+            Diagnosis::VariantBadValue |
+            Diagnosis::AutoRegisterExternal |
+            Diagnosis::NotFunctionTypeDeclarator |
+            Diagnosis::FunctionAutoExtern |
+            Diagnosis::ParameterOldStyleListLenMismatch |
+            Diagnosis::ParameterTypeListWithList |
+            Diagnosis::ParameterNotRegister |
+            Diagnosis::VoidParameter |
+            Diagnosis::AbstractParameterDeclaration |
+            Diagnosis::MissingDeclarationInOldStyle |
+            Diagnosis::DuplicateParameterName |
+            Diagnosis::MissingParameterInOldStyle |
+            Diagnosis::TypedefInOldStyle |
+            Diagnosis::LabelOutsideFunction |
             Diagnosis::DuplicateDeclaration(_, _) => Severity::Error,
         }
     }
@@ -314,7 +314,7 @@ pub fn report<W: Write, D: Display>(
     writeln!(
         w,
         "{path}:{line_no}:{}: {color}{severity}:{RESET} {msg}",
-        span.start.col
+        span.start.col,
     )?;
 
     let Ok(file) = File::open(path) else { return Ok(()) };
