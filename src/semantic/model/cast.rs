@@ -44,13 +44,13 @@ pub fn lvalue_conversion(sema: &mut Sema, re: &mut ResolvedExpression, span: &Sp
 }
 
 pub fn function_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
-    let ResolvedType::Function { .. } = sema.types.get(re.casted_ty().ty) else { return };
-    let to = QualifiedType::new(sema.types.pointer(re.casted_ty()), false, false);
+    let ResolvedType::Function { .. } = sema.types.get(re.ty.ty) else { return };
+    let to = QualifiedType::new(sema.types.pointer(re.ty), false, false);
     re.casts.push(ImplicitCast::new(CastKind::FunctionToPointer, to));
 }
 
 pub fn array_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
-    let ResolvedType::Array { elem, .. } = sema.types.get(re.casted_ty().ty) else { return };
+    let ResolvedType::Array { elem, .. } = sema.types.get(re.ty.ty) else { return };
     let to = QualifiedType::new(sema.types.pointer(*elem), false, false);
     re.casts.push(ImplicitCast::new(CastKind::ArrayToPointer, to))
 }
@@ -66,7 +66,7 @@ pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
     if !ty.is_complete(&sema.tags) {
         sema.add_diag(Diag::only_diag(Diagnosis::IncompleteType), span);
     }
-    let to = QualifiedType::new(re.casted_ty().ty, false, false);
+    let to = QualifiedType::new(re.ty.ty, false, false);
     re.casts.push(ImplicitCast::new(CastKind::LValueToRValue, to));
 }
 

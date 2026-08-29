@@ -112,7 +112,7 @@ fn type_of(
     use ExpressionKind::{LValue, RValue};
 
     match sema.expressions.get(&node.id) {
-        Some(Some(re)) => return Ok((re.casted_ty(), re.kind)),
+        Some(Some(re)) => return Ok((re.ty, re.kind)),
         Some(None) => return Err(Diagnosis::Poisoned),
         None => (),
     }
@@ -129,7 +129,7 @@ fn type_of(
         }
         Expression::Constant(value) => Ok((value.ty(sema), RValue)),
         Expression::StringLiteral(value) => Ok((value.ty(sema, ctx), LValue)),
-        Expression::ConstantExpression(expr) => as_written(sema, expr).map(|re| (re.casted_ty(), re.kind)),
+        Expression::ConstantExpression(expr) => as_written(sema, expr).map(|re| (re.ty, re.kind)),
         Expression::Add(e1, e2) => with_operands(sema, e1, e2, RValue, |sema, lhs, rhs| {
             // lvalue_conversion(sema, lhs, &e1.span);
             // lvalue_conversion(sema, rhs, &e2.span);
