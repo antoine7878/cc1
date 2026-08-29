@@ -1,7 +1,10 @@
+use std::iter::zip;
+
 use crate::ast::{Name, Storage};
 use crate::define_arena;
 use crate::parser::Span;
-use crate::semantic::{QualifiedType, SymbolArena, SymbolId};
+use crate::semantic::DeclaredParams::Unspecified;
+use crate::semantic::{QualifiedType, ResolvedTypeArena, SymbolArena, SymbolId};
 
 define_arena!(FunctionDef, FunctionDefArena, FunctionDefId, sema.functions);
 
@@ -39,6 +42,26 @@ pub enum ParamTypes {
         params: Vec<QualifiedType>,
         is_variadic: bool,
     },
+}
+
+#[rustfmt::skip]
+impl ParamTypes {
+    pub fn is_compatible(&self, types: &ResolvedTypeArena, other: &Self) -> bool {
+        match (self, other) {
+            (
+                ParamTypes::Prototype { params: p1, is_variadic: v1 },
+                ParamTypes::Prototype { params: p2, is_variadic: v2 },
+            ) => v1 == v2 && p1.len() == p2.len() && zip(p1, p2).all(|(a, b)| a.is_compatible(types, b)),
+            (
+                ParamTypes::Prototype { params: p1, is_variadic: v1 },
+                ParamTypes::Unspecified)
+            | (
+                ParamTypes::Unspecified,
+                ParamTypes::Prototype { params: p1, is_variadic: v1 }
+            ) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

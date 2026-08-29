@@ -1,6 +1,8 @@
-use crate::ast::TypeSpecifier;
+use crate::ast::Declarator::Array;
+use crate::ast::{Tag, TypeSpecifier};
 use crate::define_interner;
-use crate::semantic::{ParamTypes, TagDefArena, TagDefId};
+use crate::semantic::ResolvedType::Array;
+use crate::semantic::{ParamTypes, Sema, TagDefArena, TagDefId};
 
 define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, sema.types);
 
@@ -32,6 +34,14 @@ pub struct QualifiedType {
     pub is_volatile: bool,
 }
 
+// Two types have comparihle type if their types are the same. Additional rules for determining
+// whether two types are compatible are described in 6.5., 3 for type specifiers, in 65.3 for type
+// qualifiers, and in 6.5.4 for declarators.” Moreover. two structure, union. or enumeration types
+// declared in separate translation units are compatible if they have the same number of members.
+// the same member names. and compatible member types: for two structures. the members shall be
+// in the same order: for two structures or unions, the bit-fields shall have the same widths: for two
+// enumerations. the members shall have the same values
+
 impl ResolvedType {
     // 6.1.2.5 An array type of unknown size is an incomplete type. A structure or union type of
     // unknown content is an incomplete type.
@@ -44,8 +54,18 @@ impl ResolvedType {
         }
     }
 
-    pub fn is_arithmetic(&self) -> bool {
-        self.is_integer() || self.is_floating()
+    // 6.1.2.5 Integral and floating types are collectively called arithmetic types.
+    pub fn is_arithmetic(&self, tags: &TagDefArena) -> bool {
+        self.is_integral(tags) || self.is_floating()
+    }
+
+    // 6.1.2.5 The type char, the signed and unsigned integer types, and the enumerated types
+    // are collectively called integral types.
+    pub fn is_integral(&self, tags: &TagDefArena) -> bool {
+        match self {
+            ResolvedType::Tag(id) => tags.get(*id).kind == Tag::Enum,
+            _ => self.is_integer(),
+        }
     }
 
     pub fn is_floating(&self) -> bool {
@@ -154,6 +174,34 @@ impl QualifiedType {
             is_const,
             is_volatile,
         }
+    }
+
+    pub fn same_qualifiers(&self, other: &Self) -> bool {
+        self.is_const == other.is_const && self.is_volatile == other.is_volatile
+    }
+
+    pub fn is_compatible(&self, types: &ResolvedTypeArena, other: &Self) -> bool {
+        if self == other {
+            return true;
+        }
+        let lhs = types.get(self.ty);
+        let rhs = types.get(other.ty);
+        match (lhs, rhs) {
+            (ResolvedType::Function { ret: r1, params: p1 }, ResolvedType::Function { ret: r2, params: p2 }) => {
+                r1.is_compatible(types, r2) && p1.is_compatible(types, p2)
+            }
+            (ResolvedType::Array { elem: e1, len: s1 }, ResolvedType::Array { elem: e2, len: s2 }) => {
+                e1.is_compatible(types, e2) && (s1.is_none() || s1 == s2)
+            }
+            (ResolvedType::Pointer(l), ResolvedType::Pointer(r)) => {
+                self.same_qualifiers(other) && l.same_qualifiers(r) && l.is_compatible(types, r)
+            }
+            _ => false,
+        }
+        // Array { elem: QualifiedType, len: Option<usize> },
+        // Function { ret: QualifiedType, params: ParamTypes },
+        // Pointer(QualifiedType),
+        // Tag(TagDefId),
     }
 }
 
