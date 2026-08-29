@@ -247,11 +247,10 @@ fn an_undeclared_old_style_parameter_is_implicitly_int() {
 }
 
 #[test]
-#[ignore = "a duplicate declaration is reported as AbstractParameterDeclaration"]
-fn an_old_style_parameter_declared_twice_is_rejected() {
+fn an_old_style_parameter_declared_twice_is_not_flagged_here() {
     let diag = is_valid_old_style(&[name(1)], vec![Some(name(1)), Some(name(1))]);
-    assert_eq!(diag.res, None);
-    assert_eq!(reported(&diag), "AbstractParameterDeclaration");
+    assert_eq!(diag.res, Some(Vec::new()));
+    assert_eq!(reported(&diag), "None");
 }
 
 #[test]

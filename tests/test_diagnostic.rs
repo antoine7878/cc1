@@ -65,13 +65,9 @@ reports!(
 );
 
 reports!(
-    ignore "the second diagnosis is a mislabelled cascade of the duplicate parameter",
-    report_every_diagnosis_in_order,
+    report_old_style_parameter_declared_twice,
     "int f(a, b) int a; int a; { return a; }",
-    [
-        "<test>:1:24: error: duplicate declaration of parameter `a'",
-        "<test>:1:5: error: Absctract declaration in old style function",
-    ]
+    ["<test>:1:24: error: duplicate declaration of parameter `a'"]
 );
 
 reports!(
