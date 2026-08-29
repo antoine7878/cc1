@@ -20,7 +20,7 @@ pub struct Sema {
     pub tags: TagDefArena,
     pub functions: FunctionDefArena,
 
-    pub expressions: HashMap<ExpressionId, ResolvedExpression>,
+    pub expressions: HashMap<ExpressionId, Option<ResolvedExpression>>,
     pub bindings: HashMap<ExpressionId, Option<SymbolId>>,
     pub constants: HashMap<ExpressionId, Option<Value>>,
     pub declarations: HashMap<DeclaratorId, SymbolId>,

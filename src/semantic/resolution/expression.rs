@@ -4,29 +4,37 @@ use crate::semantic::model::cast;
 use crate::semantic::{Diagnosis, DiagnosisNode, ExpressionKind, QualifiedType, ResolvedExpression, Sema};
 
 pub fn run(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
-    let ty = type_of(sema, ctx, node);
-    match ty {
-        Ok((ty, kind)) => {
-            sema.expressions
-                .entry(node.id)
-                .or_insert(ResolvedExpression::new(ty, kind))
-                .ty = ty
-        }
-        Err(diag) => sema.diagnosis.push(DiagnosisNode {
-            span: node.span,
-            inner: diag,
-        }),
+    if sema.expressions.contains_key(&node.id) {
+        return;
     }
+    let resolved = match type_of(sema, ctx, node) {
+        Ok((ty, kind)) => Some(ResolvedExpression::new(ty, kind)),
+        Err(Diagnosis::Poisoned) => None,
+        Err(inner) => {
+            sema.diagnosis.push(DiagnosisNode { span: node.span, inner });
+            None
+        }
+    };
+    sema.expressions.insert(node.id, resolved);
+}
+
+fn take(sema: &mut Sema, node: &ExpressionNode) -> Result<ResolvedExpression, Diagnosis> {
+    let slot = sema.expressions.get_mut(&node.id).ok_or(Diagnosis::Poisoned)?;
+    slot.take().ok_or(Diagnosis::Poisoned)
+}
+
+fn put(sema: &mut Sema, node: &ExpressionNode, re: ResolvedExpression) {
+    sema.expressions.insert(node.id, Some(re));
 }
 
 fn with_operand<F>(sema: &mut Sema, node: &ExpressionNode, f: F) -> Result<QualifiedType, Diagnosis>
 where
     F: FnOnce(&mut Sema, &mut ResolvedExpression) -> Result<QualifiedType, Diagnosis>,
 {
-    let mut re = sema.expressions.remove(&node.id).ok_or(Diagnosis::Poisoned)?;
+    let mut re = take(sema, node)?;
     cast::lvalue_conversion(sema, &mut re, &node.span);
     let out = f(sema, &mut re);
-    sema.expressions.insert(node.id, re);
+    put(sema, node, re);
     out
 }
 
@@ -34,24 +42,27 @@ fn with_operands<F>(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode, f
 where
     F: FnOnce(&mut Sema, &mut ResolvedExpression, &mut ResolvedExpression) -> Result<QualifiedType, Diagnosis>,
 {
-    let mut lhs = sema.expressions.remove(&e1.id).ok_or(Diagnosis::Poisoned)?;
-    let mut rhs = match sema.expressions.remove(&e2.id) {
-        Some(rhs) => rhs,
-        None => {
-            sema.expressions.insert(e1.id, lhs);
-            return Err(Diagnosis::Poisoned);
+    let mut lhs = take(sema, e1)?;
+    let mut rhs = match take(sema, e2) {
+        Ok(rhs) => rhs,
+        Err(diag) => {
+            put(sema, e1, lhs);
+            return Err(diag);
         }
     };
     cast::lvalue_conversion(sema, &mut lhs, &e1.span);
     cast::lvalue_conversion(sema, &mut rhs, &e2.span);
     let out = f(sema, &mut lhs, &mut rhs);
-    sema.expressions.insert(e1.id, lhs);
-    sema.expressions.insert(e2.id, rhs);
+    put(sema, e1, lhs);
+    put(sema, e2, rhs);
     out
 }
 
 fn as_written<'a>(sema: &'a Sema, node: &ExpressionNode) -> Result<&'a ResolvedExpression, Diagnosis> {
-    sema.expressions.get(&node.id).ok_or(Diagnosis::Poisoned)
+    sema.expressions
+        .get(&node.id)
+        .and_then(Option::as_ref)
+        .ok_or(Diagnosis::Poisoned)
 }
 
 fn type_of(
@@ -59,8 +70,10 @@ fn type_of(
     ctx: &Context,
     node: &ExpressionNode,
 ) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
-    if let Some(re) = sema.expressions.get(&node.id) {
-        return Ok((re.ty, re.kind));
+    match sema.expressions.get(&node.id) {
+        Some(Some(re)) => return Ok((re.ty, re.kind)),
+        Some(None) => return Err(Diagnosis::Poisoned),
+        None => (),
     }
     match node.id.resolve(ctx) {
         Expression::Identifier(_) => {
