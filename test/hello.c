@@ -1,6 +1,3 @@
-enum a { OUI = 1 << 31 };
-
-/*
 char *a = "coucou";
 char *wa = L"wide coucou";
 int i1 = 1;
@@ -11,4 +8,3 @@ int i5 = 1ul;
 float f1 = 3.1415;
 float f2 = 3.1415f;
 float f3 = 3.1415l;
-*/

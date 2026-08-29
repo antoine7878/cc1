@@ -11,6 +11,7 @@ pub struct ResolvedExpression {
     pub ty: QualifiedType,
     pub kind: ExpressionKind,
     pub casts: Vec<ImplicitCast>,
+    pub result_cast: Option<ImplicitCast>,
 }
 
 impl ResolvedExpression {
@@ -23,6 +24,7 @@ impl ResolvedExpression {
             ty,
             kind,
             casts: Vec::new(),
+            result_cast: None,
         }
     }
 }

@@ -9,6 +9,7 @@ use crate::utils::{RED, RESET, YELLOW};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Diagnosis {
+    Poisoned,
     DivisionByZero,
     BadArgumentsCount,
     SyntaxError {
@@ -70,6 +71,7 @@ impl Diagnosis {
     pub fn severity(&self) -> Severity {
         match self {
             Diagnosis::MixedWideStringConcat => Severity::Warning,
+            Diagnosis::Poisoned  |
             Diagnosis::IntegerConstantTooLarge  |
             Diagnosis::DuplicateTypeQualifers |
             Diagnosis::ArithmeticOverflow |
@@ -135,6 +137,7 @@ impl DiagnosisNode {
     fn message(&self, ctx: &Context) -> String {
 
         match &self.inner {
+            Diagnosis::Poisoned => "Internal error".to_string(),
             Diagnosis::IncompleteType => "Incomplete type".to_string(),
             Diagnosis::DivisionByZero => "Division by zero".to_string(),
             Diagnosis::ConstantOverflow => "overflow in constant expression".to_string(),

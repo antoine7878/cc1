@@ -37,7 +37,7 @@ pub enum CastKind {
 // designated object (and is no longer an lvalue). If the lvalue has qualified type, the value
 // has the unqualified version of the type of the lvalue.
 // 6.2.2.1 If the lvalue has an incomplete type and does not have array type, the behavior is undefined.
-pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
+pub fn lvalue_conversion(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
     if !matches!(re.kind, ExpressionKind::LValue) {
         return;
     }
@@ -128,16 +128,16 @@ pub fn usual_arithmetic(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut
     num_conv(sema, rhs, to);
 }
 
-pub fn function_to_pointer(sema: &Sema, re: &mut ResolvedExpression) {
-    if let ResolvedType::Function { .. } = sema.types.get(re.ty.ty) {
-        re.casts.push(ImplicitCast::new(CastKind::FunctionToPointer, re.ty));
-    }
+pub fn function_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
+    let ResolvedType::Function { .. } = sema.types.get(re.ty.ty) else { return };
+    let to = QualifiedType::new(sema.types.pointer(re.ty), false, false);
+    re.casts.push(ImplicitCast::new(CastKind::FunctionToPointer, to));
 }
 
-pub fn array_to_pointer(sema: &Sema, re: &mut ResolvedExpression) {
-    if let ResolvedType::Array { elem, .. } = sema.types.get(re.ty.ty) {
-        re.casts.push(ImplicitCast::new(CastKind::ArrayToPointer, *elem))
-    }
+pub fn array_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
+    let ResolvedType::Array { elem, .. } = sema.types.get(re.ty.ty) else { return };
+    let to = QualifiedType::new(sema.types.pointer(*elem), false, false);
+    re.casts.push(ImplicitCast::new(CastKind::ArrayToPointer, to))
 }
 
 // fn assignment_conversion(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) {

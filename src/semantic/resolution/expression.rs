@@ -1,14 +1,15 @@
 use crate::ast::{Expression, ExpressionNode};
 use crate::parser::Context;
+use crate::semantic::model::cast;
 use crate::semantic::{Diagnosis, DiagnosisNode, ExpressionKind, QualifiedType, ResolvedExpression, Sema};
 
 pub fn run(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
     let ty = type_of(sema, ctx, node);
     match ty {
-        Ok(ty) => {
+        Ok((ty, kind)) => {
             sema.expressions
                 .entry(node.id)
-                .or_insert(ResolvedExpression::new(ty, ExpressionKind::RValue))
+                .or_insert(ResolvedExpression::new(ty, kind))
                 .ty = ty
         }
         Err(diag) => sema.diagnosis.push(DiagnosisNode {
@@ -18,7 +19,49 @@ pub fn run(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
     }
 }
 
-fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> Result<QualifiedType, Diagnosis> {
+fn with_operand<F>(sema: &mut Sema, node: &ExpressionNode, f: F) -> Result<QualifiedType, Diagnosis>
+where
+    F: FnOnce(&mut Sema, &mut ResolvedExpression) -> Result<QualifiedType, Diagnosis>,
+{
+    let mut re = sema.expressions.remove(&node.id).ok_or(Diagnosis::Poisoned)?;
+    cast::lvalue_conversion(sema, &mut re, &node.span);
+    let out = f(sema, &mut re);
+    sema.expressions.insert(node.id, re);
+    out
+}
+
+fn with_operands<F>(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode, f: F) -> Result<QualifiedType, Diagnosis>
+where
+    F: FnOnce(&mut Sema, &mut ResolvedExpression, &mut ResolvedExpression) -> Result<QualifiedType, Diagnosis>,
+{
+    let mut lhs = sema.expressions.remove(&e1.id).ok_or(Diagnosis::Poisoned)?;
+    let mut rhs = match sema.expressions.remove(&e2.id) {
+        Some(rhs) => rhs,
+        None => {
+            sema.expressions.insert(e1.id, lhs);
+            return Err(Diagnosis::Poisoned);
+        }
+    };
+    cast::lvalue_conversion(sema, &mut lhs, &e1.span);
+    cast::lvalue_conversion(sema, &mut rhs, &e2.span);
+    let out = f(sema, &mut lhs, &mut rhs);
+    sema.expressions.insert(e1.id, lhs);
+    sema.expressions.insert(e2.id, rhs);
+    out
+}
+
+fn as_written<'a>(sema: &'a Sema, node: &ExpressionNode) -> Result<&'a ResolvedExpression, Diagnosis> {
+    sema.expressions.get(&node.id).ok_or(Diagnosis::Poisoned)
+}
+
+fn type_of(
+    sema: &mut Sema,
+    ctx: &Context,
+    node: &ExpressionNode,
+) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
+    if let Some(re) = sema.expressions.get(&node.id) {
+        return Ok((re.ty, re.kind));
+    }
     match node.id.resolve(ctx) {
         Expression::Identifier(_) => {
             let id = sema
@@ -27,76 +70,12 @@ fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> Result<Qual
                 .copied()
                 .flatten()
                 .ok_or(Diagnosis::NonConstantExpression)?;
-            Ok(sema.symbols.get(id).ty.unwrap())
+            Ok((sema.symbols.get(id).ty.unwrap(), ExpressionKind::RValue))
         }
-        Expression::Constant(value) => Ok(value.ty(sema)),
-        Expression::StringLiteral(value) => Ok(value.ty(sema, ctx)),
+        Expression::Constant(value) => Ok((value.ty(sema), ExpressionKind::RValue)),
+        Expression::StringLiteral(value) => Ok((value.ty(sema, ctx), ExpressionKind::RValue)),
         Expression::ConstantExpression(expr) => type_of(sema, ctx, expr),
-        Expression::Add(_e1, _e2) => Err(Diagnosis::DivisionByZero),
+        Expression::Add(_e1, _e2) => Err(Diagnosis::Poisoned),
         _ => todo!(),
     }
 }
-
-// pub fn type_of(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<QualifiedType, Diagnosis> {
-//     match expr.id.resolve(ctx) {
-//         Expression::ConstantExpression(expr) => type_of(sema, ctx, expr),
-//         Expression::Identifier(name) => {
-//             let id = sema
-//                 .expressions
-//                 .get(&expr.id)
-//                 .and_then(|re| re.sym)
-//                 .ok_or(Diagnosis::UndeclaredIdentifier(*name))?;
-//             let symbol = sema.symbols.get(id);
-//             Ok(symbol.ty.unwrap())
-//         }
-//         Expression::Constant(value_node) => Ok(value_node.ty(sema)),
-//         Expression::Plus(expr) | Expression::Minus(expr) | Expression::BitNot(expr) | Expression::LogicalNot(expr) => {
-//             type_of(sema, ctx, expr)
-//         }
-//         Expression::Add(e1, e2)
-//         | Expression::Sub(e1, e2)
-//         | Expression::Mul(e1, e2)
-//         | Expression::Div(e1, e2)
-//         | Expression::Mod(e1, e2)
-//         | Expression::Left(e1, e2)
-//         | Expression::Right(e1, e2)
-//         | Expression::BitAnd(e1, e2)
-//         | Expression::BitOr(e1, e2)
-//         | Expression::BitXor(e1, e2)
-//         | Expression::Greater(e1, e2)
-//         | Expression::Lower(e1, e2)
-//         | Expression::GreaterEq(e1, e2)
-//         | Expression::LowerEq(e1, e2)
-//         | Expression::Eq(e1, e2)
-//         | Expression::Neq(e1, e2)
-//         | Expression::LogicalOr(e1, e2)
-//         | Expression::LogicalAnd(e1, e2) => type_of(sema, ctx, expr),
-//         Expression::Ternary(condition, e1, e2) => type_of(sema, ctx, expr),
-//         Expression::SizeofExpr(expr) => type_of(sema, ctx, expr),
-//         Expression::SizeofType(ty_node) => todo!(),
-//         Expression::Cast(ty_node, expr) => type_of(sema, ctx, expr),
-//         Expression::StringLiteral(_)
-//         | Expression::PostInc(_)
-//         | Expression::PostDec(_)
-//         | Expression::PreInc(_)
-//         | Expression::Deref(_)
-//         | Expression::Addr(_)
-//         | Expression::Assign(_, _)
-//         | Expression::MulAssign(_, _)
-//         | Expression::DivAssign(_, _)
-//         | Expression::ModAssign(_, _)
-//         | Expression::AddAssign(_, _)
-//         | Expression::SubAssign(_, _)
-//         | Expression::LeftAssign(_, _)
-//         | Expression::RightAssign(_, _)
-//         | Expression::AndAssign(_, _)
-//         | Expression::XorAssign(_, _)
-//         | Expression::OrAssign(_, _)
-//         | Expression::List(_, _)
-//         | Expression::ArrayAcces(_, _)
-//         | Expression::FunctionCall(_, _)
-//         | Expression::DotAcces(_, _)
-//         | Expression::PtrAcces(_, _)
-//         | Expression::PreDec(_) => todo!(),
-//     }
-// }
