@@ -122,7 +122,7 @@ impl Sema {
         let old_id = self.scopes.current(sym.kind, sym.name.id)?;
         let old_symbol = self.symbols.get(old_id);
         if self.scopes.kind() == ScopeKind::File
-            && old_symbol.is_compatible(sym)
+            && old_symbol.is_compatible(self, sym)
             && !(sym.is_init && old_symbol.is_init)
         {
             return Some(old_id);

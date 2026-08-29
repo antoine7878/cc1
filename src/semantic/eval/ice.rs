@@ -99,7 +99,10 @@ pub fn eval(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<Val
             let (qualif, _) = declaration::declared_type(sema, ctx, Some(qualif), &ty_node.declarator)
                 .ok_or(Diagnosis::NonConstantExpression)?;
             match layout::of(sema, qualif.ty) {
-                Some(layout) => Ok(Value::UnsignedLong(layout.size.into())),
+                Some(layout) => sema
+                    .target
+                    .cast(&sema.target.size_t, Value::UnsignedLong(layout.size.into()))
+                    .ok_or(Diagnosis::InvalidSizeof),
                 None => Err(Diagnosis::InvalidSizeof),
             }
         }

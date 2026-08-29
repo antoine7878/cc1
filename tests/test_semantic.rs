@@ -293,3 +293,200 @@ accept!(
 accept!(external_function_declaration_with_static, "static int g(void);");
 
 accept!(external_function_declaration_returning_pointer, "static int *g(void);");
+
+// ---- 6.5.4.3 compatibility of function types -----------------------------
+
+accept!(function_both_parameter_lists_absent, "int f(); int f();");
+
+accept!(function_prototype_then_unspecified, "int f(int); int f();");
+
+accept!(function_unspecified_then_prototype, "int f(); int f(int);");
+
+accept!(function_void_prototype_then_unspecified, "int f(void); int f();");
+
+accept!(function_pointer_parameter_is_not_promoted, "int f(int *); int f();");
+
+accept!(function_parameter_qualifier_is_dropped, "int f(const int); int f();");
+
+reject!(function_char_parameter_promotes_to_int, "int f(char); int f();");
+
+reject!(function_float_parameter_promotes_to_double, "int f(float); int f();");
+
+reject!(function_variadic_prototype_then_unspecified, "int f(int,...); int f();");
+
+accept!(
+    function_prototype_then_identifier_list_definition,
+    "int f(int); int f(a) int a; { }"
+);
+
+accept!(
+    function_unspecified_then_identifier_list_definition,
+    "int f(); int f(a) int a; { }"
+);
+
+accept!(
+    function_identifier_without_declaration_is_int,
+    "int f(int); int f(a) { }"
+);
+
+accept!(
+    function_identifier_short_promotes_to_int,
+    "int f(int); int f(a) short a; { }"
+);
+
+accept!(
+    function_identifier_float_promotes_to_double,
+    "int f(double); int f(a) float a; { }"
+);
+
+accept!(
+    function_variadic_prototype_then_identifier_list_definition,
+    "int f(int,...); int f(a) int a; { }"
+);
+
+accept!(
+    function_identifier_list_definition_then_prototype,
+    "int f(a) int a; { } int f(int);"
+);
+
+reject!(
+    function_prototype_then_empty_identifier_list_definition,
+    "int f(int); int f() { }"
+);
+
+reject!(
+    function_identifier_list_definition_with_fewer_parameters,
+    "int f(int,int); int f(a) int a; { }"
+);
+
+reject!(
+    function_identifier_char_promotes_to_int,
+    "int f(char); int f(a) char a; { }"
+);
+
+// ---- 6.5.2.2 an enumerated type is compatible with an integer type --------
+
+accept!(
+    enum_parameter_prototype_then_unspecified,
+    "enum e { A }; int f(enum e); int f();"
+);
+
+accept!(
+    enum_parameter_prototype_then_identifier_list_definition,
+    "enum e { A }; int f(enum e); int f(a) enum e a; { }"
+);
+
+reject!(
+    function_identifier_list_definition_with_other_return_type,
+    "int f(int); void f(a) int a; { }"
+);
+
+// ---- 6.5.3 a qualifier is part of the type on every level ----------------
+
+reject!(compatible_const_against_plain, "extern const int x; extern int x;");
+
+reject!(
+    compatible_volatile_against_plain,
+    "extern volatile int x; extern int x;"
+);
+
+reject!(
+    compatible_const_pointer_against_plain,
+    "extern int *const p; extern int *p;"
+);
+
+reject!(
+    compatible_pointer_to_const_against_pointer,
+    "extern const int *p; extern int *p;"
+);
+
+reject!(
+    compatible_const_tag_against_plain,
+    "struct S { int a; }; extern const struct S s; extern struct S s;"
+);
+
+reject!(
+    compatible_const_element_against_plain,
+    "extern const int a[10]; extern int a[10];"
+);
+
+// ---- 6.5.4.1 pointers to compatible types --------------------------------
+
+accept!(
+    compatible_pointer_to_function,
+    "extern int (*p)(int); extern int (*p)(int);"
+);
+
+reject!(
+    compatible_pointer_to_function_other_parameter,
+    "extern int (*p)(int); extern int (*p)(char);"
+);
+
+reject!(
+    compatible_pointer_to_function_other_return,
+    "extern int (*p)(int); extern char (*p)(int);"
+);
+
+accept!(
+    compatible_pointer_to_completed_tag,
+    "struct S; extern struct S *p; struct S { int a; }; extern struct S *p;"
+);
+
+// ---- 6.5.4.2 array sizes agree only when both are present ----------------
+
+accept!(compatible_array_unsized_then_sized, "extern int a[]; extern int a[10];");
+
+accept!(compatible_array_sized_then_unsized, "extern int a[10]; extern int a[];");
+
+accept!(
+    compatible_array_both_unsized,
+    "extern const int a[]; extern const int a[10];"
+);
+
+reject!(compatible_array_other_size, "extern int a[10]; extern int a[11];");
+
+accept!(
+    compatible_array_of_array_outer_unsized,
+    "extern int a[][4]; extern int a[3][4];"
+);
+
+accept!(
+    compatible_array_of_array_outer_sized_first,
+    "extern int a[10][4]; extern int a[][4];"
+);
+
+reject!(
+    compatible_array_of_array_other_inner_size,
+    "extern int a[3][4]; extern int a[3][5];"
+);
+
+accept!(
+    compatible_pointer_to_unsized_array,
+    "extern int (*p)[10]; extern int (*p)[];"
+);
+
+// ---- 6.5.2.2 an enumerated type is compatible with one integer type ------
+
+accept!(
+    compatible_enum_declared_twice,
+    "enum a { X }; extern enum a v; extern enum a v;"
+);
+
+reject!(
+    compatible_distinct_enums,
+    "enum a { X }; enum b { Y }; extern enum a v; extern enum b v;"
+);
+
+// ---- 6.1.2.5 the character and integer types are distinct types ----------
+
+reject!(
+    compatible_char_against_signed_char,
+    "extern char c; extern signed char c;"
+);
+
+reject!(
+    compatible_int_against_unsigned_int,
+    "extern int x; extern unsigned int x;"
+);
+
+accept!(compatible_int_against_signed_int, "extern int x; extern signed int x;");

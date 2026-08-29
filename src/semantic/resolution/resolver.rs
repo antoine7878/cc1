@@ -7,9 +7,8 @@ use crate::ast::{
     TypeSpecifier,
 };
 use crate::parser::{Context, Span};
-use crate::semantic::resolution::expression;
 use crate::semantic::{
-    DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo, QualifiedType,
+    DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo, ParamTypes, QualifiedType,
     ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, declaration, ice,
 };
 
@@ -33,7 +32,7 @@ impl<'a> SymbolResolver<'a> {
         &mut self,
         ctx: &Context,
         node: &FunctionDefinitionNode,
-    ) -> Option<(FunctionDefId, DeclaredParams)> {
+    ) -> Option<(FunctionDefId, DeclaredParams, Option<ParamTypes>)> {
         let span = &node.span;
         let decl_span = &node.declarator.span;
 
@@ -49,9 +48,67 @@ impl<'a> SymbolResolver<'a> {
         constrain::external::check_external_specifiers(&node.specifiers).collect(self, span);
 
         let name = decl.ident(ctx)?;
+        let previous = self.sema.scopes.current(SymbolKind::Function, name.id);
+        let declared = previous.and_then(|id| self.param_types(id));
+        // 6.5.4.3 If one type has a parameter type list and the other type is specified by a function
+        // definition that contains a (possibly empty) identifier list: the parameter half of that
+        // comparison needs the identifiers, so only the return type is compared here.
+        let ty = match &declared {
+            Some(declared) if !matches!(params, DeclaredParams::Prototype { .. }) => {
+                self.with_param_types(ty, declared.clone())
+            }
+            _ => ty,
+        };
         let sym = Symbol::new(name, Some(ty), Some(storage), SymbolKind::Function, true);
         let sym = self.sema.declare(sym, decl_span);
-        Some((self.sema.functions.declare(sym), params))
+        let declared = (previous == Some(sym)).then_some(declared).flatten();
+        Some((self.sema.functions.declare(sym), params, declared))
+    }
+
+    fn param_types(&self, sym: SymbolId) -> Option<ParamTypes> {
+        let ty = self.sema.symbols.get(sym).ty?;
+        match self.sema.types.get(ty.ty) {
+            ResolvedType::Function { params, .. } => Some(params.clone()),
+            _ => None,
+        }
+    }
+
+    fn with_param_types(&mut self, ty: QualifiedType, params: ParamTypes) -> QualifiedType {
+        let ret = match self.sema.types.get(ty.ty) {
+            ResolvedType::Function { ret, .. } => *ret,
+            _ => return ty,
+        };
+        QualifiedType::new(self.sema.types.function(ret, params), ty.is_const, ty.is_volatile)
+    }
+
+    // 6.5.4.3 If one type has a parameter type list and the other type is specified by a function
+    // definition that contains a (possibly empty) identifier list, both shall agree in the number of
+    // parameters, and the type of each prototype parameter shall be compatible with the type that results
+    // from the application of the default argument promotions to the type of the corresponding identifier.
+    fn check_identifier_list(
+        &mut self,
+        declared: &ParamTypes,
+        params: &DeclaredParams,
+        parameters: &[SymbolId],
+        name: Name,
+        span: &Span,
+    ) {
+        if let DeclaredParams::Names(names) = params
+            && names.len() != parameters.len()
+        {
+            return;
+        }
+        let identifiers: Vec<QualifiedType> = parameters
+            .iter()
+            .filter_map(|sym| self.sema.symbols.get(*sym).ty)
+            .collect();
+        if identifiers.len() != parameters.len() || declared.is_compatible_with_identifiers(self.sema, &identifiers) {
+            return;
+        }
+        self.add_diag(
+            Diag::only_diag(Diagnosis::DuplicateDeclaration(SymbolKind::Function, name)),
+            span,
+        );
     }
 
     fn param_empty(&mut self, lst: &[DeclarationNode], span: &Span) {
@@ -155,7 +212,7 @@ fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
 impl Visitor for Sema {
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
         walk_expression(self, ctx, node);
-        if self.expressions.contains_key(&node.id) {
+        if self.bindings.contains_key(&node.id) {
             return;
         }
         if let Expression::Identifier(name) = node.id.resolve(ctx) {
@@ -165,13 +222,13 @@ impl Visitor for Sema {
             }
             self.bindings.insert(node.id, sym);
         }
-        expression::run(self, ctx, node);
+        // expression::run(self, ctx, node);
     }
 }
 
 impl Visitor for SymbolResolver<'_> {
     fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
-        let Some((def, params)) = self.add_function(ctx, node) else { return };
+        let Some((def, params, declared)) = self.add_function(ctx, node) else { return };
 
         self.sema.scopes.push(ScopeKind::Prototype);
         let lst = &node.old_style_declarations;
@@ -184,6 +241,12 @@ impl Visitor for SymbolResolver<'_> {
             DeclaredParams::Names(names) => self.param_old_style(ctx, names, lst, span),
             DeclaredParams::Prototype { params, .. } => self.param_prototype(params, lst, span),
         };
+        if let Some(declared) = declared
+            && !matches!(params, DeclaredParams::Prototype { .. })
+            && let Some(name) = node.declarator.ident(ctx)
+        {
+            self.check_identifier_list(&declared, &params, &parameters, name, span);
+        }
         self.sema.functions.complete(def, parameters);
 
         self.visit_compound_statement(ctx, &node.body);

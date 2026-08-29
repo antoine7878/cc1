@@ -546,16 +546,22 @@ syntax!(concat_with_escapes, "char *s = \"a\\tb\" \"c\\nd\";");
 syntax!(concat_with_escaped_quote, "char *s = \"a\\\"\" \"b\";");
 literal!(literal_concat_wide, "int f(void) { return (L\"a\" L\"b\")[0]; }", "Lab");
 literal!(
+    ignore "C90 6.1.4: concatenating a narrow and a wide literal is undefined",
     literal_concat_narrow_then_wide,
     "int f(void) { return (\"a\" L\"b\")[0]; }",
     "Lab"
 );
 literal!(
+    ignore "C90 6.1.4: concatenating a narrow and a wide literal is undefined",
     literal_concat_wide_then_narrow,
     "int f(void) { return (L\"a\" \"b\")[0]; }",
     "Lab"
 );
-syntax!(concat_wide_in_init, "int f(void) { return L\"ab\" \"cd\"[0]; }");
+syntax!(
+    ignore "C90 6.1.4: concatenating a narrow and a wide literal is undefined",
+    concat_wide_in_init,
+    "int f(void) { return L\"ab\" \"cd\"[0]; }"
+);
 
 syntax!(splice_in_string, "char *s = \"a\\\nb\";");
 syntax!(splice_in_identifier, "int ab; int f(void) { return a\\\nb; }");

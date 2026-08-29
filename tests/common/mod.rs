@@ -375,6 +375,13 @@ macro_rules! syntax {
             $crate::common::run_syntax(stringify!($name), $src);
         }
     };
+    (ignore $reason:literal, $name:ident, $src:expr) => {
+        #[test]
+        #[ignore = $reason]
+        fn $name() {
+            $crate::common::run_syntax(stringify!($name), $src);
+        }
+    };
 }
 
 #[macro_export]
@@ -391,6 +398,13 @@ macro_rules! value {
 macro_rules! literal {
     ($name:ident, $src:expr, $expected:expr) => {
         #[test]
+        fn $name() {
+            $crate::common::run_literal(stringify!($name), $src, $expected);
+        }
+    };
+    (ignore $reason:literal, $name:ident, $src:expr, $expected:expr) => {
+        #[test]
+        #[ignore = $reason]
         fn $name() {
             $crate::common::run_literal(stringify!($name), $src, $expected);
         }

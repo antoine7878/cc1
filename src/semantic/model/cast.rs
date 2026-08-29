@@ -140,11 +140,19 @@ pub fn array_to_pointer(sema: &Sema, re: &mut ResolvedExpression) {
     }
 }
 
-fn assignment_conversion(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) {
-    let l = sema.types.get(lhs.value_ty().ty);
-    let r = sema.types.get(rhs.value_ty().ty);
+// fn assignment_conversion(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) {
+//     let l = sema.types.get(lhs.value_ty().ty);
+//     let r = sema.types.get(rhs.value_ty().ty);
+//
+//     let _ = l.is_arithmetic(&sema.tags) && r.is_arithmetic(&sema.tags);
+// }
 
-    let _ = l.is_arithmetic(&sema.tags) && r.is_arithmetic(&sema.tags);
+pub fn default_argument_promotions(sema: &Sema, re: &mut ResolvedExpression) {
+    if re.ty.ty == sema.builtins.float {
+        num_conv(sema, re, sema.builtins.double);
+    } else {
+        int_promote(sema, re)
+    }
 }
 
 // NullPointer,       // 6.2.2.3
@@ -155,4 +163,3 @@ fn assignment_conversion(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mu
 // pub fn convert(sema: &mut Sema, re: &mut ResolvedExpression, to: QualifiedType) {}
 
 // fn assignment_conversion() {}
-// fn default_argument_promotions() {}

@@ -1,7 +1,5 @@
-use crate::ast::Declarator::Array;
 use crate::ast::{Tag, TypeSpecifier};
 use crate::define_interner;
-use crate::semantic::ResolvedType::Array;
 use crate::semantic::{ParamTypes, Sema, TagDefArena, TagDefId};
 
 define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, sema.types);
@@ -180,28 +178,36 @@ impl QualifiedType {
         self.is_const == other.is_const && self.is_volatile == other.is_volatile
     }
 
-    pub fn is_compatible(&self, types: &ResolvedTypeArena, other: &Self) -> bool {
-        if self == other {
+    pub fn is_compatible(&self, sema: &Sema, other: &Self) -> bool {
+        // 6.5.3 For two qualified types to be compatible, both shall have the identically qualified
+        // version of a compatible type; the order of type qualifiers within a list of specifiers or
+        // qualifiers does not affect the specified type.
+        if !self.same_qualifiers(other) {
+            return false;
+        }
+        if self.ty == other.ty {
             return true;
         }
-        let lhs = types.get(self.ty);
-        let rhs = types.get(other.ty);
-        match (lhs, rhs) {
+        match (sema.types.get(self.ty), sema.types.get(other.ty)) {
+            // 6.5.4.3 For two function types to be compatible, both shall specify compatible return types.
             (ResolvedType::Function { ret: r1, params: p1 }, ResolvedType::Function { ret: r2, params: p2 }) => {
-                r1.is_compatible(types, r2) && p1.is_compatible(types, p2)
+                r1.is_compatible(sema, r2) && p1.is_compatible(sema, p2)
             }
-            (ResolvedType::Array { elem: e1, len: s1 }, ResolvedType::Array { elem: e2, len: s2 }) => {
-                e1.is_compatible(types, e2) && (s1.is_none() || s1 == s2)
+            // 6.5.4.2 For two array types to be compatible, both shall have compatible element types, and
+            // if both size specifiers are present, they shall have the same value.
+            (ResolvedType::Array { elem: e1, len: l1 }, ResolvedType::Array { elem: e2, len: l2 }) => {
+                e1.is_compatible(sema, e2) && (l1.is_none() || l2.is_none() || l1 == l2)
             }
-            (ResolvedType::Pointer(l), ResolvedType::Pointer(r)) => {
-                self.same_qualifiers(other) && l.same_qualifiers(r) && l.is_compatible(types, r)
+            // 6.5.4.1 For two pointer types to be compatible, both shall be identically qualified and both
+            // shall be pointers to compatible types.
+            (ResolvedType::Pointer(l), ResolvedType::Pointer(r)) => l.is_compatible(sema, r),
+            // 6.5.2.2 Each enumerated type shall be compatible with an integer type, the choice of type is
+            // implementation-defined.
+            (ResolvedType::Tag(id), ResolvedType::Int) | (ResolvedType::Int, ResolvedType::Tag(id)) => {
+                sema.tags.get(*id).kind == Tag::Enum
             }
             _ => false,
         }
-        // Array { elem: QualifiedType, len: Option<usize> },
-        // Function { ret: QualifiedType, params: ParamTypes },
-        // Pointer(QualifiedType),
-        // Tag(TagDefId),
     }
 }
 

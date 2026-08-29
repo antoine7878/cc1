@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::ast::{Name, Storage};
 use crate::define_arena;
-use crate::semantic::QualifiedType;
+use crate::semantic::{QualifiedType, Sema};
 
 define_arena!(Symbol, SymbolArena, SymbolId, sema.symbols);
 
@@ -49,8 +49,13 @@ impl Symbol {
         Self::with_value(name, ty, Some(value), SymbolKind::Variant)
     }
 
-    pub fn is_compatible(&self, other: &Self) -> bool {
-        self.name.id == other.name.id && self.ty == other.ty && self.storage == other.storage && self.kind == other.kind
+    pub fn is_compatible(&self, sema: &Sema, other: &Self) -> bool {
+        self.name.id == other.name.id
+            && self.kind == other.kind
+            && (self.ty == other.ty
+                || Option::zip(self.ty, other.ty)
+                    .map(|(a, b)| a.is_compatible(sema, &b))
+                    .unwrap_or(false))
     }
 }
 

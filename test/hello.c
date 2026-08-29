@@ -1,10 +1,8 @@
-#include <_printf.h>
+enum e { A = Z, B = 2, C = B + 1 };
+enum e v;
 
-enum x { OUI = 2147483647 };
-
-int main(void) {
-	printf("%i\n", OUI);
-	return 0;
+int f(void) {
+	return B + C;
 }
 
 /*

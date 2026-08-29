@@ -68,7 +68,7 @@ pub fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
 /// 6.5.2.1 Structure and union specifiers
 /// A bit-field is declared with a type other than int, signed int, or unsigned int (6.5.2.1).
 pub fn check_bit_width(ty: &ResolvedType, value: Option<Value>) -> Diag<Option<i32>> {
-    if !matches!(ty, ResolvedType::Int) {
+    if !matches!(ty, ResolvedType::Int | ResolvedType::UnsignedInt) {
         return Diag::none_diag(Diagnosis::NonIntBitFieldType);
     };
     let Some(value) = value else { return Diag::none() };
