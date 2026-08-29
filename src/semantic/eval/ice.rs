@@ -1,5 +1,5 @@
 use crate::ast::visit::Visitor;
-use crate::ast::{Expression, ExpressionNode, Tag, Value};
+use crate::ast::{Expression, ExpressionNode, Fold, Tag, Value};
 use crate::parser::Context;
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, QualifiedType, ResolvedType, Sema, SymbolKind, declaration, layout,
@@ -38,6 +38,53 @@ fn cast(sema: &mut Sema, qualif: QualifiedType, val: Value) -> Result<Value, Dia
     }
 }
 
+/// 6.4 Constant expressions are folded for the target the unit is compiled for.
+fn operands(
+    sema: &mut Sema,
+    ctx: &Context,
+    e1: &ExpressionNode,
+    e2: &ExpressionNode,
+) -> Result<(Value, Value), Diagnosis> {
+    let lhs = eval(sema, ctx, e1)?;
+    let rhs = eval(sema, ctx, e2)?;
+    Ok((lhs, rhs))
+}
+
+/// 6.3.5 The second operand of / and % shall not be zero, and the result shall be representable in
+/// the type of the operands.
+fn divisor(sema: &Sema, lhs: Value, rhs: Value) -> Result<(), Diagnosis> {
+    if rhs.is_zero() {
+        return Err(Diagnosis::DivisionByZero);
+    }
+    let fold = Fold::new(&sema.target);
+    match fold.eq(rhs, Value::Int(-1)) && fold.is_min(lhs) {
+        true => Err(Diagnosis::ConstantOverflow),
+        false => Ok(()),
+    }
+}
+
+macro_rules! fold {
+    ($sema:ident, $ctx:ident, $e1:ident, $e2:ident, $method:ident) => {{
+        let (lhs, rhs) = operands($sema, $ctx, $e1, $e2)?;
+        Ok(Fold::new(&$sema.target).$method(lhs, rhs))
+    }};
+}
+
+macro_rules! fold_divide {
+    ($sema:ident, $ctx:ident, $e1:ident, $e2:ident, $method:ident) => {{
+        let (lhs, rhs) = operands($sema, $ctx, $e1, $e2)?;
+        divisor($sema, lhs, rhs)?;
+        Ok(Fold::new(&$sema.target).$method(lhs, rhs))
+    }};
+}
+
+macro_rules! fold_compare {
+    ($sema:ident, $ctx:ident, $e1:ident, $e2:ident, $method:ident) => {{
+        let (lhs, rhs) = operands($sema, $ctx, $e1, $e2)?;
+        Ok(Value::from(Fold::new(&$sema.target).$method(lhs, rhs)))
+    }};
+}
+
 pub fn eval(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<Value, Diagnosis> {
     match expr.id.resolve(ctx) {
         Expression::ConstantExpression(expr) => eval(sema, ctx, expr),
@@ -56,29 +103,31 @@ pub fn eval(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<Val
         }
         Expression::Constant(value_node) => Ok(value_node.value),
         Expression::Plus(expr) => eval(sema, ctx, expr),
-        Expression::Minus(expr) => Ok(-eval(sema, ctx, expr)?),
-        Expression::BitNot(expr) => Ok(!eval(sema, ctx, expr)?),
-        Expression::LogicalNot(expr) => Ok(eval(sema, ctx, expr)?.logical_not()),
-        Expression::Add(e1, e2) => Ok(eval(sema, ctx, e1)? + eval(sema, ctx, e2)?),
-        Expression::Sub(e1, e2) => Ok(eval(sema, ctx, e1)? - eval(sema, ctx, e2)?),
-        Expression::Mul(e1, e2) => Ok(eval(sema, ctx, e1)? * eval(sema, ctx, e2)?),
-        Expression::Div(e1, e2) => {
-            let v1 = eval(sema, ctx, e1)?;
-            let v2 = eval(sema, ctx, e2)?;
-            if v2.is_zero() { Err(Diagnosis::DivisionByZero) } else { Ok(v1 / v2) }
+        Expression::Minus(expr) => {
+            let value = eval(sema, ctx, expr)?;
+            Ok(Fold::new(&sema.target).neg(value))
         }
-        Expression::Mod(e1, e2) => Ok(eval(sema, ctx, e1)? % eval(sema, ctx, e2)?),
-        Expression::Left(e1, e2) => Ok(eval(sema, ctx, e1)? << eval(sema, ctx, e2)?),
-        Expression::Right(e1, e2) => Ok(eval(sema, ctx, e1)? >> eval(sema, ctx, e2)?),
-        Expression::BitAnd(e1, e2) => Ok(eval(sema, ctx, e1)? & eval(sema, ctx, e2)?),
-        Expression::BitOr(e1, e2) => Ok(eval(sema, ctx, e1)? | eval(sema, ctx, e2)?),
-        Expression::BitXor(e1, e2) => Ok(eval(sema, ctx, e1)? ^ eval(sema, ctx, e2)?),
-        Expression::Greater(e1, e2) => Ok(Value::from(eval(sema, ctx, e1)? > eval(sema, ctx, e2)?)),
-        Expression::Lower(e1, e2) => Ok(Value::from(eval(sema, ctx, e1)? < eval(sema, ctx, e2)?)),
-        Expression::GreaterEq(e1, e2) => Ok(Value::from(eval(sema, ctx, e1)? >= eval(sema, ctx, e2)?)),
-        Expression::LowerEq(e1, e2) => Ok(Value::from(eval(sema, ctx, e1)? <= eval(sema, ctx, e2)?)),
-        Expression::Eq(e1, e2) => Ok(Value::from(eval(sema, ctx, e1)? == eval(sema, ctx, e2)?)),
-        Expression::Neq(e1, e2) => Ok(Value::from(eval(sema, ctx, e1)? != eval(sema, ctx, e2)?)),
+        Expression::BitNot(expr) => {
+            let value = eval(sema, ctx, expr)?;
+            Ok(Fold::new(&sema.target).bit_not(value))
+        }
+        Expression::LogicalNot(expr) => Ok(eval(sema, ctx, expr)?.logical_not()),
+        Expression::Add(e1, e2) => fold!(sema, ctx, e1, e2, add),
+        Expression::Sub(e1, e2) => fold!(sema, ctx, e1, e2, sub),
+        Expression::Mul(e1, e2) => fold!(sema, ctx, e1, e2, mul),
+        Expression::Div(e1, e2) => fold_divide!(sema, ctx, e1, e2, div),
+        Expression::Mod(e1, e2) => fold_divide!(sema, ctx, e1, e2, rem),
+        Expression::Left(e1, e2) => fold!(sema, ctx, e1, e2, shl),
+        Expression::Right(e1, e2) => fold!(sema, ctx, e1, e2, shr),
+        Expression::BitAnd(e1, e2) => fold!(sema, ctx, e1, e2, bitand),
+        Expression::BitOr(e1, e2) => fold!(sema, ctx, e1, e2, bitor),
+        Expression::BitXor(e1, e2) => fold!(sema, ctx, e1, e2, bitxor),
+        Expression::Greater(e1, e2) => fold_compare!(sema, ctx, e1, e2, gt),
+        Expression::Lower(e1, e2) => fold_compare!(sema, ctx, e1, e2, lt),
+        Expression::GreaterEq(e1, e2) => fold_compare!(sema, ctx, e1, e2, ge),
+        Expression::LowerEq(e1, e2) => fold_compare!(sema, ctx, e1, e2, le),
+        Expression::Eq(e1, e2) => fold_compare!(sema, ctx, e1, e2, eq),
+        Expression::Neq(e1, e2) => fold_compare!(sema, ctx, e1, e2, ne),
         Expression::LogicalAnd(e1, e2) => Ok(Value::from(
             eval(sema, ctx, e1)?.is_true() && eval(sema, ctx, e2)?.is_true(),
         )),

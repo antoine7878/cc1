@@ -1,13 +1,13 @@
 use crate::ast_node;
-use crate::semantic::{QualifiedType, Sema};
+use crate::semantic::{Diagnosis, QualifiedType, ResolvedType, Sema};
+use crate::target::Target;
 use std::cmp::Ordering;
-use std::ops::{
-    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign, Mul, MulAssign,
-    Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
-};
+use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Sub};
 
 // TODO add custom f80
-#[derive(Clone, Copy, Debug)]
+/// `PartialEq` compares the representation, which is what an AST node needs; comparing two
+/// constants the way C does is `Fold::eq`, since that needs the usual arithmetic conversions.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Value {
     Int(i32),
     Long(i64),
@@ -82,15 +82,17 @@ impl Value {
         }
     }
 
-    fn no_integer_prefix(value: u64, radix: u32) -> Self {
-        if value <= i32::MAX as u64 {
-            Value::Int(value as i32)
-        } else if radix != 10 && value <= u32::MAX as u64 {
-            Value::UnsignedInt(value as u32)
-        } else if value <= i64::MAX as u64 {
-            Value::Long(value as i64)
-        } else {
-            Value::UnsignedLong(value)
+    /// 6.1.3.2 Integer constants
+    /// The type of an integer constant is the first of the corresponding list in which its value
+    /// can be represented.
+    fn integer_candidates(suffix: &str, radix: u32) -> &'static [ResolvedType] {
+        use ResolvedType::{Int, Long, UnsignedInt, UnsignedLong};
+        match suffix {
+            "u" => &[UnsignedInt, UnsignedLong],
+            "l" => &[Long, UnsignedLong],
+            "ul" => &[UnsignedLong],
+            _ if radix == 10 => &[Int, Long, UnsignedLong],
+            _ => &[Int, UnsignedInt, Long, UnsignedLong],
         }
     }
 
@@ -138,7 +140,7 @@ impl Value {
         }
     }
 
-    fn parse_char(s: &str) -> Self {
+    fn parse_char(s: &str, target: &Target) -> Self {
         let prefix = if s.starts_with("L") { "L" } else { "" };
         let s = &s[(prefix.len() + 1)..(s.len() - 1)];
         let bytes = s.as_bytes();
@@ -156,56 +158,41 @@ impl Value {
             value = if prefix.is_empty() { (value << 8) | (c & 0xff) } else { c };
             count += 1;
         }
-        if prefix.is_empty() && count == 1 && value & 0x80 != 0 {
+        if prefix.is_empty() && count == 1 && target.char_signed && value & 0x80 != 0 {
             Value::Int((value | 0xffffff00) as i32)
         } else {
             Value::Int(value as i32)
         }
     }
 
-    fn parse_integer(s: &str) -> Self {
+    fn parse_integer(s: &str, target: &Target) -> (Self, Option<Diagnosis>) {
         let s = s.to_lowercase();
         let (prefix, radix) = Self::get_radix(s.as_str());
         let suffix = Self::get_integer_suffix(s.as_str());
-        let s = &s[prefix.len()..(s.len() - suffix.len())];
-        let value = if s.is_empty() { 0 } else { u64::from_str_radix(s, radix).unwrap() };
-        match suffix {
-            "u" if value > u32::MAX as u64 => Value::UnsignedLong(value),
-            "u" => Value::UnsignedInt(value as u32),
-            "l" if value > i64::MAX as u64 => Value::UnsignedLong(value),
-            "l" => Value::Long(value as i64),
-            "ul" => Value::UnsignedLong(value),
-            _ => Self::no_integer_prefix(value, radix),
-        }
+        let digits = &s[prefix.len()..(s.len() - suffix.len())];
+        let value = match digits.is_empty() {
+            true => 0,
+            false => u64::from_str_radix(digits, radix).unwrap_or(u64::MAX),
+        };
+        let candidates = Self::integer_candidates(suffix, radix);
+        let fitting = candidates.iter().find(|ty| target.fits(value, ty));
+        let diagnosis = fitting.is_none().then_some(Diagnosis::IntegerConstantTooLarge);
+        let ty = fitting
+            .or_else(|| candidates.last())
+            .expect("a non empty candidate list");
+        let value = target.cast(ty, Value::UnsignedLong(value)).expect("an integer type");
+        (value, diagnosis)
     }
-}
 
-impl PartialEq for Value {
-    fn eq(&self, other: &Self) -> bool {
-        match self.usual(*other) {
-            (Value::Int(a), Value::Int(b)) => a == b,
-            (Value::UnsignedInt(a), Value::UnsignedInt(b)) => a == b,
-            (Value::Long(a), Value::Long(b)) => a == b,
-            (Value::UnsignedLong(a), Value::UnsignedLong(b)) => a == b,
-            (Value::Float(a), Value::Float(b)) => a == b,
-            (Value::Double(a), Value::Double(b)) => a == b,
-            (Value::LongDouble(a), Value::LongDouble(b)) => a == b,
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl PartialOrd for Value {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match self.usual(*other) {
-            (Value::Int(a), Value::Int(b)) => a.partial_cmp(&b),
-            (Value::UnsignedInt(a), Value::UnsignedInt(b)) => a.partial_cmp(&b),
-            (Value::Long(a), Value::Long(b)) => a.partial_cmp(&b),
-            (Value::UnsignedLong(a), Value::UnsignedLong(b)) => a.partial_cmp(&b),
-            (Value::Float(a), Value::Float(b)) => a.partial_cmp(&b),
-            (Value::Double(a), Value::Double(b)) => a.partial_cmp(&b),
-            (Value::LongDouble(a), Value::LongDouble(b)) => a.partial_cmp(&b),
-            _ => unreachable!(),
+    /// 6.1.3 Constants
+    pub fn parse(s: &str, target: &Target) -> (Self, Option<Diagnosis>) {
+        let lower = s.to_lowercase();
+        if s.contains('\'') {
+            (Self::parse_char(s, target), None)
+        } else if !lower.starts_with("0x") && (lower.contains('.') || lower.contains('e')) {
+            (Self::parse_float(s), None)
+        } else {
+            Self::parse_integer(s, target)
         }
     }
 }
@@ -213,19 +200,6 @@ impl PartialOrd for Value {
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
         Value::Int(value as i32)
-    }
-}
-
-impl From<&str> for Value {
-    fn from(s: &str) -> Self {
-        let lower = s.to_lowercase();
-        if s.contains('\'') {
-            Self::parse_char(s)
-        } else if !lower.starts_with("0x") && (lower.contains('.') || lower.contains('e')) {
-            Self::parse_float(s)
-        } else {
-            Self::parse_integer(s)
-        }
     }
 }
 
@@ -249,6 +223,18 @@ impl Rank {
 
     pub fn to_integer(self) -> Rank {
         Rank::min(self, Rank::UnsignedLong)
+    }
+
+    fn resolved(self) -> ResolvedType {
+        match self {
+            Rank::Int => ResolvedType::Int,
+            Rank::UnsignedInt => ResolvedType::UnsignedInt,
+            Rank::Long => ResolvedType::Long,
+            Rank::UnsignedLong => ResolvedType::UnsignedLong,
+            Rank::Float => ResolvedType::Float,
+            Rank::Double => ResolvedType::Double,
+            Rank::LongDouble => ResolvedType::LongDouble,
+        }
     }
 }
 
@@ -328,155 +314,163 @@ impl Value {
     }
 
     pub fn is_true(self) -> bool {
-        self != Value::Int(0)
+        !self.is_zero()
     }
 
     pub fn logical_not(self) -> Value {
         Value::from(!self.is_true())
     }
+}
 
-    pub fn convert(self, rank: Rank) -> Self {
+/// 6.2.1.5 Usual arithmetic conversions
+/// Folding needs the target: both the common type of two operands and the width a result is
+/// truncated to depend on the size of the integer types.
+pub struct Fold<'a> {
+    target: &'a Target,
+}
+
+macro_rules! fold_arithmetic {
+    ($method:ident, $trait:ident, $wrapping:ident) => {
+        pub fn $method(&self, lhs: Value, rhs: Value) -> Value {
+            let value = match self.usual(lhs, rhs) {
+                (Value::Int(a), Value::Int(b)) => Value::Int(a.$wrapping(b)),
+                (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt(a.$wrapping(b)),
+                (Value::Long(a), Value::Long(b)) => Value::Long(a.$wrapping(b)),
+                (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong(a.$wrapping(b)),
+                (Value::Float(a), Value::Float(b)) => Value::Float($trait::$method(a, b)),
+                (Value::Double(a), Value::Double(b)) => Value::Double($trait::$method(a, b)),
+                (Value::LongDouble(a), Value::LongDouble(b)) => Value::LongDouble($trait::$method(a, b)),
+                _ => unreachable!(),
+            };
+            self.narrow(value)
+        }
+    };
+}
+
+macro_rules! fold_division {
+    ($method:ident, $trait:ident, $checked:ident) => {
+        pub fn $method(&self, lhs: Value, rhs: Value) -> Value {
+            let value = match self.usual(lhs, rhs) {
+                (Value::Int(a), Value::Int(b)) => Value::Int(a.$checked(b).unwrap_or(0)),
+                (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt(a.$checked(b).unwrap_or(0)),
+                (Value::Long(a), Value::Long(b)) => Value::Long(a.$checked(b).unwrap_or(0)),
+                (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong(a.$checked(b).unwrap_or(0)),
+                (Value::Float(a), Value::Float(b)) => Value::Float($trait::$method(a, b)),
+                (Value::Double(a), Value::Double(b)) => Value::Double($trait::$method(a, b)),
+                (Value::LongDouble(a), Value::LongDouble(b)) => Value::LongDouble($trait::$method(a, b)),
+                _ => unreachable!(),
+            };
+            self.narrow(value)
+        }
+    };
+}
+
+macro_rules! fold_bitwise {
+    ($method:ident, $trait:ident) => {
+        pub fn $method(&self, lhs: Value, rhs: Value) -> Value {
+            let value = match self.usual_integer(lhs, rhs) {
+                (Value::Int(a), Value::Int(b)) => Value::Int($trait::$method(a, b)),
+                (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt($trait::$method(a, b)),
+                (Value::Long(a), Value::Long(b)) => Value::Long($trait::$method(a, b)),
+                (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong($trait::$method(a, b)),
+                _ => unreachable!(),
+            };
+            self.narrow(value)
+        }
+    };
+}
+
+macro_rules! fold_shift {
+    ($method:ident, $wrapping:ident) => {
+        pub fn $method(&self, lhs: Value, rhs: Value) -> Value {
+            let count = self.convert(rhs, rhs.rank().to_integer()).to_u64() as u32;
+            let value = match self.convert(lhs, lhs.rank().to_integer()) {
+                Value::Int(a) => Value::Int(a.$wrapping(count)),
+                Value::UnsignedInt(a) => Value::UnsignedInt(a.$wrapping(count)),
+                Value::Long(a) => Value::Long(a.$wrapping(count)),
+                Value::UnsignedLong(a) => Value::UnsignedLong(a.$wrapping(count)),
+                _ => unreachable!(),
+            };
+            self.narrow(value)
+        }
+    };
+}
+
+macro_rules! fold_relational {
+    ($method:ident, $($ordering:path)|+) => {
+        pub fn $method(&self, lhs: Value, rhs: Value) -> bool {
+            matches!(self.cmp(lhs, rhs), $(Some($ordering))|+)
+        }
+    };
+}
+
+impl<'a> Fold<'a> {
+    pub fn new(target: &'a Target) -> Self {
+        Self { target }
+    }
+
+    /// 6.2.1.5 The greater rank of the two operands is the common type, except that a long int
+    /// which cannot represent every value of an unsigned int meets it at unsigned long int.
+    fn common(&self, lhs: Value, rhs: Value) -> Rank {
+        let (l, r) = (lhs.rank(), rhs.rank());
+        let rank = Rank::max(l, r);
+        if rank == Rank::Long && Rank::min(l, r) == Rank::UnsignedInt && self.target.long.size <= self.target.int.size {
+            return Rank::UnsignedLong;
+        }
+        rank
+    }
+
+    fn usual(&self, lhs: Value, rhs: Value) -> (Value, Value) {
+        let rank = self.common(lhs, rhs);
+        (self.convert(lhs, rank), self.convert(rhs, rank))
+    }
+
+    fn usual_integer(&self, lhs: Value, rhs: Value) -> (Value, Value) {
+        let rank = self.common(lhs, rhs).to_integer();
+        (self.convert(lhs, rank), self.convert(rhs, rank))
+    }
+
+    /// A result is representable in the type of the operands it was computed from.
+    fn narrow(&self, value: Value) -> Value {
+        self.convert(value, value.rank())
+    }
+
+    /// 6.2.1.2 When a value of integral type is converted to another integral type, the value is
+    /// truncated to the width the target gives that type.
+    pub fn convert(&self, value: Value, rank: Rank) -> Value {
         match rank {
-            Rank::Int => Value::Int(self.to_i64() as i32),
-            Rank::UnsignedInt => Value::UnsignedInt(self.to_u64() as u32),
-            Rank::Long => Value::Long(self.to_i64()),
-            Rank::UnsignedLong => Value::UnsignedLong(self.to_u64()),
-            Rank::Float => Value::Float(self.to_f64() as f32),
-            Rank::Double => Value::Double(self.to_f64()),
-            Rank::LongDouble => Value::LongDouble(self.to_f64()),
+            Rank::Float => Value::Float(value.to_f64() as f32),
+            Rank::Double => Value::Double(value.to_f64()),
+            Rank::LongDouble => Value::LongDouble(value.to_f64()),
+            _ => self.target.cast(&rank.resolved(), value).expect("an integer type"),
         }
     }
 
-    fn usual(self, rhs: Value) -> (Self, Self) {
-        let rank = Rank::max(self.rank(), rhs.rank());
-        (self.convert(rank), rhs.convert(rank))
-    }
-
-    fn usual_integer(self, rhs: Value) -> (Self, Self) {
-        let rank = Rank::max(self.rank(), rhs.rank()).to_integer();
-        (self.convert(rank), rhs.convert(rank))
-    }
-}
-
-macro_rules! value_arithmetic {
-    ($trait:ident, $method:ident, $wrapping:ident) => {
-        impl $trait for Value {
-            type Output = Value;
-
-            fn $method(self, rhs: Value) -> Value {
-                match self.usual(rhs) {
-                    (Value::Int(a), Value::Int(b)) => Value::Int(a.$wrapping(b)),
-                    (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt(a.$wrapping(b)),
-                    (Value::Long(a), Value::Long(b)) => Value::Long(a.$wrapping(b)),
-                    (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong(a.$wrapping(b)),
-                    (Value::Float(a), Value::Float(b)) => Value::Float($trait::$method(a, b)),
-                    (Value::Double(a), Value::Double(b)) => Value::Double($trait::$method(a, b)),
-                    (Value::LongDouble(a), Value::LongDouble(b)) => Value::LongDouble($trait::$method(a, b)),
-                    _ => unreachable!(),
-                }
-            }
-        }
-    };
-}
-
-macro_rules! value_division {
-    ($trait:ident, $method:ident, $checked:ident) => {
-        impl $trait for Value {
-            type Output = Value;
-
-            fn $method(self, rhs: Value) -> Value {
-                match self.usual(rhs) {
-                    (Value::Int(a), Value::Int(b)) => Value::Int(a.$checked(b).unwrap_or(0)),
-                    (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt(a.$checked(b).unwrap_or(0)),
-                    (Value::Long(a), Value::Long(b)) => Value::Long(a.$checked(b).unwrap_or(0)),
-                    (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong(a.$checked(b).unwrap_or(0)),
-                    (Value::Float(a), Value::Float(b)) => Value::Float($trait::$method(a, b)),
-                    (Value::Double(a), Value::Double(b)) => Value::Double($trait::$method(a, b)),
-                    (Value::LongDouble(a), Value::LongDouble(b)) => Value::LongDouble($trait::$method(a, b)),
-                    _ => unreachable!(),
-                }
-            }
-        }
-    };
-}
-
-macro_rules! value_bitwise {
-    ($trait:ident, $method:ident) => {
-        impl $trait for Value {
-            type Output = Value;
-
-            fn $method(self, rhs: Value) -> Value {
-                match self.usual_integer(rhs) {
-                    (Value::Int(a), Value::Int(b)) => Value::Int($trait::$method(a, b)),
-                    (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt($trait::$method(a, b)),
-                    (Value::Long(a), Value::Long(b)) => Value::Long($trait::$method(a, b)),
-                    (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong($trait::$method(a, b)),
-                    _ => unreachable!(),
-                }
-            }
-        }
-    };
-}
-
-macro_rules! value_shift {
-    ($trait:ident, $method:ident, $wrapping:ident) => {
-        impl $trait for Value {
-            type Output = Value;
-
-            fn $method(self, rhs: Value) -> Value {
-                let count = rhs.convert(rhs.rank().to_integer()).to_u64() as u32;
-                match self.convert(self.rank().to_integer()) {
-                    Value::Int(a) => Value::Int(a.$wrapping(count)),
-                    Value::UnsignedInt(a) => Value::UnsignedInt(a.$wrapping(count)),
-                    Value::Long(a) => Value::Long(a.$wrapping(count)),
-                    Value::UnsignedLong(a) => Value::UnsignedLong(a.$wrapping(count)),
-                    _ => unreachable!(),
-                }
-            }
-        }
-    };
-}
-
-macro_rules! value_assign {
-    ($trait:ident, $method:ident, $base:ident, $base_method:ident) => {
-        impl $trait for Value {
-            fn $method(&mut self, rhs: Value) {
-                *self = $base::$base_method(*self, rhs);
-            }
-        }
-    };
-}
-
-value_arithmetic!(Add, add, wrapping_add);
-value_arithmetic!(Sub, sub, wrapping_sub);
-value_arithmetic!(Mul, mul, wrapping_mul);
-value_division!(Div, div, checked_div);
-
-impl Rem for Value {
-    type Output = Value;
-
-    fn rem(self, rhs: Value) -> Value {
-        match self.usual_integer(rhs) {
-            (Value::Int(a), Value::Int(b)) => Value::Int(a.checked_rem(b).unwrap_or(0)),
-            (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt(a.checked_rem(b).unwrap_or(0)),
-            (Value::Long(a), Value::Long(b)) => Value::Long(a.checked_rem(b).unwrap_or(0)),
-            (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong(a.checked_rem(b).unwrap_or(0)),
+    pub fn cmp(&self, lhs: Value, rhs: Value) -> Option<Ordering> {
+        match self.usual(lhs, rhs) {
+            (Value::Int(a), Value::Int(b)) => a.partial_cmp(&b),
+            (Value::UnsignedInt(a), Value::UnsignedInt(b)) => a.partial_cmp(&b),
+            (Value::Long(a), Value::Long(b)) => a.partial_cmp(&b),
+            (Value::UnsignedLong(a), Value::UnsignedLong(b)) => a.partial_cmp(&b),
+            (Value::Float(a), Value::Float(b)) => a.partial_cmp(&b),
+            (Value::Double(a), Value::Double(b)) => a.partial_cmp(&b),
+            (Value::LongDouble(a), Value::LongDouble(b)) => a.partial_cmp(&b),
             _ => unreachable!(),
         }
     }
-}
 
-value_bitwise!(BitAnd, bitand);
-value_bitwise!(BitOr, bitor);
-value_bitwise!(BitXor, bitxor);
-value_shift!(Shl, shl, wrapping_shl);
-value_shift!(Shr, shr, wrapping_shr);
+    /// 6.3.5 The result of INT_MIN / -1 is not representable in the type of the operands.
+    pub fn is_min(&self, value: Value) -> bool {
+        let ty = value.rank().resolved();
+        self.target.is_signed(&ty)
+            && self
+                .target
+                .min_value(&ty)
+                .is_some_and(|min| self.eq(value, Value::Long(min)))
+    }
 
-impl Neg for Value {
-    type Output = Value;
-
-    fn neg(self) -> Value {
-        match self {
+    pub fn neg(&self, value: Value) -> Value {
+        let value = match value {
             Value::Int(v) => Value::Int(v.wrapping_neg()),
             Value::UnsignedInt(v) => Value::UnsignedInt(v.wrapping_neg()),
             Value::Long(v) => Value::Long(v.wrapping_neg()),
@@ -484,31 +478,47 @@ impl Neg for Value {
             Value::Float(v) => Value::Float(-v),
             Value::Double(v) => Value::Double(-v),
             Value::LongDouble(v) => Value::LongDouble(-v),
-        }
+        };
+        self.narrow(value)
     }
-}
 
-impl Not for Value {
-    type Output = Value;
-
-    fn not(self) -> Value {
-        match self.convert(self.rank().to_integer()) {
+    pub fn bit_not(&self, value: Value) -> Value {
+        let value = match self.convert(value, value.rank().to_integer()) {
             Value::Int(v) => Value::Int(!v),
             Value::UnsignedInt(v) => Value::UnsignedInt(!v),
             Value::Long(v) => Value::Long(!v),
             Value::UnsignedLong(v) => Value::UnsignedLong(!v),
             _ => unreachable!(),
-        }
+        };
+        self.narrow(value)
     }
-}
 
-value_assign!(AddAssign, add_assign, Add, add);
-value_assign!(SubAssign, sub_assign, Sub, sub);
-value_assign!(MulAssign, mul_assign, Mul, mul);
-value_assign!(DivAssign, div_assign, Div, div);
-value_assign!(RemAssign, rem_assign, Rem, rem);
-value_assign!(BitAndAssign, bitand_assign, BitAnd, bitand);
-value_assign!(BitOrAssign, bitor_assign, BitOr, bitor);
-value_assign!(BitXorAssign, bitxor_assign, BitXor, bitxor);
-value_assign!(ShlAssign, shl_assign, Shl, shl);
-value_assign!(ShrAssign, shr_assign, Shr, shr);
+    /// 6.3.5 The operands of the % operator shall have integral type.
+    pub fn rem(&self, lhs: Value, rhs: Value) -> Value {
+        let value = match self.usual_integer(lhs, rhs) {
+            (Value::Int(a), Value::Int(b)) => Value::Int(a.checked_rem(b).unwrap_or(0)),
+            (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt(a.checked_rem(b).unwrap_or(0)),
+            (Value::Long(a), Value::Long(b)) => Value::Long(a.checked_rem(b).unwrap_or(0)),
+            (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong(a.checked_rem(b).unwrap_or(0)),
+            _ => unreachable!(),
+        };
+        self.narrow(value)
+    }
+
+    fold_arithmetic!(add, Add, wrapping_add);
+    fold_arithmetic!(sub, Sub, wrapping_sub);
+    fold_arithmetic!(mul, Mul, wrapping_mul);
+    fold_division!(div, Div, checked_div);
+    fold_bitwise!(bitand, BitAnd);
+    fold_bitwise!(bitor, BitOr);
+    fold_bitwise!(bitxor, BitXor);
+    fold_shift!(shl, wrapping_shl);
+    fold_shift!(shr, wrapping_shr);
+
+    fold_relational!(eq, Ordering::Equal);
+    fold_relational!(ne, Ordering::Less | Ordering::Greater);
+    fold_relational!(lt, Ordering::Less);
+    fold_relational!(gt, Ordering::Greater);
+    fold_relational!(le, Ordering::Less | Ordering::Equal);
+    fold_relational!(ge, Ordering::Greater | Ordering::Equal);
+}

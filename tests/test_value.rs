@@ -1,37 +1,64 @@
-use cc1::ast::{Rank, Value};
+use cc1::ast::{Fold, Rank, Value};
+use cc1::semantic::Diagnosis;
+use cc1::target::{I386, X86_64};
 
 fn repr(value: Value) -> String {
     format!("{value:?}")
 }
 
+/// A constant whose value is representable by one of the types of its list (6.1.3.2).
 macro_rules! literal {
     ($name:ident, $src:expr, $expected:expr) => {
         #[test]
         fn $name() {
-            assert_eq!(repr(Value::from($src)), $expected, "Value::from({:?})", $src);
-        }
-    };
-    (ignore $reason:literal, $name:ident, $src:expr, $expected:expr) => {
-        #[test]
-        #[ignore = $reason]
-        fn $name() {
-            assert_eq!(repr(Value::from($src)), $expected, "Value::from({:?})", $src);
+            let (value, diagnosis) = Value::parse($src, &I386);
+            assert_eq!(repr(value), $expected, "Value::parse({:?})", $src);
+            assert!(diagnosis.is_none(), "Value::parse({:?}) reported {diagnosis:?}", $src);
         }
     };
 }
 
-macro_rules! fold {
-    ($name:ident, $expr:expr, $expected:expr) => {
+/// A constant that fits no type of its list is reported and truncated to the widest one.
+macro_rules! too_large {
+    ($name:ident, $src:expr, $expected:expr) => {
         #[test]
         fn $name() {
-            assert_eq!(repr($expr), $expected, "{}", stringify!($expr));
+            let (value, diagnosis) = Value::parse($src, &I386);
+            assert_eq!(repr(value), $expected, "Value::parse({:?})", $src);
+            assert!(
+                matches!(diagnosis, Some(Diagnosis::IntegerConstantTooLarge)),
+                "Value::parse({:?}) reported {diagnosis:?}",
+                $src
+            );
         }
     };
-    (ignore $reason:literal, $name:ident, $expr:expr, $expected:expr) => {
+}
+
+/// Folding is done for a target: on i386 int and long are both 32 bits.
+macro_rules! fold {
+    ($name:ident, $method:ident($($arg:expr),* $(,)?), $expected:expr) => {
+        #[test]
+        fn $name() {
+            let fold = Fold::new(&I386);
+            assert_eq!(
+                repr(fold.$method($($arg),*)),
+                $expected,
+                "{}",
+                stringify!($method($($arg),*))
+            );
+        }
+    };
+    (ignore $reason:literal, $name:ident, $method:ident($($arg:expr),* $(,)?), $expected:expr) => {
         #[test]
         #[ignore = $reason]
         fn $name() {
-            assert_eq!(repr($expr), $expected, "{}", stringify!($expr));
+            let fold = Fold::new(&I386);
+            assert_eq!(
+                repr(fold.$method($($arg),*)),
+                $expected,
+                "{}",
+                stringify!($method($($arg),*))
+            );
         }
     };
 }
@@ -39,7 +66,11 @@ macro_rules! fold {
 literal!(literal_zero, "0", "Int(0)");
 literal!(literal_decimal, "42", "Int(42)");
 literal!(literal_int_max, "2147483647", "Int(2147483647)");
-literal!(literal_decimal_above_int_max, "2147483648", "Long(2147483648)");
+literal!(
+    literal_decimal_above_int_max,
+    "2147483648",
+    "UnsignedLong(2147483648)"
+);
 literal!(literal_octal, "010", "Int(8)");
 literal!(literal_octal_max, "017777777777", "Int(2147483647)");
 literal!(literal_hexadecimal, "0x10", "Int(16)");
@@ -50,27 +81,16 @@ literal!(
     "UnsignedInt(2147483648)"
 );
 literal!(literal_octal_above_int_max, "020000000000", "UnsignedInt(2147483648)");
-literal!(
-    ignore "i386 long is 32 bits: Value models long/unsigned long as 64 bits",
-    literal_above_unsigned_int_max,
-    "0x100000000",
-    "Long(4294967296)"
-);
-literal!(
-    ignore "i386 long is 32 bits: Value models long/unsigned long as 64 bits",
+too_large!(literal_above_unsigned_int_max, "0x100000000", "UnsignedLong(0)");
+too_large!(
     literal_above_long_max,
     "0xffffffffffffffff",
-    "UnsignedLong(18446744073709551615)"
+    "UnsignedLong(4294967295)"
 );
 
 literal!(literal_unsigned_suffix, "1u", "UnsignedInt(1)");
 literal!(literal_unsigned_suffix_upper, "1U", "UnsignedInt(1)");
-literal!(
-    ignore "i386 long is 32 bits: Value models long/unsigned long as 64 bits",
-    literal_unsigned_suffix_promotes,
-    "4294967296u",
-    "UnsignedLong(4294967296)"
-);
+too_large!(literal_unsigned_suffix_promotes, "4294967296u", "UnsignedLong(0)");
 literal!(literal_long_suffix, "1l", "Long(1)");
 literal!(literal_long_suffix_upper, "1L", "Long(1)");
 literal!(literal_unsigned_long_suffix, "1ul", "UnsignedLong(1)");
@@ -100,174 +120,186 @@ literal!(literal_char_multi_is_packed, "'ab'", "Int(24930)");
 literal!(literal_wide_char, "L'a'", "Int(97)");
 literal!(literal_wide_char_is_not_sign_extended, "L'\\xff'", "Int(255)");
 
-fold!(add_int, Value::Int(1) + Value::Int(2), "Int(3)");
+fold!(add_int, add(Value::Int(1), Value::Int(2)), "Int(3)");
 fold!(
     ignore "C90 6.3: undefined behavior, the folded value is not guaranteed",
     add_wraps,
-    Value::Int(i32::MAX) + Value::Int(1),
+    add(Value::Int(i32::MAX), Value::Int(1)),
     "Int(-2147483648)"
 );
 fold!(
     sub_unsigned_wraps,
-    Value::UnsignedInt(1) - Value::UnsignedInt(2),
+    sub(Value::UnsignedInt(1), Value::UnsignedInt(2)),
     "UnsignedInt(4294967295)"
 );
 fold!(
     ignore "C90 6.3: undefined behavior, the folded value is not guaranteed",
     mul_wraps,
-    Value::Int(65536) * Value::Int(65536),
+    mul(Value::Int(65536), Value::Int(65536)),
     "Int(0)"
 );
-fold!(div_int, Value::Int(7) / Value::Int(2), "Int(3)");
+fold!(div_int, div(Value::Int(7), Value::Int(2)), "Int(3)");
 fold!(
     div_negative_truncates_toward_zero,
-    Value::Int(-7) / Value::Int(2),
+    div(Value::Int(-7), Value::Int(2)),
     "Int(-3)"
 );
+fold!(rem_int, rem(Value::Int(7), Value::Int(2)), "Int(1)");
 fold!(
-    ignore "placeholder: cc1 folds instead of diagnosing, no diagnosis exists yet",
-    div_by_zero_is_zero,
-    Value::Int(7) / Value::Int(0),
-    "Int(0)"
-);
-fold!(
-    ignore "placeholder: cc1 folds instead of diagnosing, no diagnosis exists yet",
-    div_overflow_is_zero,
-    Value::Int(i32::MIN) / Value::Int(-1),
-    "Int(0)"
-);
-fold!(rem_int, Value::Int(7) % Value::Int(2), "Int(1)");
-fold!(rem_keeps_sign_of_dividend, Value::Int(-7) % Value::Int(2), "Int(-1)");
-fold!(
-    ignore "placeholder: cc1 folds instead of diagnosing, no diagnosis exists yet",
-    rem_by_zero_is_zero,
-    Value::Int(7) % Value::Int(0),
-    "Int(0)"
+    rem_keeps_sign_of_dividend,
+    rem(Value::Int(-7), Value::Int(2)),
+    "Int(-1)"
 );
 
 fold!(
     add_promotes_to_unsigned,
-    Value::Int(1) + Value::UnsignedInt(0),
+    add(Value::Int(1), Value::UnsignedInt(0)),
     "UnsignedInt(1)"
 );
-fold!(add_promotes_to_long, Value::Int(1) + Value::Long(1), "Long(2)");
+fold!(add_promotes_to_long, add(Value::Int(1), Value::Long(1)), "Long(2)");
+// 6.2.1.5 a long int that cannot represent every unsigned int meets it at unsigned long int, which
+// is the case on i386 where both are 32 bits.
+fold!(
+    unsigned_int_and_long_meet_at_unsigned_long_on_i386,
+    add(Value::UnsignedInt(1), Value::Long(-1)),
+    "UnsignedLong(0)"
+);
 fold!(
     add_promotes_to_double,
-    Value::Int(1) + Value::Double(0.5),
+    add(Value::Int(1), Value::Double(0.5)),
     "Double(1.5)"
 );
 fold!(
     div_promotes_to_double,
-    Value::Int(1) / Value::Double(2.0),
+    div(Value::Int(1), Value::Double(2.0)),
     "Double(0.5)"
 );
 fold!(
     add_promotes_to_long_double,
-    Value::Double(1.0) + Value::LongDouble(1.0),
+    add(Value::Double(1.0), Value::LongDouble(1.0)),
     "LongDouble(2.0)"
 );
 
-fold!(bitand_int, Value::Int(6) & Value::Int(3), "Int(2)");
-fold!(bitor_int, Value::Int(6) | Value::Int(3), "Int(7)");
-fold!(bitxor_int, Value::Int(6) ^ Value::Int(3), "Int(5)");
+fold!(bitand_int, bitand(Value::Int(6), Value::Int(3)), "Int(2)");
+fold!(bitor_int, bitor(Value::Int(6), Value::Int(3)), "Int(7)");
+fold!(bitxor_int, bitxor(Value::Int(6), Value::Int(3)), "Int(5)");
 fold!(
     bitand_promotes_to_unsigned,
-    Value::Int(-1) & Value::UnsignedInt(255),
+    bitand(Value::Int(-1), Value::UnsignedInt(255)),
     "UnsignedInt(255)"
 );
-fold!(shift_left, Value::Int(1) << Value::Int(4), "Int(16)");
+fold!(shift_left, shl(Value::Int(1), Value::Int(4)), "Int(16)");
 fold!(
     ignore "C90 6.3: undefined behavior, the folded value is not guaranteed",
     shift_left_into_sign_bit,
-    Value::Int(1) << Value::Int(31),
+    shl(Value::Int(1), Value::Int(31)),
     "Int(-2147483648)"
 );
 fold!(
     ignore "C90 6.3: undefined behavior, the folded value is not guaranteed",
     shift_left_out_of_range_wraps_count,
-    Value::Int(1) << Value::Int(32),
+    shl(Value::Int(1), Value::Int(32)),
     "Int(1)"
 );
-fold!(shift_right_is_arithmetic, Value::Int(-8) >> Value::Int(1), "Int(-4)");
+fold!(
+    shift_right_is_arithmetic,
+    shr(Value::Int(-8), Value::Int(1)),
+    "Int(-4)"
+);
 fold!(
     shift_right_unsigned_is_logical,
-    Value::UnsignedInt(2147483648) >> Value::Int(31),
+    shr(Value::UnsignedInt(2147483648), Value::Int(31)),
     "UnsignedInt(1)"
 );
 fold!(
     shift_keeps_left_operand_type,
-    Value::Long(1) << Value::Int(1),
+    shl(Value::Long(1), Value::Int(1)),
     "Long(2)"
 );
 
-fold!(neg_int, -Value::Int(1), "Int(-1)");
+fold!(neg_int, neg(Value::Int(1)), "Int(-1)");
 fold!(
     ignore "C90 6.3: undefined behavior, the folded value is not guaranteed",
     neg_wraps,
-    -Value::Int(i32::MIN),
+    neg(Value::Int(i32::MIN)),
     "Int(-2147483648)"
 );
-fold!(neg_double, -Value::Double(1.5), "Double(-1.5)");
-fold!(bitnot_int, !Value::Int(0), "Int(-1)");
-fold!(bitnot_unsigned, !Value::UnsignedInt(0), "UnsignedInt(4294967295)");
-
+fold!(neg_double, neg(Value::Double(1.5)), "Double(-1.5)");
+fold!(bitnot_int, bit_not(Value::Int(0)), "Int(-1)");
 fold!(
-    truncate_signed_sign_extends,
-    Value::Int(200).truncate(8, true),
-    "Long(-56)"
-);
-fold!(
-    truncate_unsigned_keeps_value,
-    Value::Int(200).truncate(8, false),
-    "Long(200)"
-);
-fold!(
-    truncate_unsigned_masks,
-    Value::Int(-1).truncate(16, false),
-    "Long(65535)"
-);
-fold!(
-    ignore "i386 long is 32 bits: Value models long/unsigned long as 64 bits",
-    truncate_full_width_signed,
-    Value::Int(5).truncate(64, true),
-    "Long(5)"
-);
-fold!(
-    ignore "i386 long is 32 bits: Value models long/unsigned long as 64 bits",
-    truncate_full_width_unsigned,
-    Value::Int(-1).truncate(64, false),
-    "UnsignedLong(18446744073709551615)"
-);
-fold!(
-    truncate_zero_width_is_full_width,
-    Value::Int(-1).truncate(0, false),
-    "UnsignedLong(18446744073709551615)"
+    bitnot_unsigned,
+    bit_not(Value::UnsignedInt(0)),
+    "UnsignedInt(4294967295)"
 );
 
-fold!(convert_to_int, Value::Long(300).convert(Rank::Int), "Int(300)");
+// 6.2.1.2 an integral conversion truncates to the width the target gives the destination type.
+fold!(convert_to_int, convert(Value::Long(300), Rank::Int), "Int(300)");
 fold!(
     convert_to_int_wraps,
-    Value::Long(4294967297).convert(Rank::Int),
+    convert(Value::Long(4294967297), Rank::Int),
     "Int(1)"
 );
 fold!(
-    ignore "i386 long is 32 bits: Value models long/unsigned long as 64 bits",
-    convert_to_unsigned_long,
-    Value::Int(-1).convert(Rank::UnsignedLong),
-    "UnsignedLong(18446744073709551615)"
+    convert_to_unsigned_long_is_32_bits_on_i386,
+    convert(Value::Int(-1), Rank::UnsignedLong),
+    "UnsignedLong(4294967295)"
 );
-fold!(convert_to_double, Value::Int(3).convert(Rank::Double), "Double(3.0)");
+fold!(
+    convert_to_long_is_32_bits_on_i386,
+    convert(Value::UnsignedLong(4294967296), Rank::Long),
+    "Long(0)"
+);
+fold!(convert_to_double, convert(Value::Int(3), Rank::Double), "Double(3.0)");
 fold!(
     convert_from_double_truncates,
-    Value::Double(3.9).convert(Rank::Int),
+    convert(Value::Double(3.9), Rank::Int),
     "Int(3)"
 );
 
-fold!(logical_not_of_zero, Value::Int(0).logical_not(), "Int(1)");
-fold!(logical_not_of_nonzero, Value::Int(42).logical_not(), "Int(0)");
-fold!(logical_not_of_zero_double, Value::Double(0.0).logical_not(), "Int(1)");
-fold!(from_true, Value::from(true), "Int(1)");
-fold!(from_false, Value::from(false), "Int(0)");
+#[test]
+fn a_wider_target_keeps_the_whole_value() {
+    let fold = Fold::new(&X86_64);
+    assert_eq!(
+        repr(fold.convert(Value::UnsignedLong(4294967296), Rank::Long)),
+        "Long(4294967296)"
+    );
+    assert_eq!(
+        repr(fold.convert(Value::Int(-1), Rank::UnsignedLong)),
+        "UnsignedLong(18446744073709551615)"
+    );
+}
+
+// 6.2.1.5 on a target whose long int represents every unsigned int the pair meets at long int.
+#[test]
+fn unsigned_int_and_long_meet_at_long_on_x86_64() {
+    let fold = Fold::new(&X86_64);
+    assert_eq!(repr(fold.add(Value::UnsignedInt(1), Value::Long(-1))), "Long(0)");
+}
+
+#[test]
+fn truncate_carries_the_value_at_full_width() {
+    assert_eq!(repr(Value::Int(200).truncate(8, true)), "Long(-56)");
+    assert_eq!(repr(Value::Int(200).truncate(8, false)), "Long(200)");
+    assert_eq!(repr(Value::Int(-1).truncate(16, false)), "Long(65535)");
+    assert_eq!(repr(Value::Int(5).truncate(64, true)), "Long(5)");
+    assert_eq!(
+        repr(Value::Int(-1).truncate(64, false)),
+        "UnsignedLong(18446744073709551615)"
+    );
+    assert_eq!(
+        repr(Value::Int(-1).truncate(0, false)),
+        "UnsignedLong(18446744073709551615)"
+    );
+}
+
+#[test]
+fn logical_not_tests_against_zero() {
+    assert_eq!(repr(Value::Int(0).logical_not()), "Int(1)");
+    assert_eq!(repr(Value::Int(42).logical_not()), "Int(0)");
+    assert_eq!(repr(Value::Double(0.0).logical_not()), "Int(1)");
+    assert_eq!(repr(Value::from(true)), "Int(1)");
+    assert_eq!(repr(Value::from(false)), "Int(0)");
+}
 
 #[test]
 fn is_true_follows_zero_test() {
@@ -308,47 +340,62 @@ fn to_i64_and_to_u64_reinterpret() {
 
 #[test]
 fn equality_applies_usual_conversions() {
-    assert!(Value::Int(1) == Value::Long(1));
-    assert!(Value::Int(1) == Value::Double(1.0));
-    assert!(Value::Int(-1) == Value::UnsignedInt(u32::MAX));
-    assert!(Value::Int(1) != Value::Int(2));
+    let fold = Fold::new(&I386);
+    assert!(fold.eq(Value::Int(1), Value::Long(1)));
+    assert!(fold.eq(Value::Int(1), Value::Double(1.0)));
+    assert!(fold.eq(Value::Int(-1), Value::UnsignedInt(u32::MAX)));
+    assert!(fold.ne(Value::Int(1), Value::Int(2)));
 }
 
 #[test]
 fn ordering_applies_usual_conversions() {
-    assert!(Value::Int(1) < Value::Int(2));
-    assert!(Value::Int(1) < Value::Double(1.5));
-    assert!(Value::Int(-1) > Value::UnsignedInt(0));
-    assert!(Value::Long(-1) < Value::Long(0));
+    let fold = Fold::new(&I386);
+    assert!(fold.lt(Value::Int(1), Value::Int(2)));
+    assert!(fold.lt(Value::Int(1), Value::Double(1.5)));
+    assert!(fold.gt(Value::Int(-1), Value::UnsignedInt(0)));
+    assert!(fold.lt(Value::Long(-1), Value::Long(0)));
+    assert!(fold.le(Value::Int(2), Value::Int(2)));
+    assert!(fold.ge(Value::Int(2), Value::Int(2)));
 }
 
 #[test]
-fn compound_assignment_matches_binary_operator() {
+fn every_operator_folds_in_sequence() {
+    let fold = Fold::new(&I386);
     let mut value = Value::Int(1);
-    value += Value::Int(2);
+    value = fold.add(value, Value::Int(2));
     assert_eq!(repr(value), "Int(3)");
-    value *= Value::Int(4);
+    value = fold.mul(value, Value::Int(4));
     assert_eq!(repr(value), "Int(12)");
-    value -= Value::Int(2);
+    value = fold.sub(value, Value::Int(2));
     assert_eq!(repr(value), "Int(10)");
-    value /= Value::Int(3);
+    value = fold.div(value, Value::Int(3));
     assert_eq!(repr(value), "Int(3)");
-    value %= Value::Int(2);
+    value = fold.rem(value, Value::Int(2));
     assert_eq!(repr(value), "Int(1)");
-    value <<= Value::Int(3);
+    value = fold.shl(value, Value::Int(3));
     assert_eq!(repr(value), "Int(8)");
-    value >>= Value::Int(1);
+    value = fold.shr(value, Value::Int(1));
     assert_eq!(repr(value), "Int(4)");
-    value |= Value::Int(1);
+    value = fold.bitor(value, Value::Int(1));
     assert_eq!(repr(value), "Int(5)");
-    value &= Value::Int(3);
+    value = fold.bitand(value, Value::Int(3));
     assert_eq!(repr(value), "Int(1)");
-    value ^= Value::Int(3);
+    value = fold.bitxor(value, Value::Int(3));
     assert_eq!(repr(value), "Int(2)");
 }
 
+// 6.3.5 INT_MIN / -1 is not representable in the type of the operands.
 #[test]
-#[ignore = "C90 6.2.1.5: on i386 unsigned int + long is unsigned long, so UnsignedInt must not rank below Long"]
+fn the_minimum_of_a_signed_type_is_recognised() {
+    let fold = Fold::new(&I386);
+    assert!(fold.is_min(Value::Int(i32::MIN)));
+    assert!(fold.is_min(Value::Long(-2147483648)));
+    assert!(!fold.is_min(Value::Int(0)));
+    assert!(!fold.is_min(Value::UnsignedInt(0)));
+    assert!(!fold.is_min(Value::UnsignedLong(0)));
+}
+
+#[test]
 fn rank_is_ordered_from_int_to_long_double() {
     assert!(Rank::Int < Rank::UnsignedInt);
     assert!(Rank::UnsignedInt < Rank::Long);

@@ -1,10 +1,10 @@
-enum e { A = Z, B = 2, C = B + 1 };
-enum e v;
 
-int f(void) {
-	return B + C;
+int f(a)
+int a;
+int a;
+{
+	return a;
 }
-
 /*
 char *a = "coucou";
 char *wa = L"wide coucou";

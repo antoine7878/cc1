@@ -5,7 +5,7 @@ use std::fmt;
 
 use crate::ast::{Name, StringLitralNode, ValueNode, Value};
 use crate::parser::{YYToken, YYFeedback, Context};
-use crate::semantic::{SymbolKind};
+use crate::semantic::{DiagnosisNode, SymbolKind};
 
 %}
 
@@ -56,14 +56,14 @@ IS			(u|U|l|L|ul|UL|Ul|uL|lu|LU|lU|Lu)
 
 {L}({L}|{D})*		        { let name = alloc_ident(self); return self.ctx.parse.check_type(name); }
 
-L?'(\\.|[^\\'])+'	        { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
-0[xX]{H}+{IS}?		        { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
-0{D}+{IS}?		            { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
-{D}+{IS}?		            { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
-{D}+{E}{FS}?		        { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
+L?'(\\.|[^\\'])+'	        { return YYToken::CONSTANT(alloc_constant(self)); }
+0[xX]{H}+{IS}?		        { return YYToken::CONSTANT(alloc_constant(self)); }
+0{D}+{IS}?		            { return YYToken::CONSTANT(alloc_constant(self)); }
+{D}+{IS}?		            { return YYToken::CONSTANT(alloc_constant(self)); }
+{D}+{E}{FS}?		        { return YYToken::CONSTANT(alloc_constant(self)); }
 
-{D}*"."{D}+({E})?{FS}?	    { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
-{D}+"."{D}*({E})?{FS}?	    { return YYToken::CONSTANT(ValueNode::new(Value::from(self.yytext.as_str()), self.span)); }
+{D}*"."{D}+({E})?{FS}?	    { return YYToken::CONSTANT(alloc_constant(self)); }
+{D}+"."{D}*({E})?{FS}?	    { return YYToken::CONSTANT(alloc_constant(self)); }
 
 L?\"(\\.|[^\\"])*\"	        { return YYToken::STRING_LITERAL(alloc_string(self)); }
 
@@ -141,6 +141,15 @@ fn alloc_ident<R: Read>(lex: &mut YYLex<R>) -> Name {
     let span = lex.span;
     let name = lex.yytext.clone();
     lex.ctx.arenas.names.add(name, span)
+}
+
+fn alloc_constant<R: Read>(lex: &mut YYLex<R>) -> ValueNode {
+    let span = lex.span;
+    let (value, diagnosis) = Value::parse(lex.yytext.as_str(), &lex.ctx.target);
+    if let Some(diagnosis) = diagnosis {
+        lex.ctx.diagnosis.push(DiagnosisNode::new(diagnosis, span));
+    }
+    ValueNode::new(value, span)
 }
 
 fn alloc_string<R: Read>(lex: &mut YYLex<R>) -> StringLitralNode {

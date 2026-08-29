@@ -214,6 +214,22 @@ value!(
     &[("A", "3"), ("B", "4"), ("C", "-1"), ("D", "0")]
 );
 
+// ---- 6.3.5 the second operand of / and % shall not be zero ---------------
+
+reject!(constant_division_by_zero, "enum E { A = 1 / 0 };");
+
+reject!(constant_remainder_by_zero, "enum E { A = 1 % 0 };");
+
+reject!(constant_division_overflows, "enum E { A = (-2147483647 - 1) / -1 };");
+
+reject!(constant_remainder_overflows, "enum E { A = (-2147483647 - 1) % -1 };");
+
+// ---- 6.1.3.2 the type of an integer constant follows the target ----------
+
+accept!(constant_reaching_unsigned_int, "enum e { A = (0x80000000 % 1000) };");
+
+accept!(constant_sizeof_is_size_t, "enum e { A = sizeof(int) };");
+
 reject!(empty_declaration_of_a_basic_type, "int ;");
 
 reject!(empty_declaration_of_a_qualified_type, "const int;");

@@ -97,6 +97,10 @@ pub enum Diagnosis {
     },
     InvalidSizeof,
     UndeclaredIdentifier(Name),
+    /// 6.1.3.2 Integer constants
+    IntegerConstantTooLarge,
+    /// 6.4 Constant expressions
+    ConstantOverflow,
     // 6.2.2.1
     IncompleteType,
 
@@ -139,9 +143,11 @@ impl Diagnosis {
     #[rustfmt::skip]
     pub fn severity(&self) -> Severity {
         match self {
-            Diagnosis::DuplicateTypeQualifers => Severity::Warning,
+            Diagnosis::DuplicateTypeQualifers |
+            Diagnosis::IntegerConstantTooLarge => Severity::Warning,
             Diagnosis::IncompleteType |
             Diagnosis::DivisionByZero |
+            Diagnosis::ConstantOverflow |
             Diagnosis::BadArgumentsCount |
             Diagnosis::SyntaxError { .. } |
             Diagnosis::InvalidSizeof |
@@ -202,11 +208,13 @@ impl DiagnosisNode {
         match &self.inner {
             Diagnosis::IncompleteType => "Incomplete type".to_string(),
             Diagnosis::DivisionByZero => "Division by zero".to_string(),
+            Diagnosis::ConstantOverflow => "overflow in constant expression".to_string(),
             Diagnosis::BadArgumentsCount => "wrong argument count".to_string(),
             Diagnosis::SyntaxError { found, expected } if expected.is_empty() => format!("syntax error, unexpected {}", token_label(found)),
             Diagnosis::SyntaxError { found, expected } => format!("syntax error, unexpected {}, expecting {expected}", token_label(found)),
             Diagnosis::InvalidSizeof => "invalid application of sizeof".to_string(),
             Diagnosis::UndeclaredIdentifier(name) => format!("Use of undeclared identifier '{}'", name.id.resolve(ctx)),
+            Diagnosis::IntegerConstantTooLarge => "integer constant is too large for any integer type".to_string(),
             Diagnosis::NonConstantExpression => "Non constant expression".to_string(),
             Diagnosis::NonIntegerConstantExpression => "Non integer constant expression".to_string(),
             Diagnosis::CastToNonScalar => "Conversion to non scalar type requested".to_string(),

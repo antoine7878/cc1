@@ -224,6 +224,24 @@ reports!(
 );
 
 reports!(
+    report_integer_constant_too_large,
+    "int x = 0x100000000;",
+    ["<test>:1:9: warning: integer constant is too large for any integer type"]
+);
+
+reports!(
+    report_remainder_by_zero,
+    "enum E { A = 1 % 0 };",
+    ["<test>:1:14: error: Division by zero"]
+);
+
+reports!(
+    report_constant_overflow,
+    "enum E { A = (-2147483647 - 1) / -1 };",
+    ["<test>:1:14: error: overflow in constant expression"]
+);
+
+reports!(
     report_external_register,
     "register int x;",
     ["<test>:1:1: error: External declaration auto of register"]
