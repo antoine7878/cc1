@@ -335,8 +335,14 @@ macro_rules! fold_arithmetic {
         /// and reports it.
         pub fn $method(&self, lhs: Value, rhs: Value) -> Diag<Value> {
             let (value, overflow) = match self.usual(lhs, rhs) {
-                (Value::Int(a), Value::Int(b)) => { let (v, o) = a.$overflowing(b); (Value::Int(v), o) }
-                (Value::Long(a), Value::Long(b)) => { let (v, o) = a.$overflowing(b); (Value::Long(v), o) }
+                (Value::Int(a), Value::Int(b)) => {
+                    let (v, o) = a.$overflowing(b);
+                    (Value::Int(v), o)
+                }
+                (Value::Long(a), Value::Long(b)) => {
+                    let (v, o) = a.$overflowing(b);
+                    (Value::Long(v), o)
+                }
                 (Value::UnsignedInt(a), Value::UnsignedInt(b)) => (Value::UnsignedInt(a.$overflowing(b).0), false),
                 (Value::UnsignedLong(a), Value::UnsignedLong(b)) => (Value::UnsignedLong(a.$overflowing(b).0), false),
                 (Value::Float(a), Value::Float(b)) => (Value::Float($trait::$method(a, b)), false),
@@ -344,7 +350,10 @@ macro_rules! fold_arithmetic {
                 (Value::LongDouble(a), Value::LongDouble(b)) => (Value::LongDouble($trait::$method(a, b)), false),
                 _ => unreachable!(),
             };
-            Diag::new(self.narrow(value), overflow.then_some(Diagnosis::ArithmeticOverflow))
+            Diag::new(
+                self.narrow(value),
+                overflow.then_some(Diagnosis::ArithmeticOverflow),
+            )
         }
     };
 }
@@ -461,6 +470,16 @@ impl<'a> Fold<'a> {
         }
     }
 
+    /// 6.3.7 The right operand of a shift shall be nonnegative and less than the width in bits of
+    /// the promoted left operand.
+    pub fn shift_out_of_range(&self, lhs: Value, rhs: Value) -> bool {
+        let count = self.convert(rhs, rhs.rank().to_integer()).to_i64();
+        match self.target.bits(&lhs.rank().to_integer().resolved()) {
+            Some(width) => count < 0 || count >= i64::from(width),
+            None => true,
+        }
+    }
+
     /// 6.3.5 The result of INT_MIN / -1 is not representable in the type of the operands.
     pub fn is_min(&self, value: Value) -> bool {
         let ty = value.rank().resolved();
@@ -473,8 +492,14 @@ impl<'a> Fold<'a> {
 
     pub fn neg(&self, value: Value) -> Diag<Value> {
         let (value, overflow) = match value {
-            Value::Int(v) => { let (r, o) = v.overflowing_neg(); (Value::Int(r), o) }
-            Value::Long(v) => { let (r, o) = v.overflowing_neg(); (Value::Long(r), o) }
+            Value::Int(v) => {
+                let (r, o) = v.overflowing_neg();
+                (Value::Int(r), o)
+            }
+            Value::Long(v) => {
+                let (r, o) = v.overflowing_neg();
+                (Value::Long(r), o)
+            }
             Value::UnsignedInt(v) => (Value::UnsignedInt(v.wrapping_neg()), false),
             Value::UnsignedLong(v) => (Value::UnsignedLong(v.wrapping_neg()), false),
             Value::Float(v) => (Value::Float(-v), false),

@@ -17,14 +17,16 @@ pub enum Diagnosis {
     },
     InvalidSizeof,
     UndeclaredIdentifier(Name),
-    /// 6.1.4 String literals
+    /// 6.1.4
     MixedWideStringConcat,
-    /// 6.1.3.2 Integer constants
+    /// 6.1.3.2
     IntegerConstantTooLarge,
-    /// 6.4 Constant expressions
+    /// 6.4
     ConstantOverflow,
-    /// 6.3 If the result is not in the range of representable values for its type, the behavior is undefined.
+    /// 6.3
     ArithmeticOverflow,
+    /// 6.3.7
+    ShiftCountOutOfRange,
     /// 6.2.2.1
     IncompleteType,
 
@@ -67,10 +69,11 @@ impl Diagnosis {
     #[rustfmt::skip]
     pub fn severity(&self) -> Severity {
         match self {
-            Diagnosis::MixedWideStringConcat |
-            Diagnosis::ArithmeticOverflow |
-            Diagnosis::IntegerConstantTooLarge => Severity::Warning,
+            Diagnosis::MixedWideStringConcat => Severity::Warning,
+            Diagnosis::IntegerConstantTooLarge  |
             Diagnosis::DuplicateTypeQualifers |
+            Diagnosis::ArithmeticOverflow |
+            Diagnosis::ShiftCountOutOfRange |
             Diagnosis::IncompleteType |
             Diagnosis::DivisionByZero |
             Diagnosis::ConstantOverflow |
@@ -136,6 +139,7 @@ impl DiagnosisNode {
             Diagnosis::DivisionByZero => "Division by zero".to_string(),
             Diagnosis::ConstantOverflow => "overflow in constant expression".to_string(),
             Diagnosis::ArithmeticOverflow => "integer overflow in constant expression".to_string(),
+            Diagnosis::ShiftCountOutOfRange => "shift count out of range".to_string(),
             Diagnosis::BadArgumentsCount => "wrong argument count".to_string(),
             Diagnosis::SyntaxError { found, expected } if expected.is_empty() => format!("syntax error, unexpected {}", token_label(found)),
             Diagnosis::SyntaxError { found, expected } => format!("syntax error, unexpected {}, expecting {expected}", token_label(found)),

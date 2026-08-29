@@ -218,7 +218,7 @@ reports!(
 reports!(
     report_integer_constant_too_large,
     "int x = 0x100000000;",
-    ["<test>:1:9: warning: integer constant is too large for any integer type"]
+    ["<test>:1:9: error: integer constant is too large for any integer type"]
 );
 
 reports!(
@@ -242,13 +242,19 @@ reports!(
 reports!(
     report_arithmetic_overflow_in_addition,
     "enum E { A = 2147483647 + 1 };",
-    ["<test>:1:14: warning: integer overflow in constant expression"]
+    ["<test>:1:14: error: integer overflow in constant expression"]
 );
 
 reports!(
     report_arithmetic_overflow_in_negation,
     "enum E { A = -(-2147483647 - 1) };",
-    ["<test>:1:14: warning: integer overflow in constant expression"]
+    ["<test>:1:14: error: integer overflow in constant expression"]
+);
+
+reports!(
+    report_shift_count_out_of_range,
+    "enum E { A = 1 << 32 };",
+    ["<test>:1:14: error: shift count out of range"]
 );
 
 reports!(

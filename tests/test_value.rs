@@ -217,12 +217,13 @@ fold!(
     shl(Value::Int(1), Value::Int(31)),
     "Int(-2147483648)"
 );
-fold!(
-    ignore "C90 6.3: undefined behavior, the folded value is not guaranteed",
-    shift_left_out_of_range_wraps_count,
-    shl(Value::Int(1), Value::Int(32)),
-    "Int(1)"
-);
+#[test]
+fn a_shift_count_at_or_past_the_operand_width_is_out_of_range() {
+    let fold = Fold::new(&I386);
+    assert!(fold.shift_out_of_range(Value::Int(1), Value::Int(32)));
+    assert!(fold.shift_out_of_range(Value::Int(1), Value::Int(-1)));
+    assert!(!fold.shift_out_of_range(Value::Int(1), Value::Int(31)));
+}
 fold!(shift_right_is_arithmetic, shr(Value::Int(-8), Value::Int(1)), "Int(-4)");
 fold!(
     shift_right_unsigned_is_logical,

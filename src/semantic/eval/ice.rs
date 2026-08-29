@@ -63,9 +63,26 @@ fn divisor(sema: &Sema, lhs: Value, rhs: Value) -> Result<(), Diagnosis> {
     }
 }
 
+/// 6.3.7 Bitwise shift operators
+/// The right operand shall be nonnegative and less than the width in bits of the promoted left operand.
+fn shift_count(sema: &Sema, lhs: Value, rhs: Value) -> Result<(), Diagnosis> {
+    match Fold::new(&sema.target).shift_out_of_range(lhs, rhs) {
+        true => Err(Diagnosis::ShiftCountOutOfRange),
+        false => Ok(()),
+    }
+}
+
 macro_rules! fold {
     ($sema:ident, $ctx:ident, $e1:ident, $e2:ident, $method:ident) => {{
         let (lhs, rhs) = operands($sema, $ctx, $e1, $e2)?;
+        Ok(Fold::new(&$sema.target).$method(lhs, rhs))
+    }};
+}
+
+macro_rules! fold_shift {
+    ($sema:ident, $ctx:ident, $e1:ident, $e2:ident, $method:ident) => {{
+        let (lhs, rhs) = operands($sema, $ctx, $e1, $e2)?;
+        shift_count($sema, lhs, rhs)?;
         Ok(Fold::new(&$sema.target).$method(lhs, rhs))
     }};
 }
@@ -126,8 +143,8 @@ pub fn eval(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<Val
         Expression::Mul(e1, e2) => fold_checked!(sema, ctx, expr, e1, e2, mul),
         Expression::Div(e1, e2) => fold_divide!(sema, ctx, e1, e2, div),
         Expression::Mod(e1, e2) => fold_divide!(sema, ctx, e1, e2, rem),
-        Expression::Left(e1, e2) => fold!(sema, ctx, e1, e2, shl),
-        Expression::Right(e1, e2) => fold!(sema, ctx, e1, e2, shr),
+        Expression::Left(e1, e2) => fold_shift!(sema, ctx, e1, e2, shl),
+        Expression::Right(e1, e2) => fold_shift!(sema, ctx, e1, e2, shr),
         Expression::BitAnd(e1, e2) => fold!(sema, ctx, e1, e2, bitand),
         Expression::BitOr(e1, e2) => fold!(sema, ctx, e1, e2, bitor),
         Expression::BitXor(e1, e2) => fold!(sema, ctx, e1, e2, bitxor),
