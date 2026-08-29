@@ -211,12 +211,7 @@ fold!(
     "UnsignedInt(255)"
 );
 fold!(shift_left, shl(Value::Int(1), Value::Int(4)), "Int(16)");
-fold!(
-    ignore "C90 6.3: undefined behavior, the folded value is not guaranteed",
-    shift_left_into_sign_bit,
-    shl(Value::Int(1), Value::Int(31)),
-    "Int(-2147483648)"
-);
+fold!(shift_left_into_sign_bit, shl(Value::Int(1), Value::Int(31)), "Int(-2147483648)");
 #[test]
 fn a_shift_count_at_or_past_the_operand_width_is_out_of_range() {
     let fold = Fold::new(&I386);

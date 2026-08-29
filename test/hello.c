@@ -1,4 +1,4 @@
-enum a { OUI = 2147483647 + 1 };
+enum a { OUI = 1 << 31 };
 
 /*
 char *a = "coucou";

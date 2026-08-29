@@ -4,15 +4,14 @@ use cc1::ast::{
     TypeSpecifier, Value,
 };
 use cc1::ast::{DeclaratorNode, Node};
-use cc1::parser::{Context, Span};
+use cc1::parser::Span;
 use cc1::semantic::TypeSpecifierCounter;
 use cc1::semantic::constrain::declaration::{
     check_bit_width, check_qualifier, extern_function_only, get_qualifier, get_storage,
 };
 use cc1::semantic::constrain::external::{
-    check_external_specifiers, check_function_storage, check_one_external, check_typedef,
-    check_unique_internal_linkage, is_tentative_definition, is_valid_old_style, no_internal_incomplete_type,
-    param_storage_only_register, tentative_defintion_init_zero,
+    check_external_specifiers, check_function_storage, is_tentative_definition, is_valid_old_style,
+    param_storage_only_register,
 };
 use cc1::semantic::{Diag, ResolvedType, ScopeKind};
 
@@ -324,70 +323,6 @@ fn a_tag_or_typedef_name_stands_alone() {
     let name = Name::new(StringId::from(0usize), Span::default());
     assert_eq!(count(&[TypeSpecifier::TypedefName(name)]), None);
     assert_eq!(count(&[TypeSpecifier::Int, TypeSpecifier::TypedefName(name)]), None);
-}
-
-// #[test]
-// fn symbols_are_compatible_when_name_type_storage_and_kind_agree() {
-//     let name = Name::new(StringId::from(1usize), Span::default());
-//     let other_name = Name::new(StringId::from(2usize), Span::default());
-//     let ty = QualifiedType::new(ResolvedTypeId::from(0usize), false, false);
-//     let const_ty = QualifiedType::new(ResolvedTypeId::from(0usize), true, false);
-//     let base = Symbol::new(name, Some(ty), Some(Storage::Extern), SymbolKind::Variable, false);
-//
-//     assert!(base.is_compatible(&Symbol::new(
-//         name,
-//         Some(ty),
-//         Some(Storage::Extern),
-//         SymbolKind::Variable,
-//         true
-//     )));
-//     assert!(!base.is_compatible(&Symbol::new(
-//         other_name,
-//         Some(ty),
-//         Some(Storage::Extern),
-//         SymbolKind::Variable,
-//         false
-//     )));
-//     assert!(!base.is_compatible(&Symbol::new(
-//         name,
-//         Some(const_ty),
-//         Some(Storage::Extern),
-//         SymbolKind::Variable,
-//         false
-//     )));
-//     assert!(!base.is_compatible(&Symbol::new(
-//         name,
-//         Some(ty),
-//         Some(Storage::Static),
-//         SymbolKind::Variable,
-//         false
-//     )));
-//     assert!(!base.is_compatible(&Symbol::new(
-//         name,
-//         Some(ty),
-//         Some(Storage::Extern),
-//         SymbolKind::Function,
-//         false
-//     )));
-// }
-
-#[test]
-#[ignore = "pins five unimplemented 6.7/6.7.2 constraint stubs to reporting nothing"]
-fn unimplemented_external_constraints_report_nothing() {
-    let ctx = Context::default();
-    let name = Name::new(StringId::from(0usize), Span::default());
-
-    assert_eq!(reported(&check_unique_internal_linkage()), "None");
-    assert_eq!(reported(&check_one_external()), "None");
-    assert_eq!(reported(&tentative_defintion_init_zero()), "None");
-
-    let diag = no_internal_incomplete_type();
-    assert!(diag.res);
-    assert_eq!(reported(&diag), "None");
-
-    let diag = check_typedef(&ctx, &name);
-    assert!(diag.res);
-    assert_eq!(reported(&diag), "None");
 }
 
 fn init_declarator(initializer: Option<InitializerNode>) -> InitDeclaratorNode {
