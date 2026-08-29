@@ -268,10 +268,9 @@ fn an_old_style_declaration_of_an_unlisted_name_is_rejected() {
 }
 
 #[test]
-#[ignore = "placeholder: the parameter list is dropped without any diagnosis"]
-fn an_abstract_old_style_declaration_yields_no_parameter() {
+fn an_unresolved_old_style_declaration_falls_back_to_implicit_int() {
     let diag = is_valid_old_style(&[name(1)], vec![None]);
-    assert_eq!(diag.res, None);
+    assert_eq!(diag.res, Some(vec![name(1)]));
     assert_eq!(reported(&diag), "None");
 }
 

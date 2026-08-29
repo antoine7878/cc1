@@ -68,7 +68,7 @@ pub fn is_valid_parameter_style(params: &[ParamInfo], old_style_declarations: &[
     }
     match is_named {
         true => Diag::res(true),
-        false => Diag::with_diag(false, Diagnosis::AbstractParameterDeclaration),
+        false => Diag::with_diag(false, Diagnosis::UnnamedPrototypeParameter),
     }
 }
 
@@ -85,10 +85,7 @@ pub fn check_void_parameter(is_void: bool) -> Diag<()> {
 /// If the declarator includes an identifier list, the types of the parameters may be declared in a following declaration list,
 /// any parameter that is not declared has type int.
 pub fn is_valid_old_style(names: &[StringId], declarations: Vec<Option<StringId>>) -> Diag<Option<Vec<StringId>>> {
-    let declarations_len = declarations.len();
-    let Some(declarations) = declarations.into_iter().collect::<Option<HashSet<StringId>>>() else {
-        return Diag::res(None);
-    };
+    let declarations: HashSet<StringId> = declarations.into_iter().flatten().collect();
 
     let name_len = names.len();
     let names = names.iter().cloned().collect::<HashSet<_>>();

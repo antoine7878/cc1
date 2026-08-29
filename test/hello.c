@@ -1,7 +1,6 @@
 
 int f(a)
 int a;
-int a;
 {
 	return a;
 }

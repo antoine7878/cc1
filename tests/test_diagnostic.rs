@@ -75,7 +75,7 @@ reports!(
     "void f(void, int) { }",
     [
         "<test>:1:8: error: Parameter shall not have void type",
-        "<test>:1:6: error: Absctract declaration in old style function",
+        "<test>:1:6: error: Parameter shall include an identifier",
     ]
 );
 

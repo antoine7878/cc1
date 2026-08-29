@@ -129,7 +129,7 @@ pub enum Diagnosis {
     ParameterTypeListWithList,
     ParameterNotRegister,
     VoidParameter,
-    AbstractParameterDeclaration,
+    UnnamedPrototypeParameter,
     MissingDeclarationInOldStyle,
     DuplicateParameterName,
     MissingParameterInOldStyle,
@@ -170,7 +170,7 @@ impl Diagnosis {
             Diagnosis::ParameterTypeListWithList |
             Diagnosis::ParameterNotRegister |
             Diagnosis::VoidParameter |
-            Diagnosis::AbstractParameterDeclaration |
+            Diagnosis::UnnamedPrototypeParameter |
             Diagnosis::MissingDeclarationInOldStyle |
             Diagnosis::DuplicateParameterName |
             Diagnosis::MissingParameterInOldStyle |
@@ -232,7 +232,7 @@ impl DiagnosisNode {
             Diagnosis::ParameterTypeListWithList => "Parameter style function declration shall not be followed by a declaration list".to_string(),
             Diagnosis::ParameterNotRegister => "Parameter shall only by declared with register storage".to_string(),
             Diagnosis::VoidParameter => "Parameter shall not have void type".to_string(),
-            Diagnosis::AbstractParameterDeclaration => "Absctract declaration in old style function".to_string(),
+            Diagnosis::UnnamedPrototypeParameter => "Parameter shall include an identifier".to_string(),
             Diagnosis::MissingDeclarationInOldStyle => "Missing argument declaration in old style function".to_string(),
             Diagnosis::MissingParameterInOldStyle => "Missing parameter".to_string(),
             Diagnosis::DuplicateParameterName => "Duplicate paramter identifier".to_string(),
