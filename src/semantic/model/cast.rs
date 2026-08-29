@@ -59,7 +59,7 @@ pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
     if !matches!(re.kind, ExpressionKind::LValue) {
         return;
     }
-    let ty = sema.types.get(re.casted_ty().ty);
+    let ty = sema.types.get(re.ty.ty);
     if matches!(ty, ResolvedType::Array { .. } | ResolvedType::Function { .. }) {
         return;
     }

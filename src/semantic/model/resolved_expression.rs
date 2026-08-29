@@ -8,7 +8,7 @@ pub enum ExpressionKind {
 
 #[derive(Clone, Debug)]
 pub struct ResolvedExpression {
-    ty: QualifiedType,
+    pub ty: QualifiedType,
     pub kind: ExpressionKind,
     pub casts: Vec<ImplicitCast>,
     pub result_cast: Option<ImplicitCast>,
