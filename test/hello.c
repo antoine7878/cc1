@@ -1,9 +1,5 @@
+enum a { OUI = 2147483647 + 1 };
 
-int f(a)
-int a;
-{
-	return a;
-}
 /*
 char *a = "coucou";
 char *wa = L"wide coucou";

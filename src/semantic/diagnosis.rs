@@ -7,86 +7,6 @@ use crate::parser::{Context, Span};
 use crate::semantic::SymbolKind;
 use crate::utils::{RED, RESET, YELLOW};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Severity {
-    Warning,
-    Error,
-}
-
-impl Severity {
-    pub fn color(&self) -> &'static str {
-        match self {
-            Severity::Warning => YELLOW,
-            Severity::Error => RED,
-        }
-    }
-}
-
-impl Display for Severity {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Severity::Warning => write!(f, "warning"),
-            Severity::Error => write!(f, "error"),
-        }
-    }
-}
-
-pub const MAX_EXPECTED: usize = 5;
-
-#[derive(Clone, Copy, Debug)]
-pub struct ExpectedTokens {
-    names: [&'static str; MAX_EXPECTED],
-    len: usize,
-}
-
-const STRUCTURAL: [&str; 5] = ["';'", "','", "')'", "']'", "'}'"];
-
-fn token_label(name: &str) -> &str {
-    match name {
-        "yyeof" => "end of file",
-        name => name,
-    }
-}
-
-impl ExpectedTokens {
-    pub fn new(found: &'static str, names: &[&'static str]) -> Self {
-        if names.len() <= MAX_EXPECTED {
-            return Self::from_slice(names);
-        }
-        let structural: Vec<&'static str> = names.iter().copied().filter(|n| STRUCTURAL.contains(n)).collect();
-        if structural.len() > MAX_EXPECTED || (structural == ["'}'"] && found != "yyeof") {
-            return Self::from_slice(&[]);
-        }
-        Self::from_slice(&structural)
-    }
-
-    fn from_slice(names: &[&'static str]) -> Self {
-        let mut buf = [""; MAX_EXPECTED];
-        buf[..names.len()].copy_from_slice(names);
-        Self {
-            names: buf,
-            len: names.len(),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len == 0
-    }
-}
-
-impl Display for ExpectedTokens {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (i, name) in self.names[..self.len].iter().map(|n| token_label(n)).enumerate() {
-            match i {
-                0 => write!(f, "{name}")?,
-                i if i + 1 == self.len => write!(f, " or {name}")?,
-                _ => write!(f, ", {name}")?,
-            }
-        }
-        Ok(())
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub enum Diagnosis {
     DivisionByZero,
@@ -97,28 +17,32 @@ pub enum Diagnosis {
     },
     InvalidSizeof,
     UndeclaredIdentifier(Name),
+    /// 6.1.4 String literals
+    MixedWideStringConcat,
     /// 6.1.3.2 Integer constants
     IntegerConstantTooLarge,
     /// 6.4 Constant expressions
     ConstantOverflow,
-    // 6.2.2.1
+    /// 6.3 If the result is not in the range of representable values for its type, the behavior is undefined.
+    ArithmeticOverflow,
+    /// 6.2.2.1
     IncompleteType,
 
-    // 6.4
+    /// 6.4
     NonConstantExpression,
     NonIntegerConstantExpression,
     CastToNonScalar,
-    // 6.5
+    /// 6.5
     EmptyDeclaration,
     MultipleStorageSpecifiers,
     BlockScopeNotExtern,
     InvalidTypeSpecifer,
     DuplicateTypeQualifers,
-    /// 6.5.2.1 Structure and union specifiers
+    /// 6.5.2.1
     NonIntBitFieldType,
     NonIntArraySize,
     TagWithoutMember(SymbolKind),
-    // 6.5.2.2 Enumeration specifiers
+    /// 6.5.2.2
     VariantBadValue,
     // 6.7
     AutoRegisterExternal,
@@ -143,8 +67,10 @@ impl Diagnosis {
     #[rustfmt::skip]
     pub fn severity(&self) -> Severity {
         match self {
-            Diagnosis::DuplicateTypeQualifers |
+            Diagnosis::MixedWideStringConcat |
+            Diagnosis::ArithmeticOverflow |
             Diagnosis::IntegerConstantTooLarge => Severity::Warning,
+            Diagnosis::DuplicateTypeQualifers |
             Diagnosis::IncompleteType |
             Diagnosis::DivisionByZero |
             Diagnosis::ConstantOverflow |
@@ -209,12 +135,14 @@ impl DiagnosisNode {
             Diagnosis::IncompleteType => "Incomplete type".to_string(),
             Diagnosis::DivisionByZero => "Division by zero".to_string(),
             Diagnosis::ConstantOverflow => "overflow in constant expression".to_string(),
+            Diagnosis::ArithmeticOverflow => "integer overflow in constant expression".to_string(),
             Diagnosis::BadArgumentsCount => "wrong argument count".to_string(),
             Diagnosis::SyntaxError { found, expected } if expected.is_empty() => format!("syntax error, unexpected {}", token_label(found)),
             Diagnosis::SyntaxError { found, expected } => format!("syntax error, unexpected {}, expecting {expected}", token_label(found)),
             Diagnosis::InvalidSizeof => "invalid application of sizeof".to_string(),
             Diagnosis::UndeclaredIdentifier(name) => format!("Use of undeclared identifier '{}'", name.id.resolve(ctx)),
             Diagnosis::IntegerConstantTooLarge => "integer constant is too large for any integer type".to_string(),
+            Diagnosis::MixedWideStringConcat => "concatenation of a wide and a narrow string literal is undefined".to_string(),
             Diagnosis::NonConstantExpression => "Non constant expression".to_string(),
             Diagnosis::NonIntegerConstantExpression => "Non integer constant expression".to_string(),
             Diagnosis::CastToNonScalar => "Conversion to non scalar type requested".to_string(),
@@ -245,6 +173,29 @@ impl DiagnosisNode {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Severity {
+    Warning,
+    Error,
+}
+
+impl Severity {
+    pub fn color(&self) -> &'static str {
+        match self {
+            Severity::Warning => YELLOW,
+            Severity::Error => RED,
+        }
+    }
+}
+
+impl Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Severity::Warning => write!(f, "warning"),
+            Severity::Error => write!(f, "error"),
+        }
+    }
+}
 pub trait DiagCollector {
     fn diagnosis(&mut self) -> &mut Vec<DiagnosisNode>;
 
@@ -349,5 +300,61 @@ fn caret_end(span: Span, line: &str) -> usize {
     match span.start.line == span.end.line {
         true => span.end.col.max(span.start.col),
         false => line.len().max(span.start.col),
+    }
+}
+
+pub const MAX_EXPECTED: usize = 5;
+
+#[derive(Clone, Copy, Debug)]
+pub struct ExpectedTokens {
+    names: [&'static str; MAX_EXPECTED],
+    len: usize,
+}
+
+const STRUCTURAL: [&str; 5] = ["';'", "','", "')'", "']'", "'}'"];
+
+fn token_label(name: &str) -> &str {
+    match name {
+        "yyeof" => "end of file",
+        name => name,
+    }
+}
+
+impl ExpectedTokens {
+    pub fn new(found: &'static str, names: &[&'static str]) -> Self {
+        if names.len() <= MAX_EXPECTED {
+            return Self::from_slice(names);
+        }
+        let structural: Vec<&'static str> = names.iter().copied().filter(|n| STRUCTURAL.contains(n)).collect();
+        if structural.len() > MAX_EXPECTED || (structural == ["'}'"] && found != "yyeof") {
+            return Self::from_slice(&[]);
+        }
+        Self::from_slice(&structural)
+    }
+
+    fn from_slice(names: &[&'static str]) -> Self {
+        let mut buf = [""; MAX_EXPECTED];
+        buf[..names.len()].copy_from_slice(names);
+        Self {
+            names: buf,
+            len: names.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+}
+
+impl Display for ExpectedTokens {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, name) in self.names[..self.len].iter().map(|n| token_label(n)).enumerate() {
+            match i {
+                0 => write!(f, "{name}")?,
+                i if i + 1 == self.len => write!(f, " or {name}")?,
+                _ => write!(f, ", {name}")?,
+            }
+        }
+        Ok(())
     }
 }

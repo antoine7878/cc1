@@ -9,6 +9,15 @@ use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUni
 
 use crate::parser::{YYLex, Context, Span};
 use crate::parser::yyerror;
+use crate::semantic::{Diagnosis, DiagnosisNode};
+
+fn concat_string_literals(ctx: &mut Context, lhs: StringLitralNode, rhs: StringLitralNode, span: Span) -> StringLitralNode {
+    // 6.1.4 If one is a wide string literal and the other is not, the behavior is undefined.
+    if lhs.is_wide() != rhs.is_wide() {
+        ctx.diagnosis.push(DiagnosisNode::new(Diagnosis::MixedWideStringConcat, span));
+    }
+    ctx.arenas.names.concat(lhs, rhs, span)
+}
 
 macro_rules! node{
     ($self:expr, $factory:ident, $method:ident $(, $arg:expr)*) => {{
@@ -164,7 +173,7 @@ constant_expression /* ExpressionNode */
 
 string_literal /* StringLitralNode */
       : STRING_LITERAL                                                                      { $1 }
-      | string_literal STRING_LITERAL                                                       { node_span!(self, names, concat, $1, $2) }
+      | string_literal STRING_LITERAL                                                       { with_span!(self, concat_string_literals, &mut self.lexer.ctx, $1, $2) }
       ;
 
 expression /* ExpressionNode */

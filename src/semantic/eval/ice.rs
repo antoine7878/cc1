@@ -70,6 +70,14 @@ macro_rules! fold {
     }};
 }
 
+macro_rules! fold_checked {
+    ($sema:ident, $ctx:ident, $expr:ident, $e1:ident, $e2:ident, $method:ident) => {{
+        let (lhs, rhs) = operands($sema, $ctx, $e1, $e2)?;
+        let folded = Fold::new(&$sema.target).$method(lhs, rhs);
+        Ok($sema.add_diag(folded, &$expr.span))
+    }};
+}
+
 macro_rules! fold_divide {
     ($sema:ident, $ctx:ident, $e1:ident, $e2:ident, $method:ident) => {{
         let (lhs, rhs) = operands($sema, $ctx, $e1, $e2)?;
@@ -103,18 +111,19 @@ pub fn eval(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Result<Val
         }
         Expression::Constant(value_node) => Ok(value_node.value),
         Expression::Plus(expr) => eval(sema, ctx, expr),
-        Expression::Minus(expr) => {
-            let value = eval(sema, ctx, expr)?;
-            Ok(Fold::new(&sema.target).neg(value))
+        Expression::Minus(operand) => {
+            let value = eval(sema, ctx, operand)?;
+            let folded = Fold::new(&sema.target).neg(value);
+            Ok(sema.add_diag(folded, &expr.span))
         }
         Expression::BitNot(expr) => {
             let value = eval(sema, ctx, expr)?;
             Ok(Fold::new(&sema.target).bit_not(value))
         }
         Expression::LogicalNot(expr) => Ok(eval(sema, ctx, expr)?.logical_not()),
-        Expression::Add(e1, e2) => fold!(sema, ctx, e1, e2, add),
-        Expression::Sub(e1, e2) => fold!(sema, ctx, e1, e2, sub),
-        Expression::Mul(e1, e2) => fold!(sema, ctx, e1, e2, mul),
+        Expression::Add(e1, e2) => fold_checked!(sema, ctx, expr, e1, e2, add),
+        Expression::Sub(e1, e2) => fold_checked!(sema, ctx, expr, e1, e2, sub),
+        Expression::Mul(e1, e2) => fold_checked!(sema, ctx, expr, e1, e2, mul),
         Expression::Div(e1, e2) => fold_divide!(sema, ctx, e1, e2, div),
         Expression::Mod(e1, e2) => fold_divide!(sema, ctx, e1, e2, rem),
         Expression::Left(e1, e2) => fold!(sema, ctx, e1, e2, shl),

@@ -330,19 +330,21 @@ pub struct Fold<'a> {
 }
 
 macro_rules! fold_arithmetic {
-    ($method:ident, $trait:ident, $wrapping:ident) => {
-        pub fn $method(&self, lhs: Value, rhs: Value) -> Value {
-            let value = match self.usual(lhs, rhs) {
-                (Value::Int(a), Value::Int(b)) => Value::Int(a.$wrapping(b)),
-                (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt(a.$wrapping(b)),
-                (Value::Long(a), Value::Long(b)) => Value::Long(a.$wrapping(b)),
-                (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong(a.$wrapping(b)),
-                (Value::Float(a), Value::Float(b)) => Value::Float($trait::$method(a, b)),
-                (Value::Double(a), Value::Double(b)) => Value::Double($trait::$method(a, b)),
-                (Value::LongDouble(a), Value::LongDouble(b)) => Value::LongDouble($trait::$method(a, b)),
+    ($method:ident, $trait:ident, $overflowing:ident) => {
+        /// 6.3 A signed result outside the range representable in its type is undefined; cc1 wraps
+        /// and reports it.
+        pub fn $method(&self, lhs: Value, rhs: Value) -> Diag<Value> {
+            let (value, overflow) = match self.usual(lhs, rhs) {
+                (Value::Int(a), Value::Int(b)) => { let (v, o) = a.$overflowing(b); (Value::Int(v), o) }
+                (Value::Long(a), Value::Long(b)) => { let (v, o) = a.$overflowing(b); (Value::Long(v), o) }
+                (Value::UnsignedInt(a), Value::UnsignedInt(b)) => (Value::UnsignedInt(a.$overflowing(b).0), false),
+                (Value::UnsignedLong(a), Value::UnsignedLong(b)) => (Value::UnsignedLong(a.$overflowing(b).0), false),
+                (Value::Float(a), Value::Float(b)) => (Value::Float($trait::$method(a, b)), false),
+                (Value::Double(a), Value::Double(b)) => (Value::Double($trait::$method(a, b)), false),
+                (Value::LongDouble(a), Value::LongDouble(b)) => (Value::LongDouble($trait::$method(a, b)), false),
                 _ => unreachable!(),
             };
-            self.narrow(value)
+            Diag::new(self.narrow(value), overflow.then_some(Diagnosis::ArithmeticOverflow))
         }
     };
 }
@@ -469,17 +471,17 @@ impl<'a> Fold<'a> {
                 .is_some_and(|min| self.eq(value, Value::Long(min)))
     }
 
-    pub fn neg(&self, value: Value) -> Value {
-        let value = match value {
-            Value::Int(v) => Value::Int(v.wrapping_neg()),
-            Value::UnsignedInt(v) => Value::UnsignedInt(v.wrapping_neg()),
-            Value::Long(v) => Value::Long(v.wrapping_neg()),
-            Value::UnsignedLong(v) => Value::UnsignedLong(v.wrapping_neg()),
-            Value::Float(v) => Value::Float(-v),
-            Value::Double(v) => Value::Double(-v),
-            Value::LongDouble(v) => Value::LongDouble(-v),
+    pub fn neg(&self, value: Value) -> Diag<Value> {
+        let (value, overflow) = match value {
+            Value::Int(v) => { let (r, o) = v.overflowing_neg(); (Value::Int(r), o) }
+            Value::Long(v) => { let (r, o) = v.overflowing_neg(); (Value::Long(r), o) }
+            Value::UnsignedInt(v) => (Value::UnsignedInt(v.wrapping_neg()), false),
+            Value::UnsignedLong(v) => (Value::UnsignedLong(v.wrapping_neg()), false),
+            Value::Float(v) => (Value::Float(-v), false),
+            Value::Double(v) => (Value::Double(-v), false),
+            Value::LongDouble(v) => (Value::LongDouble(-v), false),
         };
-        self.narrow(value)
+        Diag::new(self.narrow(value), overflow.then_some(Diagnosis::ArithmeticOverflow))
     }
 
     pub fn bit_not(&self, value: Value) -> Value {
@@ -505,9 +507,9 @@ impl<'a> Fold<'a> {
         self.narrow(value)
     }
 
-    fold_arithmetic!(add, Add, wrapping_add);
-    fold_arithmetic!(sub, Sub, wrapping_sub);
-    fold_arithmetic!(mul, Mul, wrapping_mul);
+    fold_arithmetic!(add, Add, overflowing_add);
+    fold_arithmetic!(sub, Sub, overflowing_sub);
+    fold_arithmetic!(mul, Mul, overflowing_mul);
     fold_division!(div, Div, checked_div);
     fold_bitwise!(bitand, BitAnd);
     fold_bitwise!(bitor, BitOr);

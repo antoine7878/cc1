@@ -222,6 +222,24 @@ reports!(
 );
 
 reports!(
+    report_concat_narrow_then_wide_literal,
+    "int f(void) { return (\"a\" L\"b\")[0]; }",
+    ["<test>:1:23: warning: concatenation of a wide and a narrow string literal is undefined"]
+);
+
+reports!(
+    report_concat_wide_then_narrow_literal,
+    "int f(void) { return (L\"a\" \"b\")[0]; }",
+    ["<test>:1:23: warning: concatenation of a wide and a narrow string literal is undefined"]
+);
+
+reports!(
+    report_concat_wide_literal_in_subscript,
+    "int f(void) { return L\"ab\" \"cd\"[0]; }",
+    ["<test>:1:22: warning: concatenation of a wide and a narrow string literal is undefined"]
+);
+
+reports!(
     report_remainder_by_zero,
     "enum E { A = 1 % 0 };",
     ["<test>:1:14: error: Division by zero"]

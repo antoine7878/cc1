@@ -2,8 +2,22 @@ use cc1::ast::{Fold, Rank, Value};
 use cc1::semantic::{Diag, Diagnosis};
 use cc1::target::{I386, X86_64};
 
-fn repr(value: Value) -> String {
-    format!("{value:?}")
+trait FoldValue {
+    fn fold_value(self) -> Value;
+}
+impl FoldValue for Value {
+    fn fold_value(self) -> Value {
+        self
+    }
+}
+impl FoldValue for Diag<Value> {
+    fn fold_value(self) -> Value {
+        self.res
+    }
+}
+
+fn repr(value: impl FoldValue) -> String {
+    format!("{:?}", value.fold_value())
 }
 
 /// A constant whose value is representable by one of the types of its list (6.1.3.2).
@@ -11,9 +25,16 @@ macro_rules! literal {
     ($name:ident, $src:expr, $expected:expr) => {
         #[test]
         fn $name() {
-            let Diag { res: value, diagnosis } = Value::parse($src, &I386);
+            let Diag {
+                res: value,
+                diagnosis,
+            } = Value::parse($src, &I386);
             assert_eq!(repr(value), $expected, "Value::parse({:?})", $src);
-            assert!(diagnosis.is_none(), "Value::parse({:?}) reported {diagnosis:?}", $src);
+            assert!(
+                diagnosis.is_none(),
+                "Value::parse({:?}) reported {diagnosis:?}",
+                $src
+            );
         }
     };
 }
@@ -23,7 +44,10 @@ macro_rules! too_large {
     ($name:ident, $src:expr, $expected:expr) => {
         #[test]
         fn $name() {
-            let Diag { res: value, diagnosis } = Value::parse($src, &I386);
+            let Diag {
+                res: value,
+                diagnosis,
+            } = Value::parse($src, &I386);
             assert_eq!(repr(value), $expected, "Value::parse({:?})", $src);
             assert!(
                 matches!(diagnosis, Some(Diagnosis::IntegerConstantTooLarge)),
@@ -66,11 +90,7 @@ macro_rules! fold {
 literal!(literal_zero, "0", "Int(0)");
 literal!(literal_decimal, "42", "Int(42)");
 literal!(literal_int_max, "2147483647", "Int(2147483647)");
-literal!(
-    literal_decimal_above_int_max,
-    "2147483648",
-    "UnsignedLong(2147483648)"
-);
+literal!(literal_decimal_above_int_max, "2147483648", "UnsignedLong(2147483648)");
 literal!(literal_octal, "010", "Int(8)");
 literal!(literal_octal_max, "017777777777", "Int(2147483647)");
 literal!(literal_hexadecimal, "0x10", "Int(16)");
@@ -82,11 +102,7 @@ literal!(
 );
 literal!(literal_octal_above_int_max, "020000000000", "UnsignedInt(2147483648)");
 too_large!(literal_above_unsigned_int_max, "0x100000000", "UnsignedLong(0)");
-too_large!(
-    literal_above_long_max,
-    "0xffffffffffffffff",
-    "UnsignedLong(4294967295)"
-);
+too_large!(literal_above_long_max, "0xffffffffffffffff", "UnsignedLong(4294967295)");
 
 literal!(literal_unsigned_suffix, "1u", "UnsignedInt(1)");
 literal!(literal_unsigned_suffix_upper, "1U", "UnsignedInt(1)");
@@ -201,11 +217,7 @@ fold!(
     shl(Value::Int(1), Value::Int(32)),
     "Int(1)"
 );
-fold!(
-    shift_right_is_arithmetic,
-    shr(Value::Int(-8), Value::Int(1)),
-    "Int(-4)"
-);
+fold!(shift_right_is_arithmetic, shr(Value::Int(-8), Value::Int(1)), "Int(-4)");
 fold!(
     shift_right_unsigned_is_logical,
     shr(Value::UnsignedInt(2147483648), Value::Int(31)),
@@ -362,11 +374,11 @@ fn ordering_applies_usual_conversions() {
 fn every_operator_folds_in_sequence() {
     let fold = Fold::new(&I386);
     let mut value = Value::Int(1);
-    value = fold.add(value, Value::Int(2));
+    value = fold.add(value, Value::Int(2)).res;
     assert_eq!(repr(value), "Int(3)");
-    value = fold.mul(value, Value::Int(4));
+    value = fold.mul(value, Value::Int(4)).res;
     assert_eq!(repr(value), "Int(12)");
-    value = fold.sub(value, Value::Int(2));
+    value = fold.sub(value, Value::Int(2)).res;
     assert_eq!(repr(value), "Int(10)");
     value = fold.div(value, Value::Int(3));
     assert_eq!(repr(value), "Int(3)");
