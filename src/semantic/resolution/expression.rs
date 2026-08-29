@@ -1,5 +1,5 @@
 use crate::ast::{Expression, ExpressionNode};
-use crate::parser::{Context, Span};
+use crate::parser::Context;
 use crate::semantic::model::cast::{self};
 use crate::semantic::{
     Diagnosis, DiagnosisNode, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId, Sema,
@@ -89,7 +89,6 @@ fn pointer_integer_arithmetic(
     sema: &mut Sema,
     pointer: &mut ResolvedExpression,
     intergral: &mut ResolvedExpression,
-    span: &Span,
 ) -> Result<QualifiedType, Diagnosis> {
     let ResolvedType::Pointer(inner) = sema.types.get(pointer.casted_ty().ty) else {
         return Err(Diagnosis::Poisoned);
@@ -138,10 +137,10 @@ fn type_of(
                     Ok(cast::usual_arithmetic(sema, lhs, rhs).casted_ty())
                 }
                 (ResolvedType::Pointer(_), o) if o.is_integral(&sema.tags) => {
-                    pointer_integer_arithmetic(sema, lhs, rhs, &e1.span)
+                    pointer_integer_arithmetic(sema, lhs, rhs)
                 }
                 (o, ResolvedType::Pointer(_)) if o.is_integral(&sema.tags) => {
-                    pointer_integer_arithmetic(sema, rhs, lhs, &e2.span)
+                    pointer_integer_arithmetic(sema, rhs, lhs)
                 }
                 _ => Err(Diagnosis::InvalidOperand),
             }
