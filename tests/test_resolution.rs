@@ -76,12 +76,7 @@ folds!(
     ["Int(2)", "Int(3)"]
 );
 folds!(fold_character_constant, "enum E { A = 'a' };", ["Int(97)"]);
-folds!(
-    ignore "C90 6.3: undefined behavior, the folded value is not guaranteed",
-    fold_overflow_wraps,
-    "enum E { A = 2147483647 + 1 };",
-    ["Int(-2147483648)"]
-);
+folds!(fold_overflow_wraps, "enum E { A = 2147483647 + 1 };", ["Int(-2147483648)"]);
 folds!(
     fold_variant_reference,
     "enum E { A = 1, B = A + 1 };",

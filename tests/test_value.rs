@@ -87,6 +87,22 @@ macro_rules! fold {
     };
 }
 
+/// A signed arithmetic result outside its type wraps and is reported (6.3).
+macro_rules! fold_overflow {
+    ($name:ident, $method:ident($($arg:expr),* $(,)?), $expected:expr) => {
+        #[test]
+        fn $name() {
+            let Diag { res, diagnosis } = Fold::new(&I386).$method($($arg),*);
+            assert_eq!(repr(res), $expected, "{}", stringify!($method($($arg),*)));
+            assert!(
+                matches!(diagnosis, Some(Diagnosis::ArithmeticOverflow)),
+                "{} should report ArithmeticOverflow, got {diagnosis:?}",
+                stringify!($method($($arg),*))
+            );
+        }
+    };
+}
+
 literal!(literal_zero, "0", "Int(0)");
 literal!(literal_decimal, "42", "Int(42)");
 literal!(literal_int_max, "2147483647", "Int(2147483647)");
@@ -137,23 +153,13 @@ literal!(literal_wide_char, "L'a'", "Int(97)");
 literal!(literal_wide_char_is_not_sign_extended, "L'\\xff'", "Int(255)");
 
 fold!(add_int, add(Value::Int(1), Value::Int(2)), "Int(3)");
-fold!(
-    ignore "C90 6.3: undefined behavior, the folded value is not guaranteed",
-    add_wraps,
-    add(Value::Int(i32::MAX), Value::Int(1)),
-    "Int(-2147483648)"
-);
+fold_overflow!(add_wraps, add(Value::Int(i32::MAX), Value::Int(1)), "Int(-2147483648)");
 fold!(
     sub_unsigned_wraps,
     sub(Value::UnsignedInt(1), Value::UnsignedInt(2)),
     "UnsignedInt(4294967295)"
 );
-fold!(
-    ignore "C90 6.3: undefined behavior, the folded value is not guaranteed",
-    mul_wraps,
-    mul(Value::Int(65536), Value::Int(65536)),
-    "Int(0)"
-);
+fold_overflow!(mul_wraps, mul(Value::Int(65536), Value::Int(65536)), "Int(0)");
 fold!(div_int, div(Value::Int(7), Value::Int(2)), "Int(3)");
 fold!(
     div_negative_truncates_toward_zero,
@@ -230,12 +236,7 @@ fold!(
 );
 
 fold!(neg_int, neg(Value::Int(1)), "Int(-1)");
-fold!(
-    ignore "C90 6.3: undefined behavior, the folded value is not guaranteed",
-    neg_wraps,
-    neg(Value::Int(i32::MIN)),
-    "Int(-2147483648)"
-);
+fold_overflow!(neg_wraps, neg(Value::Int(i32::MIN)), "Int(-2147483648)");
 fold!(neg_double, neg(Value::Double(1.5)), "Double(-1.5)");
 fold!(bitnot_int, bit_not(Value::Int(0)), "Int(-1)");
 fold!(

@@ -240,6 +240,18 @@ reports!(
 );
 
 reports!(
+    report_arithmetic_overflow_in_addition,
+    "enum E { A = 2147483647 + 1 };",
+    ["<test>:1:14: warning: integer overflow in constant expression"]
+);
+
+reports!(
+    report_arithmetic_overflow_in_negation,
+    "enum E { A = -(-2147483647 - 1) };",
+    ["<test>:1:14: warning: integer overflow in constant expression"]
+);
+
+reports!(
     report_remainder_by_zero,
     "enum E { A = 1 % 0 };",
     ["<test>:1:14: error: Division by zero"]
