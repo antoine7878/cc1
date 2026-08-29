@@ -8,7 +8,7 @@ use cc1::ast::print::AstPrinter;
 use cc1::ast::{Expression, Name, Value};
 use cc1::parser::{Context, YYLex, Yacc};
 use cc1::pipeline::Pipeline;
-use cc1::semantic::{Analyzer, Diagnosis, DiagnosisNode, SymbolKind};
+use cc1::semantic::{Analyzer, Diagnosis, DiagnosisNode, ExpressionKind, SymbolKind};
 
 fn needs_preprocessing(src: &str) -> bool {
     src.contains("\\\n") || src.contains("/*") || src.contains("//") || src.contains('#')
@@ -153,6 +153,33 @@ impl Unit {
             .into_iter()
             .map(|value| match value {
                 Some(value) => format!("{value:?}"),
+                None => "None".to_string(),
+            })
+            .collect()
+    }
+
+    pub fn typed(&self) -> Vec<String> {
+        let mut entries: Vec<_> = self
+            .ctx
+            .sema
+            .expressions
+            .iter()
+            .map(|(id, resolved)| (usize::from(*id), resolved))
+            .collect();
+        entries.sort_by_key(|(id, _)| *id);
+        entries
+            .into_iter()
+            .map(|(_, resolved)| match resolved {
+                Some(resolved) => {
+                    let mut out = self.ctx.describe(&resolved.ty);
+                    if matches!(resolved.kind, ExpressionKind::LValue) {
+                        out.push_str(" lvalue");
+                    }
+                    for cast in &resolved.casts {
+                        out.push_str(&format!(" <{:?}> {}", cast.kind, self.ctx.describe(&cast.to)));
+                    }
+                    out
+                }
                 None => "None".to_string(),
             })
             .collect()

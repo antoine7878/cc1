@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name, StringLitralNode, ValueNode};
+use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name, StringLiteralNode, ValueNode};
 use crate::parser::{Span, YYToken};
 use crate::{ast_node, define_arena};
 
@@ -17,7 +17,7 @@ pub enum Expression {
     // Values
     Identifier(Name),
     Constant(ValueNode),
-    StringLiteral(StringLitralNode),
+    StringLiteral(StringLiteralNode),
 
     // Cst
     ConstantExpression(ExpressionNode),
@@ -112,7 +112,7 @@ impl ExpressionArena {
         Self::add(self.alloc(Expression::Constant(value)), span)
     }
 
-    pub fn string_literal(&mut self, literal: StringLitralNode, span: Span) -> ExpressionNode {
+    pub fn string_literal(&mut self, literal: StringLiteralNode, span: Span) -> ExpressionNode {
         Self::add(self.alloc(Expression::StringLiteral(literal)), span)
     }
 

@@ -1,8 +1,5 @@
-int (*a)[];
-
-void f(void) {
-	a + 1;
-}
+int a[10];
+short b = a + 1;
 
 /*
 char *a = "coucou";

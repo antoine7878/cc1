@@ -4,7 +4,7 @@ use crate::ast::{
     FunctionParameters, FunctionParametersNode, InitDeclaratorNode, Initializer, InitializerNode, IterationStatement,
     IterationStatementNode, JumpStatement, JumpStatementNode, Labeled, LabeledStatementNode, Name,
     ParameterDeclaration, Qualifier, SelectionStatement, SelectionStatementNode, Statement, StatementNode,
-    StringLitralNode, Struct, StructDeclaration, StructMemberDeclarator, TranslationUnitNode, Type, TypeSpecifier,
+    StringLiteralNode, Struct, StructDeclaration, StructMemberDeclarator, TranslationUnitNode, Type, TypeSpecifier,
     Union, ValueNode, Variant,
 };
 use crate::parser::Context;
@@ -112,12 +112,12 @@ pub trait Visitor {
 
     fn visit_value(&mut self, _ctx: &Context, _node: &ValueNode) {}
 
-    fn visit_string_litral(&mut self, ctx: &Context, node: &StringLitralNode) {
+    fn visit_string_litral(&mut self, ctx: &Context, node: &StringLiteralNode) {
         walk_string_litral(self, ctx, node);
     }
 }
 
-pub fn walk_string_litral<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &StringLitralNode) {
+pub fn walk_string_litral<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &StringLiteralNode) {
     v.visit_name(ctx, &node.name());
 }
 

@@ -17,7 +17,7 @@ pub use declaration::{
 };
 pub use expression::{Expression, ExpressionArena, ExpressionId, ExpressionNode, Type};
 pub use function::{FunctionParameters, FunctionParametersNode, ParameterDeclaration};
-pub use literal::{StringLitral, StringLitralNode};
+pub use literal::{StringLitral, StringLiteralNode};
 pub use name::{Name, StringArena, StringId};
 pub use statement::{
     CompoundStatementNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, JumpStatement,

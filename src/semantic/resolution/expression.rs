@@ -1,5 +1,5 @@
 use crate::ast::{Expression, ExpressionNode};
-use crate::parser::Context;
+use crate::parser::{Context, Span};
 use crate::semantic::model::cast::{self};
 use crate::semantic::{
     Diagnosis, DiagnosisNode, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId, Sema,
@@ -87,8 +87,9 @@ fn check_is_arithmetic(sema: &Sema, ty: ResolvedTypeId) -> Result<(), Diagnosis>
 
 fn pointer_integer_arithmetic(
     sema: &mut Sema,
-    pointer: &ResolvedExpression,
+    pointer: &mut ResolvedExpression,
     intergral: &mut ResolvedExpression,
+    span: &Span,
 ) -> Result<QualifiedType, Diagnosis> {
     let ResolvedType::Pointer(inner) = sema.types.get(pointer.casted_ty().ty) else {
         return Err(Diagnosis::Poisoned);
@@ -96,7 +97,10 @@ fn pointer_integer_arithmetic(
     match sema.types.get(inner.ty) {
         t if !t.is_complete(&sema.tags) => Err(Diagnosis::InvalidOperand),
         ResolvedType::Function { .. } => Err(Diagnosis::InvalidOperand),
-        _ => Ok(cast::promote(sema, intergral).casted_ty()),
+        _ => {
+            cast::promote(sema, intergral);
+            Ok(pointer.casted_ty())
+        }
     }
 }
 
@@ -108,7 +112,7 @@ fn type_of(
     use ExpressionKind::{LValue, RValue};
 
     match sema.expressions.get(&node.id) {
-        Some(Some(re)) => return Ok((re.ty, re.kind)),
+        Some(Some(re)) => return Ok((re.casted_ty(), re.kind)),
         Some(None) => return Err(Diagnosis::Poisoned),
         None => (),
     }
@@ -125,17 +129,19 @@ fn type_of(
         }
         Expression::Constant(value) => Ok((value.ty(sema), RValue)),
         Expression::StringLiteral(value) => Ok((value.ty(sema, ctx), LValue)),
-        Expression::ConstantExpression(expr) => as_written(sema, expr).map(|re| (re.ty, re.kind)),
+        Expression::ConstantExpression(expr) => as_written(sema, expr).map(|re| (re.casted_ty(), re.kind)),
         Expression::Add(e1, e2) => with_operands(sema, e1, e2, RValue, |sema, lhs, rhs| {
+            // lvalue_conversion(sema, lhs, &e1.span);
+            // lvalue_conversion(sema, rhs, &e2.span);
             match (sema.types.get(lhs.casted_ty().ty), sema.types.get(rhs.casted_ty().ty)) {
                 (l, r) if l.is_arithmetic(&sema.tags) && r.is_arithmetic(&sema.tags) => {
                     Ok(cast::usual_arithmetic(sema, lhs, rhs).casted_ty())
                 }
                 (ResolvedType::Pointer(_), o) if o.is_integral(&sema.tags) => {
-                    pointer_integer_arithmetic(sema, lhs, rhs)
+                    pointer_integer_arithmetic(sema, lhs, rhs, &e1.span)
                 }
                 (o, ResolvedType::Pointer(_)) if o.is_integral(&sema.tags) => {
-                    pointer_integer_arithmetic(sema, rhs, lhs)
+                    pointer_integer_arithmetic(sema, rhs, lhs, &e2.span)
                 }
                 _ => Err(Diagnosis::InvalidOperand),
             }
