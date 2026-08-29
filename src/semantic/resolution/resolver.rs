@@ -223,7 +223,7 @@ impl Visitor for Sema {
             }
             self.bindings.insert(node.id, sym);
         }
-        // expression::run(self, ctx, node);
+        expression::run(self, ctx, node);
     }
 }
 

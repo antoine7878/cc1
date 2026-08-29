@@ -94,7 +94,6 @@ fn extract_declarator(
             declarator: inner,
             params,
         } => {
-            println!("EXTRACT FUNCTION");
             let list = resolve_params(sema, ctx, params);
             let id = sema.types.function(inner_most, list.types());
             let (ty, leaf, inner_list) = extract_declarator(sema, ctx, inner, QualifiedType::new(id, false, false));

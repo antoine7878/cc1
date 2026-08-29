@@ -38,6 +38,24 @@ pub enum CastKind {
 // has the unqualified version of the type of the lvalue.
 // 6.2.2.1 If the lvalue has an incomplete type and does not have array type, the behavior is undefined.
 pub fn lvalue_conversion(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
+    function_to_pointer(sema, re);
+    array_to_pointer(sema, re);
+    l_to_r_value(sema, re, span);
+}
+
+pub fn function_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
+    let ResolvedType::Function { .. } = sema.types.get(re.ty.ty) else { return };
+    let to = QualifiedType::new(sema.types.pointer(re.ty), false, false);
+    re.casts.push(ImplicitCast::new(CastKind::FunctionToPointer, to));
+}
+
+pub fn array_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
+    let ResolvedType::Array { elem, .. } = sema.types.get(re.ty.ty) else { return };
+    let to = QualifiedType::new(sema.types.pointer(*elem), false, false);
+    re.casts.push(ImplicitCast::new(CastKind::ArrayToPointer, to))
+}
+
+pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
     if !matches!(re.kind, ExpressionKind::LValue) {
         return;
     }
@@ -58,19 +76,20 @@ pub fn lvalue_conversion(sema: &mut Sema, re: &mut ResolvedExpression, span: &Sp
 // used If an int can represent all values of the original type. the value is converted to an inf;
 // otherwise, it is converted to an unsigned int. These are called the integral p~wnotions.”
 // All other arithmetic types are unchanged by the integral promotions.
-pub fn int_promote(sema: &Sema, re: &mut ResolvedExpression) {
+pub fn promote<'a>(sema: &Sema, re: &'a mut ResolvedExpression) -> &'a mut ResolvedExpression {
     use ResolvedType::*;
 
-    let qty = re.value_ty();
+    let qty = re.casted_ty();
     match sema.types.get(qty.ty) {
         Char | SignedChar | UnsignedChar | Short | UnsignedShort => (),
         &Tag(id) if sema.tags.get(id).kind == ast::Tag::Enum => (),
-        _ => return,
+        _ => return re,
     }
 
     let kind = CastKind::IntegerPromotion;
     let to = QualifiedType::new(sema.builtins.int, false, false);
     re.casts.push(ImplicitCast::new(kind, to));
+    re
 }
 
 // 6.2.2.1 If the lvalue has qualified type, the value has the unqualified version of the type
@@ -80,7 +99,7 @@ fn convert_type(ty: ResolvedTypeId) -> QualifiedType {
 }
 
 fn num_conv(sema: &Sema, re: &mut ResolvedExpression, ty_id: ResolvedTypeId) {
-    let from = re.value_ty().ty;
+    let from = re.casted_ty().ty;
     if from == ty_id {
         return;
     }
@@ -96,22 +115,26 @@ fn num_conv(sema: &Sema, re: &mut ResolvedExpression, ty_id: ResolvedTypeId) {
 }
 
 // 6.2.1.5 Usual arithmetic conversions
-pub fn usual_arithmetic(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) {
+pub fn usual_arithmetic<'a>(
+    sema: &mut Sema,
+    lhs: &'a mut ResolvedExpression,
+    rhs: &mut ResolvedExpression,
+) -> &'a mut ResolvedExpression {
     use ResolvedType::*;
 
-    let l = sema.types.get(lhs.value_ty().ty);
-    let r = sema.types.get(rhs.value_ty().ty);
+    let l = sema.types.get(lhs.casted_ty().ty);
+    let r = sema.types.get(rhs.casted_ty().ty);
     // 6.3.5 If both operands have arithmetic type, the usual arithmetic conversions are performed
     if !l.is_arithmetic(&sema.tags) || !r.is_arithmetic(&sema.tags) {
-        return;
+        return lhs;
     }
     // 6.2.1.5 Otherwise, the integral promotions are performed on both operands.
     if l.is_integral(&sema.tags) && r.is_integral(&sema.tags) {
-        int_promote(sema, lhs);
-        int_promote(sema, rhs);
+        promote(sema, lhs);
+        promote(sema, rhs);
     }
-    if lhs.value_ty().ty == rhs.value_ty().ty {
-        return;
+    if lhs.casted_ty().ty == rhs.casted_ty().ty {
+        return lhs;
     }
     let to = match (l, r) {
         (LongDouble, _) | (_, LongDouble) => sema.builtins.long_double,
@@ -126,18 +149,7 @@ pub fn usual_arithmetic(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut
     };
     num_conv(sema, lhs, to);
     num_conv(sema, rhs, to);
-}
-
-pub fn function_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
-    let ResolvedType::Function { .. } = sema.types.get(re.ty.ty) else { return };
-    let to = QualifiedType::new(sema.types.pointer(re.ty), false, false);
-    re.casts.push(ImplicitCast::new(CastKind::FunctionToPointer, to));
-}
-
-pub fn array_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
-    let ResolvedType::Array { elem, .. } = sema.types.get(re.ty.ty) else { return };
-    let to = QualifiedType::new(sema.types.pointer(*elem), false, false);
-    re.casts.push(ImplicitCast::new(CastKind::ArrayToPointer, to))
+    lhs
 }
 
 // fn assignment_conversion(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) {
@@ -151,7 +163,7 @@ pub fn default_argument_promotions(sema: &Sema, re: &mut ResolvedExpression) {
     if re.ty.ty == sema.builtins.float {
         num_conv(sema, re, sema.builtins.double);
     } else {
-        int_promote(sema, re)
+        promote(sema, re);
     }
 }
 

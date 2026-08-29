@@ -15,7 +15,7 @@ pub struct ResolvedExpression {
 }
 
 impl ResolvedExpression {
-    pub fn value_ty(&self) -> QualifiedType {
+    pub fn casted_ty(&self) -> QualifiedType {
         self.casts.last().map(|c| c.to).unwrap_or(self.ty)
     }
 

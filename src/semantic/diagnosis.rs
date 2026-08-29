@@ -10,6 +10,7 @@ use crate::utils::{RED, RESET, YELLOW};
 #[derive(Clone, Copy, Debug)]
 pub enum Diagnosis {
     Poisoned,
+    InvalidOperand,
     DivisionByZero,
     BadArgumentsCount,
     SyntaxError {
@@ -71,43 +72,7 @@ impl Diagnosis {
     pub fn severity(&self) -> Severity {
         match self {
             Diagnosis::MixedWideStringConcat => Severity::Warning,
-            Diagnosis::Poisoned  |
-            Diagnosis::IntegerConstantTooLarge  |
-            Diagnosis::DuplicateTypeQualifers |
-            Diagnosis::ArithmeticOverflow |
-            Diagnosis::ShiftCountOutOfRange |
-            Diagnosis::IncompleteType |
-            Diagnosis::DivisionByZero |
-            Diagnosis::ConstantOverflow |
-            Diagnosis::BadArgumentsCount |
-            Diagnosis::SyntaxError { .. } |
-            Diagnosis::InvalidSizeof |
-            Diagnosis::UndeclaredIdentifier(_) |
-            Diagnosis::NonConstantExpression |
-            Diagnosis::NonIntegerConstantExpression |
-            Diagnosis::CastToNonScalar |
-            Diagnosis::EmptyDeclaration |
-            Diagnosis::TagWithoutMember(_) |
-            Diagnosis::MultipleStorageSpecifiers |
-            Diagnosis::BlockScopeNotExtern |
-            Diagnosis::InvalidTypeSpecifer |
-            Diagnosis::NonIntBitFieldType |
-            Diagnosis::NonIntArraySize |
-            Diagnosis::VariantBadValue |
-            Diagnosis::AutoRegisterExternal |
-            Diagnosis::NotFunctionTypeDeclarator |
-            Diagnosis::FunctionAutoExtern |
-            Diagnosis::ParameterOldStyleListLenMismatch |
-            Diagnosis::ParameterTypeListWithList |
-            Diagnosis::ParameterNotRegister |
-            Diagnosis::VoidParameter |
-            Diagnosis::UnnamedPrototypeParameter |
-            Diagnosis::MissingDeclarationInOldStyle |
-            Diagnosis::DuplicateParameterName |
-            Diagnosis::MissingParameterInOldStyle |
-            Diagnosis::TypedefInOldStyle |
-            Diagnosis::LabelOutsideFunction |
-            Diagnosis::DuplicateDeclaration(_, _) => Severity::Error,
+            _ => Severity::Error
         }
     }
 }
@@ -138,6 +103,7 @@ impl DiagnosisNode {
 
         match &self.inner {
             Diagnosis::Poisoned => "Internal error".to_string(),
+            Diagnosis::InvalidOperand => "invalid operand".to_string(),
             Diagnosis::IncompleteType => "Incomplete type".to_string(),
             Diagnosis::DivisionByZero => "Division by zero".to_string(),
             Diagnosis::ConstantOverflow => "overflow in constant expression".to_string(),

@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::ast::{Name, Storage};
 use crate::define_arena;
-use crate::semantic::{QualifiedType, Sema};
+use crate::semantic::{ExpressionKind, QualifiedType, Sema};
 
 define_arena!(Symbol, SymbolArena, SymbolId, sema.symbols);
 
@@ -56,6 +56,13 @@ impl Symbol {
                 || Option::zip(self.ty, other.ty)
                     .map(|(a, b)| a.is_compatible(sema, &b))
                     .unwrap_or(false))
+    }
+
+    pub fn expression_kind(&self) -> ExpressionKind {
+        match self.kind {
+            SymbolKind::Function | SymbolKind::Variant => ExpressionKind::RValue,
+            _ => ExpressionKind::LValue,
+        }
     }
 }
 

@@ -1,8 +1,6 @@
 use cc1::ast::Tag;
-use cc1::semantic::model::cast::{int_promote, usual_arithmetic};
-use cc1::semantic::{
-    CastKind, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId, Sema,
-};
+use cc1::semantic::model::cast::{promote, usual_arithmetic};
+use cc1::semantic::{CastKind, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId, Sema};
 
 fn rvalue(ty: ResolvedTypeId) -> ResolvedExpression {
     ResolvedExpression::new(QualifiedType::new(ty, false, false), ExpressionKind::RValue)
@@ -34,11 +32,11 @@ fn convert(
     let (mut lhs, mut rhs) = (rvalue(lhs), rvalue(rhs));
     usual_arithmetic(sema, &mut lhs, &mut rhs);
     assert_eq!(
-        lhs.value_ty().ty,
-        rhs.value_ty().ty,
+        lhs.casted_ty().ty,
+        rhs.casted_ty().ty,
         "the usual arithmetic conversions must yield a common type"
     );
-    (lhs.value_ty().ty, kinds(&lhs), kinds(&rhs))
+    (lhs.casted_ty().ty, kinds(&lhs), kinds(&rhs))
 }
 
 // ---- 6.2.1.5 the floating ladder -----------------------------------------
@@ -152,9 +150,9 @@ fn int_promote_promotes_an_enumerated_type() {
     let b = sema.builtins;
     let e = enum_type(&mut sema);
     let mut re = rvalue(e);
-    int_promote(&sema, &mut re);
+    promote(&sema, &mut re);
     assert_eq!(kinds(&re), vec![CastKind::IntegerPromotion]);
-    assert_eq!(re.value_ty().ty, b.int);
+    assert_eq!(re.casted_ty().ty, b.int);
 }
 
 // ---- 6.2.1.5 the integer ladder ------------------------------------------

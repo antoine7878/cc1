@@ -94,7 +94,7 @@ impl ParamTypes {
 fn promoted(sema: &Sema, ty: QualifiedType) -> QualifiedType {
     let mut re = ResolvedExpression::new(ty, ExpressionKind::RValue);
     default_argument_promotions(sema, &mut re);
-    re.value_ty()
+    re.casted_ty()
 }
 
 #[derive(Clone, Debug)]
