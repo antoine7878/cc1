@@ -23,14 +23,12 @@ macro_rules! reports {
 }
 
 reports!(
-    ignore "blocked on the todo!() in semantic::resolution::expression::type_of",
     report_undeclared_identifier,
     "void f(void) { x = 1; }",
     ["<test>:1:16: error: Use of undeclared identifier 'x'"]
 );
 
 reports!(
-    ignore "blocked on the todo!() in semantic::resolution::expression::type_of",
     report_points_at_the_offending_line,
     "int f(void)\n{\n  return y;\n}",
     ["<test>:3:10: error: Use of undeclared identifier 'y'"]
@@ -134,7 +132,6 @@ fn a_syntax_error_is_reported_by_the_parser() {
 }
 
 #[test]
-#[ignore = "blocked on the todo!() in semantic::resolution::expression::type_of"]
 fn a_report_is_colored_by_severity() {
     let unit = Unit::compile("void f(void) { x = 1; }");
     let rendered = unit.render();
@@ -144,7 +141,6 @@ fn a_report_is_colored_by_severity() {
 }
 
 #[test]
-#[ignore = "blocked on the todo!() in semantic::resolution::expression::type_of"]
 fn a_report_names_the_file_and_position() {
     let unit = Unit::compile("void f(void) { x = 1; }");
     let message = &unit.messages()[0];

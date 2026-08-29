@@ -89,9 +89,9 @@ pub fn is_valid_old_style(names: &[StringId], declarations: Vec<Option<StringId>
     let Some(declarations) = declarations.into_iter().collect::<Option<HashSet<StringId>>>() else {
         return Diag::res(None);
     };
-    if declarations.len() != declarations_len {
-        return Diag::with_diag(None, Diagnosis::AbstractParameterDeclaration);
-    }
+    // if declarations.len() != declarations_len {
+    //     return Diag::with_diag(None, Diagnosis::AbstractParameterDeclaration);
+    // }
 
     let name_len = names.len();
     let names = names.iter().cloned().collect::<HashSet<_>>();

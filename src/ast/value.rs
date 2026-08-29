@@ -1,5 +1,5 @@
 use crate::ast_node;
-use crate::semantic::{Diagnosis, QualifiedType, ResolvedType, Sema};
+use crate::semantic::{Diag, Diagnosis, QualifiedType, ResolvedType, Sema};
 use crate::target::Target;
 use std::cmp::Ordering;
 use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Sub};
@@ -165,7 +165,7 @@ impl Value {
         }
     }
 
-    fn parse_integer(s: &str, target: &Target) -> (Self, Option<Diagnosis>) {
+    fn parse_integer(s: &str, target: &Target) -> Diag<Self> {
         let s = s.to_lowercase();
         let (prefix, radix) = Self::get_radix(s.as_str());
         let suffix = Self::get_integer_suffix(s.as_str());
@@ -181,16 +181,16 @@ impl Value {
             .or_else(|| candidates.last())
             .expect("a non empty candidate list");
         let value = target.cast(ty, Value::UnsignedLong(value)).expect("an integer type");
-        (value, diagnosis)
+        Diag::new(value, diagnosis)
     }
 
     /// 6.1.3 Constants
-    pub fn parse(s: &str, target: &Target) -> (Self, Option<Diagnosis>) {
+    pub fn parse(s: &str, target: &Target) -> Diag<Self> {
         let lower = s.to_lowercase();
         if s.contains('\'') {
-            (Self::parse_char(s, target), None)
+            Diag::res(Self::parse_char(s, target))
         } else if !lower.starts_with("0x") && (lower.contains('.') || lower.contains('e')) {
-            (Self::parse_float(s), None)
+            Diag::res(Self::parse_float(s))
         } else {
             Self::parse_integer(s, target)
         }

@@ -1,5 +1,5 @@
 use cc1::ast::{Fold, Rank, Value};
-use cc1::semantic::Diagnosis;
+use cc1::semantic::{Diag, Diagnosis};
 use cc1::target::{I386, X86_64};
 
 fn repr(value: Value) -> String {
@@ -11,7 +11,7 @@ macro_rules! literal {
     ($name:ident, $src:expr, $expected:expr) => {
         #[test]
         fn $name() {
-            let (value, diagnosis) = Value::parse($src, &I386);
+            let Diag { res: value, diagnosis } = Value::parse($src, &I386);
             assert_eq!(repr(value), $expected, "Value::parse({:?})", $src);
             assert!(diagnosis.is_none(), "Value::parse({:?}) reported {diagnosis:?}", $src);
         }
@@ -23,7 +23,7 @@ macro_rules! too_large {
     ($name:ident, $src:expr, $expected:expr) => {
         #[test]
         fn $name() {
-            let (value, diagnosis) = Value::parse($src, &I386);
+            let Diag { res: value, diagnosis } = Value::parse($src, &I386);
             assert_eq!(repr(value), $expected, "Value::parse({:?})", $src);
             assert!(
                 matches!(diagnosis, Some(Diagnosis::IntegerConstantTooLarge)),

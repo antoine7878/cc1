@@ -5,7 +5,7 @@ use std::fmt;
 
 use crate::ast::{Name, StringLitralNode, ValueNode, Value};
 use crate::parser::{YYToken, YYFeedback, Context};
-use crate::semantic::{DiagnosisNode, SymbolKind};
+use crate::semantic::{Diag, DiagnosisNode, SymbolKind};
 
 %}
 
@@ -145,7 +145,7 @@ fn alloc_ident<R: Read>(lex: &mut YYLex<R>) -> Name {
 
 fn alloc_constant<R: Read>(lex: &mut YYLex<R>) -> ValueNode {
     let span = lex.span;
-    let (value, diagnosis) = Value::parse(lex.yytext.as_str(), &lex.ctx.target);
+    let Diag { res: value, diagnosis } = Value::parse(lex.yytext.as_str(), &lex.ctx.target);
     if let Some(diagnosis) = diagnosis {
         lex.ctx.diagnosis.push(DiagnosisNode::new(diagnosis, span));
     }
