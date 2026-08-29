@@ -68,14 +68,14 @@ impl<'a> SymbolResolver<'a> {
 
     fn param_types(&self, sym: SymbolId) -> Option<ParamTypes> {
         let ty = self.sema.symbols.get(sym).ty?;
-        match self.sema.types.get(ty.ty) {
+        match self.sema.types.get(ty.id) {
             ResolvedType::Function { params, .. } => Some(params.clone()),
             _ => None,
         }
     }
 
     fn with_param_types(&mut self, ty: QualifiedType, params: ParamTypes) -> QualifiedType {
-        let ret = match self.sema.types.get(ty.ty) {
+        let ret = match self.sema.types.get(ty.id) {
             ResolvedType::Function { ret, .. } => *ret,
             _ => return ty,
         };
@@ -123,7 +123,7 @@ impl<'a> SymbolResolver<'a> {
             return Vec::new();
         }
         if let [only] = params {
-            let is_void = matches!(self.sema.types.get(only.ty.ty), ResolvedType::Void);
+            let is_void = matches!(self.sema.types.get(only.ty.id), ResolvedType::Void);
             constrain::external::check_void_parameter(is_void).collect(self, &only.span);
         }
         params.iter().filter_map(|param| self.add_parameter(param)).collect()
@@ -268,7 +268,7 @@ impl Visitor for SymbolResolver<'_> {
             let decl = &init_declarator.declarator;
             let Some((ty, decl)) = declaration::declared_type(self.sema, ctx, qualif, decl) else { continue };
             let Some(name) = decl.ident(ctx) else { continue };
-            let is_function = matches!(self.sema.types.get(ty.ty), ResolvedType::Function { .. });
+            let is_function = matches!(self.sema.types.get(ty.id), ResolvedType::Function { .. });
             if let Some(declared_storage) = declared_storage
                 && declared_storage != Storage::Typedef
                 && is_function

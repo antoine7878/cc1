@@ -10,7 +10,7 @@ impl Context {
         if qt.is_volatile {
             out.push_str("volatile ")
         }
-        match qt.ty.resolve(self) {
+        match qt.id.resolve(self) {
             ResolvedType::Void => out.push_str("void"),
             ResolvedType::Char => out.push_str("char"),
             ResolvedType::SignedChar => out.push_str("signed char"),
@@ -26,7 +26,7 @@ impl Context {
             ResolvedType::LongDouble => out.push_str("long double"),
             ResolvedType::Pointer(inner) => {
                 out.push('*');
-                match inner.ty.resolve(self) {
+                match inner.id.resolve(self) {
                     ResolvedType::Function { .. } | ResolvedType::Array { .. } => {
                         out.push_str(&format!("({})", self.describe(inner)))
                     }
@@ -50,7 +50,7 @@ impl Context {
                         dimensions.push_str(&len.to_string());
                     }
                     dimensions.push(']');
-                    let ResolvedType::Array { elem: inner, len: size } = elem.ty.resolve(self) else { break };
+                    let ResolvedType::Array { elem: inner, len: size } = elem.id.resolve(self) else { break };
                     (elem, len) = (inner, size);
                 }
                 out.push_str(&self.describe(elem));

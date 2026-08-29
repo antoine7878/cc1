@@ -32,10 +32,14 @@ pub enum Diagnosis {
     /// 6.2.2.1
     IncompleteType,
 
+    /// 6.3.4
+    CastToNonScalar,
+    CastOfNonScalar,
+    IncompatibleCast,
+    // InvalidCast,
     /// 6.4
     NonConstantExpression,
     NonIntegerConstantExpression,
-    CastToNonScalar,
     /// 6.5
     EmptyDeclaration,
     MultipleStorageSpecifiers,
@@ -118,7 +122,9 @@ impl DiagnosisNode {
             Diagnosis::MixedWideStringConcat => "concatenation of a wide and a narrow string literal is undefined".to_string(),
             Diagnosis::NonConstantExpression => "Non constant expression".to_string(),
             Diagnosis::NonIntegerConstantExpression => "Non integer constant expression".to_string(),
-            Diagnosis::CastToNonScalar => "Conversion to non scalar type requested".to_string(),
+            Diagnosis::CastToNonScalar => "Conversion to non scalar type".to_string(),
+            Diagnosis::CastOfNonScalar => "Conversion of non scalar type".to_string(),
+            Diagnosis::IncompatibleCast => "Incompatible types".to_string(),
             Diagnosis::VariantBadValue => "Variant value should be in int range".to_string(),
             Diagnosis::EmptyDeclaration => "Declaration declares nothing".to_string(),
             Diagnosis::TagWithoutMember(kind) => format!("{kind} has no named member"),

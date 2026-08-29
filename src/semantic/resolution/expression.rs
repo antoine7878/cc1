@@ -1,8 +1,12 @@
-use crate::ast::{Expression, ExpressionNode};
+use std::path::Prefix::DeviceNS;
+
+use crate::ast::{Expression, ExpressionNode, Type};
 use crate::parser::Context;
-use crate::semantic::model::cast::{self};
+use crate::semantic::ice::try_fold;
+use crate::semantic::model::cast;
 use crate::semantic::{
     Diagnosis, DiagnosisNode, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId, Sema,
+    declaration,
 };
 
 pub fn run(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
@@ -79,7 +83,7 @@ fn as_written<'a>(sema: &'a Sema, node: &ExpressionNode) -> Result<&'a ResolvedE
 }
 
 fn check_is_arithmetic(sema: &Sema, ty: ResolvedTypeId) -> Result<(), Diagnosis> {
-    if !sema.types.get(ty).is_arithmetic(&sema.tags) {
+    if !sema.types.get(ty).is_arithmetic(sema) {
         return Err(Diagnosis::InvalidOperand);
     }
     Ok(())
@@ -90,10 +94,10 @@ fn pointer_integer_arithmetic(
     pointer: &mut ResolvedExpression,
     intergral: &mut ResolvedExpression,
 ) -> Result<QualifiedType, Diagnosis> {
-    let ResolvedType::Pointer(inner) = sema.types.get(pointer.casted_ty().ty) else {
+    let ResolvedType::Pointer(inner) = sema.types.get(pointer.casted_ty().id) else {
         return Err(Diagnosis::Poisoned);
     };
-    match sema.types.get(inner.ty) {
+    match sema.types.get(inner.id) {
         t if !t.is_complete(&sema.tags) => Err(Diagnosis::InvalidOperand),
         ResolvedType::Function { .. } => Err(Diagnosis::InvalidOperand),
         _ => {
@@ -103,6 +107,26 @@ fn pointer_integer_arithmetic(
     }
 }
 
+fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> bool {
+    let mut node = node;
+    if let Expression::Cast(ty_node, op) = node.id.resolve(ctx) {
+        let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
+        let Some((qualif, _)) = declaration::declared_type(sema, ctx, base, &ty_node.declarator) else {
+            return false;
+        };
+        if !matches!(sema.types.get(qualif.id), ResolvedType::Pointer(q) if q.id == sema.builtins.void)
+            || qualif.is_const
+            || qualif.is_volatile
+        {
+            return false;
+        }
+
+        node = op;
+    }
+    let Some(Some(re)) = sema.expressions.get(&node.id) else { return false };
+    sema.types.get(re.casted_ty().id).is_integer() && try_fold(sema, ctx, node).is_some_and(|v| v.is_zero())
+}
+
 fn type_of(
     sema: &mut Sema,
     ctx: &Context,
@@ -110,11 +134,6 @@ fn type_of(
 ) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
     use ExpressionKind::{LValue, RValue};
 
-    match sema.expressions.get(&node.id) {
-        Some(Some(re)) => return Ok((re.ty, re.kind)),
-        Some(None) => return Err(Diagnosis::Poisoned),
-        None => (),
-    }
     match node.id.resolve(ctx) {
         Expression::Identifier(_) => {
             let id = sema
@@ -130,27 +149,45 @@ fn type_of(
         Expression::StringLiteral(value) => Ok((value.ty(sema, ctx), LValue)),
         Expression::ConstantExpression(expr) => as_written(sema, expr).map(|re| (re.ty, re.kind)),
         Expression::Add(e1, e2) => with_operands(sema, e1, e2, RValue, |sema, lhs, rhs| {
-            // lvalue_conversion(sema, lhs, &e1.span);
-            // lvalue_conversion(sema, rhs, &e2.span);
-            match (sema.types.get(lhs.casted_ty().ty), sema.types.get(rhs.casted_ty().ty)) {
-                (l, r) if l.is_arithmetic(&sema.tags) && r.is_arithmetic(&sema.tags) => {
+            match (sema.types.get(lhs.casted_ty().id), sema.types.get(rhs.casted_ty().id)) {
+                (l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => {
                     Ok(cast::usual_arithmetic(sema, lhs, rhs).casted_ty())
                 }
-                (ResolvedType::Pointer(_), o) if o.is_integral(&sema.tags) => {
-                    pointer_integer_arithmetic(sema, lhs, rhs)
-                }
-                (o, ResolvedType::Pointer(_)) if o.is_integral(&sema.tags) => {
-                    pointer_integer_arithmetic(sema, rhs, lhs)
-                }
+                (ResolvedType::Pointer(_), o) if o.is_integral(sema) => pointer_integer_arithmetic(sema, lhs, rhs),
+                (o, ResolvedType::Pointer(_)) if o.is_integral(sema) => pointer_integer_arithmetic(sema, rhs, lhs),
                 _ => Err(Diagnosis::InvalidOperand),
             }
         }),
         Expression::Minus(e) => with_operand(sema, e, RValue, |sema, re| {
             // 6.3.3.3 The operand of the unary - operator shall have arithmetic type.
-            check_is_arithmetic(sema, re.casted_ty().ty)?;
+            check_is_arithmetic(sema, re.casted_ty().id)?;
             cast::promote(sema, re);
             Ok(re.casted_ty())
         }),
+        Expression::Cast(ty_node, operand) => {
+            let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
+            let (to_qty, _) =
+                declaration::declared_type(sema, ctx, base, &ty_node.declarator).ok_or(Diagnosis::CastToNonScalar)?;
+            let Some(Some(from_re)) = sema.expressions.get(&operand.id) else {
+                return Err(Diagnosis::Poisoned);
+            };
+            let to_ty = sema.types.get(to_qty.id);
+            let from_ty = sema.types.get(from_re.ty.id);
+            // 6.3.4
+            // Unless the type name specifies void type, the type name shall specify qualified or unqualified scalar type
+            if to_qty.id != sema.builtins.void && !to_ty.is_scalar(sema) {
+                return Err(Diagnosis::CastToNonScalar);
+            }
+            // and the operand shall have scalar type.
+            if !from_ty.is_scalar(sema) {
+                return Err(Diagnosis::CastOfNonScalar);
+            }
+            // A pointer may be convened to an integral type. The size of integer required and the result
+            // are implementation-defined If the space provided is not long enough. the behavior is undefined
+            let p_to_int = from_ty.is_pointer() && to_ty.is_integral(sema);
+            let int_to_p = from_ty.is_integral(sema) && to_ty.is_pointer();
+            Ok((to_qty, RValue))
+        }
         _ => Err(Diagnosis::Poisoned),
     }
 }

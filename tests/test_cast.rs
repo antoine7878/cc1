@@ -32,11 +32,11 @@ fn convert(
     let (mut lhs, mut rhs) = (rvalue(lhs), rvalue(rhs));
     usual_arithmetic(sema, &mut lhs, &mut rhs);
     assert_eq!(
-        lhs.casted_ty().ty,
-        rhs.casted_ty().ty,
+        lhs.casted_ty().id,
+        rhs.casted_ty().id,
         "the usual arithmetic conversions must yield a common type"
     );
-    (lhs.casted_ty().ty, kinds(&lhs), kinds(&rhs))
+    (lhs.casted_ty().id, kinds(&lhs), kinds(&rhs))
 }
 
 // ---- 6.2.1.5 the floating ladder -----------------------------------------
@@ -152,7 +152,7 @@ fn int_promote_promotes_an_enumerated_type() {
     let mut re = rvalue(e);
     promote(&sema, &mut re);
     assert_eq!(kinds(&re), vec![CastKind::IntegerPromotion]);
-    assert_eq!(re.casted_ty().ty, b.int);
+    assert_eq!(re.casted_ty().id, b.int);
 }
 
 // ---- 6.2.1.5 the integer ladder ------------------------------------------
@@ -244,8 +244,8 @@ fn an_enumerated_type_is_integral_and_arithmetic_but_not_an_integer() {
     let mut sema = Sema::default();
     let e = enum_type(&mut sema);
     let ty = sema.types.get(e);
-    assert!(ty.is_integral(&sema.tags));
-    assert!(ty.is_arithmetic(&sema.tags));
+    assert!(ty.is_integral(&sema));
+    assert!(ty.is_arithmetic(&sema));
     assert!(!ty.is_integer());
     assert!(!ty.is_floating());
 }
@@ -255,16 +255,16 @@ fn a_struct_type_is_neither_integral_nor_arithmetic() {
     let mut sema = Sema::default();
     let s = struct_type(&mut sema);
     let ty = sema.types.get(s);
-    assert!(!ty.is_integral(&sema.tags));
-    assert!(!ty.is_arithmetic(&sema.tags));
+    assert!(!ty.is_integral(&sema));
+    assert!(!ty.is_arithmetic(&sema));
 }
 
 #[test]
 fn the_basic_types_keep_their_classification() {
     let sema = Sema::default();
-    assert!(ResolvedType::Char.is_integral(&sema.tags));
-    assert!(ResolvedType::UnsignedLong.is_integral(&sema.tags));
-    assert!(!ResolvedType::Double.is_integral(&sema.tags));
-    assert!(ResolvedType::Double.is_arithmetic(&sema.tags));
-    assert!(!ResolvedType::Void.is_arithmetic(&sema.tags));
+    assert!(ResolvedType::Char.is_integral(&sema));
+    assert!(ResolvedType::UnsignedLong.is_integral(&sema));
+    assert!(!ResolvedType::Double.is_integral(&sema));
+    assert!(ResolvedType::Double.is_arithmetic(&sema));
+    assert!(!ResolvedType::Void.is_arithmetic(&sema));
 }

@@ -1,3 +1,6 @@
+use std::any::Any;
+use std::num;
+
 use crate::ast::{self};
 use crate::parser::Span;
 use crate::semantic::{
@@ -44,13 +47,13 @@ pub fn lvalue_conversion(sema: &mut Sema, re: &mut ResolvedExpression, span: &Sp
 }
 
 pub fn function_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
-    let ResolvedType::Function { .. } = sema.types.get(re.ty.ty) else { return };
+    let ResolvedType::Function { .. } = sema.types.get(re.ty.id) else { return };
     let to = QualifiedType::new(sema.types.pointer(re.ty), false, false);
     re.casts.push(ImplicitCast::new(CastKind::FunctionToPointer, to));
 }
 
 pub fn array_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
-    let ResolvedType::Array { elem, .. } = sema.types.get(re.ty.ty) else { return };
+    let ResolvedType::Array { elem, .. } = sema.types.get(re.ty.id) else { return };
     let to = QualifiedType::new(sema.types.pointer(*elem), false, false);
     re.casts.push(ImplicitCast::new(CastKind::ArrayToPointer, to))
 }
@@ -59,14 +62,14 @@ pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
     if !matches!(re.kind, ExpressionKind::LValue) {
         return;
     }
-    let ty = sema.types.get(re.ty.ty);
+    let ty = sema.types.get(re.ty.id);
     if matches!(ty, ResolvedType::Array { .. } | ResolvedType::Function { .. }) {
         return;
     }
     if !ty.is_complete(&sema.tags) {
         sema.add_diag(Diag::only_diag(Diagnosis::IncompleteType), span);
     }
-    let to = QualifiedType::new(re.ty.ty, false, false);
+    let to = QualifiedType::new(re.ty.id, false, false);
     re.casts.push(ImplicitCast::new(CastKind::LValueToRValue, to));
 }
 
@@ -80,7 +83,7 @@ pub fn promote<'a>(sema: &Sema, re: &'a mut ResolvedExpression) -> &'a mut Resol
     use ResolvedType::*;
 
     let qty = re.casted_ty();
-    match sema.types.get(qty.ty) {
+    match sema.types.get(qty.id) {
         Char | SignedChar | UnsignedChar | Short | UnsignedShort => (),
         &Tag(id) if sema.tags.get(id).kind == ast::Tag::Enum => (),
         _ => return re,
@@ -98,20 +101,36 @@ fn convert_type(ty: ResolvedTypeId) -> QualifiedType {
     QualifiedType::new(ty, false, false)
 }
 
-fn num_conv(sema: &Sema, re: &mut ResolvedExpression, ty_id: ResolvedTypeId) {
-    let from = re.casted_ty().ty;
-    if from == ty_id {
+fn convert(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId) {
+    let from = from_re.casted_ty();
+    match (sema.types.get(from.id), sema.types.get(to_id)) {
+        // from.ty == to.ty                      -> nothing
+        _ if from.id == to_id => (),
+        // both arithmetic                       -> num_conv           // 6.2.1.2-4
+        (f, t) if f.is_arithmetic(sema) && t.is_arithmetic(sema) => num_conv(sema, from_re, to_id),
+        // to is void                            -> ToVoid             // 6.3.4
+        (_, ResolvedType::Void) => (),
+        // re is a null pointer constant, to is a pointer -> NullPointer  // 6.2.2.3
+        (ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => (),
+        // both pointers                         -> PointerConversion  // 6.3.16.1
+        (ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => (),
+        _ => unreachable!(),
+    }
+}
+fn num_conv(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId) {
+    let from = from_re.casted_ty().id;
+    if from == to_id {
         return;
     }
     let from = sema.types.get(from);
-    let to = sema.types.get(ty_id);
-    let kind = match (from.is_integral(&sema.tags), to.is_integral(&sema.tags)) {
+    let to = sema.types.get(to_id);
+    let kind = match (from.is_integral(sema), to.is_integral(sema)) {
         (true, true) => CastKind::IntegerConversion,    // 6.2.1.2
         (true, false) => CastKind::IntegerToFloating,   // 6.2.1.3
         (false, true) => CastKind::FloatingToInteger,   // 6.2.1.4
         (false, false) => CastKind::FloatingConversion, // 6.2.1.4
     };
-    re.casts.push(ImplicitCast::new(kind, convert_type(ty_id)))
+    from_re.casts.push(ImplicitCast::new(kind, convert_type(to_id)))
 }
 
 // 6.2.1.5 Usual arithmetic conversions
@@ -122,18 +141,18 @@ pub fn usual_arithmetic<'a>(
 ) -> &'a mut ResolvedExpression {
     use ResolvedType::*;
 
-    let l = sema.types.get(lhs.casted_ty().ty);
-    let r = sema.types.get(rhs.casted_ty().ty);
+    let l = sema.types.get(lhs.casted_ty().id);
+    let r = sema.types.get(rhs.casted_ty().id);
     // 6.3.5 If both operands have arithmetic type, the usual arithmetic conversions are performed
-    if !l.is_arithmetic(&sema.tags) || !r.is_arithmetic(&sema.tags) {
+    if !l.is_arithmetic(sema) || !r.is_arithmetic(sema) {
         return lhs;
     }
     // 6.2.1.5 Otherwise, the integral promotions are performed on both operands.
-    if l.is_integral(&sema.tags) && r.is_integral(&sema.tags) {
+    if l.is_integral(sema) && r.is_integral(sema) {
         promote(sema, lhs);
         promote(sema, rhs);
     }
-    if lhs.casted_ty().ty == rhs.casted_ty().ty {
+    if lhs.casted_ty().id == rhs.casted_ty().id {
         return lhs;
     }
     let to = match (l, r) {
@@ -160,7 +179,7 @@ pub fn usual_arithmetic<'a>(
 // }
 
 pub fn default_argument_promotions(sema: &Sema, re: &mut ResolvedExpression) {
-    if re.casted_ty().ty == sema.builtins.float {
+    if re.casted_ty().id == sema.builtins.float {
         num_conv(sema, re, sema.builtins.double);
     } else {
         promote(sema, re);

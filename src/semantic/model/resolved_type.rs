@@ -27,7 +27,7 @@ pub enum ResolvedType {
 
 #[derive(Debug, PartialEq, Clone, Copy, Hash, Eq)]
 pub struct QualifiedType {
-    pub ty: ResolvedTypeId,
+    pub id: ResolvedTypeId,
     pub is_const: bool,
     pub is_volatile: bool,
 }
@@ -52,16 +52,25 @@ impl ResolvedType {
         }
     }
 
+    // 6.1.2.5 Arithmetic types and pointer types are collectively called scalar types.
+    pub fn is_scalar(&self, sema: &Sema) -> bool {
+        self.is_arithmetic(sema) || self.is_pointer()
+    }
+
+    pub fn is_pointer(&self) -> bool {
+        matches!(self, ResolvedType::Pointer(_))
+    }
+
     // 6.1.2.5 Integral and floating types are collectively called arithmetic types.
-    pub fn is_arithmetic(&self, tags: &TagDefArena) -> bool {
-        self.is_integral(tags) || self.is_floating()
+    pub fn is_arithmetic(&self, sema: &Sema) -> bool {
+        self.is_integral(sema) || self.is_floating()
     }
 
     // 6.1.2.5 The type char, the signed and unsigned integer types, and the enumerated types
     // are collectively called integral types.
-    pub fn is_integral(&self, tags: &TagDefArena) -> bool {
+    pub fn is_integral(&self, sema: &Sema) -> bool {
         match self {
-            ResolvedType::Tag(id) => tags.get(*id).kind == Tag::Enum,
+            ResolvedType::Tag(id) => sema.tags.get(*id).kind == Tag::Enum,
             _ => self.is_integer(),
         }
     }
@@ -147,9 +156,9 @@ impl ResolvedTypeArena {
     }
 
     pub fn adjust_parameter(&mut self, param: QualifiedType) -> QualifiedType {
-        let id = match self.get(param.ty).clone() {
+        let id = match self.get(param.id).clone() {
             ResolvedType::Array { elem, .. } => self.pointer(elem),
-            ResolvedType::Function { .. } => self.pointer(QualifiedType::new(param.ty, false, false)),
+            ResolvedType::Function { .. } => self.pointer(QualifiedType::new(param.id, false, false)),
             _ => return param,
         };
         QualifiedType::new(id, param.is_const, param.is_volatile)
@@ -157,7 +166,7 @@ impl ResolvedTypeArena {
 
     fn parameter(&mut self, param: QualifiedType) -> QualifiedType {
         let param = self.adjust_parameter(param);
-        QualifiedType::new(param.ty, false, false)
+        QualifiedType::new(param.id, false, false)
     }
 
     pub fn tag(&mut self, id: TagDefId) -> ResolvedTypeId {
@@ -166,9 +175,9 @@ impl ResolvedTypeArena {
 }
 
 impl QualifiedType {
-    pub fn new(ty: ResolvedTypeId, is_const: bool, is_volatile: bool) -> Self {
+    pub fn new(id: ResolvedTypeId, is_const: bool, is_volatile: bool) -> Self {
         QualifiedType {
-            ty,
+            id,
             is_const,
             is_volatile,
         }
@@ -185,10 +194,10 @@ impl QualifiedType {
         if !self.same_qualifiers(other) {
             return false;
         }
-        if self.ty == other.ty {
+        if self.id == other.id {
             return true;
         }
-        match (sema.types.get(self.ty), sema.types.get(other.ty)) {
+        match (sema.types.get(self.id), sema.types.get(other.id)) {
             // 6.5.4.3 For two function types to be compatible, both shall specify compatible return types.
             (ResolvedType::Function { ret: r1, params: p1 }, ResolvedType::Function { ret: r2, params: p2 }) => {
                 r1.is_compatible(sema, r2) && p1.is_compatible(sema, p2)

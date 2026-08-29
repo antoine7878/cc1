@@ -1,5 +1,8 @@
-int a[10];
-short b = a + 1;
+struct S {
+	int a;
+};
+
+enum E { A = (struct S)1 };
 
 /*
 char *a = "coucou";

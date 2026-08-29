@@ -76,7 +76,11 @@ folds!(
     ["Int(2)", "Int(3)"]
 );
 folds!(fold_character_constant, "enum E { A = 'a' };", ["Int(97)"]);
-folds!(fold_overflow_wraps, "enum E { A = 2147483647 + 1 };", ["Int(-2147483648)"]);
+folds!(
+    fold_overflow_wraps,
+    "enum E { A = 2147483647 + 1 };",
+    ["Int(-2147483648)"]
+);
 folds!(
     fold_variant_reference,
     "enum E { A = 1, B = A + 1 };",
@@ -328,7 +332,7 @@ fn identical_function_types_share_one_interned_type() {
         .data
         .iter()
         .filter(|symbol| symbol.kind == SymbolKind::Function)
-        .map(|symbol| symbol.ty.expect("function type").ty)
+        .map(|symbol| symbol.ty.expect("function type").id)
         .collect();
     assert_eq!(types[0], types[1]);
     assert_ne!(types[0], types[2]);

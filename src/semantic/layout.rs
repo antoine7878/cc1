@@ -17,7 +17,7 @@ pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Option<Layout> {
         ResolvedType::Tag(id) => of_tag(sema, *id)?,
         ResolvedType::Array { elem, len } => {
             let len = *len;
-            let elem = of(sema, elem.ty)?;
+            let elem = of(sema, elem.id)?;
             Layout::new(elem.size * len.unwrap_or(0) as u32, elem.align)
         }
         ty => sema.target.scalar(ty)?,
@@ -44,7 +44,7 @@ fn member(sema: &mut Sema, mem: Member) -> Option<(Layout, Option<u64>)> {
             let symbol = sema.symbols.get(id);
             let width = symbol.value.map(|width| width.max(0) as u64);
             let ty = symbol.ty?;
-            Some((of(sema, ty.ty)?, width))
+            Some((of(sema, ty.id)?, width))
         }
         Member::Bitfield(i) => {
             let ty = sema.builtins.int;

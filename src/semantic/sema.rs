@@ -86,7 +86,7 @@ impl Sema {
             self.add_diag(Diag::only_diag(Diagnosis::DuplicateTypeQualifers), span)
         }
         Some(QualifiedType::new(
-            base.ty,
+            base.id,
             base.is_const || is_const,
             base.is_volatile || is_volatile,
         ))
