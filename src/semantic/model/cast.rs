@@ -1,6 +1,3 @@
-use std::collections::binary_heap::Drain;
-use std::io::ErrorKind::Deadlock;
-
 use crate::arena::ResolveWith;
 use crate::ast::{self};
 use crate::parser::Span;
@@ -82,20 +79,19 @@ pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
 // used If an int can represent all values of the original type. the value is converted to an inf;
 // otherwise, it is converted to an unsigned int. These are called the integral p~wnotions.”
 // All other arithmetic types are unchanged by the integral promotions.
-pub fn promote<'a>(sema: &Sema, re: &'a mut ResolvedExpression) -> &'a mut ResolvedExpression {
+pub fn promote(sema: &Sema, re: &mut ResolvedExpression) {
     use ResolvedType::*;
 
     let qty = re.casted_ty();
     match qty.id.resolve(sema) {
         Char | SignedChar | UnsignedChar | Short | UnsignedShort => (),
         &Tag(id) if id.resolve(sema).kind == ast::Tag::Enum => (),
-        _ => return re,
+        _ => return,
     }
 
     let kind = CastKind::IntegerPromotion;
     let to = QualifiedType::new(sema.builtins.int, false, false);
     re.casts.push(ImplicitCast::new(kind, to));
-    re
 }
 
 // 6.2.2.1 If the lvalue has qualified type, the value has the unqualified version of the type
@@ -141,18 +137,14 @@ fn num_conv(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId
 }
 
 // 6.2.1.5 Usual arithmetic conversions
-pub fn usual_arithmetic<'a>(
-    sema: &mut Sema,
-    lhs: &'a mut ResolvedExpression,
-    rhs: &mut ResolvedExpression,
-) -> &'a mut ResolvedExpression {
+pub fn usual_arithmetic(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) {
     use ResolvedType::*;
 
     let l = lhs.casted_ty().id.resolve(sema);
     let r = rhs.casted_ty().id.resolve(sema);
     // 6.3.5 If both operands have arithmetic type, the usual arithmetic conversions are performed
     if !l.is_arithmetic(sema) || !r.is_arithmetic(sema) {
-        return lhs;
+        return;
     }
     // 6.2.1.5 Otherwise, the integral promotions are performed on both operands.
     if l.is_integral(sema) && r.is_integral(sema) {
@@ -160,7 +152,7 @@ pub fn usual_arithmetic<'a>(
         promote(sema, rhs);
     }
     if lhs.casted_ty().id == rhs.casted_ty().id {
-        return lhs;
+        return;
     }
     let to = match (l, r) {
         (LongDouble, _) | (_, LongDouble) => sema.builtins.long_double,
@@ -175,7 +167,6 @@ pub fn usual_arithmetic<'a>(
     };
     num_conv(sema, lhs, to);
     num_conv(sema, rhs, to);
-    lhs
 }
 
 fn is_object_or_incomplete(sema: &Sema, ty: ResolvedTypeId) -> bool {
@@ -188,12 +179,12 @@ fn pointee_licensed(sema: &Sema, lp: &QualifiedType, rp: &QualifiedType) -> bool
         || (rp.id == sema.builtins.void && is_object_or_incomplete(sema, lp.id))
 }
 
-fn assignment_conversion(
+pub fn assignment_conversion(
     sema: &mut Sema,
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,
     is_null_ptr: bool,
-) -> Result<(), Diagnosis> {
+) -> Result<QualifiedType, Diagnosis> {
     let l = lhs.ty.id.resolve(sema);
     let rhs_ty = rhs.casted_ty();
     let r = rhs_ty.id.resolve(sema);
@@ -207,7 +198,7 @@ fn assignment_conversion(
         _ => return Err(Diagnosis::IncompatibleAssignementTypes),
     }
     convert(sema, rhs, lhs.ty.id, is_null_ptr);
-    Ok(())
+    Ok(lhs.ty)
 }
 
 pub fn default_argument_promotions(sema: &Sema, re: &mut ResolvedExpression) {
@@ -216,4 +207,44 @@ pub fn default_argument_promotions(sema: &Sema, re: &mut ResolvedExpression) {
     } else {
         promote(sema, re);
     }
+}
+
+pub fn pointer_integer_arithmetic(
+    sema: &mut Sema,
+    pointer: &mut ResolvedExpression,
+    intergral: &mut ResolvedExpression,
+) -> Result<QualifiedType, Diagnosis> {
+    let ResolvedType::Pointer(inner) = pointer.casted_ty().id.resolve(sema) else {
+        return Err(Diagnosis::Poisoned);
+    };
+    match inner.id.resolve(sema) {
+        t if !t.is_complete(sema) => Err(Diagnosis::InvalidOperand),
+        ResolvedType::Function { .. } => Err(Diagnosis::InvalidOperand),
+        _ => {
+            promote(sema, intergral);
+            Ok(pointer.casted_ty())
+        }
+    }
+}
+
+pub fn pointer_minus_pointer(
+    sema: &Sema,
+    lhs: &mut ResolvedExpression,
+    rhs: &mut ResolvedExpression,
+) -> Result<QualifiedType, Diagnosis> {
+    let ResolvedType::Pointer(lp) = lhs.casted_ty().id.resolve(sema) else {
+        return Err(Diagnosis::Poisoned);
+    };
+    let ResolvedType::Pointer(rp) = rhs.casted_ty().id.resolve(sema) else {
+        return Err(Diagnosis::Poisoned);
+    };
+    let l = lp.id.resolve(sema);
+    let r = rp.id.resolve(sema);
+    if !l.is_object(sema) || !r.is_object(sema) {
+        return Err(Diagnosis::InvalidOperand);
+    }
+    if !lp.is_compatible_ignoring_qualifiers(sema, rp) {
+        return Err(Diagnosis::InvalidOperand);
+    }
+    Ok(QualifiedType::new(sema.builtins.ptrdiff_t, false, false))
 }

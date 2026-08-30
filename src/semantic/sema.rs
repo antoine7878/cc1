@@ -33,7 +33,8 @@ pub struct Sema {
 impl Default for Sema {
     fn default() -> Self {
         let mut types = ResolvedTypeArena::default();
-        let builtins = Builtins::new(&mut types);
+        let target = Target::default();
+        let builtins = Builtins::new(&mut types, &target);
         Self {
             scopes: Scopes::default(),
             diagnosis: Vec::new(),
@@ -49,7 +50,7 @@ impl Default for Sema {
             constants: HashMap::default(),
 
             layouts: HashMap::default(),
-            target: Target::default(),
+            target,
         }
     }
 }

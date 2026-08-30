@@ -27,7 +27,7 @@ pub enum TypeSpecifier {
     TypedefName(Name),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Qualifier {
     Const,
     Volatile,

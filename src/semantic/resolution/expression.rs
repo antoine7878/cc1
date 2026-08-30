@@ -91,27 +91,9 @@ fn as_written<'a>(sema: &'a Sema, node: &ExpressionNode) -> Result<&'a ResolvedE
 }
 
 fn check_is_arithmetic(sema: &Sema, ty: ResolvedTypeId) -> Result<(), Diagnosis> {
-    if !ty.resolve(sema).is_arithmetic(sema) {
-        return Err(Diagnosis::InvalidOperand);
-    }
-    Ok(())
-}
-
-fn pointer_integer_arithmetic(
-    sema: &mut Sema,
-    pointer: &mut ResolvedExpression,
-    intergral: &mut ResolvedExpression,
-) -> Result<QualifiedType, Diagnosis> {
-    let ResolvedType::Pointer(inner) = pointer.casted_ty().id.resolve(sema) else {
-        return Err(Diagnosis::Poisoned);
-    };
-    match inner.id.resolve(sema) {
-        t if !t.is_complete(sema) => Err(Diagnosis::InvalidOperand),
-        ResolvedType::Function { .. } => Err(Diagnosis::InvalidOperand),
-        _ => {
-            cast::promote(sema, intergral);
-            Ok(pointer.casted_ty())
-        }
+    match ty.resolve(sema).is_arithmetic(sema) {
+        false => Err(Diagnosis::InvalidOperand),
+        true => Ok(()),
     }
 }
 
@@ -128,38 +110,29 @@ fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNod
         {
             return false;
         }
-
         node = op;
     }
     let Some(Some(re)) = sema.expressions.get(&node.id) else { return false };
     re.casted_ty().id.resolve(sema).is_integer() && try_fold(sema, ctx, node).is_some_and(|v| v.is_zero())
 }
 
-// fn assignation(
-//     sema: &mut Sema,
-//     ctx: &Context,
-//     e1: &ExpressionNode,
-//     e2: &ExpressionNode,
-// ) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
-//     let (mut lhs, mut rhs) = takes(sema, e1, e2)?;
-//     if lhs.kind == ExpressionKind::RValue {
-//         return Err(Diagnosis::AssignToRValue);
-//     }
-//     if lhs.ty.is_const {
-//         return Err(Diagnosis::ConstAssignement);
-//     }
-//     cast::lvalue_conversion(sema, &mut rhs, &e2.span);
-//
-//     // let l_ty = sema.
-//     // let lty = lhs.id.resolve(ctx);
-//     // let rty = rhs.id.resolve(ctx);
-//     // true
-//
-//     let out = Ok((lhs.ty, ExpressionKind::RValue));
-//     put(sema, e1, lhs);
-//     put(sema, e2, rhs);
-//     out
-// }
+fn additive(
+    sema: &mut Sema,
+    lhs: &mut ResolvedExpression,
+    rhs: &mut ResolvedExpression,
+    op: char,
+) -> Result<QualifiedType, Diagnosis> {
+    match (op, lhs.casted_ty().id.resolve(sema), rhs.casted_ty().id.resolve(sema)) {
+        (_, l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => {
+            cast::usual_arithmetic(sema, lhs, rhs);
+            Ok(lhs.casted_ty())
+        }
+        (_, ResolvedType::Pointer(_), o) if o.is_integral(sema) => cast::pointer_integer_arithmetic(sema, lhs, rhs),
+        ('+', o, ResolvedType::Pointer(_)) if o.is_integral(sema) => cast::pointer_integer_arithmetic(sema, rhs, lhs),
+        ('-', ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => cast::pointer_minus_pointer(sema, lhs, rhs),
+        _ => Err(Diagnosis::InvalidOperand),
+    }
+}
 
 fn type_of(
     sema: &mut Sema,
@@ -182,16 +155,8 @@ fn type_of(
         Expression::Constant(value) => Ok((value.ty(sema), RValue)),
         Expression::StringLiteral(value) => Ok((value.ty(sema, ctx), LValue)),
         Expression::ConstantExpression(expr) => as_written(sema, expr).map(|re| (re.ty, re.kind)),
-        Expression::Add(e1, e2) => with_operands(sema, e1, e2, RValue, |sema, lhs, rhs| {
-            match (lhs.casted_ty().id.resolve(sema), rhs.casted_ty().id.resolve(sema)) {
-                (l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => {
-                    Ok(cast::usual_arithmetic(sema, lhs, rhs).casted_ty())
-                }
-                (ResolvedType::Pointer(_), o) if o.is_integral(sema) => pointer_integer_arithmetic(sema, lhs, rhs),
-                (o, ResolvedType::Pointer(_)) if o.is_integral(sema) => pointer_integer_arithmetic(sema, rhs, lhs),
-                _ => Err(Diagnosis::InvalidOperand),
-            }
-        }),
+        Expression::Add(e1, e2) => with_operands(sema, e1, e2, RValue, |sema, lhs, rhs| additive(sema, lhs, rhs, '+')),
+        Expression::Sub(e1, e2) => with_operands(sema, e1, e2, RValue, |sema, lhs, rhs| additive(sema, lhs, rhs, '-')),
         Expression::Minus(e) => with_operand(sema, e, RValue, |sema, re| {
             // 6.3.3.3 The operand of the unary - operator shall have arithmetic type.
             check_is_arithmetic(sema, re.casted_ty().id)?;
@@ -203,9 +168,6 @@ fn type_of(
             let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
             let (qualif, _) =
                 declaration::declared_type(sema, ctx, base, &ty_node.declarator).ok_or(Diagnosis::Poisoned)?;
-            // Err((Diagnosis::Poisoned))
-
-            //qualif's category
             with_operand(sema, operand, RValue, |sema, re| {
                 // 6.3.4 Unless the type name specifies void type, the type name shall specify
                 // qualified or unqualified scalar type and the operand shall have scalar type.
@@ -226,8 +188,15 @@ fn type_of(
                 Ok(qualif)
             })
         }
-
-        // Expression::Assign(e1, e2) => {}
+        // Expression::Assign(e1, e2) => {
+        //     let (mut lhs, mut rhs) = takes(sema, e1, e2)?;
+        //     cast::lvalue_conversion(sema, &mut rhs, &e2.span);
+        //     let is_null = is_null_pointer_constant(sema, ctx, e2);
+        //     let out = cast::assignment_conversion(sema, &mut lhs, &mut rhs, is_null);
+        //     put(sema, e1, lhs);
+        //     put(sema, e2, rhs);
+        //     out.map(|q| (q, RValue))
+        // }
         // Expression::Cast(ty_node, operand) => {
         //     let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
         //     let (to_qty, _) =

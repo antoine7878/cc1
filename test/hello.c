@@ -1,8 +1,8 @@
-struct S {
-	int a;
-};
+int *p;
 
-enum E { A = (struct S)1 };
+void f(void) {
+	p + 1u;
+}
 
 /*
 char *a = "coucou";

@@ -1,7 +1,8 @@
 use crate::arena::ResolveWith;
 use crate::ast::{Tag, TypeSpecifier};
 use crate::define_interner;
-use crate::semantic::{ParamTypes, Sema, TagDefArena, TagDefId};
+use crate::semantic::{ParamTypes, Sema, TagDefId};
+use crate::target::Target;
 
 define_interner!(
     ResolvedType,
@@ -39,14 +40,6 @@ pub struct QualifiedType {
     pub is_volatile: bool,
 }
 
-// Two types have comparihle type if their types are the same. Additional rules for determining
-// whether two types are compatible are described in 6.5., 3 for type specifiers, in 65.3 for type
-// qualifiers, and in 6.5.4 for declarators.” Moreover. two structure, union. or enumeration types
-// declared in separate translation units are compatible if they have the same number of members.
-// the same member names. and compatible member types: for two structures. the members shall be
-// in the same order: for two structures or unions, the bit-fields shall have the same widths: for two
-// enumerations. the members shall have the same values
-
 impl ResolvedType {
     // 6.1.2.5 An array type of unknown size is an incomplete type. A structure or union type of
     // unknown content is an incomplete type.
@@ -75,11 +68,6 @@ impl ResolvedType {
     pub fn is_object(&self, sema: &Sema) -> bool {
         self.is_complete(sema) && !self.is_function()
     }
-
-    // - all arithmetic types (integral types + floating types)
-    // - all pointer types (pointer‑to‑anything is itself a complete object type)
-    // - structure and union types once their content is defined
-    // - array types with a known element type and known count
 
     // 6.1.2.5 Integral and floating types are collectively called arithmetic types.
     pub fn is_arithmetic(&self, sema: &Sema) -> bool {
@@ -133,10 +121,12 @@ pub struct Builtins {
     pub float: ResolvedTypeId,
     pub double: ResolvedTypeId,
     pub long_double: ResolvedTypeId,
+    pub ptrdiff_t: ResolvedTypeId,
+    pub size_t: ResolvedTypeId,
 }
 
 impl Builtins {
-    pub fn new(types: &mut ResolvedTypeArena) -> Self {
+    pub fn new(types: &mut ResolvedTypeArena, target: &Target) -> Self {
         Self {
             void: types.alloc(ResolvedType::Void),
             char: types.alloc(ResolvedType::Char),
@@ -151,6 +141,8 @@ impl Builtins {
             float: types.alloc(ResolvedType::Float),
             double: types.alloc(ResolvedType::Double),
             long_double: types.alloc(ResolvedType::LongDouble),
+            ptrdiff_t: types.alloc(target.ptrdiff_t.clone()),
+            size_t: types.alloc(target.size_t.clone()),
         }
     }
 }
