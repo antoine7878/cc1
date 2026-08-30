@@ -1,3 +1,6 @@
+use std::collections::binary_heap::Drain;
+use std::io::ErrorKind::Deadlock;
+
 use crate::arena::ResolveWith;
 use crate::ast::{self};
 use crate::parser::Span;
@@ -180,9 +183,9 @@ fn assignment_conversion(
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,
     is_null_ptr: bool,
-) {
+) -> Result<(), Diagnosis> {
     let l = lhs.ty.id.resolve(sema);
-    let r = rhs.ty.id.resolve(sema);
+    let r = rhs.casted_ty().id.resolve(sema);
     match (l, r) {
         // both arithmetic                                                       -> convert(rhs, lhs_ty)
         (l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => (),
@@ -192,14 +195,17 @@ fn assignment_conversion(
         (ResolvedType::Pointer(lp), ResolvedType::Pointer(rp))
             if lhs.ty.has_qualifiers_of(&rhs.ty) && lp.is_compatible(sema, rp) => {}
         // one side void*, other object/incomplete ptr, qualifier rule holds     -> convert(rhs, lhs_ty)
-        (ResolvedType::Pointer(p), o) | (o, ResolvedType::Pointer(p))
-            if lhs.ty.has_qualifiers_of(&rhs.ty) && p.id == sema.builtins.void && (o.is_object(sema)) => {}
+        (ResolvedType::Pointer(p), ResolvedType::Pointer(o)) | (ResolvedType::Pointer(o), ResolvedType::Pointer(p))
+            if lhs.ty.has_qualifiers_of(&rhs.ty)
+                && p.id == sema.builtins.void
+                && (o.id.resolve(sema).is_object(sema)) => {}
         //     lhs is a pointer, rhs is a null pointer constant                      -> convert(rhs, lhs_ty)
         (ResolvedType::Pointer(_), _) if is_null_ptr => (),
         //     otherwise                                                             -> reject
-        _ => unreachable!(),
+        _ => return Err(Diagnosis::BadAssignement),
     }
     convert(sema, rhs, lhs.ty.id, is_null_ptr);
+    Ok(())
 }
 
 pub fn default_argument_promotions(sema: &Sema, re: &mut ResolvedExpression) {

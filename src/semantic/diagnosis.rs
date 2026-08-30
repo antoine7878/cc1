@@ -38,6 +38,7 @@ pub enum Diagnosis {
     CastOfNonScalar,
     IncompatibleCast,
     /// 6.3.16
+    BadAssignement,
     AssignToRValue,
     ConstAssignement,
     // InvalidCast,
@@ -110,6 +111,7 @@ impl DiagnosisNode {
     fn message(&self, ctx: &Context) -> String {
 
         match &self.inner {
+            Diagnosis::BadAssignement => "Wrong assignement".to_string(),
             Diagnosis::AssignToRValue => "Cannot assign to an r-value".to_string(),
             Diagnosis::ConstAssignement => "Cannot assign to const value".to_string(),
             Diagnosis::Poisoned => "Internal error".to_string(),

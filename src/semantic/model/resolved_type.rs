@@ -208,7 +208,7 @@ impl QualifiedType {
     }
 
     pub fn has_qualifiers_of(&self, other: &Self) -> bool {
-        self.is_const <= other.is_const && self.is_volatile <= other.is_volatile
+        self.is_const >= other.is_const && self.is_volatile >= other.is_volatile
     }
 
     pub fn is_compatible(&self, sema: &Sema, other: &Self) -> bool {
