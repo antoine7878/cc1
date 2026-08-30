@@ -50,11 +50,11 @@ pub struct QualifiedType {
 impl ResolvedType {
     // 6.1.2.5 An array type of unknown size is an incomplete type. A structure or union type of
     // unknown content is an incomplete type.
-    pub fn is_complete(&self, sema: &Sema) -> bool {
+    pub fn is_complete(&self, tags: &TagDefArena) -> bool {
         match self {
             ResolvedType::Void => false,
             ResolvedType::Array { len, .. } => len.is_some(),
-            ResolvedType::Tag(id) => sema.tags.get(*id).is_complete,
+            ResolvedType::Tag(id) => tags.get(*id).is_complete,
             _ => true,
         }
     }
@@ -71,15 +71,6 @@ impl ResolvedType {
     pub fn is_function(&self) -> bool {
         matches!(self, ResolvedType::Function { .. })
     }
-
-    pub fn is_object(&self, sema: &Sema) -> bool {
-        self.is_complete(sema) && !self.is_function()
-    }
-
-    // - all arithmetic types (integral types + floating types)
-    // - all pointer types (pointer‑to‑anything is itself a complete object type)
-    // - structure and union types once their content is defined
-    // - array types with a known element type and known count
 
     // 6.1.2.5 Integral and floating types are collectively called arithmetic types.
     pub fn is_arithmetic(&self, sema: &Sema) -> bool {
@@ -206,6 +197,8 @@ impl QualifiedType {
     pub fn same_qualifiers_as(&self, other: &Self) -> bool {
         self.is_const == other.is_const && self.is_volatile == other.is_volatile
     }
+
+    // self.const   self.volatile   other.const other.volatile
 
     pub fn has_qualifiers_of(&self, other: &Self) -> bool {
         self.is_const <= other.is_const && self.is_volatile <= other.is_volatile

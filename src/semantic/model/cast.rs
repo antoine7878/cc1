@@ -66,7 +66,7 @@ pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
     if matches!(ty, ResolvedType::Array { .. } | ResolvedType::Function { .. }) {
         return;
     }
-    if !ty.is_complete(&sema.tags) {
+    if !ty.is_complete(sema) {
         sema.add_diag(Diag::only_diag(Diagnosis::IncompleteType), span);
     }
     let to = QualifiedType::new(re.ty.id, false, false);
@@ -175,12 +175,32 @@ pub fn usual_arithmetic<'a>(
     lhs
 }
 
-// fn assignment_conversion(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) {
-//     let l = sema.types.get(lhs.value_ty().ty);
-//     let r = sema.types.get(rhs.value_ty().ty);
-//
-//     let _ = l.is_arithmetic(&sema.tags) && r.is_arithmetic(&sema.tags);
-// }
+fn assignment_conversion(
+    sema: &mut Sema,
+    lhs: &mut ResolvedExpression,
+    rhs: &mut ResolvedExpression,
+    is_null_ptr: bool,
+) {
+    let l = lhs.ty.id.resolve(sema);
+    let r = rhs.ty.id.resolve(sema);
+    match (l, r) {
+        // both arithmetic                                                       -> convert(rhs, lhs_ty)
+        (l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => (),
+        //     lhs is struct/union, compatible with rhs's type                       -> convert(rhs, lhs_ty)
+        (&ResolvedType::Tag(id), _) if !id.resolve(sema).is_enum() && lhs.ty.is_compatible(sema, &rhs.ty) => (),
+        // both pointers, compatible pointee, lhs pointee has all of rhs's quals -> convert(rhs, lhs_ty)
+        (ResolvedType::Pointer(lp), ResolvedType::Pointer(rp))
+            if lhs.ty.has_qualifiers_of(&rhs.ty) && lp.is_compatible(sema, rp) => {}
+        // one side void*, other object/incomplete ptr, qualifier rule holds     -> convert(rhs, lhs_ty)
+        (ResolvedType::Pointer(p), o) | (o, ResolvedType::Pointer(p))
+            if lhs.ty.has_qualifiers_of(&rhs.ty) && p.id == sema.builtins.void && (o.is_object(sema)) => {}
+        //     lhs is a pointer, rhs is a null pointer constant                      -> convert(rhs, lhs_ty)
+        (ResolvedType::Pointer(_), _) if is_null_ptr => (),
+        //     otherwise                                                             -> reject
+        _ => unreachable!(),
+    }
+    convert(sema, rhs, lhs.ty.id, is_null_ptr);
+}
 
 pub fn default_argument_promotions(sema: &Sema, re: &mut ResolvedExpression) {
     if re.casted_ty().id == sema.builtins.float {
@@ -189,12 +209,3 @@ pub fn default_argument_promotions(sema: &Sema, re: &mut ResolvedExpression) {
         promote(sema, re);
     }
 }
-
-// NullPointer,       // 6.2.2.3
-// ToVoid,            // 6.3.4
-// PointerConversion, // 6.3.16.1
-
-// convert is the dispatcher — the only place a (from, to) pair turns into a CastKind:
-// pub fn convert(sema: &mut Sema, re: &mut ResolvedExpression, to: QualifiedType) {}
-
-// fn assignment_conversion() {}

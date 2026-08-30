@@ -106,7 +106,7 @@ fn pointer_integer_arithmetic(
         return Err(Diagnosis::Poisoned);
     };
     match inner.id.resolve(sema) {
-        t if !t.is_complete(&sema.tags) => Err(Diagnosis::InvalidOperand),
+        t if !t.is_complete(sema) => Err(Diagnosis::InvalidOperand),
         ResolvedType::Function { .. } => Err(Diagnosis::InvalidOperand),
         _ => {
             cast::promote(sema, intergral);
@@ -211,8 +211,14 @@ fn type_of(
                 // qualified or unqualified scalar type and the operand shall have scalar type.
                 let ty = qualif.id.resolve(sema);
                 if !matches!(ty, ResolvedType::Void) {
-                    if !ty.is_scalar(sema) || !re.casted_ty().id.resolve(sema).is_scalar(sema) {
+                    let from = re.casted_ty().id.resolve(sema);
+                    if !ty.is_scalar(sema) || !from.is_scalar(sema) {
                         return Err(Diagnosis::CastToNonScalar);
+                    }
+                    // 6.3.4 A pointer may be converted to an integral type... An arbitrary
+                    // integer may be converted to a pointer.
+                    if ty.is_pointer() != from.is_pointer() && (ty.is_floating() || from.is_floating()) {
+                        return Err(Diagnosis::InvalidOperand);
                     }
                     let a = is_null_pointer_constant(sema, ctx, operand);
                     cast::convert(sema, re, qualif.id, a)

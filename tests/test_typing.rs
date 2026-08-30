@@ -255,6 +255,86 @@ types!(
     ["int", "int", "char[10] lvalue <ArrayToPointer> *char", "int", "*char"]
 );
 
+// ---- 6.3.4 cast operators --------------------------------------------------
+
+// gcc: sizeof((double)i) == 8
+types!(
+    a_cast_result_is_always_an_rvalue,
+    "int i; void f(void) { (double)i; }",
+    ["int lvalue <LValueToRValue> int <IntegerToFloating> double", "double"]
+);
+
+// gcc: accepts; a pointer may be converted to an integral type
+types!(
+    a_pointer_may_be_cast_to_an_integer,
+    "int *p; void f(void) { (int)p; }",
+    ["*int lvalue <LValueToRValue> *int <PointerToInteger> int", "int"]
+);
+
+// gcc: accepts; an arbitrary integer may be converted to a pointer
+types!(
+    an_integer_may_be_cast_to_a_pointer,
+    "int i; void f(void) { (int *)i; }",
+    ["int lvalue <LValueToRValue> int <IntegerToPointer> *int", "*int"]
+);
+
+// gcc: accepts; casting to void has no operand-type constraint at all
+types!(
+    a_cast_to_void_discards_the_value,
+    "void f(void) { (void)1; }",
+    ["int", "void"]
+);
+
+// 6.3.4 Unless the type name specifies void type, the type name shall specify qualified or
+// unqualified scalar type and the operand shall have scalar type.
+// gcc: rejects, `operand of type 'struct S' where arithmetic or pointer type is required`
+rejects!(
+    cast_of_a_non_scalar_operand_is_rejected,
+    "struct S { int a; } s; void f(void) { (int)s; }",
+    Diagnosis::CastToNonScalar,
+    ["struct S lvalue <LValueToRValue> struct S", "None"]
+);
+
+// gcc: rejects, `used type 'struct S' where arithmetic or pointer type is required`
+rejects!(
+    cast_to_a_non_scalar_type_is_rejected,
+    "struct S { int a; }; void f(void) { (struct S)1; }",
+    Diagnosis::CastToNonScalar,
+    ["int", "None"]
+);
+
+// 6.3.4 semantics: pointers convert with integral types, not with floating types — both are
+// individually scalar, but the combination is not licensed.
+// gcc: rejects, `pointer cannot be cast to type 'double'`
+rejects!(
+    cast_from_a_pointer_to_a_floating_type_is_rejected,
+    "int *p; void f(void) { (double)p; }",
+    Diagnosis::InvalidOperand,
+    ["*int lvalue <LValueToRValue> *int", "None"]
+);
+
+// gcc: rejects, `operand of type 'double' cannot be cast to a pointer type`
+rejects!(
+    cast_from_a_floating_type_to_a_pointer_is_rejected,
+    "double d; void f(void) { (int *)d; }",
+    Diagnosis::InvalidOperand,
+    ["double lvalue <LValueToRValue> double", "None"]
+);
+
+// A cast to a non-scalar type is reported exactly once, even when it also fails as a constant
+// expression (6.4) — regression test for a duplicate-diagnosis bug in the type/fold interaction.
+#[test]
+fn cast_to_a_non_scalar_type_is_reported_once() {
+    let unit = Unit::compile("struct S { int a; }; enum E { A = (struct S)1 };");
+    assert!(unit.parsed(), "cc1 failed to parse:\n{}", unit.render());
+    let got: Vec<_> = unit.diagnosis().iter().map(|diag| diag.inner).collect();
+    assert!(
+        matches!(got.as_slice(), [Diagnosis::CastToNonScalar]),
+        "expected exactly one CastToNonScalar, got {got:?}:\n{}",
+        unit.render()
+    );
+}
+
 // ---- 6.4 constant expressions --------------------------------------------
 
 types!(

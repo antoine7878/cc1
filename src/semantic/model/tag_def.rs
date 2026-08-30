@@ -32,6 +32,10 @@ impl TagDef {
     pub fn kind(&self) -> SymbolKind {
         self.kind.symbol_kind()
     }
+
+    pub fn is_enum(&self) -> bool {
+        matches!(self.kind, Tag::Enum)
+    }
 }
 
 impl TagDefArena {
