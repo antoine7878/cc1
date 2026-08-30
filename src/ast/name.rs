@@ -5,7 +5,7 @@ use crate::define_interner;
 use crate::parser::Span;
 use crate::utils::{BLUE, RESET};
 
-define_interner!(String, StringArena, StringId, crate::parser::Arenas, names);
+define_interner!(String, StringArena, StringId, crate::parser::AstArenas, names);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct Name {

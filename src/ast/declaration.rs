@@ -4,7 +4,7 @@ use crate::ast::{DeclarationSpecifier, ExpressionNode, FunctionParametersNode, N
 use crate::parser::{Context, Span};
 use crate::{ast_node, define_arena};
 
-define_arena!(Declarator, DeclaratorArena, DeclaratorId, crate::parser::Arenas, declarators);
+define_arena!(Declarator, DeclaratorArena, DeclaratorId, crate::parser::AstArenas, declarators);
 
 ast_node! {
     pub struct DeclarationNode {

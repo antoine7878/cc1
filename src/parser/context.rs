@@ -8,7 +8,7 @@ use crate::semantic::{DiagnosisNode, Sema};
 use crate::target::Target;
 
 #[derive(Debug, Default)]
-pub struct Arenas {
+pub struct AstArenas {
     pub names: StringArena,
     pub structs: StructArena,
     pub enums: EnumArena,
@@ -25,7 +25,7 @@ pub struct Context {
     pub target: Target,
     pub diagnosis: Vec<DiagnosisNode>,
     pub parse: ParseState,
-    pub arenas: Arenas,
+    pub arenas: AstArenas,
     pub ast: TranslationUnitNode,
     pub sema: Sema,
 }
@@ -42,14 +42,14 @@ impl ProvideMut<Sema> for Context {
     }
 }
 
-impl Provide<Arenas> for Context {
-    fn provide(&self) -> &Arenas {
+impl Provide<AstArenas> for Context {
+    fn provide(&self) -> &AstArenas {
         &self.arenas
     }
 }
 
-impl ProvideMut<Arenas> for Context {
-    fn provide_mut(&mut self) -> &mut Arenas {
+impl ProvideMut<AstArenas> for Context {
+    fn provide_mut(&mut self) -> &mut AstArenas {
         &mut self.arenas
     }
 }
