@@ -2,7 +2,7 @@ use std::fmt::{self, Display};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write, stderr};
 
-use crate::ast::Name;
+use crate::ast::{Name, Qualifier};
 use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::SymbolKind;
@@ -38,7 +38,8 @@ pub enum Diagnosis {
     CastOfNonScalar,
     IncompatibleCast,
     /// 6.3.16
-    BadAssignement,
+    IncompatibleAssignementTypes,
+    DiscardedQualifiers(Qualifier),
     AssignToRValue,
     ConstAssignement,
     // InvalidCast,
@@ -111,7 +112,8 @@ impl DiagnosisNode {
     fn message(&self, ctx: &Context) -> String {
 
         match &self.inner {
-            Diagnosis::BadAssignement => "Wrong assignement".to_string(),
+            Diagnosis::DiscardedQualifiers(q) => format!("Assignement discard {q} qualifer" ),
+            Diagnosis::IncompatibleAssignementTypes => "Wrong assignement".to_string(),
             Diagnosis::AssignToRValue => "Cannot assign to an r-value".to_string(),
             Diagnosis::ConstAssignement => "Cannot assign to const value".to_string(),
             Diagnosis::Poisoned => "Internal error".to_string(),

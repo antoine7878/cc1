@@ -6,7 +6,13 @@ use crate::parser::Span;
 use crate::semantic::model::cast::default_argument_promotions;
 use crate::semantic::{ExpressionKind, QualifiedType, ResolvedExpression, Sema, SymbolArena, SymbolId};
 
-define_arena!(FunctionDef, FunctionDefArena, FunctionDefId, crate::semantic::Sema, functions);
+define_arena!(
+    FunctionDef,
+    FunctionDefArena,
+    FunctionDefId,
+    crate::semantic::Sema,
+    functions
+);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FunctionDef {

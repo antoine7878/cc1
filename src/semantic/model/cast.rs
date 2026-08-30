@@ -178,6 +178,16 @@ pub fn usual_arithmetic<'a>(
     lhs
 }
 
+fn is_object_or_incomplete(sema: &Sema, ty: ResolvedTypeId) -> bool {
+    !matches!(ty.resolve(sema), ResolvedType::Function { .. } | ResolvedType::Void)
+}
+
+fn pointee_licensed(sema: &Sema, lp: &QualifiedType, rp: &QualifiedType) -> bool {
+    lp.is_compatible_ignoring_qualifiers(sema, rp)
+        || (lp.id == sema.builtins.void && is_object_or_incomplete(sema, rp.id))
+        || (rp.id == sema.builtins.void && is_object_or_incomplete(sema, lp.id))
+}
+
 fn assignment_conversion(
     sema: &mut Sema,
     lhs: &mut ResolvedExpression,
@@ -185,24 +195,16 @@ fn assignment_conversion(
     is_null_ptr: bool,
 ) -> Result<(), Diagnosis> {
     let l = lhs.ty.id.resolve(sema);
-    let r = rhs.casted_ty().id.resolve(sema);
+    let rhs_ty = rhs.casted_ty();
+    let r = rhs_ty.id.resolve(sema);
     match (l, r) {
         // both arithmetic                                                       -> convert(rhs, lhs_ty)
         (l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => (),
-        //     lhs is struct/union, compatible with rhs's type                       -> convert(rhs, lhs_ty)
-        (&ResolvedType::Tag(id), _) if !id.resolve(sema).is_enum() && lhs.ty.is_compatible(sema, &rhs.ty) => (),
-        // both pointers, compatible pointee, lhs pointee has all of rhs's quals -> convert(rhs, lhs_ty)
+        (&ResolvedType::Tag(id), _) if !id.resolve(sema).is_enum() && lhs.ty.is_compatible(sema, &rhs_ty) => (),
         (ResolvedType::Pointer(lp), ResolvedType::Pointer(rp))
-            if lhs.ty.has_qualifiers_of(&rhs.ty) && lp.is_compatible(sema, rp) => {}
-        // one side void*, other object/incomplete ptr, qualifier rule holds     -> convert(rhs, lhs_ty)
-        (ResolvedType::Pointer(p), ResolvedType::Pointer(o)) | (ResolvedType::Pointer(o), ResolvedType::Pointer(p))
-            if lhs.ty.has_qualifiers_of(&rhs.ty)
-                && p.id == sema.builtins.void
-                && (o.id.resolve(sema).is_object(sema)) => {}
-        //     lhs is a pointer, rhs is a null pointer constant                      -> convert(rhs, lhs_ty)
+            if lp.has_qualifiers_of(rp) && pointee_licensed(sema, lp, rp) => {}
         (ResolvedType::Pointer(_), _) if is_null_ptr => (),
-        //     otherwise                                                             -> reject
-        _ => return Err(Diagnosis::BadAssignement),
+        _ => return Err(Diagnosis::IncompatibleAssignementTypes),
     }
     convert(sema, rhs, lhs.ty.id, is_null_ptr);
     Ok(())

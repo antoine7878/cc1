@@ -212,17 +212,15 @@ impl QualifiedType {
     }
 
     pub fn is_compatible(&self, sema: &Sema, other: &Self) -> bool {
-        // 6.5.3 For two qualified types to be compatible, both shall have the identically qualified
-        // version of a compatible type; the order of type qualifiers within a list of specifiers or
-        // qualifiers does not affect the specified type.
-        if !self.same_qualifiers_as(other) {
-            return false;
-        }
+        self.same_qualifiers_as(other) && self.is_compatible_ignoring_qualifiers(sema, other)
+    }
+
+    pub fn is_compatible_ignoring_qualifiers(&self, sema: &Sema, other: &Self) -> bool {
         if self.id == other.id {
             return true;
         }
         match (self.id.resolve(sema), other.id.resolve(sema)) {
-            // 6.5.4.3 For two function types to be compatible, both shall specify compatible return types.
+            // 6.5.4.3 For two function types to be compatible, both shall specify compatible return types. Moreover...
             (ResolvedType::Function { ret: r1, params: p1 }, ResolvedType::Function { ret: r2, params: p2 }) => {
                 r1.is_compatible(sema, r2) && p1.is_compatible(sema, p2)
             }
