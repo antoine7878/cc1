@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::arena::{ResolveMutWith, ResolveWith};
 use crate::ast::{DeclaratorId, ExpressionId, Name, Tag, Value};
 use crate::parser::Span;
 use crate::semantic::{
@@ -77,7 +78,7 @@ impl Sema {
         span: &Span,
     ) -> Option<QualifiedType> {
         let sym_id = self.scopes.lookup_ordinary(name.id)?;
-        let sym = self.symbols.get(sym_id);
+        let sym = sym_id.resolve(&*self);
         if sym.kind != SymbolKind::Typedef {
             return self.add_diag(Diag::none_diag(Diagnosis::UndeclaredIdentifier(name)), span);
         }
@@ -96,7 +97,7 @@ impl Sema {
         let Some(name) = name else { return self.tags.declare(kind, None) };
 
         if let Some(id) = self.scopes.lookup_tag(name.id, is_definition) {
-            let def = self.tags.get(id);
+            let def = id.resolve(&*self);
             if def.kind != kind || (is_definition && def.is_complete) {
                 self.add_diag(Diag::only_diag(Diagnosis::DuplicateDeclaration(def.kind(), name)), span)
             }
@@ -120,7 +121,7 @@ impl Sema {
 
     fn dedup(&mut self, sym: &Symbol, span: &Span) -> Option<SymbolId> {
         let old_id = self.scopes.current(sym.kind, sym.name.id)?;
-        let old_symbol = self.symbols.get(old_id);
+        let old_symbol = old_id.resolve(&*self);
         if self.scopes.kind() == ScopeKind::File
             && old_symbol.is_compatible(self, sym)
             && !(sym.is_init && old_symbol.is_init)
@@ -135,9 +136,9 @@ impl Sema {
 
     pub fn add_label_symbol(&mut self, name: Name, span: &Span, is_init: bool) {
         if let Some(old) = self.scopes.lookup_label(name.id) {
-            let old_init = self.symbols.get(old).is_init;
+            let old_init = old.resolve(&*self).is_init;
             if !old_init && is_init {
-                self.symbols.get_mut(old).is_init = true;
+                old.resolve_mut(self).is_init = true;
                 return;
             }
             if !(is_init && old_init) {

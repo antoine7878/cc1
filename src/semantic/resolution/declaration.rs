@@ -1,3 +1,4 @@
+use crate::arena::ResolveWith;
 use crate::ast::{
     DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, ExpressionNode, FunctionParameters,
     FunctionParametersNode, Name, ParameterDeclaration, StructDeclaration, Tag, TypeSpecifier,
@@ -139,7 +140,7 @@ fn resolve_prototype(
         .filter_map(|param| resolve_parameter(sema, ctx, param))
         .collect();
     for param in &params {
-        let is_void = matches!(sema.types.get(param.ty.id), ResolvedType::Void);
+        let is_void = matches!(param.ty.id.resolve(sema), ResolvedType::Void);
         let is_special_case = params.len() == 1 && param.name.is_some();
         constrain::external::check_void_parameter(is_void && !is_special_case).collect(sema, &param.span);
     }
@@ -196,13 +197,13 @@ pub fn struct_or_union_tag(
             let Some((ty, node)) = declared_type(sema, ctx, qual, decl) else { continue };
             let bit_width = declarator.bit_width.as_ref().and_then(|e| {
                 let value = ice::eval_constant(sema, ctx, e);
-                constrain::declaration::check_bit_width(sema.types.get(ty.id), value).collect(sema, span)
+                constrain::declaration::check_bit_width(ty.id.resolve(sema), value).collect(sema, span)
             });
             match (node.ident(ctx), bit_width) {
                 (Some(name), _) => {
                     if members
                         .iter()
-                        .any(|&m| matches!(m, Member::Symbol(id) if sema.symbols.get(id).name.id == name.id ))
+                        .any(|&m| matches!(m, Member::Symbol(id) if id.resolve(sema).name.id == name.id ))
                     {
                         sema.add_diag(
                             Diag::only_diag(Diagnosis::DuplicateDeclaration(SymbolKind::Member, name)),

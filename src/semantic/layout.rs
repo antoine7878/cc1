@@ -1,3 +1,4 @@
+use crate::arena::ResolveWith;
 use crate::ast::Tag;
 use crate::semantic::{Member, ResolvedType, ResolvedTypeId, Sema, TagDefId};
 use crate::target::Layout;
@@ -13,7 +14,7 @@ pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Option<Layout> {
     if let Some(&layout) = sema.layouts.get(&qualified_type) {
         return Some(layout);
     }
-    let layout = match sema.types.get(qualified_type) {
+    let layout = match qualified_type.resolve(sema) {
         ResolvedType::Tag(id) => of_tag(sema, *id)?,
         ResolvedType::Array { elem, len } => {
             let len = *len;
@@ -27,7 +28,7 @@ pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Option<Layout> {
 }
 
 pub fn of_tag(sema: &mut Sema, id: TagDefId) -> Option<Layout> {
-    let tag = sema.tags.get(id).clone();
+    let tag = id.resolve(sema).clone();
     if !tag.is_complete {
         return None;
     }
@@ -41,7 +42,7 @@ pub fn of_tag(sema: &mut Sema, id: TagDefId) -> Option<Layout> {
 fn member(sema: &mut Sema, mem: Member) -> Option<(Layout, Option<u64>)> {
     match mem {
         Member::Symbol(id) => {
-            let symbol = sema.symbols.get(id);
+            let symbol = id.resolve(sema);
             let width = symbol.value.map(|width| width.max(0) as u64);
             let ty = symbol.ty?;
             Some((of(sema, ty.id)?, width))

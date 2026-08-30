@@ -1,5 +1,6 @@
 use std::path::Prefix::DeviceNS;
 
+use crate::arena::ResolveWith;
 use crate::ast::{Expression, ExpressionNode, Type};
 use crate::context::Context;
 use crate::semantic::ice::try_fold;
@@ -83,7 +84,7 @@ fn as_written<'a>(sema: &'a Sema, node: &ExpressionNode) -> Result<&'a ResolvedE
 }
 
 fn check_is_arithmetic(sema: &Sema, ty: ResolvedTypeId) -> Result<(), Diagnosis> {
-    if !sema.types.get(ty).is_arithmetic(sema) {
+    if !ty.resolve(sema).is_arithmetic(sema) {
         return Err(Diagnosis::InvalidOperand);
     }
     Ok(())
@@ -94,10 +95,10 @@ fn pointer_integer_arithmetic(
     pointer: &mut ResolvedExpression,
     intergral: &mut ResolvedExpression,
 ) -> Result<QualifiedType, Diagnosis> {
-    let ResolvedType::Pointer(inner) = sema.types.get(pointer.casted_ty().id) else {
+    let ResolvedType::Pointer(inner) = pointer.casted_ty().id.resolve(sema) else {
         return Err(Diagnosis::Poisoned);
     };
-    match sema.types.get(inner.id) {
+    match inner.id.resolve(sema) {
         t if !t.is_complete(&sema.tags) => Err(Diagnosis::InvalidOperand),
         ResolvedType::Function { .. } => Err(Diagnosis::InvalidOperand),
         _ => {
@@ -114,7 +115,7 @@ fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNod
         let Some((qualif, _)) = declaration::declared_type(sema, ctx, base, &ty_node.declarator) else {
             return false;
         };
-        if !matches!(sema.types.get(qualif.id), ResolvedType::Pointer(q) if q.id == sema.builtins.void)
+        if !matches!(qualif.id.resolve(sema), ResolvedType::Pointer(q) if q.id == sema.builtins.void)
             || qualif.is_const
             || qualif.is_volatile
         {
@@ -124,7 +125,7 @@ fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNod
         node = op;
     }
     let Some(Some(re)) = sema.expressions.get(&node.id) else { return false };
-    sema.types.get(re.casted_ty().id).is_integer() && try_fold(sema, ctx, node).is_some_and(|v| v.is_zero())
+    re.casted_ty().id.resolve(sema).is_integer() && try_fold(sema, ctx, node).is_some_and(|v| v.is_zero())
 }
 
 fn type_of(
@@ -142,14 +143,14 @@ fn type_of(
                 .copied()
                 .flatten()
                 .ok_or(Diagnosis::Poisoned)?;
-            let sym = sema.symbols.get(id);
+            let sym = id.resolve(sema);
             Ok((sym.ty.ok_or(Diagnosis::Poisoned)?, sym.expression_kind()))
         }
         Expression::Constant(value) => Ok((value.ty(sema), RValue)),
         Expression::StringLiteral(value) => Ok((value.ty(sema, ctx), LValue)),
         Expression::ConstantExpression(expr) => as_written(sema, expr).map(|re| (re.ty, re.kind)),
         Expression::Add(e1, e2) => with_operands(sema, e1, e2, RValue, |sema, lhs, rhs| {
-            match (sema.types.get(lhs.casted_ty().id), sema.types.get(rhs.casted_ty().id)) {
+            match (lhs.casted_ty().id.resolve(sema), rhs.casted_ty().id.resolve(sema)) {
                 (l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => {
                     Ok(cast::usual_arithmetic(sema, lhs, rhs).casted_ty())
                 }
@@ -192,8 +193,8 @@ fn type_of(
             let Some(Some(from_re)) = sema.expressions.get(&operand.id) else {
                 return Err(Diagnosis::Poisoned);
             };
-            let to_ty = sema.types.get(to_qty.id);
-            let from_ty = sema.types.get(from_re.ty.id);
+            let to_ty = to_qty.id.resolve(sema);
+            let from_ty = from_re.ty.id.resolve(sema);
             // 6.3.4
             // Unless the type name specifies void type, the type name shall specify qualified or unqualified scalar type
             if to_qty.id != sema.builtins.void && !to_ty.is_scalar(sema) {

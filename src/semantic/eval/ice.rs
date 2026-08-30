@@ -1,3 +1,4 @@
+use crate::arena::ResolveWith;
 use crate::ast::visit::Visitor;
 use crate::ast::{Expression, ExpressionNode, Fold, Tag, Value};
 use crate::context::Context;
@@ -37,9 +38,9 @@ pub fn try_fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option
 }
 
 fn cast(sema: &mut Sema, qualif: QualifiedType, val: Value) -> Result<Value, Diagnosis> {
-    let ty = sema.types.get(qualif.id);
+    let ty = qualif.id.resolve(sema);
     if let ResolvedType::Tag(id) = ty {
-        return match sema.tags.get(*id).kind {
+        return match (*id).resolve(sema).kind {
             Tag::Enum => sema
                 .target
                 .cast(&ResolvedType::Int, val)
@@ -139,7 +140,7 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut Sink) 
                 .copied()
                 .flatten()
                 .ok_or(Diagnosis::NonConstantExpression)?;
-            let symbol = sema.symbols.get(id);
+            let symbol = id.resolve(sema);
             if symbol.kind != SymbolKind::Variant {
                 return Err(Diagnosis::NonConstantExpression);
             }

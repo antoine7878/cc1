@@ -1,3 +1,4 @@
+use crate::arena::ResolveWith;
 use crate::ast::{Tag, TypeSpecifier};
 use crate::define_interner;
 use crate::semantic::{ParamTypes, Sema, TagDefArena, TagDefId};
@@ -74,7 +75,7 @@ impl ResolvedType {
     // are collectively called integral types.
     pub fn is_integral(&self, sema: &Sema) -> bool {
         match self {
-            ResolvedType::Tag(id) => sema.tags.get(*id).kind == Tag::Enum,
+            ResolvedType::Tag(id) => (*id).resolve(sema).kind == Tag::Enum,
             _ => self.is_integer(),
         }
     }
@@ -201,7 +202,7 @@ impl QualifiedType {
         if self.id == other.id {
             return true;
         }
-        match (sema.types.get(self.id), sema.types.get(other.id)) {
+        match (self.id.resolve(sema), other.id.resolve(sema)) {
             // 6.5.4.3 For two function types to be compatible, both shall specify compatible return types.
             (ResolvedType::Function { ret: r1, params: p1 }, ResolvedType::Function { ret: r2, params: p2 }) => {
                 r1.is_compatible(sema, r2) && p1.is_compatible(sema, p2)
@@ -217,7 +218,7 @@ impl QualifiedType {
             // 6.5.2.2 Each enumerated type shall be compatible with an integer type, the choice of type is
             // implementation-defined.
             (ResolvedType::Tag(id), ResolvedType::Int) | (ResolvedType::Int, ResolvedType::Tag(id)) => {
-                sema.tags.get(*id).kind == Tag::Enum
+                (*id).resolve(sema).kind == Tag::Enum
             }
             _ => false,
         }

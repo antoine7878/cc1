@@ -1,3 +1,4 @@
+use crate::arena::ResolveWith;
 use crate::ast::visit::{
     Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_jump_statement, walk_labeled_statement,
 };
@@ -68,15 +69,15 @@ impl<'a> SymbolResolver<'a> {
     }
 
     fn param_types(&self, sym: SymbolId) -> Option<ParamTypes> {
-        let ty = self.sema.symbols.get(sym).ty?;
-        match self.sema.types.get(ty.id) {
+        let ty = sym.resolve(&*self.sema).ty?;
+        match ty.id.resolve(&*self.sema) {
             ResolvedType::Function { params, .. } => Some(params.clone()),
             _ => None,
         }
     }
 
     fn with_param_types(&mut self, ty: QualifiedType, params: ParamTypes) -> QualifiedType {
-        let ret = match self.sema.types.get(ty.id) {
+        let ret = match ty.id.resolve(&*self.sema) {
             ResolvedType::Function { ret, .. } => *ret,
             _ => return ty,
         };
@@ -102,7 +103,7 @@ impl<'a> SymbolResolver<'a> {
         }
         let identifiers: Vec<QualifiedType> = parameters
             .iter()
-            .filter_map(|sym| self.sema.symbols.get(*sym).ty)
+            .filter_map(|sym| (*sym).resolve(&*self.sema).ty)
             .collect();
         if identifiers.len() != parameters.len() || declared.is_compatible_with_identifiers(self.sema, &identifiers) {
             return;
@@ -124,7 +125,7 @@ impl<'a> SymbolResolver<'a> {
             return Vec::new();
         }
         if let [only] = params {
-            let is_void = matches!(self.sema.types.get(only.ty.id), ResolvedType::Void);
+            let is_void = matches!(only.ty.id.resolve(&*self.sema), ResolvedType::Void);
             constrain::external::check_void_parameter(is_void).collect(self, &only.span);
         }
         params.iter().filter_map(|param| self.add_parameter(param)).collect()
@@ -156,7 +157,7 @@ impl<'a> SymbolResolver<'a> {
                         .iter()
                         .map(|decl| {
                             self.add_parameter_declarator(ctx, specifiers, &decl.declarator, span)
-                                .map(|sym_id| self.sema.symbols.get(sym_id).name.id)
+                                .map(|sym_id| sym_id.resolve(&*self.sema).name.id)
                         })
                         .collect::<Vec<_>>()
                 },
@@ -269,7 +270,7 @@ impl Visitor for SymbolResolver<'_> {
             let decl = &init_declarator.declarator;
             let Some((ty, decl)) = declaration::declared_type(self.sema, ctx, qualif, decl) else { continue };
             let Some(name) = decl.ident(ctx) else { continue };
-            let is_function = matches!(self.sema.types.get(ty.id), ResolvedType::Function { .. });
+            let is_function = matches!(ty.id.resolve(&*self.sema), ResolvedType::Function { .. });
             if let Some(declared_storage) = declared_storage
                 && declared_storage != Storage::Typedef
                 && is_function
