@@ -234,8 +234,6 @@ impl Visitor for Sema {
         let decl = &node.declarator;
         let Some(&sym) = self.declarations.get(&decl.id) else { return };
         let Some(ty) = sym.resolve(self).ty else { return };
-        // let inner = declaration::base_type(self, ctx, specifiers, &init_decl.span);
-        // let Some((ty, _)) = declaration::declared_type(self, ctx, inner, decl) else { return };
         match &init_node.init {
             Initializer::Single(e) => {
                 self.visit_expression(ctx, e);
@@ -344,3 +342,4 @@ impl Visitor for SymbolResolver<'_> {
         self.sema.visit_init_declarator(ctx, node);
     }
 }
+// - return — still not wired. Needs the small threaded-state addition (current function's return type) discussed a few turns back.
