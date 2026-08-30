@@ -1,7 +1,8 @@
 use std::env::args;
 use std::process::exit;
 
-use crate::parser::{Context, Span};
+use crate::context::Context;
+use crate::parser::Span;
 use crate::semantic::{Diagnosis, DiagnosisNode};
 
 #[derive(Default)]

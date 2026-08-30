@@ -2,7 +2,8 @@ use std::fmt::Display;
 
 use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name, TypeSpecifier};
 use crate::ast_node;
-use crate::parser::{Context, Span};
+use crate::context::Context;
+use crate::parser::Span;
 
 ast_node! {
     pub struct FunctionParametersNode {

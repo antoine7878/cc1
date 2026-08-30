@@ -5,13 +5,14 @@ use crate::ast::{Qualifier, Type, ExpressionNode, Name, DeclarationSpecifier, In
 use crate::ast::{DeclarationNode, InitDeclaratorNode, DeclaratorNode, InitializerNode, Storage, FunctionParametersNode, Tag};
 use crate::ast::{StructDeclaration, StructMemberDeclarator, VariantId, EnumId, LabeledStatementNode, StatementNode, Labeled, CompoundStatementNode};
 use crate::ast::{ExpressionStatementNode, SelectionStatementNode, IterationStatementNode, JumpStatementNode, JumpStatement};
-use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode, ValueNode, StringLitralNode};
+use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode, ValueNode, StringLiteralNode};
 
-use crate::parser::{YYLex, Context, Span};
+use crate::context::Context;
+use crate::parser::{YYLex, Span};
 use crate::parser::yyerror;
 use crate::semantic::{Diagnosis, DiagnosisNode};
 
-fn concat_string_literals(ctx: &mut Context, lhs: StringLitralNode, rhs: StringLitralNode, span: Span) -> StringLitralNode {
+fn concat_string_literals(ctx: &mut Context, lhs: StringLiteralNode, rhs: StringLiteralNode, span: Span) -> StringLiteralNode {
     // 6.1.4 If one is a wide string literal and the other is not, the behavior is undefined.
     if lhs.is_wide() != rhs.is_wide() {
         ctx.diagnosis.push(DiagnosisNode::new(Diagnosis::MixedWideStringConcat, span));
@@ -56,7 +57,7 @@ macro_rules! spec {
 
 %token<Name> IDENTIFIER TYPE_NAME
 %token<ValueNode> CONSTANT
-%token<StringLitralNode> STRING_LITERAL
+%token<StringLiteralNode> STRING_LITERAL
 %token TYPEDEF EXTERN STATIC AUTO REGISTER
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID
 %token STRUCT UNION ENUM ELLIPSIS
@@ -82,7 +83,7 @@ macro_rules! spec {
 %nonassoc PREC_THEN
 %nonassoc ELSE
 
-%type<StringLitralNode> string_literal
+%type<StringLiteralNode> string_literal
 %type<Vec<Name>> identifier_list
 
 %type<ExpressionNode> expression constant_expression
@@ -171,7 +172,7 @@ constant_expression /* ExpressionNode */
     : expression %prec PREC_NO_COMMA                                                        { node_span!(self, expressions, constant_expression, $1) }
     ;
 
-string_literal /* StringLitralNode */
+string_literal /* StringLiteralNode */
       : STRING_LITERAL                                                                      { $1 }
       | string_literal STRING_LITERAL                                                       { with_span!(self, concat_string_literals, &mut self.lexer.ctx, $1, $2) }
       ;

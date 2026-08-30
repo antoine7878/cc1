@@ -1,6 +1,6 @@
 use crate::ast::visit::Visitor;
 use crate::ast::{Expression, ExpressionNode, Fold, Tag, Value};
-use crate::parser::Context;
+use crate::context::Context;
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedType, Sema, SymbolKind, declaration, layout,
 };

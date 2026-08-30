@@ -2,7 +2,8 @@ use crate::ast::{
     DeclarationSpecifier, Declarator, DeclaratorNode, EnumId, ExpressionNode, FunctionParameters,
     FunctionParametersNode, Name, ParameterDeclaration, StructDeclaration, Tag, TypeSpecifier,
 };
-use crate::parser::{Context, Span};
+use crate::context::Context;
+use crate::parser::Span;
 use crate::semantic::{
     DeclaredParams, Diag, DiagCollector, Diagnosis, Member, ParamInfo, QualifiedType, ResolvedType, Sema, Symbol,
     SymbolKind, TagDefId, constrain, ice,

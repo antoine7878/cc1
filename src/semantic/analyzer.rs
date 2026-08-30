@@ -1,5 +1,5 @@
 use crate::ast::visit::walk_translation_unit;
-use crate::parser::Context;
+use crate::context::Context;
 use crate::semantic::{ScopeKind, Sema, SymbolResolver, eval};
 
 pub struct Analyzer;

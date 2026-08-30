@@ -1,5 +1,6 @@
 pub mod arena;
 pub mod ast;
+pub mod context;
 pub mod parser;
 pub mod pipeline;
 pub mod report;

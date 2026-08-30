@@ -14,7 +14,7 @@ use crate::ast::{
     ParameterDeclaration, Qualifier, SelectionStatementNode, Struct, StructDeclaration, StructMemberDeclarator,
     TranslationUnitNode, Type, TypeSpecifier, Union, Variant,
 };
-use crate::parser::Context;
+use crate::context::Context;
 use crate::semantic::ExpressionKind;
 use crate::utils::{CYAN, GRAY, GREEN, RESET};
 

@@ -3,8 +3,9 @@
 %{
 use std::fmt;
 
-use crate::ast::{Name, StringLitralNode, ValueNode, Value};
-use crate::parser::{YYToken, YYFeedback, Context};
+use crate::ast::{Name, StringLiteralNode, ValueNode, Value};
+use crate::context::Context;
+use crate::parser::{YYToken, YYFeedback};
 use crate::semantic::{Diag, DiagnosisNode, SymbolKind};
 
 %}
@@ -152,7 +153,7 @@ fn alloc_constant<R: Read>(lex: &mut YYLex<R>) -> ValueNode {
     ValueNode::new(value, span)
 }
 
-fn alloc_string<R: Read>(lex: &mut YYLex<R>) -> StringLitralNode {
+fn alloc_string<R: Read>(lex: &mut YYLex<R>) -> StringLiteralNode {
     let span = lex.span;
     let text = lex.yytext.clone();
     lex.ctx.arenas.names.literal(&text, span)

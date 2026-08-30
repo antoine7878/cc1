@@ -2,7 +2,8 @@ use std::fmt::Display;
 use std::fs::File;
 use std::io::{BufReader, Read};
 
-use crate::parser::{Context, YYLex, Yacc};
+use crate::context::Context;
+use crate::parser::{YYLex, Yacc};
 use crate::semantic::{Diagnosis, DiagnosisNode, ExpectedTokens};
 
 pub fn parse_source(ctx: Context) -> Context {

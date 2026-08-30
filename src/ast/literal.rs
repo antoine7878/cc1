@@ -1,6 +1,7 @@
 use crate::ast::{Name, StringArena};
 use crate::ast_node;
-use crate::parser::{Context, Span};
+use crate::context::Context;
+use crate::parser::Span;
 use crate::semantic::{QualifiedType, Sema};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -44,9 +44,9 @@ macro_rules! define_arena {
             }
         }
 
-        impl $crate::arena::ResolveWith<$crate::parser::Context> for $id {
+        impl $crate::arena::ResolveWith<$crate::context::Context> for $id {
             type Output = $ty;
-            fn resolve(self, ctx: &$crate::parser::Context) -> &$ty {
+            fn resolve(self, ctx: &$crate::context::Context) -> &$ty {
                 $crate::arena::ResolveWith::<$holder>::resolve(
                     self,
                     $crate::arena::Provide::<$holder>::provide(ctx),
@@ -54,9 +54,9 @@ macro_rules! define_arena {
             }
         }
 
-        impl $crate::arena::ResolveMutWith<$crate::parser::Context> for $id {
+        impl $crate::arena::ResolveMutWith<$crate::context::Context> for $id {
             type Output = $ty;
-            fn resolve_mut(self, ctx: &mut $crate::parser::Context) -> &mut $ty {
+            fn resolve_mut(self, ctx: &mut $crate::context::Context) -> &mut $ty {
                 $crate::arena::ResolveMutWith::<$holder>::resolve_mut(
                     self,
                     $crate::arena::ProvideMut::<$holder>::provide_mut(ctx),
@@ -65,8 +65,8 @@ macro_rules! define_arena {
         }
 
         impl $id {
-            pub fn resolve<'a>(&self, ctx: &'a $crate::parser::Context) -> &'a $ty {
-                $crate::arena::ResolveWith::<$crate::parser::Context>::resolve(*self, ctx)
+            pub fn resolve<'a>(&self, ctx: &'a $crate::context::Context) -> &'a $ty {
+                $crate::arena::ResolveWith::<$crate::context::Context>::resolve(*self, ctx)
             }
         }
     };
@@ -85,9 +85,9 @@ macro_rules! define_interner {
             }
         }
 
-        impl $crate::arena::ResolveWith<$crate::parser::Context> for $id {
+        impl $crate::arena::ResolveWith<$crate::context::Context> for $id {
             type Output = $ty;
-            fn resolve(self, ctx: &$crate::parser::Context) -> &$ty {
+            fn resolve(self, ctx: &$crate::context::Context) -> &$ty {
                 $crate::arena::ResolveWith::<$holder>::resolve(
                     self,
                     $crate::arena::Provide::<$holder>::provide(ctx),
@@ -96,8 +96,8 @@ macro_rules! define_interner {
         }
 
         impl $id {
-            pub fn resolve<'a>(&self, ctx: &'a $crate::parser::Context) -> &'a $ty {
-                $crate::arena::ResolveWith::<$crate::parser::Context>::resolve(*self, ctx)
+            pub fn resolve<'a>(&self, ctx: &'a $crate::context::Context) -> &'a $ty {
+                $crate::arena::ResolveWith::<$crate::context::Context>::resolve(*self, ctx)
             }
         }
     };

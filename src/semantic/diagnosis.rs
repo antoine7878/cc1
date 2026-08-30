@@ -3,7 +3,8 @@ use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write, stderr};
 
 use crate::ast::Name;
-use crate::parser::{Context, Span};
+use crate::context::Context;
+use crate::parser::Span;
 use crate::semantic::SymbolKind;
 use crate::utils::{RED, RESET, YELLOW};
 

@@ -1,7 +1,7 @@
 use std::path::Prefix::DeviceNS;
 
 use crate::ast::{Expression, ExpressionNode, Type};
-use crate::parser::Context;
+use crate::context::Context;
 use crate::semantic::ice::try_fold;
 use crate::semantic::model::cast;
 use crate::semantic::{

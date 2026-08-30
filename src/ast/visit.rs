@@ -7,7 +7,7 @@ use crate::ast::{
     StringLiteralNode, Struct, StructDeclaration, StructMemberDeclarator, TranslationUnitNode, Type, TypeSpecifier,
     Union, ValueNode, Variant,
 };
-use crate::parser::Context;
+use crate::context::Context;
 
 pub trait Visitor {
     fn visit_translation_unit(&mut self, ctx: &Context, node: &TranslationUnitNode) {

@@ -1,3 +1,4 @@
+pub mod arenas;
 pub mod declaration;
 pub mod expression;
 pub mod function;
@@ -11,6 +12,7 @@ pub mod unit;
 pub mod value;
 pub mod visit;
 
+pub use arenas::AstArenas;
 pub use declaration::{
     DeclarationNode, Declarator, DeclaratorArena, DeclaratorId, DeclaratorNode, InitDeclaratorNode, Initializer,
     InitializerNode,

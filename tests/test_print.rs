@@ -2,7 +2,7 @@
 //
 // use cc1::ast::visit::{walk_declaration, walk_expression, walk_statement};
 // use cc1::ast::{DeclarationNode, Expression, ExpressionId, ExpressionNode, StatementNode, Visitor};
-// use cc1::parser::Context;
+// use cc1::context::Context;
 // use cc1::semantic::{CastKind, ExpressionKind, ImplicitCast, QualifiedType, ResolvedExpression};
 // use common::Unit;
 //

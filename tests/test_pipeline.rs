@@ -1,6 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use cc1::parser::{Context, Span};
+use cc1::context::Context;
+use cc1::parser::Span;
 use cc1::pipeline::Pipeline;
 use cc1::semantic::{Diagnosis, DiagnosisNode, ExpectedTokens};
 

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::ast::{DeclarationNode, DeclarationSpecifier, InitDeclaratorNode, Name, Storage, StringId};
-use crate::parser::Context;
+use crate::context::Context;
 use crate::semantic::{DeclaredParams, Diag, ParamInfo, diagnosis::Diagnosis};
 
 /// 6.7 External definitions

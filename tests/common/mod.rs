@@ -6,7 +6,8 @@ use std::process::{Command, Stdio};
 
 use cc1::ast::print::AstPrinter;
 use cc1::ast::{Expression, Name, Value};
-use cc1::parser::{Context, YYLex, Yacc};
+use cc1::context::Context;
+use cc1::parser::{YYLex, Yacc};
 use cc1::pipeline::Pipeline;
 use cc1::semantic::{Analyzer, Diagnosis, DiagnosisNode, ExpressionKind, SymbolKind};
 

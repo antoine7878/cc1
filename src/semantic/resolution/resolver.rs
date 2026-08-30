@@ -6,7 +6,8 @@ use crate::ast::{
     FunctionDefinitionNode, JumpStatement, JumpStatementNode, Labeled, LabeledStatementNode, Name, Storage,
     TypeSpecifier,
 };
-use crate::parser::{Context, Span};
+use crate::context::Context;
+use crate::parser::Span;
 use crate::semantic::resolution::expression;
 use crate::semantic::{
     DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo, ParamTypes, QualifiedType,

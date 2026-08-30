@@ -1,10 +1,11 @@
 use std::fmt::Display;
 
 use crate::ast::{DeclarationSpecifier, ExpressionNode, FunctionParametersNode, Name, Qualifier};
-use crate::parser::{Context, Span};
+use crate::context::Context;
+use crate::parser::Span;
 use crate::{ast_node, define_arena};
 
-define_arena!(Declarator, DeclaratorArena, DeclaratorId, crate::parser::AstArenas, declarators);
+define_arena!(Declarator, DeclaratorArena, DeclaratorId, crate::ast::AstArenas, declarators);
 
 ast_node! {
     pub struct DeclarationNode {

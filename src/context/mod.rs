@@ -1,23 +1,8 @@
 use crate::arena::{Provide, ProvideMut};
-use crate::ast::{
-    DeclaratorArena, EnumArena, ExpressionArena, Name, StatementArena, StringArena, StringId, StructArena,
-    StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena,
-};
+use crate::ast::{AstArenas, Name, StringId, StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier};
 use crate::parser::{ParseState, Span};
 use crate::semantic::{DiagnosisNode, Sema};
 use crate::target::Target;
-
-#[derive(Debug, Default)]
-pub struct AstArenas {
-    pub names: StringArena,
-    pub structs: StructArena,
-    pub enums: EnumArena,
-    pub unions: UnionArena,
-    pub variants: VariantArena,
-    pub expressions: ExpressionArena,
-    pub declarators: DeclaratorArena,
-    pub statements: StatementArena,
-}
 
 #[derive(Debug, Default)]
 pub struct Context {
