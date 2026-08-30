@@ -48,6 +48,11 @@ fn put(sema: &mut Sema, node: &ExpressionNode, re: ResolvedExpression) {
     sema.expressions.insert(node.id, Some(re));
 }
 
+fn puts(sema: &mut Sema, e1: &ExpressionNode, re1: ResolvedExpression, e2: &ExpressionNode, re2: ResolvedExpression) {
+    put(sema, e1, re1);
+    put(sema, e2, re2);
+}
+
 fn with_operand<F>(
     sema: &mut Sema,
     node: &ExpressionNode,
@@ -78,9 +83,38 @@ where
     cast::lvalue_conversion(sema, &mut lhs, &e1.span);
     cast::lvalue_conversion(sema, &mut rhs, &e2.span);
     let out = f(sema, &mut lhs, &mut rhs);
-    put(sema, e1, lhs);
-    put(sema, e2, rhs);
+    puts(sema, e1, lhs, e2, rhs);
     out.map(|q| (q, kind))
+}
+
+fn assign_target(lhs: &ResolvedExpression) -> Result<(), Diagnosis> {
+    if lhs.kind == ExpressionKind::RValue {
+        return Err(Diagnosis::AssignToRValue);
+    }
+    if lhs.ty.is_const {
+        return Err(Diagnosis::ConstAssignement);
+    }
+    Ok(())
+}
+
+fn with_assignment<F>(
+    sema: &mut Sema,
+    ctx: &Context,
+    lhs_node: &ExpressionNode,
+    rhs_node: &ExpressionNode,
+    f: F,
+) -> Result<(QualifiedType, ExpressionKind), Diagnosis>
+where
+    F: FnOnce(&mut Sema, &mut ResolvedExpression, &mut ResolvedExpression, bool) -> Result<QualifiedType, Diagnosis>,
+{
+    let is_null = is_null_pointer_constant(sema, ctx, rhs_node);
+    let (mut lhs, mut rhs) = takes(sema, lhs_node, rhs_node)?;
+    let out = assign_target(&lhs).and_then(|()| {
+        cast::lvalue_conversion(sema, &mut rhs, &rhs_node.span);
+        f(sema, &mut lhs, &mut rhs, is_null)
+    });
+    puts(sema, e1, lhs, e2, rhs);
+    out.map(|q| (q, ExpressionKind::RValue))
 }
 
 fn as_written<'a>(sema: &'a Sema, node: &ExpressionNode) -> Result<&'a ResolvedExpression, Diagnosis> {
@@ -166,6 +200,7 @@ fn type_of(
             let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
             let (qualif, _) =
                 declaration::declared_type(sema, ctx, base, &ty_node.declarator).ok_or(Diagnosis::Poisoned)?;
+            let is_null = is_null_pointer_constant(sema, ctx, operand);
             with_operand(sema, operand, RValue, |sema, re| {
                 let ty = qualif.id.resolve(sema);
                 if !matches!(ty, ResolvedType::Void) {
@@ -176,27 +211,14 @@ fn type_of(
                     if ty.is_pointer() != from.is_pointer() && (ty.is_floating() || from.is_floating()) {
                         return Err(Diagnosis::InvalidOperand);
                     }
-                    let a = is_null_pointer_constant(sema, ctx, operand);
-                    cast::convert(sema, re, qualif.id, a)
+                    cast::convert(sema, re, qualif.id, is_null);
                 }
                 Ok(qualif)
             })
         }
-        Expression::Assign(e1, e2) => {
-            let (mut lhs, mut rhs) = takes(sema, e1, e2)?;
-            if lhs.kind == RValue {
-                return Err(Diagnosis::AssignToRValue);
-            }
-            if lhs.ty.is_const {
-                return Err(Diagnosis::ConstAssignement);
-            }
-            cast::lvalue_conversion(sema, &mut rhs, &e2.span);
-            let is_null = is_null_pointer_constant(sema, ctx, e2);
-            let out = cast::assignment_conversion(sema, &mut lhs, &mut rhs, is_null);
-            put(sema, e1, lhs);
-            put(sema, e2, rhs);
-            out.map(|q| (q, RValue))
-        }
+        Expression::Assign(e1, e2) => with_assignment(sema, ctx, e1, e2, |sema, lhs, rhs, is_null| {
+            cast::assignment_conversion(sema, lhs, rhs, is_null)
+        }),
         _ => Err(Diagnosis::Poisoned),
     }
 }

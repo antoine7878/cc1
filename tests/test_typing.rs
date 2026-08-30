@@ -343,6 +343,141 @@ types!(
     ["int", "int", "int", "int"]
 );
 
+// ---- 6.3.6 additive operators: subtraction --------------------------------
+
+// 6.3.6 the left operand is a pointer to an object type and the right operand has integral type.
+types!(
+    a_pointer_minus_an_integer_is_a_pointer,
+    "int *p; void f(void) { p - 1; }",
+    ["*int lvalue <LValueToRValue> *int", "int", "*int"]
+);
+
+// 6.3.6 both operands are pointers to qualified or unqualified versions of compatible object
+// types — the result is ptrdiff_t, which is `int` on i386.
+types!(
+    two_compatible_pointers_subtract_to_ptrdiff_t,
+    "int *p, *q; void f(void) { p - q; }",
+    [
+        "*int lvalue <LValueToRValue> *int",
+        "*int lvalue <LValueToRValue> *int",
+        "int"
+    ]
+);
+
+types!(
+    pointer_subtraction_works_for_any_compatible_object_type,
+    "char *p, *q; void f(void) { p - q; }",
+    [
+        "*char lvalue <LValueToRValue> *char",
+        "*char lvalue <LValueToRValue> *char",
+        "int"
+    ]
+);
+
+// gcc: rejects, `invalid operands to binary expression ('int' and 'int *')` — subtraction is
+// not symmetric the way addition is: an integer minus a pointer is never licensed.
+rejects!(
+    an_integer_minus_a_pointer_is_rejected,
+    "int i; int *p; void f(void) { i - p; }",
+    Diagnosis::InvalidOperand,
+    [
+        "int lvalue <LValueToRValue> int",
+        "*int lvalue <LValueToRValue> *int",
+        "None"
+    ]
+);
+
+// gcc: rejects, `arithmetic on a pointer to an incomplete type 'struct S'`
+rejects!(
+    subtracting_pointers_to_an_incomplete_type_is_rejected,
+    "struct S *p, *q; void f(void) { p - q; }",
+    Diagnosis::InvalidOperand,
+    [
+        "*struct S (incomplete) lvalue <LValueToRValue> *struct S (incomplete)",
+        "*struct S (incomplete) lvalue <LValueToRValue> *struct S (incomplete)",
+        "None"
+    ]
+);
+
+// gcc: rejects, `invalid operands to binary expression ('int *' and 'double')`
+rejects!(
+    subtracting_a_floating_index_is_rejected,
+    "int *p; void f(void) { p - 1.5; }",
+    Diagnosis::InvalidOperand,
+    ["*int lvalue <LValueToRValue> *int", "double", "None"]
+);
+
+// ---- 6.3.16.1 simple assignment --------------------------------------------
+
+types!(assigning_a_constant_keeps_the_lvalues_type, "int x; void f(void) { x = 1; }", ["int lvalue", "int", "int"]);
+
+// gcc: accepts; the double is truncated toward the destination's type
+types!(
+    assignment_converts_the_right_operand_to_the_left_operands_type,
+    "int x; void f(void) { x = 3.5; }",
+    ["int lvalue", "double <FloatingToInteger> int", "int"]
+);
+
+// 6.2.2.3 an integral constant expression with the value 0 is a null pointer constant, and the
+// left operand being a pointer licenses the assignment on its own (bullet 5).
+types!(
+    zero_is_a_null_pointer_constant,
+    "int *p; void f(void) { p = 0; }",
+    ["*int lvalue", "int <NullPointer> *int", "*int"]
+);
+
+// gcc: rejects, `incompatible pointer types assigning to 'int *' from 'char *'`
+rejects!(
+    assigning_an_incompatible_pointer_is_rejected,
+    "char *p; int *q; void f(void) { q = p; }",
+    Diagnosis::IncompatibleAssignementTypes,
+    ["*int lvalue", "*char lvalue <LValueToRValue> *char", "None"]
+);
+
+// 6.3.16.1 the type pointed to by the left has all the qualifiers of the type pointed to by the
+// right — dropping const on the way in is a distinct diagnosis from a plain type mismatch.
+// gcc: rejects, `assigning to 'char *' from 'const char *' discards qualifiers`
+rejects!(
+    assigning_away_const_through_a_pointer_is_rejected,
+    "const char *p; char *q; void f(void) { q = p; }",
+    Diagnosis::DiscardedQualifiers(_),
+    ["*char lvalue", "*const char lvalue <LValueToRValue> *const char", "None"]
+);
+
+// gcc: accepts; a pointer may pick up qualifiers it didn't have, just not lose them
+types!(
+    assigning_a_pointer_that_gains_const_is_accepted,
+    "char *p; const char *q; void f(void) { q = p; }",
+    [
+        "*const char lvalue",
+        "*char lvalue <LValueToRValue> *char <PointerConversion> *const char",
+        "*const char"
+    ]
+);
+
+// gcc: accepts; 6.3.16.1's second bullet is structure/union assignment
+types!(
+    a_compatible_structure_may_be_assigned,
+    "struct S { int a; } x, y; void f(void) { x = y; }",
+    ["struct S lvalue", "struct S lvalue <LValueToRValue> struct S", "struct S"]
+);
+
+// gcc: rejects, `expression is not assignable`
+rejects!(
+    assigning_to_an_rvalue_is_rejected,
+    "void f(void) { 1 = 1; }",
+    Diagnosis::AssignToRValue,
+    ["int", "int", "None"]
+);
+
+// gcc: rejects, `cannot assign to variable 'x' with const-qualified type 'const int'`
+rejects!(
+    assigning_to_a_const_variable_is_rejected,
+    "void f(void) { const int x; x = 1; }",
+    Diagnosis::ConstAssignement,
+    ["const int lvalue", "int", "None"]
+);
+
 // ---- resolution failures do not cascade ----------------------------------
 
 rejects!(
