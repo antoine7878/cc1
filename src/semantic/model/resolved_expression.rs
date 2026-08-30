@@ -1,6 +1,6 @@
 use crate::semantic::{ImplicitCast, QualifiedType};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExpressionKind {
     RValue,
     LValue,

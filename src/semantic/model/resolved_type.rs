@@ -61,6 +61,10 @@ impl ResolvedType {
         matches!(self, ResolvedType::Pointer(_))
     }
 
+    pub fn is_function(&self) -> bool {
+        matches!(self, ResolvedType::Function { .. })
+    }
+
     // 6.1.2.5 Integral and floating types are collectively called arithmetic types.
     pub fn is_arithmetic(&self, sema: &Sema) -> bool {
         self.is_integral(sema) || self.is_floating()

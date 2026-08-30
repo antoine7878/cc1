@@ -164,6 +164,27 @@ fn type_of(
             cast::promote(sema, re);
             Ok(re.casted_ty())
         }),
+        Expression::Assign(e1, e2) => {
+            let mut lhs = take(sema, e1)?;
+            let mut rhs = match take(sema, e2) {
+                Ok(rhs) => rhs,
+                Err(diag) => {
+                    put(sema, e1, lhs);
+                    return Err(diag);
+                }
+            };
+            if lhs.kind == LValue {
+                return Err(Diagnosis::AssignToRValue);
+            }
+            cast::lvalue_conversion(sema, &mut rhs, &e2.span);
+
+            // let l_ty = sema.
+
+            let out = Ok((lhs.ty, RValue));
+            put(sema, e1, lhs);
+            put(sema, e2, rhs);
+            out
+        }
         Expression::Cast(ty_node, operand) => {
             let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
             let (to_qty, _) =
@@ -185,7 +206,18 @@ fn type_of(
             // A pointer may be convened to an integral type. The size of integer required and the result
             // are implementation-defined If the space provided is not long enough. the behavior is undefined
             let p_to_int = from_ty.is_pointer() && to_ty.is_integral(sema);
+            // An arbitary integer may be converted to a pointer. The result is implementation defined
             let int_to_p = from_ty.is_integral(sema) && to_ty.is_pointer();
+            // A pointer to an object or incomplete type may be converted to a pointer to a different
+            // object type or a different incomplete type. The resulting pointer might not be valid if it is
+            // improperly aligned for the type pointed to.
+            let p_to_p = from_ty.is_pointer() && to_ty.is_pointer();
+            // A pointer to a function of one type may be converted to a pointer to a function of another
+            // type and back again; the result shall compare equal to the original pointer. If a converted
+            // pointer is used to call a function that has a type that is not compatible with the type of the
+            // called function. the behavior is undefined.
+            let f_to_f = from_ty.is_function() && to_ty.is_function();
+
             Ok((to_qty, RValue))
         }
         _ => Err(Diagnosis::Poisoned),
