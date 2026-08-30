@@ -24,6 +24,7 @@ pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> O
     sema.diagnosis.append(&mut collected);
     let value = match folded {
         Ok(value) => Some(value),
+        Err(Diagnosis::Poisoned) => None, // already reported by the type pass
         Err(diagnosis) => sema.add_diag(Diag::none_diag(diagnosis), &expr.span),
     };
     sema.constants.insert(expr.id, value);
@@ -45,14 +46,17 @@ fn cast(sema: &mut Sema, qualif: QualifiedType, val: Value) -> Result<Value, Dia
                 .target
                 .cast(&ResolvedType::Int, val)
                 .ok_or(Diagnosis::NonIntegerConstantExpression),
-            _ => Err(Diagnosis::CastToNonScalar),
+            // 6.3.4 a non-scalar cast target is a constraint violation the type pass already
+            // catches and reports (Diagnosis::CastToNonScalar); fold never reaches a poisoned
+            // node, see the short-circuit at the top of fold.
+            _ => unreachable!("sould be catched in typing"),
         };
     }
     if let Some(casted) = sema.target.cast(ty, val) {
         return Ok(casted);
     }
     match ty {
-        ResolvedType::Array { .. } | ResolvedType::Void => Err(Diagnosis::CastToNonScalar),
+        ResolvedType::Array { .. } | ResolvedType::Void => unreachable!("sould be catched in typing"),
         _ => Err(Diagnosis::NonIntegerConstantExpression),
     }
 }

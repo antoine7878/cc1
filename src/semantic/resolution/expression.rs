@@ -212,7 +212,7 @@ fn type_of(
                 let ty = qualif.id.resolve(sema);
                 if !matches!(ty, ResolvedType::Void) {
                     if !ty.is_scalar(sema) || !re.casted_ty().id.resolve(sema).is_scalar(sema) {
-                        return Err(Diagnosis::InvalidOperand);
+                        return Err(Diagnosis::CastToNonScalar);
                     }
                     let a = is_null_pointer_constant(sema, ctx, operand);
                     cast::convert(sema, re, qualif.id, a)
