@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::arena::ResolveWith;
 use crate::ast::{self};
 use crate::parser::Span;
@@ -253,4 +255,24 @@ pub fn pointer_minus_pointer(
         return Err(Diagnosis::InvalidOperand);
     }
     Ok(QualifiedType::new(sema.builtins.ptrdiff_t, false, false))
+}
+
+impl fmt::Display for CastKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CastKind::IntegerPromotion => write!(f, "promo"),
+            CastKind::IntegerConversion => write!(f, "i->i"),
+            CastKind::IntegerToFloating => write!(f, "i->f"),
+            CastKind::FloatingConversion => write!(f, "fc"),
+            CastKind::FloatingToInteger => write!(f, "f->i"),
+            CastKind::FunctionToPointer => write!(f, "fn->p"),
+            CastKind::LValueToRValue => write!(f, "l->r"),
+            CastKind::ArrayToPointer => write!(f, "a->p"),
+            CastKind::NullPointer => write!(f, "->null"),
+            CastKind::ToVoid => write!(f, "->void"),
+            CastKind::PointerToInteger => write!(f, "p->i"),
+            CastKind::IntegerToPointer => write!(f, "i->p"),
+            CastKind::PointerConversion => write!(f, "p->p"),
+        }
+    }
 }

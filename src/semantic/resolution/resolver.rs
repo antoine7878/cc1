@@ -1,11 +1,12 @@
 use crate::arena::ResolveWith;
 use crate::ast::visit::{
-    Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_jump_statement, walk_labeled_statement,
+    Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_init_declarator, walk_jump_statement,
+    walk_labeled_statement,
 };
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Expression, ExpressionNode,
-    FunctionDefinitionNode, InitDeclaratorNode, Initializer, JumpStatement, JumpStatementNode, Labeled,
-    LabeledStatementNode, Name, Storage, TypeSpecifier,
+    FunctionDefinitionNode, InitDeclaratorNode, Initializer, InitializerNode, JumpStatement, JumpStatementNode,
+    Labeled, LabeledStatementNode, Name, Storage, TypeSpecifier,
 };
 use crate::context::Context;
 use crate::parser::Span;
@@ -217,6 +218,26 @@ fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
     })
 }
 
+// fn do_init(
+//     sema: &mut Sema,
+//     ctx: &Context,
+//     ty: QualifiedType,
+//     init_node: &InitializerNode,
+// ) -> Result<QualifiedType, Diagnosis> {
+//     match &init_node.init {
+//         Initializer::Single(e) => {
+//             sema.visit_expression(ctx, e);
+//             expression::init(sema, ctx, ty, e)
+//         }
+//         Initializer::List(inits) => {
+//             let a = inits.iter().try_for_each(|d| do_init(sema, ctx, ty, d));
+//             // .map(|d| do_init(sema, ctx, ty, d))
+//             // .collect::<Result<Vec<_>, _>>()?;
+//             Err(Diagnosis::Poisoned)
+//         }
+//     }
+// }
+
 impl Visitor for Sema {
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
         walk_expression(self, ctx, node);
@@ -234,18 +255,30 @@ impl Visitor for Sema {
     }
 
     fn visit_init_declarator(&mut self, ctx: &Context, node: &InitDeclaratorNode) {
-        let Some(init_node) = &node.initializer else { return };
         let decl = &node.declarator;
         let Some(&sym) = self.declarations.get(&decl.id) else { return };
         let Some(ty) = sym.resolve(self).ty else { return };
-        match &init_node.init {
+        self.init_type = Some(ty);
+        walk_init_declarator(self, ctx, node);
+        self.init_type = None;
+    }
+
+    fn visit_initializer(&mut self, ctx: &Context, node: &InitializerNode) {
+        let ty = self.init_type.expect("no init type");
+        match &node.init {
             Initializer::Single(e) => {
                 self.visit_expression(ctx, e);
                 if let Err(inner) = expression::init(self, ctx, ty, e) {
                     self.add_diag(Diag::only_diag(inner), &e.span);
                 }
             }
-            Initializer::List(_) => todo!(),
+            Initializer::List(inits) => {
+                let ResolvedType::Array { elem, .. } = ty.id.resolve(self) else { panic!("ouspi") };
+                self.init_type = Some(*elem);
+                for node in inits {
+                    self.visit_initializer(ctx, node);
+                }
+            }
         }
     }
 

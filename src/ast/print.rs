@@ -67,7 +67,7 @@ impl AstPrinter {
         }
         for cast in &resolved.casts {
             self.put(format_args!(
-                " {GRAY}<{:?}>{CYAN} {GREEN}'{}'{CYAN}",
+                " {GRAY}{}{CYAN} {GREEN}'{}'{CYAN}",
                 cast.kind,
                 ctx.describe(&cast.to)
             ));
