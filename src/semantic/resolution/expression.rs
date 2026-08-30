@@ -59,9 +59,9 @@ pub fn init(
     ty: QualifiedType,
     init_node: &ExpressionNode,
 ) -> Result<QualifiedType, Diagnosis> {
+    let is_null = is_null_pointer_constant(sema, ctx, init_node);
     let mut ty = ResolvedExpression::new(ty, ExpressionKind::LValue);
     let mut re = take(sema, init_node)?;
-    let is_null = is_null_pointer_constant(sema, ctx, init_node);
     let out = cast::assignment_conversion(sema, &mut ty, &mut re, is_null);
     put(sema, init_node, re);
     out

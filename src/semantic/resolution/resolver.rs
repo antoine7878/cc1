@@ -4,16 +4,15 @@ use crate::ast::visit::{
 };
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Expression, ExpressionNode,
-    FunctionDefinitionNode, Initializer, JumpStatement, JumpStatementNode, Labeled, LabeledStatementNode, Name,
-    Storage, TypeSpecifier,
+    FunctionDefinitionNode, InitDeclaratorNode, Initializer, JumpStatement, JumpStatementNode, Labeled,
+    LabeledStatementNode, Name, Storage, TypeSpecifier,
 };
 use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::resolution::expression;
 use crate::semantic::{
-    DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, ExpressionKind, FunctionDefId, ParamInfo,
-    ParamTypes, QualifiedType, ResolvedExpression, ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind,
-    constrain, declaration, ice,
+    DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo, ParamTypes, QualifiedType,
+    ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, declaration, ice,
 };
 
 #[derive(Debug)]
@@ -230,22 +229,22 @@ impl Visitor for Sema {
         expression::run(self, ctx, node);
     }
 
-    // fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode) {
-    //     let specifiers = &node.specifiers;
-    //     let span = &node.span;
-    //     let declared_storage = constrain::declaration::get_storage(specifiers).collect(self, span);
-    //     let Some(ty) = declaration::base_type(self, ctx, specifiers, span) else { return };
-    //     for init_decl in &node.init_declarators {
-    //         let Some(init_node) = &init_decl.initializer else { continue };
-    //         match &init_node.init {
-    //             Initializer::Single(e) => {
-    //                 self.visit_expression(ctx, e);
-    //                 expression::init(self, ctx, ty, e);
-    //             }
-    //             Initializer::List(_) => todo!(),
-    //         }
-    //     }
-    // }
+    fn visit_init_declarator(&mut self, ctx: &Context, node: &InitDeclaratorNode) {
+        let Some(init_node) = &node.initializer else { return };
+        let decl = &node.declarator;
+        let Some(&sym) = self.declarations.get(&decl.id) else { return };
+        let Some(ty) = sym.resolve(self).ty else { return };
+        // let inner = declaration::base_type(self, ctx, specifiers, &init_decl.span);
+        // let Some((ty, _)) = declaration::declared_type(self, ctx, inner, decl) else { return };
+        match &init_node.init {
+            Initializer::Single(e) => {
+                self.visit_expression(ctx, e);
+                let _ = expression::init(self, ctx, ty, e)
+                    .map_err(|inner| self.diagnosis.push(DiagnosisNode::new(inner, e.span)));
+            }
+            Initializer::List(_) => todo!(),
+        }
+    }
 }
 
 impl Visitor for SymbolResolver<'_> {
@@ -302,8 +301,10 @@ impl Visitor for SymbolResolver<'_> {
                 _ => SymbolKind::Variable,
             };
             let is_init = init_declarator.initializer.is_some();
-            self.sema
+            let sym_id = self
+                .sema
                 .declare(Symbol::new(name, Some(ty), Some(storage), kind, is_init), &decl.span);
+            self.sema.declarations.insert(init_declarator.declarator.id, sym_id);
         }
         walk_declaration(self, ctx, node);
     }
@@ -337,5 +338,9 @@ impl Visitor for SymbolResolver<'_> {
 
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
         self.sema.visit_expression(ctx, node);
+    }
+
+    fn visit_init_declarator(&mut self, ctx: &Context, node: &InitDeclaratorNode) {
+        self.sema.visit_init_declarator(ctx, node);
     }
 }
