@@ -40,7 +40,7 @@ impl<'a> SymbolResolver<'a> {
         let decl_span = &node.declarator.span;
 
         let qualif = declaration::base_type(self.sema, ctx, &node.specifiers, span);
-        let (ty, decl, params) = declaration::declared_function(self.sema, ctx, qualif, &node.declarator)?;
+        let (rty, decl, params) = declaration::declared_function(self.sema, ctx, qualif, &node.declarator)?;
         let params = constrain::external::extract_function_declarator(params).collect(self, decl_span)?;
 
         let storage = constrain::declaration::get_storage(&node.specifiers)
@@ -58,10 +58,14 @@ impl<'a> SymbolResolver<'a> {
         // comparison needs the identifiers, so only the return type is compared here.
         let ty = match &declared {
             Some(declared) if !matches!(params, DeclaredParams::Prototype { .. }) => {
-                self.with_param_types(ty, declared.clone())
+                self.with_param_types(rty, declared.clone())
             }
-            _ => ty,
+            _ => rty,
         };
+        match ty.id.resolve(self.sema) {
+            &ResolvedType::Function { ret, .. } => self.sema.return_type = Some(ret),
+            _ => unreachable!(),
+        }
         let sym = Symbol::new(name, Some(ty), Some(storage), SymbolKind::Function, true);
         let sym = self.sema.declare(sym, decl_span);
         let declared = (previous == Some(sym)).then_some(declared).flatten();
@@ -243,6 +247,23 @@ impl Visitor for Sema {
             Initializer::List(_) => todo!(),
         }
     }
+
+    fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode) {
+        match (&node.stmt, self.return_type) {
+            (JumpStatement::Return(Some(e)), Some(ty)) => {
+                self.visit_expression(ctx, e);
+                let _ = expression::init(self, ctx, ty, e)
+                    .map_err(|inner| self.diagnosis.push(DiagnosisNode::new(inner, e.span)));
+            }
+            (JumpStatement::Return(None), Some(ty)) => {
+                if ty.id != self.builtins.void {
+                    self.add_diag(Diag::only_diag(Diagnosis::InvalidReturnType), &node.span);
+                }
+            }
+            (JumpStatement::Return(_), None) => unreachable!("return outside function"),
+            _ => (),
+        }
+    }
 }
 
 impl Visitor for SymbolResolver<'_> {
@@ -264,8 +285,8 @@ impl Visitor for SymbolResolver<'_> {
             self.check_identifier_list(&declared, &params, &parameters, name, span);
         }
         self.sema.functions.complete(def, parameters);
-
         self.visit_compound_statement(ctx, &node.body);
+        self.sema.return_type = None;
     }
 
     fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode) {
@@ -319,10 +340,16 @@ impl Visitor for SymbolResolver<'_> {
     }
 
     fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode) {
-        if let JumpStatement::Goto(name) = node.stmt {
-            self.sema.add_label_symbol(name, &node.span, false);
+        match &node.stmt {
+            JumpStatement::Goto(name) => self.sema.add_label_symbol(*name, &node.span, false),
+            JumpStatement::Return(e) => {
+                if let Some(e) = e {
+                    self.visit_expression(ctx, e);
+                }
+                self.sema.visit_jump_statement(ctx, node);
+            }
+            _ => walk_jump_statement(self, ctx, node),
         }
-        walk_jump_statement(self, ctx, node);
     }
 
     fn visit_compound_statement(&mut self, ctx: &Context, node: &CompoundStatementNode) {
@@ -342,4 +369,3 @@ impl Visitor for SymbolResolver<'_> {
         self.sema.visit_init_declarator(ctx, node);
     }
 }
-// - return — still not wired. Needs the small threaded-state addition (current function's return type) discussed a few turns back.

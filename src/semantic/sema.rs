@@ -28,6 +28,7 @@ pub struct Sema {
 
     pub layouts: HashMap<ResolvedTypeId, Layout>,
     pub target: Target,
+    pub return_type: Option<QualifiedType>,
 }
 
 impl Default for Sema {
@@ -50,6 +51,7 @@ impl Default for Sema {
             constants: HashMap::default(),
 
             layouts: HashMap::default(),
+            return_type: None,
             target,
         }
     }
