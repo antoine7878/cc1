@@ -1,6 +1,3 @@
-use std::any::Any;
-use std::num;
-
 use crate::arena::ResolveWith;
 use crate::ast::{self};
 use crate::parser::Span;
@@ -102,7 +99,15 @@ fn convert_type(ty: ResolvedTypeId) -> QualifiedType {
     QualifiedType::new(ty, false, false)
 }
 
-fn convert(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId) {
+// convert(sema, re, to, is_null_constant):
+//     from = re.casted_ty()
+//     from.id == to.id                              -> nothing
+//     both arithmetic                                -> num_conv(re, to)          // 6.2.1.2-4
+//     to is Void                                      -> push ToVoid
+//     to is Pointer, and is_null_constant             -> push NullPointer         // 6.2.2.3
+//     from is Pointer, to is Pointer                  -> push PointerConversion   // 6.3.16.1
+//     _ -> unreachable!()   // the caller was supposed to have licensed this pair already
+pub fn convert(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId, is_null_ptr: bool) {
     let from = from_re.casted_ty();
     match (from.id.resolve(sema), to_id.resolve(sema)) {
         // from.ty == to.ty                      -> nothing
@@ -110,11 +115,17 @@ fn convert(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId)
         // both arithmetic                       -> num_conv           // 6.2.1.2-4
         (f, t) if f.is_arithmetic(sema) && t.is_arithmetic(sema) => num_conv(sema, from_re, to_id),
         // to is void                            -> ToVoid             // 6.3.4
-        (_, ResolvedType::Void) => (),
+        (_, ResolvedType::Void) => from_re
+            .casts
+            .push(ImplicitCast::new(CastKind::ToVoid, convert_type(to_id))),
         // re is a null pointer constant, to is a pointer -> NullPointer  // 6.2.2.3
-        (ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => (),
+        (_, ResolvedType::Pointer(_)) if is_null_ptr => from_re
+            .casts
+            .push(ImplicitCast::new(CastKind::NullPointer, convert_type(to_id))),
         // both pointers                         -> PointerConversion  // 6.3.16.1
-        (ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => (),
+        (ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => from_re
+            .casts
+            .push(ImplicitCast::new(CastKind::PointerConversion, convert_type(to_id))),
         _ => unreachable!(),
     }
 }

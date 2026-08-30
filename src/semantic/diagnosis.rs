@@ -39,6 +39,7 @@ pub enum Diagnosis {
     IncompatibleCast,
     /// 6.3.16
     AssignToRValue,
+    ConstAssignement,
     // InvalidCast,
     /// 6.4
     NonConstantExpression,
@@ -110,6 +111,7 @@ impl DiagnosisNode {
 
         match &self.inner {
             Diagnosis::AssignToRValue => "Cannot assign to an r-value".to_string(),
+            Diagnosis::ConstAssignement => "Cannot assign to const value".to_string(),
             Diagnosis::Poisoned => "Internal error".to_string(),
             Diagnosis::InvalidOperand => "invalid operand".to_string(),
             Diagnosis::IncompleteType => "Incomplete type".to_string(),

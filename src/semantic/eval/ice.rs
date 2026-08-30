@@ -45,14 +45,14 @@ fn cast(sema: &mut Sema, qualif: QualifiedType, val: Value) -> Result<Value, Dia
                 .target
                 .cast(&ResolvedType::Int, val)
                 .ok_or(Diagnosis::NonIntegerConstantExpression),
-            _ => Err(Diagnosis::Poisoned),
+            _ => Err(Diagnosis::CastToNonScalar),
         };
     }
     if let Some(casted) = sema.target.cast(ty, val) {
         return Ok(casted);
     }
     match ty {
-        ResolvedType::Array { .. } | ResolvedType::Void => Err(Diagnosis::Poisoned),
+        ResolvedType::Array { .. } | ResolvedType::Void => Err(Diagnosis::CastToNonScalar),
         _ => Err(Diagnosis::NonIntegerConstantExpression),
     }
 }
