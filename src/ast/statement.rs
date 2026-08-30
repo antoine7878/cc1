@@ -4,7 +4,13 @@ use crate::ast::{DeclarationNode, ExpressionNode, Name};
 use crate::parser::Span;
 use crate::{ast_node, define_arena};
 
-define_arena!(Statement, StatementArena, StatementId, crate::ast::AstArenas, statements);
+define_arena!(
+    Statement,
+    StatementArena,
+    StatementId,
+    crate::ast::AstArenas,
+    statements
+);
 
 ast_node! {
     pub struct StatementNode {
@@ -71,10 +77,12 @@ pub enum IterationStatement {
     While(ExpressionNode, StatementNode),
     Do(StatementNode, ExpressionNode),
     For(
-        ExpressionStatementNode,
-        ExpressionStatementNode,
-        Option<ExpressionNode>,
-        StatementNode,
+        Box<(
+            ExpressionStatementNode,
+            ExpressionStatementNode,
+            Option<ExpressionNode>,
+            StatementNode,
+        )>,
     ),
 }
 
@@ -211,7 +219,7 @@ impl IterationStatementNode {
         stmt: StatementNode,
         span: Span,
     ) -> IterationStatementNode {
-        IterationStatementNode::new(IterationStatement::For(e1, e2, expr, stmt), span)
+        IterationStatementNode::new(IterationStatement::For(Box::new((e1, e2, expr, stmt))), span)
     }
 }
 

@@ -4,15 +4,16 @@ use crate::ast::visit::{
 };
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Expression, ExpressionNode,
-    FunctionDefinitionNode, JumpStatement, JumpStatementNode, Labeled, LabeledStatementNode, Name, Storage,
-    TypeSpecifier,
+    FunctionDefinitionNode, Initializer, JumpStatement, JumpStatementNode, Labeled, LabeledStatementNode, Name,
+    Storage, TypeSpecifier,
 };
 use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::resolution::expression;
 use crate::semantic::{
-    DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo, ParamTypes, QualifiedType,
-    ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, declaration, ice,
+    DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, ExpressionKind, FunctionDefId, ParamInfo,
+    ParamTypes, QualifiedType, ResolvedExpression, ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind,
+    constrain, declaration, ice,
 };
 
 #[derive(Debug)]
@@ -114,10 +115,11 @@ impl<'a> SymbolResolver<'a> {
         );
     }
 
-    fn param_empty(&mut self, lst: &[DeclarationNode], span: &Span) {
+    fn param_empty(&mut self, lst: &[DeclarationNode], span: &Span) -> Vec<SymbolId> {
         if !lst.is_empty() {
             self.add_diag(Diag::only_diag(Diagnosis::ParameterTypeListWithList), span)
         }
+        Vec::new()
     }
 
     fn param_prototype(&mut self, params: &[ParamInfo], lst: &[DeclarationNode], span: &Span) -> Vec<SymbolId> {
@@ -227,6 +229,23 @@ impl Visitor for Sema {
         }
         expression::run(self, ctx, node);
     }
+
+    // fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode) {
+    //     let specifiers = &node.specifiers;
+    //     let span = &node.span;
+    //     let declared_storage = constrain::declaration::get_storage(specifiers).collect(self, span);
+    //     let Some(ty) = declaration::base_type(self, ctx, specifiers, span) else { return };
+    //     for init_decl in &node.init_declarators {
+    //         let Some(init_node) = &init_decl.initializer else { continue };
+    //         match &init_node.init {
+    //             Initializer::Single(e) => {
+    //                 self.visit_expression(ctx, e);
+    //                 expression::init(self, ctx, ty, e);
+    //             }
+    //             Initializer::List(_) => todo!(),
+    //         }
+    //     }
+    // }
 }
 
 impl Visitor for SymbolResolver<'_> {
@@ -237,10 +256,7 @@ impl Visitor for SymbolResolver<'_> {
         let lst = &node.old_style_declarations;
         let span = &node.declarator.span;
         let parameters = match &params {
-            DeclaredParams::Unspecified => {
-                self.param_empty(lst, span);
-                Vec::new()
-            }
+            DeclaredParams::Unspecified => self.param_empty(lst, span),
             DeclaredParams::Names(names) => self.param_old_style(ctx, names, lst, span),
             DeclaredParams::Prototype { params, .. } => self.param_prototype(params, lst, span),
         };

@@ -53,6 +53,20 @@ fn puts(sema: &mut Sema, e1: &ExpressionNode, re1: ResolvedExpression, e2: &Expr
     put(sema, e2, re2);
 }
 
+pub fn init(
+    sema: &mut Sema,
+    ctx: &Context,
+    ty: QualifiedType,
+    init_node: &ExpressionNode,
+) -> Result<QualifiedType, Diagnosis> {
+    let mut ty = ResolvedExpression::new(ty, ExpressionKind::LValue);
+    let mut re = take(sema, init_node)?;
+    let is_null = is_null_pointer_constant(sema, ctx, init_node);
+    let out = cast::assignment_conversion(sema, &mut ty, &mut re, is_null);
+    put(sema, init_node, re);
+    out
+}
+
 fn with_operand<F>(
     sema: &mut Sema,
     node: &ExpressionNode,
@@ -87,7 +101,7 @@ where
     out.map(|q| (q, kind))
 }
 
-fn assign_target(lhs: &ResolvedExpression) -> Result<(), Diagnosis> {
+fn check_assign_lhs(lhs: &ResolvedExpression) -> Result<(), Diagnosis> {
     if lhs.kind == ExpressionKind::RValue {
         return Err(Diagnosis::AssignToRValue);
     }
@@ -100,17 +114,17 @@ fn assign_target(lhs: &ResolvedExpression) -> Result<(), Diagnosis> {
 fn with_assignment<F>(
     sema: &mut Sema,
     ctx: &Context,
-    lhs_node: &ExpressionNode,
-    rhs_node: &ExpressionNode,
+    e1: &ExpressionNode,
+    e2: &ExpressionNode,
     f: F,
 ) -> Result<(QualifiedType, ExpressionKind), Diagnosis>
 where
     F: FnOnce(&mut Sema, &mut ResolvedExpression, &mut ResolvedExpression, bool) -> Result<QualifiedType, Diagnosis>,
 {
-    let is_null = is_null_pointer_constant(sema, ctx, rhs_node);
-    let (mut lhs, mut rhs) = takes(sema, lhs_node, rhs_node)?;
-    let out = assign_target(&lhs).and_then(|()| {
-        cast::lvalue_conversion(sema, &mut rhs, &rhs_node.span);
+    let is_null = is_null_pointer_constant(sema, ctx, e2);
+    let (mut lhs, mut rhs) = takes(sema, e1, e2)?;
+    let out = check_assign_lhs(&lhs).and_then(|()| {
+        cast::lvalue_conversion(sema, &mut rhs, &e2.span);
         f(sema, &mut lhs, &mut rhs, is_null)
     });
     puts(sema, e1, lhs, e2, rhs);

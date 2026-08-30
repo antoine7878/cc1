@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, Enum, Expression,
     ExpressionNode, ExpressionStatementNode, ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionNode,
@@ -261,7 +263,8 @@ pub fn walk_iteration_statement<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, n
             v.visit_statement(ctx, body);
             v.visit_expression(ctx, cond);
         }
-        IterationStatement::For(init, cond, inc, body) => {
+        IterationStatement::For(b) => {
+            let (init, cond, inc, body) = b.deref();
             v.visit_expression_statement(ctx, init);
             v.visit_expression_statement(ctx, cond);
             if let Some(inc) = inc {

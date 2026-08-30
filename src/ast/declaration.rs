@@ -5,7 +5,13 @@ use crate::context::Context;
 use crate::parser::Span;
 use crate::{ast_node, define_arena};
 
-define_arena!(Declarator, DeclaratorArena, DeclaratorId, crate::ast::AstArenas, declarators);
+define_arena!(
+    Declarator,
+    DeclaratorArena,
+    DeclaratorId,
+    crate::ast::AstArenas,
+    declarators
+);
 
 ast_node! {
     pub struct DeclarationNode {

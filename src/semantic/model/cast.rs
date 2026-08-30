@@ -173,7 +173,7 @@ fn is_object_or_incomplete(sema: &Sema, ty: ResolvedTypeId) -> bool {
     !matches!(ty.resolve(sema), ResolvedType::Function { .. } | ResolvedType::Void)
 }
 
-fn pointee_licensed(sema: &Sema, lp: &QualifiedType, rp: &QualifiedType) -> bool {
+fn assign_pointer(sema: &Sema, lp: &QualifiedType, rp: &QualifiedType) -> bool {
     lp.is_compatible_ignoring_qualifiers(sema, rp)
         || (lp.id == sema.builtins.void && is_object_or_incomplete(sema, rp.id))
         || (rp.id == sema.builtins.void && is_object_or_incomplete(sema, lp.id))
@@ -195,7 +195,7 @@ pub fn assignment_conversion(
     match (l, r) {
         (l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => (),
         (&ResolvedType::Tag(id), _) if !id.resolve(sema).is_enum() && lhs.ty.is_compatible(sema, &rhs_ty) => (),
-        (ResolvedType::Pointer(lp), ResolvedType::Pointer(rp)) if pointee_licensed(sema, lp, rp) => {
+        (ResolvedType::Pointer(lp), ResolvedType::Pointer(rp)) if assign_pointer(sema, lp, rp) => {
             if !lp.has_qualifiers_of(rp) {
                 return Err(Diagnosis::DiscardedQualifiers(discarded_qualifier(lp, rp)));
             }
