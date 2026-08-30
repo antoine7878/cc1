@@ -4,8 +4,8 @@ use crate::context::Context;
 use crate::semantic::ice::try_fold;
 use crate::semantic::model::cast;
 use crate::semantic::{
-    Diagnosis, DiagnosisNode, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId, Sema,
-    declaration,
+    Diag, DiagCollector, Diagnosis, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId,
+    Sema, declaration,
 };
 
 pub fn run(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
@@ -14,9 +14,8 @@ pub fn run(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
     }
     let resolved = match type_of(sema, ctx, node) {
         Ok((ty, kind)) => Some(ResolvedExpression::new(ty, kind)),
-        Err(Diagnosis::Poisoned) => None,
         Err(inner) => {
-            sema.diagnosis.push(DiagnosisNode { span: node.span, inner });
+            sema.add_diag(Diag::only_diag(inner), &node.span);
             None
         }
     };

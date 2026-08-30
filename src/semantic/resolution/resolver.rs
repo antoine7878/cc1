@@ -241,8 +241,9 @@ impl Visitor for Sema {
         match &init_node.init {
             Initializer::Single(e) => {
                 self.visit_expression(ctx, e);
-                let _ = expression::init(self, ctx, ty, e)
-                    .map_err(|inner| self.diagnosis.push(DiagnosisNode::new(inner, e.span)));
+                if let Err(inner) = expression::init(self, ctx, ty, e) {
+                    self.add_diag(Diag::only_diag(inner), &e.span);
+                }
             }
             Initializer::List(_) => todo!(),
         }
@@ -252,8 +253,9 @@ impl Visitor for Sema {
         match (&node.stmt, self.return_type) {
             (JumpStatement::Return(Some(e)), Some(ty)) => {
                 self.visit_expression(ctx, e);
-                let _ = expression::init(self, ctx, ty, e)
-                    .map_err(|inner| self.diagnosis.push(DiagnosisNode::new(inner, e.span)));
+                if let Err(inner) = expression::init(self, ctx, ty, e) {
+                    self.add_diag(Diag::only_diag(inner), &e.span);
+                }
             }
             (JumpStatement::Return(None), Some(ty)) => {
                 if ty.id != self.builtins.void {

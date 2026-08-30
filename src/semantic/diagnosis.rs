@@ -191,7 +191,9 @@ pub trait DiagCollector {
     fn diagnosis(&mut self) -> &mut Vec<DiagnosisNode>;
 
     fn add_diag<T>(&mut self, diag: Diag<T>, span: &Span) -> T {
-        if let Some(diagnosis) = diag.diagnosis {
+        if let Some(diagnosis) = diag.diagnosis
+            && !matches!(diagnosis, Diagnosis::Poisoned)
+        {
             self.diagnosis().push(DiagnosisNode::new(diagnosis, *span));
         }
         diag.res
