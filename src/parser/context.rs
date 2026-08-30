@@ -1,3 +1,4 @@
+use crate::arena::{Provide, ProvideMut};
 use crate::ast::{
     DeclaratorArena, EnumArena, ExpressionArena, Name, StatementArena, StringArena, StringId, StructArena,
     StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, UnionArena, VariantArena,
@@ -27,6 +28,30 @@ pub struct Context {
     pub arenas: Arenas,
     pub ast: TranslationUnitNode,
     pub sema: Sema,
+}
+
+impl Provide<Sema> for Context {
+    fn provide(&self) -> &Sema {
+        &self.sema
+    }
+}
+
+impl ProvideMut<Sema> for Context {
+    fn provide_mut(&mut self) -> &mut Sema {
+        &mut self.sema
+    }
+}
+
+impl Provide<Arenas> for Context {
+    fn provide(&self) -> &Arenas {
+        &self.arenas
+    }
+}
+
+impl ProvideMut<Arenas> for Context {
+    fn provide_mut(&mut self) -> &mut Arenas {
+        &mut self.arenas
+    }
 }
 
 impl Context {

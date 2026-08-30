@@ -2,7 +2,7 @@ use crate::ast::{Name, Tag};
 use crate::define_arena;
 use crate::semantic::{SymbolId, SymbolKind};
 
-define_arena!(TagDef, TagDefArena, TagDefId, sema.tags);
+define_arena!(TagDef, TagDefArena, TagDefId, crate::semantic::Sema, tags);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TagDef {
