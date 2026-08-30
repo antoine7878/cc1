@@ -31,6 +31,8 @@ pub enum CastKind {
 
     NullPointer,       // 6.2.2.3
     ToVoid,            // 6.3.4
+    PointerToInteger,  // 6.3.4
+    IntegerToPointer,  // 6.3.4
     PointerConversion, // 6.3.16.1
 }
 
@@ -99,35 +101,25 @@ fn convert_type(ty: ResolvedTypeId) -> QualifiedType {
     QualifiedType::new(ty, false, false)
 }
 
-// convert(sema, re, to, is_null_constant):
-//     from = re.casted_ty()
-//     from.id == to.id                              -> nothing
-//     both arithmetic                                -> num_conv(re, to)          // 6.2.1.2-4
-//     to is Void                                      -> push ToVoid
-//     to is Pointer, and is_null_constant             -> push NullPointer         // 6.2.2.3
-//     from is Pointer, to is Pointer                  -> push PointerConversion   // 6.3.16.1
-//     _ -> unreachable!()   // the caller was supposed to have licensed this pair already
 pub fn convert(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId, is_null_ptr: bool) {
     let from = from_re.casted_ty();
-    match (from.id.resolve(sema), to_id.resolve(sema)) {
-        // from.ty == to.ty                      -> nothing
-        _ if from.id == to_id => (),
-        // both arithmetic                       -> num_conv           // 6.2.1.2-4
-        (f, t) if f.is_arithmetic(sema) && t.is_arithmetic(sema) => num_conv(sema, from_re, to_id),
-        // to is void                            -> ToVoid             // 6.3.4
-        (_, ResolvedType::Void) => from_re
-            .casts
-            .push(ImplicitCast::new(CastKind::ToVoid, convert_type(to_id))),
-        // re is a null pointer constant, to is a pointer -> NullPointer  // 6.2.2.3
-        (_, ResolvedType::Pointer(_)) if is_null_ptr => from_re
-            .casts
-            .push(ImplicitCast::new(CastKind::NullPointer, convert_type(to_id))),
-        // both pointers                         -> PointerConversion  // 6.3.16.1
-        (ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => from_re
-            .casts
-            .push(ImplicitCast::new(CastKind::PointerConversion, convert_type(to_id))),
+    let implicit_cast = match (from.id.resolve(sema), to_id.resolve(sema)) {
+        _ if from.id == to_id => return,
+        (f, t) if f.is_arithmetic(sema) && t.is_arithmetic(sema) => return num_conv(sema, from_re, to_id),
+        (_, ResolvedType::Void) => ImplicitCast::new(CastKind::ToVoid, convert_type(to_id)),
+        (_, ResolvedType::Pointer(_)) if is_null_ptr => ImplicitCast::new(CastKind::NullPointer, convert_type(to_id)),
+        (ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => {
+            ImplicitCast::new(CastKind::PointerConversion, convert_type(to_id))
+        }
+        (ResolvedType::Pointer(_), t) if t.is_integral(sema) => {
+            ImplicitCast::new(CastKind::PointerToInteger, convert_type(to_id))
+        }
+        (f, ResolvedType::Pointer(_)) if f.is_integral(sema) => {
+            ImplicitCast::new(CastKind::IntegerToPointer, convert_type(to_id))
+        }
         _ => unreachable!(),
-    }
+    };
+    from_re.casts.push(implicit_cast)
 }
 fn num_conv(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId) {
     let from = from_re.casted_ty().id;

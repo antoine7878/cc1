@@ -46,22 +46,18 @@ fn cast(sema: &mut Sema, qualif: QualifiedType, val: Value) -> Result<Value, Dia
                 .target
                 .cast(&ResolvedType::Int, val)
                 .ok_or(Diagnosis::NonIntegerConstantExpression),
-            // 6.3.4 a non-scalar cast target is a constraint violation the type pass already
-            // catches and reports (Diagnosis::CastToNonScalar); fold never reaches a poisoned
-            // node, see the short-circuit at the top of fold.
-            _ => unreachable!("sould be catched in typing"),
+            _ => Err(Diagnosis::CastToNonScalar),
         };
     }
     if let Some(casted) = sema.target.cast(ty, val) {
         return Ok(casted);
     }
     match ty {
-        ResolvedType::Array { .. } | ResolvedType::Void => unreachable!("sould be catched in typing"),
+        ResolvedType::Array { .. } | ResolvedType::Void => Err(Diagnosis::CastToNonScalar),
         _ => Err(Diagnosis::NonIntegerConstantExpression),
     }
 }
 
-/// 6.4 Constant expressions are folded for the target the unit is compiled for.
 fn operands(
     sema: &mut Sema,
     ctx: &Context,
@@ -206,6 +202,11 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut Sink) 
             }
         }
         Expression::Cast(ty_node, operand) => {
+            // 6.3.4's scalar-target constraint is already checked (and, if violated, reported)
+            // by the type pass, which fully covers Cast; don't re-derive and re-diagnose it here.
+            if let Some(None) = sema.expressions.get(&expr.id) {
+                return Err(Diagnosis::Poisoned);
+            }
             let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &expr.span);
             let (qualif, _) = declaration::declared_type(sema, ctx, base, &ty_node.declarator)
                 .ok_or(Diagnosis::NonConstantExpression)?;
