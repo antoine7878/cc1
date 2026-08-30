@@ -179,6 +179,10 @@ fn pointee_licensed(sema: &Sema, lp: &QualifiedType, rp: &QualifiedType) -> bool
         || (rp.id == sema.builtins.void && is_object_or_incomplete(sema, lp.id))
 }
 
+fn discarded_qualifier(lp: &QualifiedType, rp: &QualifiedType) -> ast::Qualifier {
+    if rp.is_const && !lp.is_const { ast::Qualifier::Const } else { ast::Qualifier::Volatile }
+}
+
 pub fn assignment_conversion(
     sema: &mut Sema,
     lhs: &mut ResolvedExpression,
@@ -189,11 +193,13 @@ pub fn assignment_conversion(
     let rhs_ty = rhs.casted_ty();
     let r = rhs_ty.id.resolve(sema);
     match (l, r) {
-        // both arithmetic                                                       -> convert(rhs, lhs_ty)
         (l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => (),
         (&ResolvedType::Tag(id), _) if !id.resolve(sema).is_enum() && lhs.ty.is_compatible(sema, &rhs_ty) => (),
-        (ResolvedType::Pointer(lp), ResolvedType::Pointer(rp))
-            if lp.has_qualifiers_of(rp) && pointee_licensed(sema, lp, rp) => {}
+        (ResolvedType::Pointer(lp), ResolvedType::Pointer(rp)) if pointee_licensed(sema, lp, rp) => {
+            if !lp.has_qualifiers_of(rp) {
+                return Err(Diagnosis::DiscardedQualifiers(discarded_qualifier(lp, rp)));
+            }
+        }
         (ResolvedType::Pointer(_), _) if is_null_ptr => (),
         _ => return Err(Diagnosis::IncompatibleAssignementTypes),
     }
