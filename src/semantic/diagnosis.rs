@@ -5,10 +5,10 @@ use std::io::{self, BufRead, BufReader, Write, stderr};
 use crate::ast::{Name, Qualifier};
 use crate::context::Context;
 use crate::parser::Span;
-use crate::semantic::SymbolKind;
+use crate::semantic::{QualifiedType, SymbolKind};
 use crate::utils::{RED, RESET, YELLOW};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum Diagnosis {
     InvalidReturnType,
     ArrayInitTooLong,
@@ -40,7 +40,7 @@ pub enum Diagnosis {
     CastOfNonScalar,
     IncompatibleCast,
     /// 6.3.16
-    IncompatibleAssignementTypes,
+    IncompatibleAssignementTypes(QualifiedType, QualifiedType),
     DiscardedQualifiers(Qualifier),
     AssignToRValue,
     ConstAssignement,
@@ -112,12 +112,11 @@ impl DiagnosisNode {
 
     #[rustfmt::skip]
     fn message(&self, ctx: &Context) -> String {
-
         match &self.inner {
             Diagnosis::ArrayInitTooLong => "excess elements in array initializer".to_string(),
             Diagnosis::InvalidReturnType => "Invalid return type".to_string(),
             Diagnosis::DiscardedQualifiers(q) => format!("Assignement discard {q} qualifer" ),
-            Diagnosis::IncompatibleAssignementTypes => "Wrong assignement".to_string(),
+            Diagnosis::IncompatibleAssignementTypes(to, from) => format!("assignment to ‘{}’ from incompatible pointer type ‘{}’", to.describe(&ctx.sema, ctx), from.describe(&ctx.sema, ctx)),
             Diagnosis::AssignToRValue => "Cannot assign to an r-value".to_string(),
             Diagnosis::ConstAssignement => "Cannot assign to const value".to_string(),
             Diagnosis::Poisoned => "Internal error".to_string(),
@@ -250,7 +249,7 @@ impl<T> Diag<Option<T>> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct DiagnosisNode {
     pub span: Span,
     pub inner: Diagnosis,

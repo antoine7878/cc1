@@ -55,15 +55,14 @@ fn puts(sema: &mut Sema, e1: &ExpressionNode, re1: ResolvedExpression, e2: &Expr
 pub fn init(
     sema: &mut Sema,
     ctx: &Context,
-    ty: QualifiedType,
+    l_ty: QualifiedType,
     init_node: &ExpressionNode,
-) -> Result<QualifiedType, Diagnosis> {
+) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
     let is_null = is_null_pointer_constant(sema, ctx, init_node);
-    let mut ty = ResolvedExpression::new(ty, ExpressionKind::LValue);
-    let mut re = take(sema, init_node)?;
-    let out = cast::assignment_conversion(sema, &mut ty, &mut re, is_null);
-    put(sema, init_node, re);
-    out
+    with_operand(sema, init_node, ExpressionKind::RValue, |sema, re| {
+        let mut l_re = ResolvedExpression::new(l_ty, ExpressionKind::LValue);
+        cast::assignment_conversion(sema, &mut l_re, re, is_null)
+    })
 }
 
 fn with_operand<F>(

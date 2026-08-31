@@ -1,5 +1,6 @@
 use crate::arena::ResolveWith;
 use crate::ast::{Tag, TypeSpecifier};
+use crate::context::Context;
 use crate::define_interner;
 use crate::semantic::{ParamTypes, Sema, TagDefId};
 use crate::target::Target;
@@ -274,5 +275,80 @@ impl TypeSpecifierCounter {
         Some([
             c.signed, c.unsigned, c.void, c.char, c.short, c.int, c.long, c.float, c.double,
         ])
+    }
+}
+
+impl QualifiedType {
+    pub fn describe(&self, sema: &Sema, ctx: &Context) -> String {
+        let mut out = String::new();
+        if self.is_const {
+            out.push_str("const ");
+        }
+        if self.is_volatile {
+            out.push_str("volatile ")
+        }
+        match self.id.resolve(sema) {
+            ResolvedType::Void => out.push_str("void"),
+            ResolvedType::Char => out.push_str("char"),
+            ResolvedType::SignedChar => out.push_str("signed char"),
+            ResolvedType::UnsignedChar => out.push_str("unsigned char"),
+            ResolvedType::Short => out.push_str("short"),
+            ResolvedType::UnsignedShort => out.push_str("unsigned short"),
+            ResolvedType::Int => out.push_str("int"),
+            ResolvedType::UnsignedInt => out.push_str("unsigned int"),
+            ResolvedType::Long => out.push_str("long"),
+            ResolvedType::UnsignedLong => out.push_str("unsigned long"),
+            ResolvedType::Float => out.push_str("float"),
+            ResolvedType::Double => out.push_str("double"),
+            ResolvedType::LongDouble => out.push_str("long double"),
+            ResolvedType::Pointer(inner) => {
+                match inner.id.resolve(sema) {
+                    ResolvedType::Function { .. } | ResolvedType::Array { .. } => {
+                        out.push_str(&format!("({})", inner.describe(sema, ctx)))
+                    }
+                    _ => out.push_str(&inner.describe(sema, ctx)),
+                }
+                out.push_str(" *");
+            }
+            &ResolvedType::Tag(id) => {
+                let def = id.resolve(sema);
+                let name = def.name.map(|n| n.id.resolve(ctx).as_str()).unwrap_or("<anonymous>");
+                out.push_str(&format!("{} {}", def.kind(), name));
+                if !def.is_complete {
+                    out.push_str(" (incomplete)");
+                }
+            }
+            ResolvedType::Array { elem, len } => {
+                let (mut elem, mut len) = (elem, len);
+                let mut dimensions = String::new();
+                loop {
+                    dimensions.push('[');
+                    if let Some(len) = len {
+                        dimensions.push_str(&len.to_string());
+                    }
+                    dimensions.push(']');
+                    let ResolvedType::Array { elem: inner, len: size } = elem.id.resolve(sema) else { break };
+                    (elem, len) = (inner, size);
+                }
+                out.push_str(&elem.describe(sema, ctx));
+                out.push_str(&dimensions);
+            }
+            ResolvedType::Function { ret, params } => {
+                out.push_str(&ret.describe(sema, ctx));
+                out.push('(');
+                if let ParamTypes::Prototype { params, is_variadic } = params {
+                    let described: Vec<String> = params.iter().map(|param| param.describe(sema, ctx)).collect();
+                    match described.is_empty() {
+                        true => out.push_str("void"),
+                        false => out.push_str(&described.join(", ")),
+                    }
+                    if *is_variadic {
+                        out.push_str(", ...")
+                    }
+                }
+                out.push(')');
+            }
+        }
+        out
     }
 }

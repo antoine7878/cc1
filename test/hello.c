@@ -1,1 +1,5 @@
-int *x = {0};
+void f(void) {
+	double *p;
+	char *q;
+	q = p;
+}

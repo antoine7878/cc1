@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::arena::ResolveWith;
-use crate::ast::{self};
+use crate::ast::{self, Qualifier};
 use crate::parser::Span;
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId,
@@ -175,14 +175,14 @@ fn is_object_or_incomplete(sema: &Sema, ty: ResolvedTypeId) -> bool {
     !matches!(ty.resolve(sema), ResolvedType::Function { .. } | ResolvedType::Void)
 }
 
-fn assign_pointer(sema: &Sema, lp: &QualifiedType, rp: &QualifiedType) -> bool {
+fn can_assign_pointer(sema: &Sema, lp: &QualifiedType, rp: &QualifiedType) -> bool {
     lp.is_compatible_ignoring_qualifiers(sema, rp)
         || (lp.id == sema.builtins.void && is_object_or_incomplete(sema, rp.id))
         || (rp.id == sema.builtins.void && is_object_or_incomplete(sema, lp.id))
 }
 
 fn discarded_qualifier(lp: &QualifiedType, rp: &QualifiedType) -> ast::Qualifier {
-    if rp.is_const && !lp.is_const { ast::Qualifier::Const } else { ast::Qualifier::Volatile }
+    if rp.is_const && !lp.is_const { Qualifier::Const } else { Qualifier::Volatile }
 }
 
 pub fn assignment_conversion(
@@ -197,13 +197,13 @@ pub fn assignment_conversion(
     match (l, r) {
         (l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => (),
         (&ResolvedType::Tag(id), _) if !id.resolve(sema).is_enum() && lhs.ty.is_compatible(sema, &rhs_ty) => (),
-        (ResolvedType::Pointer(lp), ResolvedType::Pointer(rp)) if assign_pointer(sema, lp, rp) => {
+        (ResolvedType::Pointer(lp), ResolvedType::Pointer(rp)) if can_assign_pointer(sema, lp, rp) => {
             if !lp.has_qualifiers_of(rp) {
                 return Err(Diagnosis::DiscardedQualifiers(discarded_qualifier(lp, rp)));
             }
         }
         (ResolvedType::Pointer(_), _) if is_null_ptr => (),
-        _ => return Err(Diagnosis::IncompatibleAssignementTypes),
+        _ => return Err(Diagnosis::IncompatibleAssignementTypes(lhs.ty, rhs_ty)),
     }
     convert(sema, rhs, lhs.ty.id, is_null_ptr);
     Ok(lhs.ty)

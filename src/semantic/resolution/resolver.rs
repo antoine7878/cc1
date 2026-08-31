@@ -176,12 +176,14 @@ impl<'a> SymbolResolver<'a> {
         else {
             return Vec::new();
         };
-        for string_id in missing_id {
-            let ty = QualifiedType::new(self.sema.builtins.int, false, false);
-            let name = Name::new(string_id, Span::default());
-            let sym = Symbol::new(name, Some(ty), Some(Storage::Auto), SymbolKind::Parameter, false);
-            self.sema.declare(sym, &Span::default());
-        }
+        let ty = QualifiedType::new(self.sema.builtins.int, false, false);
+        missing_id
+            .into_iter()
+            .map(|string_id| Name::new(string_id, Span::default()))
+            .map(|name| Symbol::new(name, Some(ty), Some(Storage::Auto), SymbolKind::Parameter, false))
+            .for_each(|sym| {
+                let _ = self.sema.declare(sym, &Span::default());
+            });
         names
             .iter()
             .filter_map(|name| self.sema.scopes.lookup_ordinary(name.id))
@@ -217,26 +219,6 @@ fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
         _ => false,
     })
 }
-
-// fn do_init(
-//     sema: &mut Sema,
-//     ctx: &Context,
-//     ty: QualifiedType,
-//     init_node: &InitializerNode,
-// ) -> Result<QualifiedType, Diagnosis> {
-//     match &init_node.init {
-//         Initializer::Single(e) => {
-//             sema.visit_expression(ctx, e);
-//             expression::init(sema, ctx, ty, e)
-//         }
-//         Initializer::List(inits) => {
-//             let a = inits.iter().try_for_each(|d| do_init(sema, ctx, ty, d));
-//             // .map(|d| do_init(sema, ctx, ty, d))
-//             // .collect::<Result<Vec<_>, _>>()?;
-//             Err(Diagnosis::Poisoned)
-//         }
-//     }
-// }
 
 impl Visitor for Sema {
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
@@ -282,7 +264,7 @@ impl Visitor for Sema {
                 for (i, node) in inits.iter().enumerate() {
                     if len.is_some_and(|l| l <= i) {
                         self.add_diag(Diag::only_diag(Diagnosis::ArrayInitTooLong), &inits[i].span);
-                        break
+                        break;
                     }
                     self.visit_initializer(ctx, node);
                 }

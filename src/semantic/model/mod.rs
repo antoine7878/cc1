@@ -1,5 +1,4 @@
 pub mod cast;
-pub mod display;
 pub mod function_def;
 pub mod resolved_expression;
 pub mod resolved_type;
