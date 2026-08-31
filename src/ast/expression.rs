@@ -173,17 +173,14 @@ impl ExpressionArena {
         Self::add(self.alloc(expr), span)
     }
 
-    pub fn add_list(&mut self, lhs: ExpressionNode, rhs: ExpressionNode) -> ExpressionNode {
-        match self.get_mut(lhs.id) {
-            Expression::List(v) => {
-                v.push(rhs);
-                lhs
-            }
-            _ => {
-                let span = Span::new(lhs.span.start, rhs.span.end);
-                Self::add(self.alloc(Expression::List(vec![lhs])), span)
-            }
-        }
+    pub fn add_list(&mut self, mut lhs: ExpressionNode, rhs: ExpressionNode) -> ExpressionNode {
+        let Expression::List(v) = self.get_mut(lhs.id) else {
+            let span = Span::new(lhs.span.start, rhs.span.end);
+            return Self::add(self.alloc(Expression::List(vec![lhs, rhs])), span);
+        };
+        lhs.span.end = rhs.span.end;
+        v.push(rhs);
+        lhs
     }
 
     pub fn binary(&mut self, lhs: ExpressionNode, tok: YYToken, rhs: ExpressionNode, span: Span) -> ExpressionNode {

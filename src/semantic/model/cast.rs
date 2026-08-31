@@ -19,7 +19,7 @@ impl ImplicitCast {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CastKind {
     IntegerPromotion,   // 6.2.1.1
     IntegerConversion,  // 6.2.1.2

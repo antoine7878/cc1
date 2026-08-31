@@ -16,9 +16,9 @@ impl Context {
                 [
                     symbol.kind.to_string(),
                     symbol.name.id.resolve(self).clone(),
-                    symbol.storage.map(|s| s.to_string()).unwrap_or_default(),
-                    symbol.value.map(|v| v.to_string()).unwrap_or("-".to_string()),
-                    symbol.ty.map(|ty| ty.describe(&self.sema, self)).unwrap_or_default(),
+                    symbol.storage.map_or(String::default(), |s| s.to_string()),
+                    symbol.value.map_or("-".to_string(), |v| v.to_string()),
+                    symbol.ty.map_or(String::default(), |ty| ty.describe(&self.sema, self)),
                 ]
             })
             .collect();

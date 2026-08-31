@@ -52,10 +52,7 @@ impl Symbol {
     pub fn is_compatible(&self, sema: &Sema, other: &Self) -> bool {
         self.name.id == other.name.id
             && self.kind == other.kind
-            && (self.ty == other.ty
-                || Option::zip(self.ty, other.ty)
-                    .map(|(a, b)| a.is_compatible(sema, &b))
-                    .unwrap_or(false))
+            && (self.ty == other.ty || Option::zip(self.ty, other.ty).is_some_and(|(a, b)| a.is_compatible(sema, &b)))
     }
 
     pub fn expression_kind(&self) -> ExpressionKind {

@@ -16,11 +16,10 @@ pub struct ResolvedExpression {
 
 impl ResolvedExpression {
     pub fn casted_ty(&self) -> QualifiedType {
-        self.casts.last().map(|c| c.to).unwrap_or(self.ty)
+        self.casts.last().map_or(self.ty, |c| c.to)
     }
 
-    pub fn new(ty: QualifiedType, kind: ExpressionKind) -> Self {
-        Self {
+    pub fn new(ty: QualifiedType, kind: ExpressionKind) -> Self { Self {
             ty,
             kind,
             casts: Vec::new(),

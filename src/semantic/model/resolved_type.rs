@@ -312,7 +312,7 @@ impl QualifiedType {
             }
             &ResolvedType::Tag(id) => {
                 let def = id.resolve(sema);
-                let name = def.name.map(|n| n.id.resolve(ctx).as_str()).unwrap_or("<anonymous>");
+                let name = def.name.map_or("<anonymous>", |n| n.id.resolve(ctx).as_str());
                 out.push_str(&format!("{} {}", def.kind(), name));
                 if !def.is_complete {
                     out.push_str(" (incomplete)");
