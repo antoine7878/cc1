@@ -139,6 +139,16 @@ impl Unit {
             .collect()
     }
 
+    pub fn expressions(&self) -> Vec<String> {
+        self.ctx
+            .arenas
+            .expressions
+            .data
+            .iter()
+            .map(|expression| expression.to_string())
+            .collect()
+    }
+
     pub fn const_values(&self) -> Vec<Option<Value>> {
         let mut entries: Vec<_> = self
             .ctx

@@ -114,12 +114,12 @@ pub trait Visitor {
 
     fn visit_value(&mut self, _ctx: &Context, _node: &ValueNode) {}
 
-    fn visit_string_litral(&mut self, ctx: &Context, node: &StringLiteralNode) {
-        walk_string_litral(self, ctx, node);
+    fn visit_string_literal(&mut self, ctx: &Context, node: &StringLiteralNode) {
+        walk_string_literal(self, ctx, node);
     }
 }
 
-pub fn walk_string_litral<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &StringLiteralNode) {
+pub fn walk_string_literal<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &StringLiteralNode) {
     v.visit_name(ctx, &node.name());
 }
 
@@ -284,51 +284,15 @@ pub fn walk_jump_statement<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: 
 pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &ExpressionNode) {
     match node.id.resolve(ctx) {
         Expression::Identifier(name) => v.visit_name(ctx, name),
-        Expression::StringLiteral(literal) => v.visit_string_litral(ctx, literal),
+        Expression::StringLiteral(literal) => v.visit_string_literal(ctx, literal),
         Expression::Constant(value) => v.visit_value(ctx, value),
         Expression::ConstantExpression(expr)
-        | Expression::PostInc(expr)
-        | Expression::PostDec(expr)
-        | Expression::PreInc(expr)
-        | Expression::PreDec(expr)
-        | Expression::Addr(expr)
-        | Expression::Deref(expr)
-        | Expression::Plus(expr)
-        | Expression::Minus(expr)
-        | Expression::BitNot(expr)
-        | Expression::LogicalNot(expr)
+        | Expression::Unary(_, expr)
         | Expression::SizeofExpr(expr)
         | Expression::FunctionCall(expr, None) => v.visit_expression(ctx, expr),
-        Expression::Add(lhs, rhs)
-        | Expression::Sub(lhs, rhs)
-        | Expression::Mul(lhs, rhs)
-        | Expression::Div(lhs, rhs)
-        | Expression::Mod(lhs, rhs)
-        | Expression::Right(lhs, rhs)
-        | Expression::Left(lhs, rhs)
-        | Expression::Greater(lhs, rhs)
-        | Expression::Lower(lhs, rhs)
-        | Expression::GreaterEq(lhs, rhs)
-        | Expression::LowerEq(lhs, rhs)
-        | Expression::Eq(lhs, rhs)
-        | Expression::Neq(lhs, rhs)
-        | Expression::BitAnd(lhs, rhs)
-        | Expression::BitOr(lhs, rhs)
-        | Expression::BitXor(lhs, rhs)
-        | Expression::LogicalAnd(lhs, rhs)
-        | Expression::LogicalOr(lhs, rhs)
-        | Expression::Assign(lhs, rhs)
-        | Expression::AddAssign(lhs, rhs)
-        | Expression::SubAssign(lhs, rhs)
-        | Expression::MulAssign(lhs, rhs)
-        | Expression::DivAssign(lhs, rhs)
-        | Expression::ModAssign(lhs, rhs)
-        | Expression::RightAssign(lhs, rhs)
-        | Expression::LeftAssign(lhs, rhs)
-        | Expression::AndAssign(lhs, rhs)
-        | Expression::OrAssign(lhs, rhs)
-        | Expression::XorAssign(lhs, rhs)
-        | Expression::ArrayAcces(lhs, rhs)
+        Expression::Binary(_, lhs, rhs)
+        | Expression::Assign(_, lhs, rhs)
+        | Expression::ArrayAccess(lhs, rhs)
         | Expression::FunctionCall(lhs, Some(rhs)) => {
             v.visit_expression(ctx, lhs);
             v.visit_expression(ctx, rhs);
@@ -338,7 +302,7 @@ pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &Exp
             v.visit_expression(ctx, then);
             v.visit_expression(ctx, otherwise);
         }
-        Expression::DotAcces(tag, ident) | Expression::PtrAcces(tag, ident) => {
+        Expression::Member(_, tag, ident) => {
             v.visit_expression(ctx, tag);
             v.visit_name(ctx, ident);
         }

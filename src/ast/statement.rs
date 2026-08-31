@@ -109,7 +109,7 @@ impl StatementArena {
         self.add(Statement::Labeled(node), span)
     }
 
-    pub fn compund(&mut self, stmt: CompoundStatementNode, span: Span) -> StatementNode {
+    pub fn compound(&mut self, stmt: CompoundStatementNode, span: Span) -> StatementNode {
         self.add(Statement::Compound(stmt), span)
     }
 

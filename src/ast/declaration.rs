@@ -93,7 +93,7 @@ impl DeclaratorArena {
         }
     }
 
-    pub fn abstrct(&mut self, span: Span) -> DeclaratorNode {
+    pub fn abstract_declarator(&mut self, span: Span) -> DeclaratorNode {
         self.add(Declarator::Abstract, span)
     }
 

@@ -115,10 +115,10 @@ fn each_qualifier_is_reported_once() {
 fn a_repeated_qualifier_is_rejected() {
     let diag = check_qualifier([Qualifier::Const, Qualifier::Const]);
     assert_eq!(diag.res, (true, false));
-    assert_eq!(reported(&diag), "DuplicateTypeQualifers");
+    assert_eq!(reported(&diag), "DuplicateTypeQualifiers");
     assert_eq!(
         reported(&check_qualifier([Qualifier::Volatile, Qualifier::Volatile])),
-        "DuplicateTypeQualifers"
+        "DuplicateTypeQualifiers"
     );
 }
 
@@ -137,7 +137,7 @@ fn qualifiers_are_picked_out_of_the_specifier_list() {
             DeclarationSpecifier::Qualifier(Qualifier::Const),
             DeclarationSpecifier::Qualifier(Qualifier::Const)
         ])),
-        "DuplicateTypeQualifers"
+        "DuplicateTypeQualifiers"
     );
 }
 

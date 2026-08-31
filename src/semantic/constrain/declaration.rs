@@ -33,7 +33,7 @@ pub fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
         return Diag::some(ResolvedType::Int);
     }
     let Some(a) = TypeSpecifierCounter::count(types) else {
-        return Diag::with_diag(None, Diagnosis::InvalidTypeSpecifer);
+        return Diag::with_diag(None, Diagnosis::InvalidTypeSpecifier);
     };
     //   s, u, v, c, s, i, l, f, d
     match  a {
@@ -61,7 +61,7 @@ pub fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
         [0, 0, 0, 0, 0, 0, 0, 1, 0] => Diag::some(ResolvedType::Float),
         [0, 0, 0, 0, 0, 0, 0, 0, 1] => Diag::some(ResolvedType::Double),
         [0, 0, 0, 0, 0, 0, 1, 0, 1] => Diag::some(ResolvedType::LongDouble),
-        _ => Diag::with_diag(None, Diagnosis::InvalidTypeSpecifer),
+        _ => Diag::with_diag(None, Diagnosis::InvalidTypeSpecifier),
     }
 }
 
@@ -95,7 +95,7 @@ where
     }
     let ret = (const_count >= 1, volatile_count >= 1);
     if const_count > 1 || volatile_count > 1 {
-        return Diag::with_diag(ret, Diagnosis::DuplicateTypeQualifers);
+        return Diag::with_diag(ret, Diagnosis::DuplicateTypeQualifiers);
     }
     Diag::res(ret)
 }

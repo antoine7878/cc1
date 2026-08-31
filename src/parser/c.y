@@ -6,6 +6,7 @@ use crate::ast::{DeclarationNode, InitDeclaratorNode, DeclaratorNode, Initialize
 use crate::ast::{StructDeclaration, StructMemberDeclarator, VariantId, EnumId, LabeledStatementNode, StatementNode, Labeled, CompoundStatementNode};
 use crate::ast::{ExpressionStatementNode, SelectionStatementNode, IterationStatementNode, JumpStatementNode, JumpStatement};
 use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode, ValueNode, StringLiteralNode};
+use crate::ast::{BinaryOp, MemberOp, UnaryOp};
 
 use crate::context::Context;
 use crate::parser::{YYLex, Span};
@@ -182,53 +183,53 @@ expression /* ExpressionNode */
     | IDENTIFIER                                                                            { node_span!(self, expressions, identifier, $1) }
     | CONSTANT                                                                              { node_span!(self, expressions, constant, $1)}
     | string_literal                                                                        { node_span!(self, expressions, string_literal, $1) }
-    | expression '[' expression ']'                                                         { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression '[' expression ']'                                                         { node_span!(self, expressions, array_access, $1, $3) }
     | expression '(' ')'                                                                    { node_span!(self, expressions, function_call, $1, None) }
     | expression '(' expression ')'                                                         { node_span!(self, expressions, function_call, $1, Some($3)) }
-    | expression '.' IDENTIFIER                                                             { node_span!(self, expressions, access, $1, $2, $3) }
-    | expression PTR_OP IDENTIFIER                                                          { node_span!(self, expressions, access, $1, $2, $3) }
+    | expression '.' IDENTIFIER                                                             { node_span!(self, expressions, member, $1, MemberOp::Dot, $3) }
+    | expression PTR_OP IDENTIFIER                                                          { node_span!(self, expressions, member, $1, MemberOp::Arrow, $3) }
     | SIZEOF '(' type_name ')'                                                              { node_span!(self, expressions, sizeof_type, $3) }
     | SIZEOF expression %prec PREC_UNARY                                                    { node_span!(self, expressions, sizeof_expr, $2) }
     | '(' type_name ')' expression %prec PREC_UNARY                                         { node_span!(self, expressions, cast, $2, $4) }
-    | expression INC_OP                                                                     { node_span!(self, expressions, unary, YYToken::POST_INC_OP, $1) }
-    | expression DEC_OP                                                                     { node_span!(self, expressions, unary, YYToken::POST_DEC_OP, $1) }
-    | INC_OP expression                                                                     { node_span!(self, expressions, unary, $1, $2) }
-    | DEC_OP expression                                                                     { node_span!(self, expressions, unary, $1, $2) }
-    | '&' expression %prec PREC_UNARY                                                       { node_span!(self, expressions, unary, $1, $2) }
-    | '*' expression %prec PREC_UNARY                                                       { node_span!(self, expressions, unary, $1, $2) }
-    | '+' expression %prec PREC_UNARY                                                       { node_span!(self, expressions, unary, $1, $2) }
-    | '-' expression %prec PREC_UNARY                                                       { node_span!(self, expressions, unary, $1, $2) }
-    | '~' expression                                                                        { node_span!(self, expressions, unary, $1, $2) }
-    | '!' expression                                                                        { node_span!(self, expressions, unary, $1, $2) }
-    | expression '+' expression                                                             { node_span!(self, expressions, binary, $1, $2, $3) }
-    | expression '-' expression                                                             { node_span!(self, expressions, binary, $1, $2, $3) }
-    | expression '*' expression                                                             { node_span!(self, expressions, binary, $1, $2, $3) }
-    | expression '/' expression                                                             { node_span!(self, expressions, binary, $1, $2, $3) }
-    | expression '%' expression                                                             { node_span!(self, expressions, binary, $1, $2, $3) }
-    | expression LEFT_OP expression                                                         { node_span!(self, expressions, binary, $1, $2, $3) }
-    | expression RIGHT_OP expression                                                        { node_span!(self, expressions, binary, $1, $2, $3) }
-    | expression '<' expression                                                             { node_span!(self, expressions, binary, $1, $2, $3) }
-    | expression '>' expression                                                             { node_span!(self, expressions, binary, $1, $2, $3) }
-    | expression LE_OP expression                                                           { node_span!(self, expressions, binary, $1, $2, $3) }
-    | expression GE_OP expression                                                           { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression EQ_OP expression                                                           { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression NE_OP expression                                                           { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression '&' expression                                                             { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression '^' expression                                                             { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression '|' expression                                                             { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression AND_OP expression                                                          { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression OR_OP expression                                                           { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression '=' expression                                                             { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression MUL_ASSIGN expression                                                      { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression DIV_ASSIGN expression                                                      { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression MOD_ASSIGN expression                                                      { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression ADD_ASSIGN expression                                                      { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression SUB_ASSIGN expression                                                      { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression LEFT_ASSIGN expression                                                     { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression RIGHT_ASSIGN expression                                                    { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression AND_ASSIGN expression                                                      { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression XOR_ASSIGN expression                                                      { node_span!(self, expressions, binary, $1, $2, $3) }
-	| expression OR_ASSIGN expression                                                       { node_span!(self, expressions, binary, $1, $2, $3) }
+    | expression INC_OP                                                                     { node_span!(self, expressions, unary, UnaryOp::PostInc, $1) }
+    | expression DEC_OP                                                                     { node_span!(self, expressions, unary, UnaryOp::PostDec, $1) }
+    | INC_OP expression                                                                     { node_span!(self, expressions, unary, UnaryOp::PreInc, $2) }
+    | DEC_OP expression                                                                     { node_span!(self, expressions, unary, UnaryOp::PreDec, $2) }
+    | '&' expression %prec PREC_UNARY                                                       { node_span!(self, expressions, unary, UnaryOp::Addr, $2) }
+    | '*' expression %prec PREC_UNARY                                                       { node_span!(self, expressions, unary, UnaryOp::Deref, $2) }
+    | '+' expression %prec PREC_UNARY                                                       { node_span!(self, expressions, unary, UnaryOp::Plus, $2) }
+    | '-' expression %prec PREC_UNARY                                                       { node_span!(self, expressions, unary, UnaryOp::Minus, $2) }
+    | '~' expression                                                                        { node_span!(self, expressions, unary, UnaryOp::BitNot, $2) }
+    | '!' expression                                                                        { node_span!(self, expressions, unary, UnaryOp::LogicalNot, $2) }
+    | expression '+' expression                                                             { node_span!(self, expressions, binary, $1, BinaryOp::Add, $3) }
+    | expression '-' expression                                                             { node_span!(self, expressions, binary, $1, BinaryOp::Sub, $3) }
+    | expression '*' expression                                                             { node_span!(self, expressions, binary, $1, BinaryOp::Mul, $3) }
+    | expression '/' expression                                                             { node_span!(self, expressions, binary, $1, BinaryOp::Div, $3) }
+    | expression '%' expression                                                             { node_span!(self, expressions, binary, $1, BinaryOp::Mod, $3) }
+    | expression LEFT_OP expression                                                         { node_span!(self, expressions, binary, $1, BinaryOp::Left, $3) }
+    | expression RIGHT_OP expression                                                        { node_span!(self, expressions, binary, $1, BinaryOp::Right, $3) }
+    | expression '<' expression                                                             { node_span!(self, expressions, binary, $1, BinaryOp::Lower, $3) }
+    | expression '>' expression                                                             { node_span!(self, expressions, binary, $1, BinaryOp::Greater, $3) }
+    | expression LE_OP expression                                                           { node_span!(self, expressions, binary, $1, BinaryOp::LowerEq, $3) }
+    | expression GE_OP expression                                                           { node_span!(self, expressions, binary, $1, BinaryOp::GreaterEq, $3) }
+	| expression EQ_OP expression                                                           { node_span!(self, expressions, binary, $1, BinaryOp::Eq, $3) }
+	| expression NE_OP expression                                                           { node_span!(self, expressions, binary, $1, BinaryOp::Neq, $3) }
+	| expression '&' expression                                                             { node_span!(self, expressions, binary, $1, BinaryOp::BitAnd, $3) }
+	| expression '^' expression                                                             { node_span!(self, expressions, binary, $1, BinaryOp::BitXor, $3) }
+	| expression '|' expression                                                             { node_span!(self, expressions, binary, $1, BinaryOp::BitOr, $3) }
+	| expression AND_OP expression                                                          { node_span!(self, expressions, binary, $1, BinaryOp::LogicalAnd, $3) }
+	| expression OR_OP expression                                                           { node_span!(self, expressions, binary, $1, BinaryOp::LogicalOr, $3) }
+	| expression '=' expression                                                             { node_span!(self, expressions, assign, $1, None, $3) }
+	| expression MUL_ASSIGN expression                                                      { node_span!(self, expressions, assign, $1, Some(BinaryOp::Mul), $3) }
+	| expression DIV_ASSIGN expression                                                      { node_span!(self, expressions, assign, $1, Some(BinaryOp::Div), $3) }
+	| expression MOD_ASSIGN expression                                                      { node_span!(self, expressions, assign, $1, Some(BinaryOp::Mod), $3) }
+	| expression ADD_ASSIGN expression                                                      { node_span!(self, expressions, assign, $1, Some(BinaryOp::Add), $3) }
+	| expression SUB_ASSIGN expression                                                      { node_span!(self, expressions, assign, $1, Some(BinaryOp::Sub), $3) }
+	| expression LEFT_ASSIGN expression                                                     { node_span!(self, expressions, assign, $1, Some(BinaryOp::Left), $3) }
+	| expression RIGHT_ASSIGN expression                                                    { node_span!(self, expressions, assign, $1, Some(BinaryOp::Right), $3) }
+	| expression AND_ASSIGN expression                                                      { node_span!(self, expressions, assign, $1, Some(BinaryOp::BitAnd), $3) }
+	| expression XOR_ASSIGN expression                                                      { node_span!(self, expressions, assign, $1, Some(BinaryOp::BitXor), $3) }
+	| expression OR_ASSIGN expression                                                       { node_span!(self, expressions, assign, $1, Some(BinaryOp::BitOr), $3) }
     | expression '?' expression ':' expression                                              { node_span!(self, expressions, ternary, $1, $3, $5) }
     | expression ',' expression                                                             { self.lexer.ctx.arenas.expressions.add_list($1, $3) }
     ;
@@ -351,7 +352,7 @@ parameter_list /* Vec<ParameterDeclaration> */
 parameter_declaration /* ParameterDeclaration */
 	: declaration_specifiers declarator                                                     { with_span!(self, ParameterDeclaration::new, $1, $2) }
 	| declaration_specifiers abstract_declarator                                            { with_span!(self, ParameterDeclaration::new, $1, $2) }
-	| declaration_specifiers                                                                { let a = node_span!(self, declarators, abstrct); with_span!(self, ParameterDeclaration::new, $1, a) }
+	| declaration_specifiers                                                                { let a = node_span!(self, declarators, abstract_declarator); with_span!(self, ParameterDeclaration::new, $1, a) }
 	;
 
 identifier_list /* Vec<Name> */
@@ -360,7 +361,7 @@ identifier_list /* Vec<Name> */
 	;
 
 type_name /* Type */
-	: specifier_qualifier_list                                                              { Type { specifiers: $1, declarator: node_span!(self, declarators, abstrct) } }
+	: specifier_qualifier_list                                                              { Type { specifiers: $1, declarator: node_span!(self, declarators, abstract_declarator) } }
 	| specifier_qualifier_list abstract_declarator                                          { Type { specifiers: $1, declarator: $2 } }
 	;
 
@@ -382,19 +383,19 @@ specifier_qualifier_list_typed /* Vec<DeclarationSpecifier> — a type specifier
 	;
 
 abstract_declarator /* DeclaratorNode */
-	: pointer                                                                               { let a = node_span!(self, declarators, abstrct); node_span!(self, declarators, with_pointer, $1, a) }
+	: pointer                                                                               { let a = node_span!(self, declarators, abstract_declarator); node_span!(self, declarators, with_pointer, $1, a) }
 	| direct_abstract_declarator                                                            { $1 }
 	| pointer direct_abstract_declarator                                                    { node_span!(self, declarators, with_pointer, $1, $2) }
 	;
 
 direct_abstract_declarator /* DeclaratorNode */
 	: '(' abstract_declarator ')'                                                           { $2 }
-	| '[' ']'                                                                               { let a = node_span!(self, declarators, abstrct); node_span!(self, declarators, array, a, None) }
-	| '[' constant_expression ']'                                                           { let a = node_span!(self, declarators, abstrct); node_span!(self, declarators, array, a, Some($2)) }
+	| '[' ']'                                                                               { let a = node_span!(self, declarators, abstract_declarator); node_span!(self, declarators, array, a, None) }
+	| '[' constant_expression ']'                                                           { let a = node_span!(self, declarators, abstract_declarator); node_span!(self, declarators, array, a, Some($2)) }
 	| direct_abstract_declarator '[' ']'                                                    { node_span!(self, declarators, array, $1, None) }
 	| direct_abstract_declarator '[' constant_expression ']'                                { node_span!(self, declarators, array, $1, Some($3)) }
-	| '(' ')'                                                                               { let a = node_span!(self, declarators, abstrct); let b = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, a, b) }
-	| '(' parameter_type_list ')'                                                           { let a = node_span!(self, declarators, abstrct); node_span!(self, declarators, function, a, $2) }
+	| '(' ')'                                                                               { let a = node_span!(self, declarators, abstract_declarator); let b = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, a, b) }
+	| '(' parameter_type_list ')'                                                           { let a = node_span!(self, declarators, abstract_declarator); node_span!(self, declarators, function, a, $2) }
 	| direct_abstract_declarator '(' ')'                                                    { let a = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, $1, a) }
 	| direct_abstract_declarator '(' enter_scope parameter_type_list exit_scope ')'         { node_span!(self, declarators, function, $1, $4) }
 	;
@@ -429,7 +430,7 @@ struct_declarator_list /* Vec<StructMemberDeclarator> */
 
 struct_declarator /* StructMemberDeclarator */
 	: declarator                                                                            { with_span!(self, StructMemberDeclarator::new, $1, None) }
-	| ':' constant_expression                                                               { let d = node_span!(self, declarators, abstrct); with_span!(self, StructMemberDeclarator::new, d, Some($2)) }
+	| ':' constant_expression                                                               { let d = node_span!(self, declarators, abstract_declarator); with_span!(self, StructMemberDeclarator::new, d, Some($2)) }
 	| declarator ':' constant_expression                                                    { with_span!(self, StructMemberDeclarator::new, $1, Some($3)) }
 	;
 
@@ -451,7 +452,7 @@ enumerator /* VariantId */
 
 statement /* StatementNode */
 	: labeled_statement                                                                     { node_span!(self, statements, labeled, $1) }
-	| compound_statement                                                                    { node_span!(self, statements, compund, $1)}
+	| compound_statement                                                                    { node_span!(self, statements, compound, $1)}
 	| expression_statement                                                                  { node_span!(self, statements, expression, $1) }
 	| selection_statement                                                                   { node_span!(self, statements, selection, $1) }
 	| iteration_statement                                                                   { node_span!(self, statements, iteration, $1) }

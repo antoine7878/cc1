@@ -5,35 +5,35 @@ use crate::parser::Span;
 use crate::semantic::{QualifiedType, Sema};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum StringLitral {
+pub enum StringLiteral {
     String(Name),
     WString(Name),
 }
 
 ast_node! {
     pub struct StringLiteralNode {
-        pub string: StringLitral
+        pub string: StringLiteral
     }
 
 }
 
-impl StringLitral {
+impl StringLiteral {
     pub fn new_wide(name: Name) -> Self {
-        StringLitral::WString(name)
+        StringLiteral::WString(name)
     }
 
     pub fn new(name: Name) -> Self {
-        StringLitral::String(name)
+        StringLiteral::String(name)
     }
 
     pub fn name(&self) -> Name {
         match self {
-            StringLitral::String(name) | StringLitral::WString(name) => *name,
+            StringLiteral::String(name) | StringLiteral::WString(name) => *name,
         }
     }
 
     pub fn is_wide(&self) -> bool {
-        matches!(self, StringLitral::WString(_))
+        matches!(self, StringLiteral::WString(_))
     }
 }
 
@@ -48,8 +48,8 @@ impl StringLiteralNode {
 
     pub fn ty(&self, sema: &mut Sema, ctx: &Context) -> QualifiedType {
         let (base_id, s) = match self.string {
-            StringLitral::String(s) => (sema.builtins.char, s),
-            StringLitral::WString(s) => (sema.builtins.int, s),
+            StringLiteral::String(s) => (sema.builtins.char, s),
+            StringLiteral::WString(s) => (sema.builtins.int, s),
         };
         let len = s.id.resolve(ctx).len();
         let base = QualifiedType::new(base_id, false, false);
@@ -62,7 +62,7 @@ impl StringArena {
     /// The token still carries its optional `L` prefix and its delimiters.
     pub fn literal(&mut self, text: &str, span: Span) -> StringLiteralNode {
         let is_wide = text.starts_with('L');
-        let constructor = if is_wide { StringLitral::new_wide } else { StringLitral::new };
+        let constructor = if is_wide { StringLiteral::new_wide } else { StringLiteral::new };
         let start = if is_wide { 2 } else { 1 };
         let name = self.add(text[start..text.len() - 1].to_string(), span);
         StringLiteralNode::new(constructor(name), span)
@@ -72,7 +72,7 @@ impl StringArena {
     /// Adjacent character string literal tokens are concatenated into a single literal.
     pub fn concat(&mut self, lhs: StringLiteralNode, rhs: StringLiteralNode, span: Span) -> StringLiteralNode {
         let is_wide = lhs.is_wide() || rhs.is_wide();
-        let constructor = if is_wide { StringLitral::new_wide } else { StringLitral::new };
+        let constructor = if is_wide { StringLiteral::new_wide } else { StringLiteral::new };
         let mut text = self.get(lhs.name().id).clone();
         text.push_str(self.get(rhs.name().id));
         let name = self.add(text, span);

@@ -199,11 +199,11 @@ pub fn assignment_conversion(
         (&ResolvedType::Tag(id), _) if !id.resolve(sema).is_enum() && lhs.ty.is_compatible(sema, &rhs_ty) => (),
         (ResolvedType::Pointer(lp), ResolvedType::Pointer(rp)) if can_assign_pointer(sema, lp, rp) => {
             if !lp.has_qualifiers_of(rp) {
-                return Err(Diagnosis::AssignementDiscardedQualifiers(discarded_qualifier(lp, rp)));
+                return Err(Diagnosis::AssignmentDiscardedQualifiers(discarded_qualifier(lp, rp)));
             }
         }
         (ResolvedType::Pointer(_), _) if is_null_ptr => (),
-        _ => return Err(Diagnosis::AssignementIncompatibleTypes(lhs.ty, rhs_ty)),
+        _ => return Err(Diagnosis::AssignmentIncompatibleTypes(lhs.ty, rhs_ty)),
     }
     convert(sema, rhs, lhs.ty.id, is_null_ptr);
     Ok(lhs.ty)
@@ -220,7 +220,7 @@ pub fn default_argument_promotions(sema: &Sema, re: &mut ResolvedExpression) {
 pub fn pointer_integer_arithmetic(
     sema: &mut Sema,
     pointer: &mut ResolvedExpression,
-    intergral: &mut ResolvedExpression,
+    integral: &mut ResolvedExpression,
 ) -> Result<QualifiedType, Diagnosis> {
     let ResolvedType::Pointer(inner) = pointer.casted_ty().id.resolve(sema) else {
         return Err(Diagnosis::Poisoned);
@@ -229,7 +229,7 @@ pub fn pointer_integer_arithmetic(
         t if !t.is_complete(sema) => Err(Diagnosis::InvalidOperand),
         ResolvedType::Function { .. } => Err(Diagnosis::InvalidOperand),
         _ => {
-            promote(sema, intergral);
+            promote(sema, integral);
             Ok(pointer.casted_ty())
         }
     }

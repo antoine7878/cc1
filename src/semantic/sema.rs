@@ -89,7 +89,7 @@ impl Sema {
         }
         let base = sym.ty?;
         if (is_const && base.is_const) || (is_volatile && base.is_volatile) {
-            self.add_diag(Diag::only_diag(Diagnosis::DuplicateTypeQualifers), span)
+            self.add_diag(Diag::only_diag(Diagnosis::DuplicateTypeQualifiers), span)
         }
         Some(QualifiedType::new(
             base.id,

@@ -220,7 +220,7 @@ impl Visitor for AstPrinter {
             let expr = node.id.resolve(ctx);
             printer.put(format_args!("{} ", expr));
             printer.print_expression_type(ctx, node.id);
-            if let Expression::DotAcces(tag, ident) | Expression::PtrAcces(tag, ident) = expr {
+            if let Expression::Member(_, tag, ident) = expr {
                 printer.visit_expression(ctx, tag);
                 printer.put(format_args!(" "));
                 printer.visit_name(ctx, ident);

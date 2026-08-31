@@ -1,6 +1,6 @@
 use crate::arena::ResolveWith;
 use crate::ast::visit::Visitor;
-use crate::ast::{Expression, ExpressionNode, Fold, Tag, Value};
+use crate::ast::{BinaryOp, Expression, ExpressionNode, Fold, Tag, UnaryOp, Value};
 use crate::context::Context;
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedType, Sema, SymbolKind, declaration, layout,
@@ -147,39 +147,49 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut Sink) 
             symbol.value.map(Value::Int).ok_or(Diagnosis::NonConstantExpression)
         }
         Expression::Constant(value_node) => Ok(value_node.value),
-        Expression::Plus(expr) => fold(sema, ctx, expr, sink),
-        Expression::Minus(operand) => {
-            let value = fold(sema, ctx, operand, sink)?;
-            let folded = Fold::new(&sema.target).neg(value);
-            Ok(sink.add_diag(folded, &expr.span))
-        }
-        Expression::BitNot(expr) => {
-            let value = fold(sema, ctx, expr, sink)?;
-            Ok(Fold::new(&sema.target).bit_not(value))
-        }
-        Expression::LogicalNot(expr) => Ok(fold(sema, ctx, expr, sink)?.logical_not()),
-        Expression::Add(e1, e2) => fold_checked!(sema, ctx, sink, expr, e1, e2, add),
-        Expression::Sub(e1, e2) => fold_checked!(sema, ctx, sink, expr, e1, e2, sub),
-        Expression::Mul(e1, e2) => fold_checked!(sema, ctx, sink, expr, e1, e2, mul),
-        Expression::Div(e1, e2) => fold_divide!(sema, ctx, sink, e1, e2, div),
-        Expression::Mod(e1, e2) => fold_divide!(sema, ctx, sink, e1, e2, rem),
-        Expression::Left(e1, e2) => fold_shift!(sema, ctx, sink, e1, e2, shl),
-        Expression::Right(e1, e2) => fold_shift!(sema, ctx, sink, e1, e2, shr),
-        Expression::BitAnd(e1, e2) => fold!(sema, ctx, sink, e1, e2, bitand),
-        Expression::BitOr(e1, e2) => fold!(sema, ctx, sink, e1, e2, bitor),
-        Expression::BitXor(e1, e2) => fold!(sema, ctx, sink, e1, e2, bitxor),
-        Expression::Greater(e1, e2) => fold_compare!(sema, ctx, sink, e1, e2, gt),
-        Expression::Lower(e1, e2) => fold_compare!(sema, ctx, sink, e1, e2, lt),
-        Expression::GreaterEq(e1, e2) => fold_compare!(sema, ctx, sink, e1, e2, ge),
-        Expression::LowerEq(e1, e2) => fold_compare!(sema, ctx, sink, e1, e2, le),
-        Expression::Eq(e1, e2) => fold_compare!(sema, ctx, sink, e1, e2, eq),
-        Expression::Neq(e1, e2) => fold_compare!(sema, ctx, sink, e1, e2, ne),
-        Expression::LogicalAnd(e1, e2) => Ok(Value::from(
-            fold(sema, ctx, e1, sink)?.is_true() && fold(sema, ctx, e2, sink)?.is_true(),
-        )),
-        Expression::LogicalOr(e1, e2) => Ok(Value::from(
-            fold(sema, ctx, e1, sink)?.is_true() || fold(sema, ctx, e2, sink)?.is_true(),
-        )),
+        Expression::Unary(op, operand) => match op {
+            UnaryOp::Plus => fold(sema, ctx, operand, sink),
+            UnaryOp::Minus => {
+                let value = fold(sema, ctx, operand, sink)?;
+                let folded = Fold::new(&sema.target).neg(value);
+                Ok(sink.add_diag(folded, &expr.span))
+            }
+            UnaryOp::BitNot => {
+                let value = fold(sema, ctx, operand, sink)?;
+                Ok(Fold::new(&sema.target).bit_not(value))
+            }
+            UnaryOp::LogicalNot => Ok(fold(sema, ctx, operand, sink)?.logical_not()),
+            UnaryOp::PostInc
+            | UnaryOp::PostDec
+            | UnaryOp::PreInc
+            | UnaryOp::PreDec
+            | UnaryOp::Addr
+            | UnaryOp::Deref => Err(Diagnosis::NonConstantExpression),
+        },
+        Expression::Binary(op, e1, e2) => match op {
+            BinaryOp::Add => fold_checked!(sema, ctx, sink, expr, e1, e2, add),
+            BinaryOp::Sub => fold_checked!(sema, ctx, sink, expr, e1, e2, sub),
+            BinaryOp::Mul => fold_checked!(sema, ctx, sink, expr, e1, e2, mul),
+            BinaryOp::Div => fold_divide!(sema, ctx, sink, e1, e2, div),
+            BinaryOp::Mod => fold_divide!(sema, ctx, sink, e1, e2, rem),
+            BinaryOp::Left => fold_shift!(sema, ctx, sink, e1, e2, shl),
+            BinaryOp::Right => fold_shift!(sema, ctx, sink, e1, e2, shr),
+            BinaryOp::BitAnd => fold!(sema, ctx, sink, e1, e2, bitand),
+            BinaryOp::BitOr => fold!(sema, ctx, sink, e1, e2, bitor),
+            BinaryOp::BitXor => fold!(sema, ctx, sink, e1, e2, bitxor),
+            BinaryOp::Greater => fold_compare!(sema, ctx, sink, e1, e2, gt),
+            BinaryOp::Lower => fold_compare!(sema, ctx, sink, e1, e2, lt),
+            BinaryOp::GreaterEq => fold_compare!(sema, ctx, sink, e1, e2, ge),
+            BinaryOp::LowerEq => fold_compare!(sema, ctx, sink, e1, e2, le),
+            BinaryOp::Eq => fold_compare!(sema, ctx, sink, e1, e2, eq),
+            BinaryOp::Neq => fold_compare!(sema, ctx, sink, e1, e2, ne),
+            BinaryOp::LogicalAnd => Ok(Value::from(
+                fold(sema, ctx, e1, sink)?.is_true() && fold(sema, ctx, e2, sink)?.is_true(),
+            )),
+            BinaryOp::LogicalOr => Ok(Value::from(
+                fold(sema, ctx, e1, sink)?.is_true() || fold(sema, ctx, e2, sink)?.is_true(),
+            )),
+        },
         Expression::Ternary(condition, e1, e2) => {
             if fold(sema, ctx, condition, sink)?.is_true() {
                 fold(sema, ctx, e1, sink)
@@ -217,27 +227,10 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut Sink) 
             cast(sema, qualif, val)
         }
         Expression::StringLiteral(_)
-        | Expression::PostInc(_)
-        | Expression::PostDec(_)
-        | Expression::PreInc(_)
-        | Expression::Deref(_)
-        | Expression::Addr(_)
-        | Expression::Assign(_, _)
-        | Expression::MulAssign(_, _)
-        | Expression::DivAssign(_, _)
-        | Expression::ModAssign(_, _)
-        | Expression::AddAssign(_, _)
-        | Expression::SubAssign(_, _)
-        | Expression::LeftAssign(_, _)
-        | Expression::RightAssign(_, _)
-        | Expression::AndAssign(_, _)
-        | Expression::XorAssign(_, _)
-        | Expression::OrAssign(_, _)
+        | Expression::Assign(_, _, _)
         | Expression::List(_)
-        | Expression::ArrayAcces(_, _)
+        | Expression::ArrayAccess(_, _)
         | Expression::FunctionCall(_, _)
-        | Expression::DotAcces(_, _)
-        | Expression::PtrAcces(_, _)
-        | Expression::PreDec(_) => Err(Diagnosis::NonConstantExpression),
+        | Expression::Member(_, _, _) => Err(Diagnosis::NonConstantExpression),
     }
 }

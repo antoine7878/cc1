@@ -468,7 +468,7 @@ shaped!(
 rejects_shaped!(
     assigning_an_incompatible_pointer_is_rejected,
     "char *p; int *q; void f(void) { q = p; }",
-    |u| Diagnosis::AssignementIncompatibleTypes(to, from)
+    |u| Diagnosis::AssignmentIncompatibleTypes(to, from)
         if *to == u.symbol_ty("q") && *from == u.symbol_ty("p"),
     vec![
         lv(Ty::ptr(Ty::Int)),
@@ -480,7 +480,7 @@ rejects_shaped!(
 rejects_shaped!(
     assigning_away_const_through_a_pointer_is_rejected,
     "const char *p; char *q; void f(void) { q = p; }",
-    Diagnosis::AssignementDiscardedQualifiers(_),
+    Diagnosis::AssignmentDiscardedQualifiers(_),
     vec![
         lv(Ty::ptr(Ty::Char)),
         lv(Ty::ptr(Ty::konst(Ty::Char))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Char))),
@@ -520,7 +520,7 @@ rejects_shaped!(
 rejects_shaped!(
     assigning_to_a_const_variable_is_rejected,
     "void f(void) { const int x; x = 1; }",
-    Diagnosis::ConstAssignement,
+    Diagnosis::ConstAssignment,
     vec![lv(Ty::konst(Ty::Int)), rv(Ty::Int), none()]
 );
 

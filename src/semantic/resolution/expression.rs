@@ -1,5 +1,5 @@
 use crate::arena::ResolveWith;
-use crate::ast::{Expression, ExpressionNode, Type};
+use crate::ast::{BinaryOp, Expression, ExpressionNode, Type, UnaryOp};
 use crate::context::Context;
 use crate::semantic::ice::try_fold;
 use crate::semantic::model::cast;
@@ -62,8 +62,8 @@ pub fn init(
     with_operand(sema, init_node, ExpressionKind::RValue, |sema, re| {
         let mut l_re = ResolvedExpression::new(l_ty, ExpressionKind::LValue);
         cast::assignment_conversion(sema, &mut l_re, re, is_null).map_err(|e| match e {
-            Diagnosis::AssignementIncompatibleTypes(a, b) => Diagnosis::InitIncompatibleTypes(a, b),
-            Diagnosis::AssignementDiscardedQualifiers(a) => Diagnosis::InitDiscardedQualifiers(a),
+            Diagnosis::AssignmentIncompatibleTypes(a, b) => Diagnosis::InitIncompatibleTypes(a, b),
+            Diagnosis::AssignmentDiscardedQualifiers(a) => Diagnosis::InitDiscardedQualifiers(a),
             _ => e,
         })
     })
@@ -108,7 +108,7 @@ fn check_assign_lhs(lhs: &ResolvedExpression) -> Result<(), Diagnosis> {
         return Err(Diagnosis::AssignToRValue);
     }
     if lhs.ty.is_const {
-        return Err(Diagnosis::ConstAssignement);
+        return Err(Diagnosis::ConstAssignment);
     }
     Ok(())
 }
@@ -170,7 +170,7 @@ fn additive(
     sema: &mut Sema,
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,
-    op: char,
+    op: BinaryOp,
 ) -> Result<QualifiedType, Diagnosis> {
     match (op, lhs.casted_ty().id.resolve(sema), rhs.casted_ty().id.resolve(sema)) {
         (_, l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => {
@@ -178,8 +178,12 @@ fn additive(
             Ok(lhs.casted_ty())
         }
         (_, ResolvedType::Pointer(_), o) if o.is_integral(sema) => cast::pointer_integer_arithmetic(sema, lhs, rhs),
-        ('+', o, ResolvedType::Pointer(_)) if o.is_integral(sema) => cast::pointer_integer_arithmetic(sema, rhs, lhs),
-        ('-', ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => cast::pointer_minus_pointer(sema, lhs, rhs),
+        (BinaryOp::Add, o, ResolvedType::Pointer(_)) if o.is_integral(sema) => {
+            cast::pointer_integer_arithmetic(sema, rhs, lhs)
+        }
+        (BinaryOp::Sub, ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => {
+            cast::pointer_minus_pointer(sema, lhs, rhs)
+        }
         _ => Err(Diagnosis::InvalidOperand),
     }
 }
@@ -231,15 +235,16 @@ fn type_of(
         Expression::Constant(value) => Ok((value.ty(sema), RValue)),
         Expression::StringLiteral(value) => Ok((value.ty(sema, ctx), LValue)),
         Expression::ConstantExpression(expr) => as_written(sema, expr).map(|re| (re.ty, re.kind)),
-        Expression::Add(e1, e2) => with_operands(sema, e1, e2, RValue, |sema, lhs, rhs| additive(sema, lhs, rhs, '+')),
-        Expression::Sub(e1, e2) => with_operands(sema, e1, e2, RValue, |sema, lhs, rhs| additive(sema, lhs, rhs, '-')),
-        Expression::Minus(e) => with_operand(sema, e, RValue, |sema, re| {
+        Expression::Binary(op @ (BinaryOp::Add | BinaryOp::Sub), e1, e2) => {
+            with_operands(sema, e1, e2, RValue, |sema, lhs, rhs| additive(sema, lhs, rhs, *op))
+        }
+        Expression::Unary(UnaryOp::Minus, e) => with_operand(sema, e, RValue, |sema, re| {
             check_is_arithmetic(sema, re.casted_ty().id)?;
             cast::promote(sema, re);
             Ok(re.casted_ty())
         }),
         Expression::Cast(ty_node, operand) => cast(sema, ctx, node, ty_node, operand),
-        Expression::Assign(e1, e2) => with_assignment(sema, ctx, e1, e2, |sema, lhs, rhs, is_null| {
+        Expression::Assign(None, e1, e2) => with_assignment(sema, ctx, e1, e2, |sema, lhs, rhs, is_null| {
             cast::assignment_conversion(sema, lhs, rhs, is_null)
         }),
         // Expression::FunctionCall(fn_node, args) => {
