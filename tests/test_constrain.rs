@@ -92,32 +92,32 @@ fn a_function_declared_in_a_block_must_be_extern() {
 
 #[test]
 fn no_qualifier_leaves_the_type_unqualified() {
-    let diag = check_qualifier(&[]);
+    let diag = check_qualifier([]);
     assert_eq!(diag.res, (false, false));
     assert_eq!(reported(&diag), "None");
 }
 
 #[test]
 fn each_qualifier_is_reported_once() {
-    assert_eq!(check_qualifier(&[Qualifier::Const]).res, (true, false));
-    assert_eq!(check_qualifier(&[Qualifier::Volatile]).res, (false, true));
+    assert_eq!(check_qualifier([Qualifier::Const]).res, (true, false));
+    assert_eq!(check_qualifier([Qualifier::Volatile]).res, (false, true));
     assert_eq!(
-        check_qualifier(&[Qualifier::Const, Qualifier::Volatile]).res,
+        check_qualifier([Qualifier::Const, Qualifier::Volatile]).res,
         (true, true)
     );
     assert_eq!(
-        reported(&check_qualifier(&[Qualifier::Const, Qualifier::Volatile])),
+        reported(&check_qualifier([Qualifier::Const, Qualifier::Volatile])),
         "None"
     );
 }
 
 #[test]
 fn a_repeated_qualifier_is_rejected() {
-    let diag = check_qualifier(&[Qualifier::Const, Qualifier::Const]);
+    let diag = check_qualifier([Qualifier::Const, Qualifier::Const]);
     assert_eq!(diag.res, (true, false));
     assert_eq!(reported(&diag), "DuplicateTypeQualifers");
     assert_eq!(
-        reported(&check_qualifier(&[Qualifier::Volatile, Qualifier::Volatile])),
+        reported(&check_qualifier([Qualifier::Volatile, Qualifier::Volatile])),
         "DuplicateTypeQualifers"
     );
 }

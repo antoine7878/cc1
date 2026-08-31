@@ -80,7 +80,7 @@ fn extract_declarator(
     match declarator.id.resolve(ctx) {
         Declarator::Pointer { qualifiers, inner } => {
             let (is_const, is_volatile) =
-                constrain::declaration::check_qualifier(qualifiers).collect(sema, &declarator.span);
+                constrain::declaration::check_qualifier(qualifiers.iter().copied()).collect(sema, &declarator.span);
             let id = sema.types.pointer(inner_most);
             extract_declarator(sema, ctx, inner, QualifiedType::new(id, is_const, is_volatile))
         }

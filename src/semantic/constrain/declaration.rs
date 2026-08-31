@@ -81,9 +81,9 @@ pub fn check_bit_width(ty: &ResolvedType, value: Option<Value>) -> Diag<Option<i
 
 /// 6.5.3 Type qualifiers
 /// The same type qualifier shall not appear more than once in the same specifier list or qualifier list, either directly or via one or more typedefs.
-pub fn check_qualifier<'a, T>(qualifiers: &'a T) -> Diag<(bool, bool)>
+pub fn check_qualifier<I>(qualifiers: I) -> Diag<(bool, bool)>
 where
-    &'a T: IntoIterator<Item = &'a Qualifier>,
+    I: IntoIterator<Item = Qualifier>,
 {
     let mut const_count = 0;
     let mut volatile_count = 0;
@@ -105,5 +105,5 @@ pub fn get_qualifier(specifiers: &[DeclarationSpecifier]) -> Diag<(bool, bool)> 
         &DeclarationSpecifier::Qualifier(q) => Some(q),
         _ => None,
     });
-    check_qualifier(&a)
+    check_qualifier(a)
 }
