@@ -15,6 +15,7 @@ impl Analyzer {
     }
 
     fn resolve_names(sema: &mut Sema, ctx: &Context) {
+        sema.size_expr_facts(ctx.arenas.expressions.len());
         let mut resolver = SymbolResolver::new(sema);
         resolver.sema.scopes.push(ScopeKind::File);
         walk_translation_unit(&mut resolver, ctx, &ctx.ast);

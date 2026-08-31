@@ -150,15 +150,13 @@ impl Unit {
     }
 
     pub fn const_values(&self) -> Vec<Option<Value>> {
-        let mut entries: Vec<_> = self
-            .ctx
+        self.ctx
             .sema
-            .constants
+            .expr_facts()
             .iter()
-            .map(|(id, value)| (usize::from(*id), *value))
-            .collect();
-        entries.sort_by_key(|(id, _)| *id);
-        entries.into_iter().map(|(_, value)| value).collect()
+            .filter(|facts| facts.constant_seen)
+            .map(|facts| facts.constant)
+            .collect()
     }
 
     pub fn folded(&self) -> Vec<String> {
@@ -172,17 +170,12 @@ impl Unit {
     }
 
     pub fn shapes(&self) -> Vec<Shape> {
-        let mut entries: Vec<_> = self
-            .ctx
+        self.ctx
             .sema
-            .expressions
+            .expr_facts()
             .iter()
-            .map(|(id, resolved)| (usize::from(*id), resolved))
-            .collect();
-        entries.sort_by_key(|(id, _)| *id);
-        entries
-            .into_iter()
-            .map(|(_, resolved)| match resolved {
+            .filter(|facts| facts.resolved_seen)
+            .map(|facts| match &facts.resolved {
                 Some(resolved) => Shape {
                     ty: Some(self.ty_tree(resolved.ty)),
                     lvalue: matches!(resolved.kind, ExpressionKind::LValue),
@@ -279,22 +272,18 @@ impl Unit {
     }
 
     pub fn bindings(&self) -> Vec<(String, Option<usize>)> {
-        let mut entries: Vec<_> = self
-            .ctx
+        self.ctx
             .sema
-            .bindings
+            .expr_facts()
             .iter()
-            .map(|(id, symbol)| (usize::from(*id), symbol.map(usize::from)))
-            .collect();
-        entries.sort_by_key(|(id, _)| *id);
-        entries
-            .into_iter()
-            .map(|(id, symbol)| {
+            .enumerate()
+            .filter(|(_, facts)| facts.binding_seen)
+            .map(|(id, facts)| {
                 let name = match &self.ctx.arenas.expressions.data[id] {
                     Expression::Identifier(name) => name.id.resolve(&self.ctx).clone(),
                     other => format!("{other:?}"),
                 };
-                (name, symbol)
+                (name, facts.binding.map(usize::from))
             })
             .collect()
     }
