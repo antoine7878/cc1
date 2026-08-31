@@ -1,6 +1,4 @@
-mod common;
-
-use common::{Unit, strip_ansi};
+use crate::common::{Unit, strip_ansi};
 
 fn messages(src: &str) -> Vec<String> {
     Unit::compile(src).messages()

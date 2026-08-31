@@ -1,5 +1,3 @@
-mod common;
-
 // ---- 6.5.6 typedef and lexerhack -----------------------
 
 accept!(typedef_then_use, "typedef int T; T x;");

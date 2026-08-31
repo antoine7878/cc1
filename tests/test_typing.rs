@@ -1,8 +1,6 @@
-mod common;
-
 use cc1::semantic::CastKind::*;
 use cc1::semantic::Diagnosis;
-use common::{Shape, Ty, Unit, ints, lv, none, rv};
+use crate::common::{Shape, Ty, Unit, ints, lv, none, rv};
 
 macro_rules! shaped {
     ($name:ident, $src:expr, $shapes:expr $(,)?) => {

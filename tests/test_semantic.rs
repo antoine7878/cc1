@@ -1,5 +1,3 @@
-mod common;
-
 use cc1::semantic::Diagnosis;
 
 // ---- 6.5.2.3 tags name one type across all their mentions ----------------

@@ -1,7 +1,5 @@
-mod common;
-
 use cc1::semantic::{Diagnosis, FunctionDefId, SymbolKind};
-use common::{Ty, Unit};
+use crate::common::{Ty, Unit};
 
 fn folded(src: &str) -> Vec<String> {
     let unit = Unit::compile(src);

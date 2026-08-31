@@ -1,5 +1,3 @@
-mod common;
-
 // ---- 6.5.2.1 scalar members are laid out in declaration order -------------
 
 size!(size_single_char, "struct S { char a; };", "struct S", 1);
@@ -167,7 +165,7 @@ macro_rules! unnamed_size {
     ($name:ident, $decl:expr, $ty:expr, $expected:expr) => {
         #[test]
         fn $name() {
-            common::run_size(stringify!($name), $decl, $ty, $expected);
+            crate::common::run_size(stringify!($name), $decl, $ty, $expected);
         }
     };
 }
