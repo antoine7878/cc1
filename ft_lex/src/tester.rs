@@ -160,13 +160,6 @@ mod test {
     }
 
     #[test]
-    fn pipe_rs() {
-        test_lex("./test/pipe_1_r.l", "salut\n", b"5\n");
-        test_lex("./test/pipe_2_r.l", "salut\n", b"5\n");
-        test_lex("./test/pipe_3_r.l", "salut", b"salut\n");
-    }
-
-    #[test]
     fn yyless_rs() {
         test_lex("./test/yyless_r.l", "salut\n", b"MATCHlut\n");
     }

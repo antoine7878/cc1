@@ -146,7 +146,7 @@ impl LexParser {
                         self.code_fragements[i] = Vec::from(if i < self.code_fragements.len() - 1 {
                             self.code_fragements[i + 1].as_slice()
                         } else {
-                            b"ECHO;"
+                            b"self.echo();"
                         });
                     }
                 }

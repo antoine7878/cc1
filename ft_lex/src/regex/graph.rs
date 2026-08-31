@@ -15,8 +15,7 @@ impl Graph {
 
     fn add_start_arrow(&mut self, start: usize, condition: usize, start_condition: &str) {
         let enter_node = format!("__start_{}_{}__", start, condition);
-        self.dot
-            .raw(&format!(" {enter_node} [shape=point, label=\"\"];\n"));
+        self.dot.raw(&format!(" {enter_node} [shape=point, label=\"\"];\n"));
         self.dot.raw(&format!(
             " {} -> {} [label=\"{}\"];\n",
             enter_node, start, start_condition
