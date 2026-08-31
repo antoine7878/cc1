@@ -5,11 +5,13 @@ use std::io::{Cursor, Write};
 use std::process::{Command, Stdio};
 
 use cc1::ast::print::AstPrinter;
-use cc1::ast::{Expression, Name, Value};
+use cc1::ast::{Expression, Name, Tag, Value};
 use cc1::context::Context;
 use cc1::parser::{YYLex, Yacc};
 use cc1::pipeline::Pipeline;
-use cc1::semantic::{Analyzer, Diagnosis, DiagnosisNode, ExpressionKind, SymbolKind};
+use cc1::semantic::{
+    Analyzer, CastKind, Diagnosis, DiagnosisNode, ExpressionKind, ParamTypes, QualifiedType, ResolvedType, SymbolKind,
+};
 
 fn needs_preprocessing(src: &str) -> bool {
     src.contains("\\\n") || src.contains("/*") || src.contains("//") || src.contains('#')
@@ -159,7 +161,7 @@ impl Unit {
             .collect()
     }
 
-    pub fn typed(&self) -> Vec<String> {
+    pub fn shapes(&self) -> Vec<Shape> {
         let mut entries: Vec<_> = self
             .ctx
             .sema
@@ -171,19 +173,99 @@ impl Unit {
         entries
             .into_iter()
             .map(|(_, resolved)| match resolved {
-                Some(resolved) => {
-                    let mut out = self.ctx.describe(&resolved.ty);
-                    if matches!(resolved.kind, ExpressionKind::LValue) {
-                        out.push_str(" lvalue");
-                    }
-                    for cast in &resolved.casts {
-                        out.push_str(&format!(" <{:?}> {}", cast.kind, self.ctx.describe(&cast.to)));
-                    }
-                    out
-                }
-                None => "None".to_string(),
+                Some(resolved) => Shape {
+                    ty: Some(self.ty_tree(resolved.ty)),
+                    lvalue: matches!(resolved.kind, ExpressionKind::LValue),
+                    casts: resolved
+                        .casts
+                        .iter()
+                        .map(|cast| (cast.kind, self.ty_tree(cast.to)))
+                        .collect(),
+                },
+                None => Shape::unresolved(),
             })
             .collect()
+    }
+
+    pub fn ty_tree(&self, qt: QualifiedType) -> Ty {
+        let base = match qt.id.resolve(&self.ctx) {
+            ResolvedType::Void => Ty::Void,
+            ResolvedType::Char => Ty::Char,
+            ResolvedType::SignedChar => Ty::SChar,
+            ResolvedType::UnsignedChar => Ty::UChar,
+            ResolvedType::Short => Ty::Short,
+            ResolvedType::UnsignedShort => Ty::UShort,
+            ResolvedType::Int => Ty::Int,
+            ResolvedType::UnsignedInt => Ty::UInt,
+            ResolvedType::Long => Ty::Long,
+            ResolvedType::UnsignedLong => Ty::ULong,
+            ResolvedType::Float => Ty::Float,
+            ResolvedType::Double => Ty::Double,
+            ResolvedType::LongDouble => Ty::LDouble,
+            ResolvedType::Pointer(inner) => Ty::Ptr(Box::new(self.ty_tree(*inner))),
+            ResolvedType::Array { elem, len } => Ty::Array(Box::new(self.ty_tree(*elem)), *len),
+            ResolvedType::Function { ret, params } => {
+                let variadic = matches!(params, ParamTypes::Prototype { is_variadic: true, .. });
+                let params = match params {
+                    ParamTypes::Unspecified => None,
+                    ParamTypes::Prototype { params, .. } => Some(params.iter().map(|p| self.ty_tree(*p)).collect()),
+                };
+                Ty::Func {
+                    ret: Box::new(self.ty_tree(*ret)),
+                    params,
+                    variadic,
+                }
+            }
+            ResolvedType::Tag(tag) => {
+                let def = tag.resolve(&self.ctx);
+                let name = def.name.map(|n| n.id.resolve(&self.ctx).clone());
+                let complete = def.is_complete;
+                match def.kind {
+                    Tag::Struct => Ty::Struct { tag: name, complete },
+                    Tag::Union => Ty::Union { tag: name, complete },
+                    Tag::Enum => Ty::Enum { tag: name, complete },
+                }
+            }
+        };
+        let base = if qt.is_volatile { Ty::Volatile(Box::new(base)) } else { base };
+        if qt.is_const { Ty::Const(Box::new(base)) } else { base }
+    }
+
+    pub fn symbol_ty_tree(&self, name: &str) -> Ty {
+        self.ty_tree(self.symbol_ty(name))
+    }
+
+    pub fn symbol_ty(&self, name: &str) -> QualifiedType {
+        self.ctx
+            .sema
+            .symbols
+            .data
+            .iter()
+            .find(|symbol| symbol.name.id.resolve(&self.ctx).as_str() == name)
+            .unwrap_or_else(|| panic!("no symbol `{name}` in the unit"))
+            .ty
+            .unwrap_or_else(|| panic!("symbol `{name}` has no type"))
+    }
+
+    pub fn prim(&self, name: &str) -> QualifiedType {
+        let b = &self.ctx.sema.builtins;
+        let id = match name {
+            "void" => b.void,
+            "char" => b.char,
+            "signed char" => b.signed_char,
+            "unsigned char" => b.unsigned_char,
+            "short" => b.short,
+            "unsigned short" => b.unsigned_short,
+            "int" => b.int,
+            "unsigned" | "unsigned int" => b.unsigned_int,
+            "long" => b.long,
+            "unsigned long" => b.unsigned_long,
+            "float" => b.float,
+            "double" => b.double,
+            "long double" => b.long_double,
+            other => panic!("unknown primitive `{other}`"),
+        };
+        QualifiedType::new(id, false, false)
     }
 
     pub fn bindings(&self) -> Vec<(String, Option<usize>)> {
@@ -217,7 +299,10 @@ impl Unit {
                 (
                     symbol.name.id.resolve(&self.ctx).clone(),
                     symbol.kind.to_string(),
-                    symbol.ty.map(|ty| self.ctx.describe(&ty)).unwrap_or_default(),
+                    symbol
+                        .ty
+                        .map(|ty| ty.describe(&self.ctx.sema, &self.ctx))
+                        .unwrap_or_default(),
                 )
             })
             .collect()
@@ -260,6 +345,187 @@ impl Unit {
         }
         out
     }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Ty {
+    Void,
+    Char,
+    SChar,
+    UChar,
+    Short,
+    UShort,
+    Int,
+    UInt,
+    Long,
+    ULong,
+    Float,
+    Double,
+    LDouble,
+    Ptr(Box<Ty>),
+    Array(Box<Ty>, Option<usize>),
+    Func {
+        ret: Box<Ty>,
+        params: Option<Vec<Ty>>,
+        variadic: bool,
+    },
+    Struct {
+        tag: Option<String>,
+        complete: bool,
+    },
+    Union {
+        tag: Option<String>,
+        complete: bool,
+    },
+    Enum {
+        tag: Option<String>,
+        complete: bool,
+    },
+    Const(Box<Ty>),
+    Volatile(Box<Ty>),
+}
+
+impl Ty {
+    pub fn ptr(inner: Ty) -> Ty {
+        Ty::Ptr(Box::new(inner))
+    }
+
+    pub fn arr(elem: Ty, len: usize) -> Ty {
+        Ty::Array(Box::new(elem), Some(len))
+    }
+
+    pub fn flex(elem: Ty) -> Ty {
+        Ty::Array(Box::new(elem), None)
+    }
+
+    pub fn func(ret: Ty, params: impl IntoIterator<Item = Ty>) -> Ty {
+        Ty::Func {
+            ret: Box::new(ret),
+            params: Some(params.into_iter().collect()),
+            variadic: false,
+        }
+    }
+
+    pub fn func0(ret: Ty) -> Ty {
+        Ty::Func {
+            ret: Box::new(ret),
+            params: Some(Vec::new()),
+            variadic: false,
+        }
+    }
+
+    pub fn func_variadic(ret: Ty, params: impl IntoIterator<Item = Ty>) -> Ty {
+        Ty::Func {
+            ret: Box::new(ret),
+            params: Some(params.into_iter().collect()),
+            variadic: true,
+        }
+    }
+
+    pub fn noproto(ret: Ty) -> Ty {
+        Ty::Func {
+            ret: Box::new(ret),
+            params: None,
+            variadic: false,
+        }
+    }
+
+    pub fn strukt(tag: &str) -> Ty {
+        Ty::Struct {
+            tag: Some(tag.to_string()),
+            complete: true,
+        }
+    }
+
+    pub fn strukt_incomplete(tag: &str) -> Ty {
+        Ty::Struct {
+            tag: Some(tag.to_string()),
+            complete: false,
+        }
+    }
+
+    pub fn anon_struct() -> Ty {
+        Ty::Struct {
+            tag: None,
+            complete: true,
+        }
+    }
+
+    pub fn union(tag: &str) -> Ty {
+        Ty::Union {
+            tag: Some(tag.to_string()),
+            complete: true,
+        }
+    }
+
+    pub fn enom(tag: &str) -> Ty {
+        Ty::Enum {
+            tag: Some(tag.to_string()),
+            complete: true,
+        }
+    }
+
+    pub fn konst(inner: Ty) -> Ty {
+        Ty::Const(Box::new(inner))
+    }
+
+    pub fn vol(inner: Ty) -> Ty {
+        Ty::Volatile(Box::new(inner))
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Shape {
+    pub ty: Option<Ty>,
+    pub lvalue: bool,
+    pub casts: Vec<(CastKind, Ty)>,
+}
+
+impl Shape {
+    pub fn rvalue(ty: Ty) -> Self {
+        Self {
+            ty: Some(ty),
+            lvalue: false,
+            casts: Vec::new(),
+        }
+    }
+
+    pub fn lvalue(ty: Ty) -> Self {
+        Self {
+            ty: Some(ty),
+            lvalue: true,
+            casts: Vec::new(),
+        }
+    }
+
+    pub fn unresolved() -> Self {
+        Self {
+            ty: None,
+            lvalue: false,
+            casts: Vec::new(),
+        }
+    }
+
+    pub fn then(mut self, kind: CastKind, to: Ty) -> Self {
+        self.casts.push((kind, to));
+        self
+    }
+}
+
+pub fn rv(ty: Ty) -> Shape {
+    Shape::rvalue(ty)
+}
+
+pub fn lv(ty: Ty) -> Shape {
+    Shape::lvalue(ty)
+}
+
+pub fn none() -> Shape {
+    Shape::unresolved()
+}
+
+pub fn ints(n: usize) -> Vec<Shape> {
+    (0..n).map(|_| rv(Ty::Int)).collect()
 }
 
 pub fn strip_ansi(text: &str) -> String {
@@ -449,7 +715,7 @@ macro_rules! recover {
 
             let mut got = unit.diagnosis().iter();
             $(
-                let next = got.next().map(|diag| diag.inner);
+                let next = got.next().map(|diag| diag.inner.clone());
                 assert!(
                     matches!(next, Some($diag)),
                     "`{name}` expected {}, got {next:?}:\n{}\n{}",
@@ -458,7 +724,7 @@ macro_rules! recover {
                     unit.render()
                 );
             )*
-            let extra: Vec<_> = got.map(|diag| diag.inner).collect();
+            let extra: Vec<_> = got.map(|diag| diag.inner.clone()).collect();
             assert!(
                 extra.is_empty(),
                 "`{name}` unexpected extra diagnosis {extra:?}:\n{}\n{}",

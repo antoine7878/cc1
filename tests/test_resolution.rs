@@ -1,7 +1,7 @@
 mod common;
 
 use cc1::semantic::{Diagnosis, FunctionDefId, SymbolKind};
-use common::Unit;
+use common::{Ty, Unit};
 
 fn folded(src: &str) -> Vec<String> {
     let unit = Unit::compile(src);
@@ -36,7 +36,17 @@ macro_rules! folds {
     };
 }
 
-macro_rules! describes {
+macro_rules! tree {
+    ($name:ident, $src:expr, $symbol:expr, $ty:expr) => {
+        #[test]
+        fn $name() {
+            let unit = accepted($src);
+            assert_eq!(unit.symbol_ty_tree($symbol), $ty, "{}", $src);
+        }
+    };
+}
+
+macro_rules! renders {
     ($name:ident, $src:expr, $symbol:expr, $expected:expr) => {
         #[test]
         fn $name() {
@@ -135,10 +145,8 @@ fn an_identifier_binds_to_the_innermost_declaration() {
 fn an_identifier_binds_to_a_parameter() {
     let unit = accepted("void f(int a) { a = 1; }");
     let symbols = unit.symbols();
-    assert_eq!(
-        symbols[1],
-        ("a".to_string(), "parameter".to_string(), "int".to_string())
-    );
+    assert_eq!((symbols[1].0.as_str(), symbols[1].1.as_str()), ("a", "parameter"));
+    assert_eq!(unit.symbol_ty_tree("a"), Ty::Int);
     assert_eq!(unit.bindings(), vec![("a".to_string(), Some(1))]);
 }
 
@@ -170,142 +178,133 @@ fn each_occurrence_is_bound_separately() {
     );
 }
 
-describes!(describe_int, "int x;", "x", "int");
-describes!(describe_implicit_int, "static x;", "x", "int");
-describes!(describe_char, "char x;", "x", "char");
-describes!(describe_signed_char, "signed char x;", "x", "signed char");
-describes!(describe_unsigned_char, "unsigned char x;", "x", "unsigned char");
-describes!(describe_short, "short x;", "x", "short");
-describes!(describe_short_int, "short int x;", "x", "short");
-describes!(describe_unsigned, "unsigned x;", "x", "unsigned int");
-describes!(describe_long, "long x;", "x", "long");
-describes!(describe_unsigned_long, "unsigned long int x;", "x", "unsigned long");
-describes!(describe_float, "float x;", "x", "float");
-describes!(describe_double, "double x;", "x", "double");
-describes!(describe_long_double, "long double x;", "x", "long double");
-describes!(describe_const, "const int x;", "x", "const int");
-describes!(describe_volatile, "volatile int x;", "x", "volatile int");
-describes!(
-    describe_const_volatile,
-    "const volatile int x;",
-    "x",
-    "const volatile int"
-);
-describes!(describe_pointer, "char *p;", "p", "*char");
-describes!(describe_pointer_to_pointer, "int **p;", "p", "**int");
-describes!(describe_pointer_to_const, "const int *p;", "p", "*const int");
-describes!(describe_const_pointer, "int *const p;", "p", "const *int");
-describes!(describe_struct, "struct S { int a; } s;", "s", "struct S");
-describes!(describe_union, "union U { int a; } u;", "u", "union U");
-describes!(describe_enum, "enum E { A } e;", "e", "enum E");
-describes!(
+tree!(describe_int, "int x;", "x", Ty::Int);
+tree!(describe_implicit_int, "static x;", "x", Ty::Int);
+tree!(describe_char, "char x;", "x", Ty::Char);
+tree!(describe_signed_char, "signed char x;", "x", Ty::SChar);
+tree!(describe_unsigned_char, "unsigned char x;", "x", Ty::UChar);
+tree!(describe_short, "short x;", "x", Ty::Short);
+tree!(describe_short_int, "short int x;", "x", Ty::Short);
+tree!(describe_unsigned, "unsigned x;", "x", Ty::UInt);
+tree!(describe_long, "long x;", "x", Ty::Long);
+tree!(describe_unsigned_long, "unsigned long int x;", "x", Ty::ULong);
+tree!(describe_float, "float x;", "x", Ty::Float);
+tree!(describe_double, "double x;", "x", Ty::Double);
+tree!(describe_long_double, "long double x;", "x", Ty::LDouble);
+tree!(describe_const, "const int x;", "x", Ty::konst(Ty::Int));
+tree!(describe_volatile, "volatile int x;", "x", Ty::vol(Ty::Int));
+tree!(describe_const_volatile, "const volatile int x;", "x", Ty::konst(Ty::vol(Ty::Int)));
+tree!(describe_pointer, "char *p;", "p", Ty::ptr(Ty::Char));
+tree!(describe_pointer_to_pointer, "int **p;", "p", Ty::ptr(Ty::ptr(Ty::Int)));
+tree!(describe_pointer_to_const, "const int *p;", "p", Ty::ptr(Ty::konst(Ty::Int)));
+tree!(describe_const_pointer, "int *const p;", "p", Ty::konst(Ty::ptr(Ty::Int)));
+tree!(describe_struct, "struct S { int a; } s;", "s", Ty::strukt("S"));
+tree!(describe_union, "union U { int a; } u;", "u", Ty::union("U"));
+tree!(describe_enum, "enum E { A } e;", "e", Ty::enom("E"));
+tree!(
     describe_incomplete_struct,
     "struct S; struct S *p;",
     "p",
-    "*struct S (incomplete)"
+    Ty::ptr(Ty::strukt_incomplete("S"))
 );
-describes!(describe_typedef_target, "typedef unsigned int T;", "T", "unsigned int");
-describes!(describe_through_typedef, "typedef char *S; S s;", "s", "*char");
-describes!(
-    describe_qualified_typedef,
-    "typedef int T; const T x;",
-    "x",
-    "const int"
-);
-describes!(describe_member, "struct S { double a; };", "a", "double");
-describes!(
+tree!(describe_typedef_target, "typedef unsigned int T;", "T", Ty::UInt);
+tree!(describe_through_typedef, "typedef char *S; S s;", "s", Ty::ptr(Ty::Char));
+tree!(describe_qualified_typedef, "typedef int T; const T x;", "x", Ty::konst(Ty::Int));
+tree!(describe_member, "struct S { double a; };", "a", Ty::Double);
+tree!(
     describe_anonymous_struct_typedef,
     "typedef struct { int a; } T; T x;",
     "x",
-    "struct <anonymous>"
+    Ty::anon_struct()
 );
-describes!(describe_parameter, "void f(char *s) { }", "s", "*char");
-describes!(
-    describe_function_returns,
-    "long f(void) { return 0; }",
-    "f",
-    "long(void)"
-);
-describes!(
+tree!(describe_parameter, "void f(char *s) { }", "s", Ty::ptr(Ty::Char));
+tree!(describe_function_returns, "long f(void) { return 0; }", "f", Ty::func0(Ty::Long));
+tree!(
     describe_function_returning_pointer,
     "int *f(void) { return 0; }",
     "f",
-    "*int(void)"
+    Ty::func0(Ty::ptr(Ty::Int))
 );
-describes!(
-    describe_function_without_prototype,
-    "int f() { return 0; }",
-    "f",
-    "int()"
-);
-describes!(
+tree!(describe_function_without_prototype, "int f() { return 0; }", "f", Ty::noproto(Ty::Int));
+tree!(
     describe_function_parameters,
     "void f(int a, char *s) { }",
     "f",
-    "void(int, *char)"
+    Ty::func(Ty::Void, [Ty::Int, Ty::ptr(Ty::Char)])
 );
-describes!(
+tree!(
     describe_variadic_function,
     "int f(char *s, ...) { return 0; }",
     "f",
-    "int(*char, ...)"
+    Ty::func_variadic(Ty::Int, [Ty::ptr(Ty::Char)])
 );
-describes!(describe_pointer_to_function, "int (*p)(void);", "p", "*(int(void))");
-describes!(
+tree!(describe_pointer_to_function, "int (*p)(void);", "p", Ty::ptr(Ty::func0(Ty::Int)));
+tree!(
     describe_array_of_pointer_to_function,
     "int (*p[3])(void);",
     "p",
-    "*(int(void))[3]"
+    Ty::arr(Ty::ptr(Ty::func0(Ty::Int)), 3)
 );
-describes!(describe_array, "int a[3];", "a", "int[3]");
-describes!(describe_array_of_array, "int a[3][5];", "a", "int[3][5]");
-describes!(describe_array_of_array_of_array, "int a[3][5][7];", "a", "int[3][5][7]");
-describes!(describe_incomplete_array, "int a[];", "a", "int[]");
-describes!(describe_incomplete_array_of_array, "int a[][5];", "a", "int[][5]");
-describes!(describe_array_of_pointer, "int *a[3];", "a", "*int[3]");
-describes!(describe_pointer_to_array, "int (*p)[3];", "p", "*(int[3])");
-describes!(
+tree!(describe_array, "int a[3];", "a", Ty::arr(Ty::Int, 3));
+tree!(describe_array_of_array, "int a[3][5];", "a", Ty::arr(Ty::arr(Ty::Int, 5), 3));
+tree!(
+    describe_array_of_array_of_array,
+    "int a[3][5][7];",
+    "a",
+    Ty::arr(Ty::arr(Ty::arr(Ty::Int, 7), 5), 3)
+);
+tree!(describe_incomplete_array, "int a[];", "a", Ty::flex(Ty::Int));
+tree!(describe_incomplete_array_of_array, "int a[][5];", "a", Ty::flex(Ty::arr(Ty::Int, 5)));
+tree!(describe_array_of_pointer, "int *a[3];", "a", Ty::arr(Ty::ptr(Ty::Int), 3));
+tree!(describe_pointer_to_array, "int (*p)[3];", "p", Ty::ptr(Ty::arr(Ty::Int, 3)));
+tree!(
     describe_pointer_to_array_of_array,
     "int (*p)[3][5];",
     "p",
-    "*(int[3][5])"
+    Ty::ptr(Ty::arr(Ty::arr(Ty::Int, 5), 3))
 );
-describes!(describe_array_parameter, "void f(int a[3]) { }", "a", "*int");
-describes!(
+tree!(describe_array_parameter, "void f(int a[3]) { }", "a", Ty::ptr(Ty::Int));
+tree!(
     describe_function_parameter,
     "void f(int g(void)) { }",
     "g",
-    "*(int(void))"
+    Ty::ptr(Ty::func0(Ty::Int))
 );
-describes!(
+tree!(
     describe_adjusted_parameter_types,
     "void f(int a[3], int g(void)) { }",
     "f",
-    "void(*int, *(int(void)))"
+    Ty::func(Ty::Void, [Ty::ptr(Ty::Int), Ty::ptr(Ty::func0(Ty::Int))])
 );
-describes!(
+tree!(
     describe_old_style_array_parameter,
     "int f(a) int a[3]; { return 0; }",
     "a",
-    "*int"
+    Ty::ptr(Ty::Int)
 );
-describes!(
-    describe_qualified_parameter,
-    "void f(const int a) { }",
-    "a",
-    "const int"
-);
-describes!(
+tree!(describe_qualified_parameter, "void f(const int a) { }", "a", Ty::konst(Ty::Int));
+tree!(
     describe_unqualified_parameter_type,
     "void f(const int a) { }",
     "f",
-    "void(int)"
+    Ty::func(Ty::Void, [Ty::Int])
 );
-describes!(
+tree!(
     describe_old_style_function,
     "int f(a, b) int a; char b; { return a; }",
     "f",
-    "int()"
+    Ty::noproto(Ty::Int)
+);
+
+renders!(render_int, "int x;", "x", "int");
+renders!(render_const_int, "const int x;", "x", "const int");
+renders!(render_pointer, "char *p;", "p", "char *");
+renders!(render_array, "int a[3];", "a", "int[3]");
+renders!(
+    render_function_type,
+    "void f(int a, char *s) { }",
+    "f",
+    "void(int, char *)"
 );
 
 #[test]
@@ -315,11 +314,10 @@ fn a_prototype_and_its_definition_declare_one_function() {
         .symbols()
         .into_iter()
         .filter(|(_, kind, _)| kind == "function")
+        .map(|(name, kind, _)| (name, kind))
         .collect();
-    assert_eq!(
-        functions,
-        [("f".to_string(), "function".to_string(), "int(int)".to_string())]
-    );
+    assert_eq!(functions, [("f".to_string(), "function".to_string())]);
+    assert_eq!(unit.symbol_ty_tree("f"), Ty::func(Ty::Int, [Ty::Int]));
 }
 
 #[test]
@@ -373,7 +371,7 @@ fn a_function_definition_takes_its_type_from_its_symbol() {
         .functions
         .ty(id, &unit.ctx.sema.symbols)
         .expect("function type");
-    assert_eq!(unit.ctx.describe(&ty), "int(int, char)");
+    assert_eq!(unit.ty_tree(ty), Ty::func(Ty::Int, [Ty::Int, Ty::Char]));
 }
 
 #[test]

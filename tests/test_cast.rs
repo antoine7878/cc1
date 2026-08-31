@@ -22,8 +22,6 @@ fn struct_type(sema: &mut Sema) -> ResolvedTypeId {
     sema.types.tag(id)
 }
 
-/// Runs the usual arithmetic conversions and reports the common type together with the
-/// cast chain each operand acquired.
 fn convert(
     sema: &mut Sema,
     lhs: ResolvedTypeId,
