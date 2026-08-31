@@ -130,7 +130,7 @@ impl<R: Read> Yacc<R> {
         yylog!(self, "Starting parse");
         /* DEBUGGING */
 
-        self.push_statcks(0, YYToken::yyeof, Span::default());
+        self.push_stacks(0, YYToken::yyeof, Span::default());
         self.read_token();
 
         while self.continue_parse {
@@ -189,7 +189,7 @@ impl<R: Read> Yacc<R> {
         yylog!(self, "Shifting token {:?}", YYToken::error);
         /* DEBUGGING */
 
-        self.push_statcks((-act) as usize, YYToken::error, Span::new(start, end));
+        self.push_stacks((-act) as usize, YYToken::error, Span::new(start, end));
         self.token_since_error = 0;
 
         let top = (-act) as usize;
@@ -243,7 +243,7 @@ impl<R: Read> Yacc<R> {
         self.lookahead = None;
     }
 
-    fn push_statcks(&mut self, state: usize, value: YYToken, span: Span) {
+    fn push_stacks(&mut self, state: usize, value: YYToken, span: Span) {
         self.state_stack.push(state);
         self.value_stack.push(value);
         self.span_stack.push(span);
@@ -293,7 +293,7 @@ impl<R: Read> Yacc<R> {
         );
         /* DEBUGGING */
         let token = self.lookahead.take().unwrap_or(YYToken::yyeof);
-        self.push_statcks(-self.act as usize, token, self.lexer.span);
+        self.push_stacks(-self.act as usize, token, self.lexer.span);
     }
 
     fn reduce(&mut self) {
@@ -317,7 +317,7 @@ impl<R: Read> Yacc<R> {
         }
 
         let &top = self.state_stack.last().unwrap();
-        self.push_statcks(-((&Self::YY_GOTO_TABLE)[top][product] + 1) as usize, yyval, self.span);
+        self.push_stacks(-((&Self::YY_GOTO_TABLE)[top][product] + 1) as usize, yyval, self.span);
     }
 
     #[allow(unused_braces, clippy::let_and_return)]

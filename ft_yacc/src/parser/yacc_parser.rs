@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
 use crate::models::{ActionId, Production, StackPosition, TokenData, TokenId, TokenKind, Yacc};
-use crate::parser::input_iterator::InputItertor;
+use crate::parser::input_iterator::InputIterator;
 use crate::utils::YaccError;
 
 pub struct YaccParser {
-    it: InputItertor,
+    it: InputIterator,
     max_prec: Option<usize>,
     yacc: Yacc,
     gen_token_count: usize,
@@ -17,7 +17,7 @@ pub struct YaccParser {
 
 impl YaccParser {
     pub fn new(file: Option<String>) -> Result<Self, YaccError> {
-        let it = InputItertor::new(file)?;
+        let it = InputIterator::new(file)?;
         Ok(Self {
             yacc: Yacc::new(it.file_name.to_string()),
             it,

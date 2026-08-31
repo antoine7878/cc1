@@ -176,7 +176,7 @@ impl Emitter {
     fn dump_bindings(&self, w: &mut Dumper, parser: &LALRParser, production: &Production) -> Result<(), YaccError> {
         let ctx = production.mid_context.as_ref().unwrap_or(&production.recipe);
         let mut seen = BTreeSet::new();
-        for pos in &production.stack_positons {
+        for pos in &production.stack_positions {
             let Some(num) = pos.stack_position.filter(|&num| seen.insert(num)) else {
                 continue;
             };
@@ -207,7 +207,7 @@ impl Emitter {
         action_id: ActionId,
         production: &Production,
     ) -> Result<(), YaccError> {
-        let mut positions = production.stack_positons.iter().peekable();
+        let mut positions = production.stack_positions.iter().peekable();
         for (i, c) in parser.yacc.actions[action_id].char_indices() {
             if let Some(pos) = positions.peek()
                 && pos.action_position == i

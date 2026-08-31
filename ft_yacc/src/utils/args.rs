@@ -59,7 +59,7 @@ impl ArgParser for Args {
             'b' => self.b = self.value(it, 'b')?,
             'p' => self.p = self.value(it, 'p')?,
             'h' => Self::help(),
-            c => return Err(ArgError::UnkownOption(c)),
+            c => return Err(ArgError::UnknownOption(c)),
         }
         Ok(())
     }

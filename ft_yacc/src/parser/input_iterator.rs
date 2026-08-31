@@ -6,7 +6,7 @@ use std::vec::IntoIter;
 use crate::models::StackPosition;
 use crate::utils::{YaccError, escape_of_char};
 
-pub struct InputItertor {
+pub struct InputIterator {
     cs: IntoIter<char>,
     peeks: [Option<char>; 2],
     pub file_name: String,
@@ -14,7 +14,7 @@ pub struct InputItertor {
     pub col_no: usize,
 }
 
-impl InputItertor {
+impl InputIterator {
     pub fn new(file: Option<String>) -> Result<Self, YaccError> {
         let file = file.unwrap_or("-".to_string());
 
@@ -27,7 +27,7 @@ impl InputItertor {
         let mut buf = String::new();
         file.read_to_string(&mut buf)?;
         let cs = buf.chars().collect::<Vec<char>>().into_iter();
-        Ok(InputItertor {
+        Ok(InputIterator {
             cs,
             peeks: [None, None],
             file_name,
@@ -187,13 +187,13 @@ impl InputItertor {
     }
 
     pub fn take_code(&mut self, stack_positions: &mut Vec<StackPosition>) -> Result<String, YaccError> {
-        let mut braket_depth: u32 = 0;
+        let mut bracket_depth: u32 = 0;
         let mut buffer = String::new();
         let line = self.line_no;
         while let Some(c) = self.next() {
             match c {
-                '{' => braket_depth += 1,
-                '}' => braket_depth -= 1,
+                '{' => bracket_depth += 1,
+                '}' => bracket_depth -= 1,
                 '"' | '\'' => {
                     buffer.push(c);
                     self.take_c_literal(c, &mut buffer);
@@ -219,11 +219,11 @@ impl InputItertor {
                 _ => (),
             }
             buffer.push(c);
-            if braket_depth == 0 {
+            if bracket_depth == 0 {
                 break;
             }
         }
-        if braket_depth != 0 {
+        if bracket_depth != 0 {
             self.error_line("invalid action", line)?;
         }
         self.skip_whitespace();

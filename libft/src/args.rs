@@ -5,7 +5,7 @@ use std::str::Chars;
 pub enum ArgError {
     MissingValue(char),
     WrongType(char, String),
-    UnkownOption(char),
+    UnknownOption(char),
     BadArgumentCount(usize, usize),
     NotAfile(String),
     Process(String),
@@ -18,7 +18,7 @@ impl fmt::Display for ArgError {
         match self {
             ArgError::MissingValue(opt) => write!(f, "Option -{} is missing a value", opt),
             ArgError::WrongType(opt, val) => write!(f, "{} is not a value of option -{} ", val, opt),
-            ArgError::UnkownOption(opt) => write!(f, "Unkown option -{}", opt),
+            ArgError::UnknownOption(opt) => write!(f, "Unknown option -{}", opt),
             ArgError::BadArgumentCount(a, b) => write!(f, "Bad argument count, got {}, expected {}", a, b),
             ArgError::NotAfile(name) => write!(f, "{} is not a file", name),
             ArgError::Process(name) => write!(f, "{}", name),

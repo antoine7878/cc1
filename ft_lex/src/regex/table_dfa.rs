@@ -14,7 +14,7 @@ pub struct TableDfa {
     // start table starting_state = yy_start[start_condition]
     yy_start: Vec<isize>,
     // start table action = yy_start[current_state]
-    yy_trailling: Vec<isize>,
+    yy_trailing: Vec<isize>,
     // start table action = yy_accept[current_state]
     yy_accept: Vec<isize>,
 }
@@ -29,7 +29,7 @@ impl TableDfa {
         tables.yy_base = tables.build_base(&dfa);
         tables.transition_count = tables.yy_base.len();
         tables.yy_start = tables.build_start(&dfa);
-        tables.yy_trailling = tables.build_trailling(&dfa);
+        tables.yy_trailing = tables.build_trailing(&dfa);
         tables.class_count = tables.classes.len();
         tables.yy_accept = tables.build_accept(&dfa);
         tables
@@ -40,7 +40,7 @@ impl TableDfa {
             ("yy_char_eq", &self.yy_char_eq),
             ("yy_base", &self.yy_base),
             ("yy_start", &self.yy_start),
-            ("yy_trailling", &self.yy_trailling),
+            ("yy_trailing", &self.yy_trailing),
             ("yy_accept", &self.yy_accept),
         ])
     }
@@ -92,7 +92,7 @@ impl TableDfa {
         dfa.condition_to_start.values().map(|&x| x as isize).collect()
     }
 
-    fn build_trailling(&self, dfa: &Dfa) -> Vec<isize> {
+    fn build_trailing(&self, dfa: &Dfa) -> Vec<isize> {
         dfa.nodes
             .iter()
             .map(|state| state.trailing_tags.ones().next().map(|c| c as isize).unwrap_or(-1))

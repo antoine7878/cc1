@@ -20,7 +20,7 @@ pub struct LexParser {
     definition: Definition,
     auxiliary: String,
     start_conditions: Vec<String>,
-    code_fragements: Vec<Vec<u8>>,
+    code_fragments: Vec<Vec<u8>>,
     nfas: Vec<Nfa>,
     pub line_no: usize,
     current_file: String,
@@ -37,7 +37,7 @@ impl LexParser {
             state: LexParserState::Definition,
             definition: Definition::default(),
             auxiliary: String::new(),
-            code_fragements: Vec::new(),
+            code_fragments: Vec::new(),
             start_conditions: Vec::new(),
             nfas: Vec::new(),
             line_no: 0,
@@ -98,7 +98,7 @@ impl LexParser {
         let dfa = Dfa::from(nfa);
         let table_dfa = TableDfa::new(dfa, compress);
         let a = self
-            .code_fragements
+            .code_fragments
             .iter()
             .cloned()
             .map(|v| String::from_utf8(v).unwrap())
@@ -140,11 +140,11 @@ impl LexParser {
             (Definition, DefinitionBlock) => (),
             (DefinitionBlock, Definition) => (),
             (Rules, Auxiliary) => {
-                for i in (0..self.code_fragements.len()).rev() {
-                    Self::trim_vec(&mut self.code_fragements[i]);
-                    if self.code_fragements[i] == b"|" {
-                        self.code_fragements[i] = Vec::from(if i < self.code_fragements.len() - 1 {
-                            self.code_fragements[i + 1].as_slice()
+                for i in (0..self.code_fragments.len()).rev() {
+                    Self::trim_vec(&mut self.code_fragments[i]);
+                    if self.code_fragments[i] == b"|" {
+                        self.code_fragments[i] = Vec::from(if i < self.code_fragments.len() - 1 {
+                            self.code_fragments[i + 1].as_slice()
                         } else {
                             b"self.echo();"
                         });
@@ -240,7 +240,7 @@ impl LexParser {
             line.into(),
             &self.definition.substitutions,
             &self.start_conditions,
-            &mut self.code_fragements,
+            &mut self.code_fragments,
         )?;
         if depth != 0 {
             self.next_state(LexParserState::ActionBlock(depth, in_comment));
@@ -257,7 +257,7 @@ impl LexParser {
         } else {
             self.next_state(LexParserState::ActionBlock(depth, in_comment))
         }
-        let Some(last) = self.code_fragements.last_mut() else {
+        let Some(last) = self.code_fragments.last_mut() else {
             return Err(LexError::InputFile("not rule parsed".to_string()));
         };
         last.extend(line);

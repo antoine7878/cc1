@@ -56,7 +56,7 @@ impl ArgParser for Args {
             't' => self.t = true,
             'h' => Self::help(),
 
-            c => return Err(ArgError::UnkownOption(c)),
+            c => return Err(ArgError::UnknownOption(c)),
         }
         Ok(())
     }

@@ -120,7 +120,7 @@ impl<R: Read> YYLex<R> {
     const YY_CHAR_EQ: [isize; 0] = [];
     const YY_BASE: [isize; 0] = [];
     const YY_START: [isize; 0] = [];
-    const YY_TRAILLING: [isize; 0] = [];
+    const YY_TRAILING: [isize; 0] = [];
     const YY_ACCEPT: [isize; 0] = [];
 
     const YY_CLASS_COUNT: usize = 42;
@@ -182,8 +182,8 @@ impl<R: Read> YYLex<R> {
     }
 
     fn try_accept(&mut self) {
-        if Self::YY_TRAILLING[self.current_state] >= 0 {
-            self.trailing_action = Self::YY_TRAILLING[self.current_state];
+        if Self::YY_TRAILING[self.current_state] >= 0 {
+            self.trailing_action = Self::YY_TRAILING[self.current_state];
             self.trailing_end_pos = self.run_position;
         }
         if Self::YY_ACCEPT[self.current_state] < 0 {

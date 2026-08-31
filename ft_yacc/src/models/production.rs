@@ -7,7 +7,7 @@ pub struct Production {
     pub action: Option<ActionId>,
     pub precedence: Option<usize>,
     pub line_no: usize,
-    pub stack_positons: Vec<StackPosition>,
+    pub stack_positions: Vec<StackPosition>,
     pub mid_context: Option<Vec<TokenId>>,
 }
 
@@ -18,7 +18,7 @@ impl Production {
         action: Option<ActionId>,
         precedence: Option<usize>,
         line_no: usize,
-        stack_positons: Vec<StackPosition>,
+        stack_positions: Vec<StackPosition>,
         mid_context: Option<Vec<TokenId>>,
     ) -> Self {
         Self {
@@ -27,7 +27,7 @@ impl Production {
             action,
             precedence,
             line_no,
-            stack_positons,
+            stack_positions,
             mid_context,
         }
     }
