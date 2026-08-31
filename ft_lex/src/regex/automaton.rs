@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::bitset::BitSet;
+use libft::BitSet;
 use crate::regex::Graph;
 
 pub type StateId = usize;

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use crate::bitset::BitSet;
+use libft::BitSet;
 
 use crate::regex::{
     Ast, Atom, Automaton, ConditionId, Expression, FragmentId, State, StateId, Transition,

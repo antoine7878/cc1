@@ -1,12 +1,20 @@
 use std::fmt::{self};
+use std::hash::{Hash, Hasher};
 use std::{iter::zip, ops::Index};
 
 type C = u64;
 
-#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
+#[derive(PartialEq, Clone, PartialOrd, Eq, Ord)]
 pub struct BitSet {
     data: Vec<C>,
     capacity: usize,
+}
+
+impl Hash for BitSet {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.data.hash(state);
+        self.capacity.hash(state);
+    }
 }
 
 impl BitSet {
@@ -17,6 +25,12 @@ impl BitSet {
             data: vec![C::MIN; chunks],
             capacity,
         }
+    }
+
+    pub fn from<T: IntoIterator<Item = usize>>(capacity: usize, it: T) -> Self {
+        let mut set = Self::with_capacity(capacity);
+        set.extend(it);
+        set
     }
 
     pub fn insert(&mut self, value: usize) {
@@ -33,7 +47,7 @@ impl BitSet {
         }
     }
 
-    pub fn ones(&self) -> impl Iterator<Item = usize> + '_ {
+    pub fn ones(&self) -> OnesIter<'_> {
         OnesIter {
             data: &self.data,
             chunk_idx: 0,
@@ -46,6 +60,7 @@ impl BitSet {
         !self.data.iter().any(|&c| c != 0)
     }
 
+    /// return 1 if index in contain in self
     pub fn get(&self, index: usize) -> bool {
         (self.data[index / Self::CHK_SIZE] >> (index % Self::CHK_SIZE)) & 1 == 1
     }
@@ -56,6 +71,16 @@ impl BitSet {
 
     pub fn union_with(&mut self, other: &Self) {
         zip(self.data.iter_mut(), other.data.iter()).for_each(|(a, b)| *a |= b);
+    }
+
+    pub fn union_changed(&mut self, other: &Self) -> bool {
+        let mut changed = false;
+        zip(self.data.iter_mut(), other.data.iter()).for_each(|(a, b)| {
+            let merged = *a | b;
+            changed |= merged != *a;
+            *a = merged;
+        });
+        changed
     }
 
     pub fn toggle(&mut self) {
@@ -80,13 +105,20 @@ impl Index<usize> for BitSet {
     }
 }
 
+impl fmt::Debug for BitSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.ones().collect::<Vec<_>>())
+    }
+}
+
 impl fmt::Display for BitSet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.ones().collect::<Vec<_>>())
     }
 }
 
-struct OnesIter<'a> {
+#[derive(Clone)]
+pub struct OnesIter<'a> {
     data: &'a [C],
     chunk_idx: usize,
     current: C,

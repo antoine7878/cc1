@@ -1,33 +1,9 @@
 use std::env::args;
-use std::fmt::{self};
 use std::path::Path;
 use std::process::exit;
 use std::str::Chars;
 
-#[derive(Debug)]
-pub enum ArgError {
-    MissingValue(char),
-    WrongType(char, String),
-    UnkownOption(char),
-    BadArgumentCount(usize, usize),
-    NotAfile(String),
-    Process(String),
-}
-
-impl std::error::Error for ArgError {}
-
-impl fmt::Display for ArgError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ArgError::MissingValue(opt) => write!(f, "Option -{} is missing a value", opt),
-            ArgError::WrongType(opt, val) => write!(f, "{} is not a value of option -{} ", val, opt),
-            ArgError::UnkownOption(opt) => write!(f, "Unkown option -{}", opt),
-            ArgError::BadArgumentCount(a, b) => write!(f, "Bad argument count, got {}, expected {}", a, b),
-            ArgError::NotAfile(name) => write!(f, "{} is not a file", name),
-            ArgError::Process(name) => write!(f, "{}", name),
-        }
-    }
-}
+use libft::{ArgError, ArgParser};
 
 #[derive(Debug)]
 pub struct Args {
@@ -65,48 +41,35 @@ impl Default for Args {
     }
 }
 
-impl Args {
-    pub fn parse() -> Result<Self, ArgError> {
-        let mut args = Args::default();
-        let mut only_unamed: bool = false;
-        while let Some(arg) = args.argv.next() {
-            match arg.starts_with('-') {
-                _ if only_unamed => args.mandatory.push(arg),
-                false => args.mandatory.push(arg),
-                true if arg == "--" => only_unamed = true,
-                true => {
-                    let mut it = arg.chars();
-                    it.next();
-                    while let Some(c) = it.next() {
-                        args.parse_char(c, &mut it)?;
-                    }
-                }
-            }
-        }
-        args.process_args()
+impl ArgParser for Args {
+    fn positional(&mut self, arg: String) {
+        self.mandatory.push(arg);
     }
 
-    fn parse_char(&mut self, c: char, it: &mut Chars) -> Result<(), ArgError> {
+    fn argv(&mut self) -> &mut std::env::Args {
+        &mut self.argv
+    }
+
+    fn flag(&mut self, c: char, it: &mut Chars) -> Result<(), ArgError> {
         match c {
             't' => self.t = true,
             'v' => self.v = true,
             'g' => self.g = true,
-            'o' => self.o = self.parse_value(it, 'o')?,
-            'b' => self.b = self.parse_value(it, 'b')?,
-            'p' => self.p = self.parse_value(it, 'p')?,
+            'o' => self.o = self.value(it, 'o')?,
+            'b' => self.b = self.value(it, 'b')?,
+            'p' => self.p = self.value(it, 'p')?,
             'h' => Self::help(),
             c => return Err(ArgError::UnkownOption(c)),
         }
         Ok(())
     }
+}
 
-    fn parse_value<T: TryFrom<String>>(&mut self, it: &mut Chars, opt: char) -> Result<T, ArgError> {
-        let mut str_value = it.collect::<String>();
-        if str_value.is_empty() {
-            str_value = self.argv.next().ok_or(ArgError::MissingValue(opt))?
-        }
-        let value = T::try_from(str_value.clone());
-        value.or(Err(ArgError::WrongType(opt, str_value)))
+impl Args {
+    pub fn parse() -> Result<Self, ArgError> {
+        let mut args = Args::default();
+        args.walk()?;
+        args.process_args()
     }
 
     fn process_args(mut self) -> Result<Self, ArgError> {

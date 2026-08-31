@@ -1,7 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 mod args;
-mod bitset;
 mod error;
 mod front;
 mod generator;

@@ -138,10 +138,6 @@ impl Yacc {
         self.productions[id].precedence
     }
 
-    pub fn is_typed(&self) -> bool {
-        !self.union.is_empty()
-    }
-
     // ----- print ---------------
 
     pub fn config_to_string(&self, config: &Configuration) -> String {

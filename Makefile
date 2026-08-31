@@ -1,10 +1,10 @@
 NAME = target/debug/cc1
 
-FT_LEX = ft_lex/target/release/ft_lex
+FT_LEX = target/release/ft_lex
 LEX_FILE = src/parser/c.l
 LEXER = src/parser/lex.rs
 
-FT_YACC = ft_yacc/target/release/ft_yacc
+FT_YACC = target/release/ft_yacc
 YACC_FILE = src/parser/c.y
 PARSER = src/parser/yacc.rs
 
@@ -15,18 +15,13 @@ all: $(NAME)
 $(NAME): $(LEXER) $(PARSER)
 	cargo build
 
-# ----- ft_lex --------------------
+# ----- ft_lex / ft_yacc --------------------
 
-$(FT_LEX):
-	$(MAKE) -C ft_lex
+$(FT_LEX) $(FT_YACC):
+	cargo build --release -p ft_lex -p ft_yacc
 
 $(LEXER): $(LEX_FILE) | $(FT_LEX)
 	$(FT_LEX) -c $(LEX_FILE) -o $(LEXER)
-
-# ----- ft_yacc --------------------
-
-$(FT_YACC):
-	$(MAKE) -C ft_yacc
 
 $(PARSER): $(YACC_FILE) | $(FT_YACC)
 	$(FT_YACC) $(YACC_FILE) -o $(PARSER)
@@ -38,7 +33,11 @@ test: $(NAME)
 	./$(NAME) test/hello.i
 
 ctest: $(NAME)
-	cargo nextest run
+	cargo nextest run -p cc1
+
+ttest:
+	cargo build --release -p ft_lex -p ft_yacc
+	cargo nextest run -p ft_lex -p ft_yacc -p libft
 
 coverage: $(NAME)
 	cargo llvm-cov nextest
@@ -57,9 +56,7 @@ cc:
 clean:
 	cargo clean
 	rm -rf $(LEXER) $(PARSER)
-	make -C ft_lex clean
-	make -C ft_yacc clean
 
 re: clean all
 
-.PHONY: all clean re test lexer parser $(FT_LEX) $(FT_YACC) $(NAME)
+.PHONY: all clean re test ttest lexer parser $(FT_LEX) $(FT_YACC) $(NAME)

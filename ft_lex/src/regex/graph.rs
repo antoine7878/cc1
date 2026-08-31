@@ -1,87 +1,43 @@
+use libft::Dot;
+
 use crate::regex::Automaton;
 use crate::utils::byte_label;
 
 pub struct Graph {
-    dot: String,
+    dot: Dot,
 }
 
 #[allow(unused)]
 impl Graph {
     fn new(name: &str) -> Self {
-        let mut dot = String::new();
-        dot.push_str(&format!("digraph {name} {{\n"));
-        dot.push_str("    rankdir=LR;\n");
-        dot.push_str("    labelloc=\"t\";\n");
-        dot.push_str("    edge [fontsize=10];\n");
-        dot.push('\n');
-        Self { dot }
-    }
-
-    fn dot_escape(s: &str) -> String {
-        s.replace('\\', r"\\").replace('"', r#"\""#)
+        Self { dot: Dot::new(name) }
     }
 
     fn add_start_arrow(&mut self, start: usize, condition: usize, start_condition: &str) {
         let enter_node = format!("__start_{}_{}__", start, condition);
         self.dot
-            .push_str(&format!(" {enter_node} [shape=point, label=\"\"];\n"));
-        self.dot.push_str(&format!(
+            .raw(&format!(" {enter_node} [shape=point, label=\"\"];\n"));
+        self.dot.raw(&format!(
             " {} -> {} [label=\"{}\"];\n",
             enter_node, start, start_condition
         ));
-        self.dot.push('\n');
+        self.dot.raw("\n");
     }
 
     fn add_exit_arrow(&mut self, node: usize, label: &str, l: String) {
         let exit_id = format!("__exit_{}_{}__", node, label);
 
-        self.dot.push_str(&format!(
+        self.dot.raw(&format!(
             "    {} [shape=point, style=invis, width=0, height=0, label=\"\"];\n",
             exit_id
         ));
 
-        self.dot.push_str(&format!(
+        self.dot.raw(&format!(
             "    {} -> {} [label=\"{}\"];\n",
             node,
             exit_id,
-            Self::dot_escape(&l),
+            Dot::escape(&l),
         ));
-    }
-
-    fn add_node(&mut self, id: usize, shape: &str, label: &str, tooltip: &str) {
-        self.dot.push_str(&format!(
-            "    {} [shape={}, label=\"{}\", tooltip=\"{}\"];\n",
-            id,
-            shape,
-            Self::dot_escape(label),
-            Self::dot_escape(tooltip),
-        ));
-    }
-
-    fn add_edge(&mut self, from: usize, to: usize, label: &str) {
-        self.dot.push_str(&format!(
-            "    {} -> {} [label=\"{}\"];\n",
-            from,
-            to,
-            Self::dot_escape(label),
-        ));
-    }
-
-    fn finish(&mut self) {
-        self.dot.push_str("}\n");
-    }
-
-    fn write_svg(&self, file: &str) -> std::io::Result<()> {
-        use std::fs;
-        use std::process::Command;
-
-        let file_dot = format!("{file}.dot");
-        let file_svg = format!("{file}.svg");
-        fs::write(file_dot.as_str(), &self.dot)?;
-        let _status = Command::new("dot")
-            .args(["-Tsvg", file_dot.as_str(), "-o", file_svg.as_str()])
-            .status()?;
-        Ok(())
     }
 
     pub fn label_of_transitions(transitions: &[usize]) -> String {
@@ -132,7 +88,9 @@ impl Graph {
                 }
                 None => "circle",
             };
-            graph.add_node(id, shape, &id.to_string(), &format!("{:?}", node.trailing_tags));
+            graph
+                .dot
+                .node(id, shape, &id.to_string(), &format!("{:?}", node.trailing_tags));
             for transition in &node.transitions {
                 let label = if transition.on.is_clear() {
                     "ε".to_string()
@@ -141,10 +99,10 @@ impl Graph {
                     a.sort();
                     Graph::label_of_transitions(a.as_slice())
                 };
-                graph.add_edge(id, transition.to, &label);
+                graph.dot.edge(id, transition.to, &label);
             }
         }
-        graph.finish();
-        graph.write_svg(file)
+        graph.dot.finish();
+        graph.dot.write_svg(file)
     }
 }

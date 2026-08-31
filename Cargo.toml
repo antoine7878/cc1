@@ -7,3 +7,6 @@ autotests = false
 [[test]]
 name = "suite"
 path = "tests/main.rs"
+
+[workspace]
+members = ["ft_lex", "ft_yacc", "libft"]

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+while getopts ":n:a:v" opt; do
+    case $opt in
+    n) name=$OPTARG ;;
+    a) age=$OPTARG ;;
+    v) verbose=true ;;
+    \?) echo "Invalid option: -$OPTARG" ;;
+    :) echo "Option -$OPTARG requires an argument" ;;
+    esac
+done
+
+echo "Name: $name, Age: $age, Verbose: $verbose"

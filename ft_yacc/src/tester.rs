@@ -4,14 +4,12 @@ mod test {
     use std::io::{Read, Write};
     use std::path::Path;
     use std::process::{Command, Output, Stdio};
-    use std::sync::LazyLock;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[derive(Debug)]
     pub struct TmpFile {
         pub path: String,
-        pub tag: String,
     }
 
     static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -26,10 +24,9 @@ mod test {
                 .as_nanos()
                 .to_string();
 
-            let tag = format!("{}{}", now, count);
-            let path = format!("test/gen/{}{}{}", prefix, tag, extension);
+            let path = format!("test/gen/{}{}{}{}", prefix, now, count, extension);
             let mut _file = File::create(&path).unwrap();
-            Self { path, tag }
+            Self { path }
         }
     }
 
@@ -66,7 +63,7 @@ mod test {
     }
 
     fn ft_yacc_bin() -> String {
-        format!("{}/target/release/ft_yacc", env!("CARGO_MANIFEST_DIR"))
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../target/release/ft_yacc").to_string()
     }
 
     fn ft_yacc_raw(args: &[&str]) -> Output {
@@ -96,12 +93,15 @@ mod test {
         format!("test/gen/{}{}{}", prefix, now, count)
     }
 
-    static BUILD: LazyLock<()> = LazyLock::new(|| {
-        cmd_with_out("cargo", &["build", "--release"]);
-    });
-
     fn ensure_build() {
-        LazyLock::force(&BUILD);
+        assert_bin(&ft_yacc_bin());
+    }
+
+    fn assert_bin(bin: &str) {
+        assert!(
+            Path::new(bin).is_file(),
+            "{bin} is missing: run `make ttest` (or `cargo build --release -p ft_lex -p ft_yacc`)"
+        );
     }
 
     fn test_diag(yacc_file: &str, expected: &[&str]) {
@@ -131,11 +131,13 @@ mod test {
     }
 
     fn ft_lex(lex_file: &str, parser_file: &str) -> Vec<u8> {
-        cmd_with_out("./../ft_lex/target/release/ft_lex", &["-o", parser_file, lex_file])
+        let bin = concat!(env!("CARGO_MANIFEST_DIR"), "/../target/release/ft_lex");
+        assert_bin(bin);
+        cmd_with_out(bin, &["-o", parser_file, lex_file])
     }
 
     fn ft_yacc(yacc_file: &str, parser_file: &str) -> Vec<u8> {
-        cmd_with_out("./target/release/ft_yacc", &["-b", parser_file, yacc_file])
+        cmd_with_out(&ft_yacc_bin(), &["-b", parser_file, yacc_file])
     }
 
     fn compile_parser(parser_file: &str, exec_file: &str) {

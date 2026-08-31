@@ -1,8 +1,9 @@
 use std::collections::BTreeSet;
-use std::io::{self, Write};
+use std::fmt;
+use std::io::Write;
 
 use crate::generator::dumper::Dumper;
-use crate::models::{Action, ActionId, Production, TokenData, Yacc};
+use crate::models::{ActionId, Production, TokenData, Yacc};
 use crate::parser::LALRParser;
 use crate::utils::{YaccError, str_of_escape};
 
@@ -25,18 +26,18 @@ impl Emitter {
         writeln!(w, "const YY_EOF_TOKEN_ID: usize = {};", Yacc::END_TOKEN_ID)?;
         writeln!(w, "const YY_ACCEPT_TOKEN_ID: usize = {};", Yacc::ACCEPT_TOKEN_ID)?;
         self.goto_table(w, parser)?;
-        self.rlen_table(w, parser)?;
-        self.product_table(w, parser)?;
-        self.action_table(w, parser)?;
-        self.default_action_table(w, parser)?;
-        self.default_reduce_table(w, parser)?;
-        self.token_names(w, parser)?;
+        self.array(w, "YY_RLEN_TABLE", "usize", parser.rlens())?;
+        self.array(w, "YY_PRODUCT_TABLE", "usize", parser.products())?;
+        self.array(w, "YY_ACTION_TABLE", "isize", parser.actions())?;
+        self.array(w, "YY_DEFAULT_ACT", "isize", parser.default_actions())?;
+        self.array(w, "YY_DEFAULT_REDUCE_ACT", "isize", parser.default_reduces())?;
+        self.array(w, "YY_TOKEN_NAMES", "&str", parser.token_names().map(|n| format!("\"{}\"", n)))?;
         Ok(())
     }
 
     pub fn dump_debug(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
-        self.production_line_table(w, parser)?;
-        self.is_terminal_table(w, parser)?;
+        self.array(w, "YY_PRODUCTION_LINE", "usize", parser.production_lines())?;
+        self.array(w, "YY_TERMINAL_TABLE", "bool", parser.is_terminals())?;
         Ok(())
     }
 
@@ -222,10 +223,10 @@ impl Emitter {
             parser.yacc.tokens.len(),
             parser.states.len(),
         )?;
-        for row in &parser.goto_table {
+        for row in parser.goto_rows() {
             write!(w, "[")?;
-            for actions in row {
-                self.write_action(w, actions.first())?;
+            for action in row {
+                write!(w, "{},", action)?;
             }
             writeln!(w, "],")?;
         }
@@ -233,115 +234,16 @@ impl Emitter {
         Ok(())
     }
 
-    fn rlen_table(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
-        write!(w, "const YY_RLEN_TABLE: [usize; {}] = [", parser.yacc.productions.len(),)?;
-        for p in &parser.yacc.productions {
-            write!(w, "{},", p.recipe.len())?
-        }
-        writeln!(w, "];")?;
-        Ok(())
-    }
-
-    fn product_table(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
-        write!(
-            w,
-            "const YY_PRODUCT_TABLE: [usize; {}] = [",
-            parser.yacc.productions.len(),
-        )?;
-        for p in &parser.yacc.productions {
-            write!(w, "{},", p.product)?;
-        }
-        writeln!(w, "];")?;
-        Ok(())
-    }
-
-    fn action_table(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
-        write!(
-            w,
-            "const YY_ACTION_TABLE: [isize; {}] = [",
-            parser.yacc.productions.len()
-        )?;
-        for p in &parser.yacc.productions {
-            match p.action {
-                Some(i) => write!(w, "{},", i)?,
-                None => write!(w, "-1,")?,
-            }
-        }
-        writeln!(w, "];")?;
-        Ok(())
-    }
-
-    fn default_action_table(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
-        write!(w, "const YY_DEFAULT_ACT: [isize; {}] = [", parser.states.len(),)?;
-        for row in &parser.goto_table {
-            let mut it = row.iter().filter(|s| !s.is_empty());
-            let first = it.next().unwrap().first();
-            if matches!(first, Some(Action::Reduce(_))) && it.all(|a| a.first() == first) {
-                self.write_action(w, first)?
-            } else {
-                write!(w, "0,")?
-            }
-        }
-        writeln!(w, "];")?;
-        Ok(())
-    }
-
-    fn default_reduce_table(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
-        write!(w, "const YY_DEFAULT_REDUCE_ACT: [isize; {}] = [", parser.states.len(),)?;
-
-        for row in &parser.goto_table {
-            let mut it = row
-                .iter()
-                .filter_map(|s| s.first().filter(|a| matches!(a, Action::Reduce(_) | Action::Error)));
-
-            if let Some(first) = it.next()
-                && it.all(|a| a == first)
-            {
-                self.write_action(w, Some(first))?
-            } else {
-                write!(w, "0,")?
-            }
-        }
-        writeln!(w, "];")?;
-        Ok(())
-    }
-
-    fn token_names(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
-        write!(w, "const YY_TOKEN_NAMES: [&str; {}] = [", parser.yacc.tokens.len())?;
-        for tok in &parser.yacc.tokens {
-            let name = tok.self_display_name().replace('\\', "\\\\").replace('"', "\\\"");
-            write!(w, "\"{}\",", name)?;
-        }
-        writeln!(w, "];")?;
-        Ok(())
-    }
-
-    fn write_action(&self, w: &mut Dumper, action: Option<&Action>) -> io::Result<()> {
-        match action {
-            Some(Action::Shift(s)) | Some(Action::Goto(s)) => write!(w, "-{},", s + 1),
-            Some(Action::Accept(r)) | Some(Action::Reduce(r)) => write!(w, "{},", r + 1),
-            _ => write!(w, "0,"),
-        }
-    }
-
-    fn production_line_table(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
-        write!(
-            w,
-            "const YY_PRODUCTION_LINE: [usize; {}] = [",
-            parser.yacc.productions.len(),
-        )?;
-
-        for p in &parser.yacc.productions {
-            write!(w, "{},", p.line_no)?;
-        }
-        writeln!(w, "];")?;
-        Ok(())
-    }
-
-    fn is_terminal_table(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
-        write!(w, "const YY_TERMINAL_TABLE: [bool; {}] = [", parser.yacc.tokens.len())?;
-        for i in 0..parser.yacc.tokens.len() {
-            write!(w, "{},", parser.yacc.tokens[i].is_nonterminal())?;
+    fn array<I, T>(&self, w: &mut Dumper, name: &str, ty: &str, items: I) -> Result<(), YaccError>
+    where
+        I: IntoIterator<Item = T>,
+        I::IntoIter: ExactSizeIterator,
+        T: fmt::Display,
+    {
+        let items = items.into_iter();
+        write!(w, "const {}: [{}; {}] = [", name, ty, items.len())?;
+        for item in items {
+            write!(w, "{},", item)?;
         }
         writeln!(w, "];")?;
         Ok(())

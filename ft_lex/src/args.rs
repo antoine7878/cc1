@@ -3,24 +3,7 @@ use std::fmt;
 use std::process::exit;
 use std::str::Chars;
 
-#[derive(Debug)]
-pub enum ArgError {
-    MissingValue(char),
-    WrongType(char, String),
-    UnkownOption(char),
-}
-
-impl std::error::Error for ArgError {}
-
-impl fmt::Display for ArgError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ArgError::MissingValue(opt) => write!(f, "Option {} is missing a value", opt),
-            ArgError::WrongType(val, opt) => write!(f, "{} is not a value of option {} ", val, opt),
-            ArgError::UnkownOption(opt) => write!(f, "Unkown option {}", opt),
-        }
-    }
-}
+use libft::{ArgError, ArgParser};
 
 #[derive(Debug)]
 pub struct Args {
@@ -55,31 +38,18 @@ impl Default for Args {
     }
 }
 
-impl Args {
-    pub fn parse() -> Result<Self, ArgError> {
-        let mut args = Args::default();
-        let mut only_unamed: bool = false;
-        while let Some(arg) = args.argv.next() {
-            match arg.starts_with('-') {
-                _ if only_unamed => args.i.push(arg),
-                false => args.i.push(arg),
-                true if arg == "--" => only_unamed = true,
-                true => {
-                    let mut it = arg.chars();
-                    it.next();
-                    while let Some(c) = it.next() {
-                        args.parse_char(c, &mut it)?;
-                    }
-                }
-            }
-        }
-        Ok(args)
+impl ArgParser for Args {
+    fn positional(&mut self, arg: String) {
+        self.i.push(arg);
     }
 
-    fn parse_char(&mut self, c: char, it: &mut Chars) -> Result<(), ArgError> {
+    fn argv(&mut self) -> &mut std::env::Args {
+        &mut self.argv
+    }
+
+    fn flag(&mut self, c: char, it: &mut Chars) -> Result<(), ArgError> {
         match c {
-            'o' => self.o = self.parse_value(it, 'o')?,
-            // 'o' => self.o = Some(argv.next().ok_or(ArgError::MissingValue('o'))?),
+            'o' => self.o = self.value(it, 'o')?,
             'c' => self.c = true,
             'n' => self.n = true,
             'v' => self.v = true,
@@ -90,30 +60,14 @@ impl Args {
         }
         Ok(())
     }
+}
 
-    fn parse_value<T: TryFrom<String>>(
-        &mut self,
-        it: &mut Chars,
-        opt: char,
-    ) -> Result<T, ArgError> {
-        let mut str_value = it.collect::<String>();
-        if str_value.is_empty() {
-            str_value = self.argv.next().ok_or(ArgError::MissingValue(opt))?
-        }
-        let value = T::try_from(str_value.clone());
-        value.or(Err(ArgError::WrongType(opt, str_value)))
+impl Args {
+    pub fn parse() -> Result<Self, ArgError> {
+        let mut args = Args::default();
+        args.walk()?;
+        Ok(args)
     }
-
-    // fn parse_value<T: TryFrom<String>>(
-    //     arg: &mut T,
-    //     argv: &mut std::env::Args,
-    //     opt: &str,
-    // ) -> Result<(), ArgError> {
-    //     let str_value = argv.next().ok_or(ArgError::MissingValue("-x"))?;
-    //     let value = T::try_from(str_value.clone());
-    //     *arg = value.or(Err(ArgError::WrongType(opt.to_string(), str_value)))?;
-    //     Ok(())
-    // }
 
     pub fn help() {
         println!("-i        input lex file(s)");

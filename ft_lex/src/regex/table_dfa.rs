@@ -1,4 +1,4 @@
-use crate::bitset::BitSet;
+use libft::BitSet;
 use crate::regex::Dfa;
 
 #[derive(Debug, Default, Clone)]

@@ -63,8 +63,17 @@ mod test {
         out
     }
 
+    fn ft_lex_bin() -> String {
+        let bin = concat!(env!("CARGO_MANIFEST_DIR"), "/../target/release/ft_lex");
+        assert!(
+            Path::new(bin).is_file(),
+            "{bin} is missing: run `make ttest` (or `cargo build --release -p ft_lex -p ft_yacc`)"
+        );
+        bin.to_string()
+    }
+
     fn ft_lex(lex_file: &str, parser_file: &str) -> Vec<u8> {
-        cmd_with_out("./target/release/ft_lex", &["-o", parser_file, lex_file])
+        cmd_with_out(&ft_lex_bin(), &["-o", parser_file, lex_file])
     }
 
     fn run_parser(exec_file: &str, test_input: &str, expected_output: &[u8]) {
@@ -199,7 +208,7 @@ mod test {
 
         args.extend(lexfiles);
 
-        cmd_with_out("./target/release/ft_lex", &args);
+        cmd_with_out(&ft_lex_bin(), &args);
         compile_parser(&parser_file.name, &exec_file.name);
         run_parser(&exec_file.name, test_input, expected_output);
     }

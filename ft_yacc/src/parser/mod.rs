@@ -1,5 +1,6 @@
 mod input_iterator;
 mod lalr;
+mod tables;
 mod verbose;
 mod yacc_parser;
 

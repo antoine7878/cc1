@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
 
-use crate::bitset::BitSet;
+use libft::BitSet;
 use crate::regex::{Automaton, ConditionId, Nfa, State, StateId, Transition};
 
 #[derive(Debug, Clone, PartialEq, Default)]
