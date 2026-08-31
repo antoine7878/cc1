@@ -122,25 +122,13 @@ impl<R: Read> YYLex<R> {
     const YY_START: [isize; 0] = [];
     const YY_TRAILLING: [isize; 0] = [];
     const YY_ACCEPT: [isize; 0] = [];
-    const YY_NEXT_ACCEPT: [isize; 0] = [];
 
     const YY_CLASS_COUNT: usize = 42;
-    const YY_RULE_COUNT: usize = 69;
 
     /* REMOVE */
 
     fn begin(&mut self, condition: usize) {
         self.start_condition = condition;
-    }
-
-    fn reject(&mut self) {
-        let next_action = Self::YY_NEXT_ACCEPT[self.stack_top().state * Self::YY_RULE_COUNT + self.action as usize];
-        self.action = if next_action >= 0 {
-            next_action
-        } else {
-            self.accept_stack.pop();
-            Self::YY_ACCEPT[self.stack_top().state]
-        };
     }
 
     fn keep_bytes_to_process(&mut self) -> usize {

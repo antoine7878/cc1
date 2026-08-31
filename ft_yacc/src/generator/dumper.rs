@@ -48,6 +48,7 @@ impl Dumper {
                 "/* DEBUGGING_TABLES */" => generator.dump_debug(&mut w, parser)?,
                 "/* DEFINES */" => (),
                 "/* ACTIONS */" => generator.dump_actions(&mut w, parser)?,
+                "/* DEFAULT_ACTIONS */" => generator.dump_default_actions(&mut w, parser)?,
                 _ => writeln!(w, "{}", line)?,
             }
         }

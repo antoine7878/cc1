@@ -96,7 +96,7 @@ impl LexParser {
         );
         let nfa_state_count = nfa.nodes.len();
         let dfa = Dfa::from(nfa);
-        let table_dfa = TableDfa::new(dfa, self.code_fragements.len(), compress);
+        let table_dfa = TableDfa::new(dfa, compress);
         let a = self
             .code_fragements
             .iter()

@@ -359,7 +359,10 @@ impl<R: Read> Yacc<R> {
                 if rlen == 0 {
                     YYToken::Empty
                 } else {
-                    std::mem::replace(&mut self.value_stack[idx], YYToken::Empty)
+                    match self.act {
+                        /* DEFAULT_ACTIONS */
+                        _ => std::mem::replace(&mut self.value_stack[idx], YYToken::Empty),
+                    }
                 }
             }
             _ => unreachable!(),

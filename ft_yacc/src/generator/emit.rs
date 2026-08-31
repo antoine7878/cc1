@@ -55,6 +55,28 @@ impl Emitter {
         Ok(())
     }
 
+    pub fn dump_default_actions(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
+        for (rule, prod) in parser.yacc.productions.iter().enumerate() {
+            if prod.action.is_some() {
+                continue;
+            }
+            let Some(&first) = prod.recipe.first() else {
+                continue;
+            };
+            let product = &parser.yacc.tokens[prod.product];
+            let first = &parser.yacc.tokens[first];
+            match (&product.utype, &first.utype) {
+                (Some(pty), Some(fty)) if pty == fty => writeln!(
+                    w,
+                    "{} => YYToken::{}(std::mem::replace(&mut self.value_stack[idx], YYToken::Empty).into_{}()),",
+                    rule, product.name, first.name
+                )?,
+                _ => (),
+            }
+        }
+        Ok(())
+    }
+
     fn token_enum(&self, w: &mut Dumper, tokens: &[TokenData]) -> Result<(), YaccError> {
         writeln!(
             w,

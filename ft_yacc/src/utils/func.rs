@@ -55,9 +55,9 @@ pub fn str_of_escape(c: char) -> String {
         '\x0D' => "\\r".to_string(),
         '\x09' => "\\t".to_string(),
         '\x0B' => "\\v".to_string(),
-        '\x5C' => "\\'".to_string(),
-        '\x27' => "\\\\".to_string(),
-        '\x33' => "\\\"".to_string(),
+        '\x5C' => "\\\\".to_string(),
+        '\x27' => "\\'".to_string(),
+        '\x22' => "\\\"".to_string(),
         c => c.to_string(),
     }
 }

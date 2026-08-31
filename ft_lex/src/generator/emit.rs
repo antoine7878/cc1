@@ -11,7 +11,6 @@ pub fn dump_tables(lex: &Lex) -> String {
         .collect::<Vec<_>>()
         .join("\n")
         + &format!("\nconst YY_CLASS_COUNT: usize = {};\n", lex.table_dfa.class_count)
-        + &format!("const YY_RULE_COUNT: usize = {};\n", lex.code_fragments.len())
 }
 
 pub fn dump_actions(code_fragments: &[String]) -> String {

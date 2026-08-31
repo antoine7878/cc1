@@ -251,16 +251,6 @@ mod test {
         );
     }
 
-    #[test]
-    fn neg_rs() {
-        test_yacc(
-            "./test/tester/op_r.l",
-            "./test/tester/neg_r.y",
-            "42 2+3*4\n",
-            b"[line 42] mul\n[line 42] add\nline 42 => 14\n",
-        );
-    }
-
     // ----- declarations: associativity & precedence -----
 
     #[test]

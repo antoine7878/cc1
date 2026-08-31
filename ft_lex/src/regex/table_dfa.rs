@@ -17,12 +17,10 @@ pub struct TableDfa {
     yy_trailling: Vec<isize>,
     // start table action = yy_accept[current_state]
     yy_accept: Vec<isize>,
-    // start table next_action = yy_next_accept[current_state][action]
-    yy_next_accept: Vec<isize>,
 }
 
 impl TableDfa {
-    pub fn new(dfa: Dfa, accept_len: usize, compress: bool) -> Self {
+    pub fn new(dfa: Dfa, compress: bool) -> Self {
         let mut tables = Self {
             state_count: dfa.nodes.len(),
             ..Default::default()
@@ -33,7 +31,7 @@ impl TableDfa {
         tables.yy_start = tables.build_start(&dfa);
         tables.yy_trailling = tables.build_trailling(&dfa);
         tables.class_count = tables.classes.len();
-        (tables.yy_accept, tables.yy_next_accept) = tables.build_accept(&dfa, accept_len);
+        tables.yy_accept = tables.build_accept(&dfa);
         tables
     }
 
@@ -44,7 +42,6 @@ impl TableDfa {
             ("yy_start", &self.yy_start),
             ("yy_trailling", &self.yy_trailling),
             ("yy_accept", &self.yy_accept),
-            ("yy_next_accept", &self.yy_next_accept),
         ])
     }
 
@@ -102,24 +99,14 @@ impl TableDfa {
             .collect()
     }
 
-    fn build_accept(&self, dfa: &Dfa, accept_len: usize) -> (Vec<isize>, Vec<isize>) {
+    fn build_accept(&self, dfa: &Dfa) -> Vec<isize> {
         let mut yy_accept: Vec<isize> = vec![];
-        let mut yy_next_accept: Vec<isize> = vec![-1; dfa.nodes.len() * accept_len];
-        for (j, node) in dfa.nodes.iter().enumerate() {
-            let vec: Vec<usize> = node.accept_fragments.ones().collect();
-            match vec.len() {
-                0 => yy_accept.push(-1),
-                1 => yy_accept.push(node.accept_fragments.ones().next().unwrap() as isize),
-                _ => {
-                    for i in 0..vec.len() - 1 {
-                        let a = vec[i];
-                        let b = vec[i + 1] as isize;
-                        yy_next_accept[j * accept_len + a] = b;
-                    }
-                    yy_accept.push(node.accept_fragments.ones().next().unwrap() as isize);
-                }
+        for node in dfa.nodes.iter() {
+            match node.accept_fragments.ones().next() {
+                None => yy_accept.push(-1),
+                Some(fragment) => yy_accept.push(fragment as isize),
             }
         }
-        (yy_accept, yy_next_accept)
+        yy_accept
     }
 }

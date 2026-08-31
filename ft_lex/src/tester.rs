@@ -154,12 +154,6 @@ mod test {
     }
 
     #[test]
-    fn reject_rs() {
-        test_lex("./test/reject_1_r.l", "salut", b"12345salut\n");
-        test_lex("./test/reject_2_r.l", "aaaaaaaaaaaaaaaaaaaaaaaaaaaa", b"123\n");
-    }
-
-    #[test]
     fn yyless_rs() {
         test_lex("./test/yyless_r.l", "salut\n", b"MATCHlut\n");
     }
