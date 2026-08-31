@@ -273,11 +273,20 @@ impl Visitor for Sema {
                 }
             }
             Initializer::List(inits) => {
-                let ResolvedType::Array { elem, .. } = ty.id.resolve(self) else { panic!("ouspi") };
-                self.init_type = Some(*elem);
-                for node in inits {
+                let (elem, len) = match ty.id.resolve(self) {
+                    &ResolvedType::Array { elem, len } => (elem, len),
+                    _ => (ty, Some(1)),
+                };
+                let ty_stash = self.init_type;
+                self.init_type = Some(elem);
+                for (i, node) in inits.iter().enumerate() {
+                    if len.is_some_and(|l| l <= i) {
+                        self.add_diag(Diag::only_diag(Diagnosis::ArrayInitTooLong), &inits[i].span);
+                        break
+                    }
                     self.visit_initializer(ctx, node);
                 }
+                self.init_type = ty_stash;
             }
         }
     }

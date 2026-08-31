@@ -479,6 +479,73 @@ types!(
     ["*char lvalue <PointerConversion> *const char"]
 );
 
+// ---- 6.5.7 array and scalar initializer lists -----------------------------
+
+types!(
+    array_initializer_types_each_element,
+    "void f(void) { int a[3] = {1,2,3}; }",
+    ["int", "int", "int", "int", "int"]
+);
+
+types!(
+    array_initializer_may_have_fewer_elements_than_declared,
+    "void f(void) { int a[3] = {1,2}; }",
+    ["int", "int", "int", "int"]
+);
+
+rejects!(
+    array_initializer_with_too_many_elements_is_rejected,
+    "void f(void) { int a[2] = {1,2,3}; }",
+    Diagnosis::ArrayInitTooLong,
+    ["int", "int", "int", "int"]
+);
+
+types!(
+    incomplete_array_size_is_inferred_from_initializer,
+    "void f(void) { int a[] = {1,2,3}; }",
+    ["int", "int", "int"]
+);
+
+types!(
+    scalar_initializer_may_be_wrapped_in_braces,
+    "void f(void) { int x = {1}; }",
+    ["int"]
+);
+
+rejects!(
+    scalar_initializer_with_too_many_elements_is_rejected,
+    "void f(void) { int x = {1,2}; }",
+    Diagnosis::ArrayInitTooLong,
+    ["int"]
+);
+
+types!(
+    nested_array_initializer_types_every_element,
+    "void f(void) { int a[2][2] = {{1,2},{3,4}}; }",
+    ["int", "int", "int", "int", "int", "int", "int", "int"]
+);
+
+// Regression test: an excess element in one inner list must not corrupt the
+// element type used for a later sibling list.
+rejects!(
+    excess_elements_in_a_nested_list_do_not_affect_sibling_lists,
+    "void f(void) { int a[2][2] = {{1,2,3},{4,5}}; }",
+    Diagnosis::ArrayInitTooLong,
+    ["int", "int", "int", "int", "int", "int", "int", "int"]
+);
+
+types!(
+    array_initializer_converts_each_element_to_the_declared_type,
+    "void f(void) { int a[2] = {1, 3.5}; }",
+    ["int", "int", "int", "double <FloatingToInteger> int"]
+);
+
+types!(
+    array_of_pointers_initializer_accepts_null_pointer_constants,
+    "void f(void) { int *a[2] = {0, 0}; }",
+    ["int", "int", "int <NullPointer> *int", "int <NullPointer> *int"]
+);
+
 // ---- resolution failures do not cascade ----------------------------------
 
 rejects!(

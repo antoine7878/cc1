@@ -11,6 +11,7 @@ use crate::utils::{RED, RESET, YELLOW};
 #[derive(Clone, Copy, Debug)]
 pub enum Diagnosis {
     InvalidReturnType,
+    ArrayInitTooLong,
     Poisoned,
     InvalidOperand,
     DivisionByZero,
@@ -113,6 +114,7 @@ impl DiagnosisNode {
     fn message(&self, ctx: &Context) -> String {
 
         match &self.inner {
+            Diagnosis::ArrayInitTooLong => "excess elements in array initializer".to_string(),
             Diagnosis::InvalidReturnType => "Invalid return type".to_string(),
             Diagnosis::DiscardedQualifiers(q) => format!("Assignement discard {q} qualifer" ),
             Diagnosis::IncompatibleAssignementTypes => "Wrong assignement".to_string(),
