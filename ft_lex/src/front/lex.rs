@@ -4,6 +4,7 @@ use std::io::{BufWriter, Write, stdout};
 use crate::Args;
 use crate::error::LexError;
 use crate::front::Definition;
+use crate::generator::emit;
 use crate::regex::TableDfa;
 
 #[derive(Debug, Clone, Default)]
@@ -18,14 +19,13 @@ pub struct Lex {
 
 impl Lex {
     pub fn run(&mut self, args: &Args) -> Result<(), LexError> {
-        let template_file = args.x.template_file();
+        let template_file = include_str!("../../template/template.rs");
 
         let writer: Box<dyn Write> = match &args.o {
             None => Box::new(stdout()),
             Some(file) => Box::new(File::create(file)?),
         };
         let mut out_buffer = BufWriter::new(writer);
-        let generator = args.x.generator();
         let mut remove = false;
         for line in template_file.lines() {
             match line.trim() {
@@ -38,11 +38,11 @@ impl Lex {
                 }
                 "/* MAIN */" if self.definition.no_main => break,
                 "/* TOKENS */" if self.definition.no_yacc => {
-                    out_buffer.write_all(generator.dump_tokens(&self.definition.tokens).as_bytes())?
+                    out_buffer.write_all(emit::dump_tokens(&self.definition.tokens).as_bytes())?
                 }
-                "/* DEFINES */" => out_buffer.write_all(generator.dump_defines(self).as_bytes())?,
-                "/* TABLES */" => out_buffer.write_all(generator.dump_tables(self).as_bytes())?,
-                "/* ACTIONS */" => out_buffer.write_all(generator.dump_actions(&self.code_fragments).as_bytes())?,
+                "/* DEFINES */" => out_buffer.write_all(emit::dump_defines(self).as_bytes())?,
+                "/* TABLES */" => out_buffer.write_all(emit::dump_tables(self).as_bytes())?,
+                "/* ACTIONS */" => out_buffer.write_all(emit::dump_actions(&self.code_fragments).as_bytes())?,
                 _ => {
                     out_buffer.write_all(line.as_bytes())?;
                     out_buffer.write_all(b"\n")?;

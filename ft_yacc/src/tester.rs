@@ -1,14 +1,12 @@
 #[cfg(test)]
 mod test {
-    use std::fs::{File, remove_file};
+    use std::fs::{File, create_dir_all, remove_file};
     use std::io::{Read, Write};
     use std::path::Path;
     use std::process::{Command, Output, Stdio};
     use std::sync::LazyLock;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
-
-    use crate::generator::lang::Lang;
 
     #[derive(Debug)]
     pub struct TmpFile {
@@ -20,6 +18,7 @@ mod test {
 
     impl TmpFile {
         fn new(prefix: &str, extension: &str) -> Self {
+            create_dir_all("test/gen").unwrap();
             let count = COUNTER.fetch_add(1, Ordering::Relaxed);
             let now = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
@@ -31,14 +30,6 @@ mod test {
             let path = format!("test/gen/{}{}{}", prefix, tag, extension);
             let mut _file = File::create(&path).unwrap();
             Self { path, tag }
-        }
-
-        fn from_file(path: String) -> Self {
-            let mut _file = File::create(&path).unwrap();
-            Self {
-                path,
-                tag: "".to_string(),
-            }
         }
     }
 
@@ -106,7 +97,7 @@ mod test {
     }
 
     static BUILD: LazyLock<()> = LazyLock::new(|| {
-        cmd_with_out("cargo", &["build"]);
+        cmd_with_out("cargo", &["build", "--release"]);
     });
 
     fn ensure_build() {
@@ -122,7 +113,7 @@ mod test {
         for e in expected {
             assert!(text.contains(e), "expected diagnostic to contain {e:?}, got:\n{text}");
         }
-        let _ = remove_file(format!("{stem}.tab.c"));
+        let _ = remove_file(format!("{stem}_tab.rs"));
     }
 
     fn test_conflict_report(yacc_file: &str, expected: &str) {
@@ -136,35 +127,19 @@ mod test {
             text.contains(expected),
             "expected conflict report to contain {expected:?}, got:\n{text}"
         );
-        let _ = remove_file(format!("{stem}.tab.c"));
+        let _ = remove_file(format!("{stem}_tab.rs"));
     }
 
-    fn ft_lex(lex_file: &str, parser_file: &str, lang: &Lang) -> Vec<u8> {
-        cmd_with_out(
-            "./../ft_lex/target/release/ft_lex",
-            &["-x", lang.lex_flag(), "-o", parser_file, lex_file],
-        )
+    fn ft_lex(lex_file: &str, parser_file: &str) -> Vec<u8> {
+        cmd_with_out("./../ft_lex/target/release/ft_lex", &["-o", parser_file, lex_file])
     }
 
-    fn ft_yacc(yacc_file: &str, parser_file: &str, lang: &Lang) -> Vec<u8> {
-        match lang {
-            Lang::Rust => cmd_with_out(
-                "./target/release/ft_yacc",
-                &["-x", lang.lex_flag(), "-b", parser_file, yacc_file],
-            ),
-            Lang::C => cmd_with_out(
-                "./target/release/ft_yacc",
-                &["-x", lang.lex_flag(), "-d", "-b", parser_file, yacc_file],
-            ),
-        }
+    fn ft_yacc(yacc_file: &str, parser_file: &str) -> Vec<u8> {
+        cmd_with_out("./target/release/ft_yacc", &["-b", parser_file, yacc_file])
     }
 
-    fn compile_parser(parser_file: &str, lexer_file: &str, exec_file: &str, lang: &Lang) {
-        let cc_flags = match lang {
-            Lang::C => vec![parser_file, lexer_file, "-I.", "-o", exec_file],
-            Lang::Rust => vec!["--edition=2024", parser_file, "-o", exec_file],
-        };
-        cmd_with_out(lang.compiler(), &cc_flags);
+    fn compile_parser(parser_file: &str, exec_file: &str) {
+        cmd_with_out("rustc", &["--edition=2024", parser_file, "-o", exec_file]);
     }
 
     fn run_parser(exec_file: &str, test_input: &str) -> Vec<u8> {
@@ -176,18 +151,6 @@ mod test {
         println!("{}", String::from_utf8_lossy(expected_output));
         println!("===========================================");
         assert_eq!(out, expected_output)
-    }
-
-    fn copy_lex_file(original: &str, mod_name: &str) -> TmpFile {
-        let mut buffer = String::new();
-        let mut original = File::open(original).unwrap();
-        let _ = original.read_to_string(&mut buffer).unwrap();
-        let ret = TmpFile::new("lex_", "");
-        let mut file = File::create(&ret.path).unwrap();
-        file.write_all(format!("%{{\n#include \"{}.h\"\n%}}\n", mod_name).as_bytes())
-            .unwrap();
-        file.write_all(buffer.as_bytes()).unwrap();
-        ret
     }
 
     fn copy_yacc_file(original: &str, mod_name: &str) -> TmpFile {
@@ -210,36 +173,22 @@ mod test {
         let mut yacc_file = yacc_file.to_string();
         ensure_build();
 
-        let lang = Lang::from_file(lex_file);
-        let mut lex_file = lex_file.to_string();
         let exec_file = TmpFile::new("test_yacc", "");
-        let lexer_file = TmpFile::new("lex_yy", lang.src_extension());
+        let lexer_file = TmpFile::new("lex_yy", ".rs");
 
-        let ext = lang.tab_extention();
+        let ext = "_tab.rs";
         let parser_file = TmpFile::new("", ext);
         let name = &parser_file.path;
         let name = &name[..(name.len() - ext.len())];
 
-        let (file, dst) = match lang {
-            Lang::Rust => (copy_yacc_file(&yacc_file, &get_stem(&lexer_file.path)), &mut yacc_file),
-            Lang::C => (copy_lex_file(&lex_file, &get_stem(&parser_file.path)), &mut lex_file),
-        };
-        *dst = file.path.clone();
+        let file = copy_yacc_file(&yacc_file, &get_stem(&lexer_file.path));
+        yacc_file = file.path.clone();
 
-        let header_path = format!("test/gen/{}.tab.h", parser_file.tag);
-        let _header_file = TmpFile::from_file(header_path);
-
-        ft_lex(&lex_file, &lexer_file.path, &lang);
-        ft_yacc(&yacc_file, name, &lang);
-        compile_parser(&parser_file.path, &lexer_file.path, &exec_file.path, &lang);
+        ft_lex(lex_file, &lexer_file.path);
+        ft_yacc(&yacc_file, name);
+        compile_parser(&parser_file.path, &exec_file.path);
         let out = run_parser(&exec_file.path, test_input);
         assert_output(&out, expected_output);
-    }
-
-    #[test]
-    fn basic_c() {
-        test_yacc("./test/tester/calc.l", "./test/tester/calc.y", "2+3", b"= 5\n");
-        test_yacc("./test/tester/calc.l", "./test/tester/calc.y", "2+3*4/2+1", b"= 9\n");
     }
 
     #[test]
@@ -275,25 +224,6 @@ mod test {
     }
 
     #[test]
-    fn basic_error_c() {
-        test_yacc("./test/tester/calc.l", "./test/tester/calc.y", "2+", b"syntax error\n");
-        test_yacc("./test/tester/calc.l", "./test/tester/calc.y", "a", b"syntax error\n");
-        test_yacc(
-            "./test/tester/calc.l",
-            "./test/tester/calc.y",
-            "1a",
-            b"= 1\nsyntax error\n",
-        );
-        test_yacc(
-            "./test/tester/calc.l",
-            "./test/tester/calc.y",
-            "1a1",
-            b"= 1\nsyntax error\n",
-        );
-        test_yacc("./test/tester/calc.l", "./test/tester/calc.y", "a1", b"syntax error\n");
-    }
-
-    #[test]
     fn unwind_rs() {
         test_yacc(
             "./test/tester/calc_r.l",
@@ -310,28 +240,6 @@ mod test {
     }
 
     #[test]
-    fn unwind_c() {
-        test_yacc(
-            "./test/tester/calc.l",
-            "./test/tester/calc.y",
-            "1+1\n2+\n2+2",
-            b"= 2\n= 4\nsyntax error\n",
-        );
-        test_yacc(
-            "./test/tester/calc.l",
-            "./test/tester/calc.y",
-            "1+1\n+2\n2+2",
-            b"= 2\n= 4\nsyntax error\n",
-        );
-        test_yacc(
-            "./test/tester/calc.l",
-            "./test/tester/calc.y",
-            "1+1\n+2\n2+2",
-            b"= 2\n= 4\nsyntax error\n",
-        );
-    }
-
-    #[test]
     fn prec_rs() {
         test_yacc(
             "./test/tester/calc_r.l",
@@ -342,37 +250,16 @@ mod test {
     }
 
     #[test]
-    fn prec_c() {
+    fn neg_rs() {
         test_yacc(
-            "./test/tester/calc.l",
-            "./test/tester/calc_prec.y",
-            "2+3*4\n2*3+4",
-            b"= 20\n= 10\n",
-        );
-    }
-
-    #[test]
-    fn neg_c() {
-        test_yacc(
-            "./test/tester/neg.l",
-            "./test/tester/neg.y",
+            "./test/tester/op_r.l",
+            "./test/tester/neg_r.y",
             "42 2+3*4\n",
             b"[line 42] mul\n[line 42] add\nline 42 => 14\n",
         );
     }
 
     // ----- declarations: associativity & precedence -----
-
-    #[test]
-    fn right_c() {
-        test_yacc("./test/tester/neg.l", "./test/tester/right.y", "2^3^2\n", b"= 512\n");
-        test_yacc(
-            "./test/tester/neg.l",
-            "./test/tester/right.y",
-            "2^3\n2+2^3\n",
-            b"= 8\n= 10\n",
-        );
-    }
 
     #[test]
     fn right_rs() {
@@ -382,17 +269,6 @@ mod test {
             "./test/tester/right_r.y",
             "2^3\n2+2^3",
             b"= 8\n= 10\n",
-        );
-    }
-
-    #[test]
-    fn nonassoc_c() {
-        test_yacc("./test/tester/neg.l", "./test/tester/nonassoc.y", "1<2\n", b"= 1\n");
-        test_yacc(
-            "./test/tester/neg.l",
-            "./test/tester/nonassoc.y",
-            "1<2<3\n",
-            b"syntax error\n",
         );
     }
 
@@ -408,26 +284,9 @@ mod test {
     }
 
     #[test]
-    fn uminus_c() {
-        test_yacc("./test/tester/neg.l", "./test/tester/uminus.y", "-2+3\n", b"= 1\n");
-        test_yacc("./test/tester/neg.l", "./test/tester/uminus.y", "-(2+3)\n", b"= -5\n");
-    }
-
-    #[test]
     fn uminus_rs() {
         test_yacc("./test/tester/op_r.l", "./test/tester/uminus_r.y", "-2+3", b"= 1\n");
         test_yacc("./test/tester/op_r.l", "./test/tester/uminus_r.y", "-(2+3)", b"= -5\n");
-    }
-
-    #[test]
-    fn union2_c() {
-        test_yacc(
-            "./test/tester/union2.l",
-            "./test/tester/union2.y",
-            "1.5+2\n",
-            b"= 3.5\n",
-        );
-        test_yacc("./test/tester/union2.l", "./test/tester/union2.y", "2+3\n", b"= 5\n");
     }
 
     #[test]
@@ -447,11 +306,6 @@ mod test {
     }
 
     #[test]
-    fn start_c() {
-        test_yacc("./test/tester/neg.l", "./test/tester/start.y", "5", b"= 5\n");
-    }
-
-    #[test]
     fn start_rs() {
         test_yacc("./test/tester/op_r.l", "./test/tester/start_r.y", "5", b"= 5\n");
     }
@@ -460,26 +314,25 @@ mod test {
     fn start_typed_ok() {
         ensure_build();
         let stem = tmp_stem("startt_");
-        let out = ft_yacc_raw(&["-d", "-b", &stem, "./test/tester/start2.y"]);
+        let out = ft_yacc_raw(&["-b", &stem, "./test/tester/start2.y"]);
         let text = combined(&out);
         println!("{text}");
         assert!(out.status.success());
         assert!(!text.contains("Error"), "valid grammar rejected:\n{text}");
-        let _ = remove_file(format!("{stem}.tab.c"));
-        let _ = remove_file(format!("{stem}.tab.h"));
+        let _ = remove_file(format!("{stem}_tab.rs"));
     }
 
     #[test]
-    fn defact_c() {
-        test_yacc("./test/tester/neg.l", "./test/tester/defact.y", "42", b"= 42\n");
+    fn defact_rs() {
+        test_yacc("./test/tester/op_r.l", "./test/tester/defact_r.y", "42", b"= 42\n");
     }
 
     #[test]
-    fn escapes_c() {
+    fn escapes_rs() {
         test_yacc(
-            "./test/tester/calc.l",
-            "./test/tester/escapes.y",
-            "x\ty\\z'",
+            "./test/tester/op_r.l",
+            "./test/tester/escapes_r.y",
+            "x\ny\\z'",
             b"escapes ok\n",
         );
     }
@@ -495,26 +348,6 @@ mod test {
     }
 
     #[test]
-    fn charlit_c() {
-        test_yacc(
-            "./test/tester/neg.l",
-            "./test/tester/charlit.y",
-            "abent",
-            b"charlit ok\n",
-        );
-    }
-
-    #[test]
-    fn midact_c() {
-        test_yacc(
-            "./test/tester/neg.l",
-            "./test/tester/midact.y",
-            "x42y",
-            b"mid 42\nend 42 43\n",
-        );
-    }
-
-    #[test]
     fn midact_rs() {
         test_yacc(
             "./test/tester/op_r.l",
@@ -525,33 +358,21 @@ mod test {
     }
 
     #[test]
-    fn comments_c() {
-        test_yacc("./test/tester/neg.l", "./test/tester/comments.y", "x", b"comments ok\n");
+    fn comments_rs() {
+        test_yacc("./test/tester/op_r.l", "./test/tester/comments_r.y", "x", b"comments ok\n");
     }
 
     #[test]
-    fn frag_c() {
-        test_yacc("./test/tester/neg.l", "./test/tester/frag.y", "x", b"esc \" %} ok\n");
+    fn frag_rs() {
+        test_yacc("./test/tester/op_r.l", "./test/tester/frag_r.y", "x", b"esc \" %} ok\n");
     }
 
     #[test]
-    fn action_c() {
-        test_yacc("./test/tester/neg.l", "./test/tester/action.y", "42", b"\"42\"\n");
+    fn action_rs() {
+        test_yacc("./test/tester/op_r.l", "./test/tester/action_r.y", "42", b"\"42\"\n");
     }
 
     // ----- error handling macros --------------------
-
-    #[test]
-    fn errmac_c() {
-        test_yacc("./test/tester/neg.l", "./test/tester/errmac.y", "o\nq", b"ok\nret=0\n");
-        test_yacc("./test/tester/neg.l", "./test/tester/errmac.y", "o\nx", b"ok\nret=3\n");
-        test_yacc(
-            "./test/tester/neg.l",
-            "./test/tester/errmac.y",
-            "z\n\nq",
-            b"recovered 0\nret=0\n",
-        );
-    }
 
     #[test]
     fn errmac_rs() {
@@ -630,14 +451,14 @@ mod test {
         assert!(!out.status.success(), "yacc shall exit with status > 0 on error");
         assert!(!out.stderr.is_empty(), "diagnostics shall be written to stderr");
         assert!(out.stdout.is_empty(), "stdout shall not be used");
-        let _ = remove_file(format!("{stem}.tab.c"));
+        let _ = remove_file(format!("{stem}_tab.rs"));
     }
 
     // ----- conflict --------------------
 
     #[test]
-    fn else_c() {
-        test_yacc("./test/tester/neg.l", "./test/tester/else.y", "iisls", b"ifelse\nif\n");
+    fn else_rs() {
+        test_yacc("./test/tester/op_r.l", "./test/tester/else_r.y", "iisls", b"ifelse\nif\n");
     }
 
     #[test]
@@ -659,60 +480,26 @@ mod test {
         println!("{text}");
         assert!(out.status.success());
         assert!(!text.contains("conflict"), "resolved conflicts reported:\n{text}");
-        let _ = remove_file(format!("{stem}.tab.c"));
+        let _ = remove_file(format!("{stem}_tab.rs"));
     }
 
     // ----- options --------------------
 
     #[test]
-    fn opt_d_header() {
-        ensure_build();
-        let stem = tmp_stem("optd_");
-        let out = ft_yacc_raw(&["-d", "-b", &stem, "./test/tester/mini.y"]);
-        println!("{}", combined(&out));
-        assert!(out.status.success());
-        let hdr = read_file(&format!("{stem}.tab.h"));
-        assert!(hdr.contains("NUMBER = 300"), "token code missing:\n{hdr}");
-        assert!(!hdr.contains("yylex("), "header shall not declare yylex");
-        assert!(!hdr.contains("yyerror("), "header shall not declare yyerror");
-        let _ = remove_file(format!("{stem}.tab.c"));
-        let _ = remove_file(format!("{stem}.tab.h"));
-    }
-
-    #[test]
-    fn opt_l_noline() {
-        ensure_build();
-        let stem = tmp_stem("optl_");
-        let out = ft_yacc_raw(&["-l", "-b", &stem, "./test/tester/mini.y"]);
-        assert!(out.status.success());
-        let src = read_file(&format!("{stem}.tab.c"));
-        assert!(!src.contains("#line"), "#line present with -l");
-        let _ = remove_file(format!("{stem}.tab.c"));
-
-        let out = ft_yacc_raw(&["-b", &stem, "./test/tester/mini.y"]);
-        assert!(out.status.success());
-        let src = read_file(&format!("{stem}.tab.c"));
-        assert!(src.contains("#line"), "#line missing without -l");
-        let _ = remove_file(format!("{stem}.tab.c"));
-    }
-
-    #[test]
     fn opt_t_debug() {
         ensure_build();
         let stem = tmp_stem("optt_");
-        let out = ft_yacc_raw(&["-t", "-d", "-b", &stem, "./test/tester/mini.y"]);
+        let out = ft_yacc_raw(&["-t", "-b", &stem, "./test/tester/mini.y"]);
         assert!(out.status.success());
-        let hdr = read_file(&format!("{stem}.tab.h"));
-        assert!(hdr.contains("#define YYDEBUG 1"), "-t header:\n{hdr}");
-        let _ = remove_file(format!("{stem}.tab.c"));
-        let _ = remove_file(format!("{stem}.tab.h"));
+        let src = read_file(&format!("{stem}_tab.rs"));
+        assert!(src.contains("macro_rules! yylog"), "-t src:\n{src}");
+        let _ = remove_file(format!("{stem}_tab.rs"));
 
-        let out = ft_yacc_raw(&["-d", "-b", &stem, "./test/tester/mini.y"]);
+        let out = ft_yacc_raw(&["-b", &stem, "./test/tester/mini.y"]);
         assert!(out.status.success());
-        let hdr = read_file(&format!("{stem}.tab.h"));
-        assert!(hdr.contains("#define YYDEBUG 0"), "default header:\n{hdr}");
-        let _ = remove_file(format!("{stem}.tab.c"));
-        let _ = remove_file(format!("{stem}.tab.h"));
+        let src = read_file(&format!("{stem}_tab.rs"));
+        assert!(!src.contains("macro_rules! yylog"), "default src:\n{src}");
+        let _ = remove_file(format!("{stem}_tab.rs"));
     }
 
     #[test]
@@ -721,10 +508,10 @@ mod test {
         let stem = tmp_stem("optp_");
         let out = ft_yacc_raw(&["-p", "zz", "-b", &stem, "./test/tester/mini.y"]);
         assert!(out.status.success());
-        let src = read_file(&format!("{stem}.tab.c"));
+        let src = read_file(&format!("{stem}_tab.rs"));
         assert!(src.contains("zzparse"), "prefixed name missing:\n{src}");
         assert!(!src.contains("yyparse"), "unprefixed yyparse remains");
-        let _ = remove_file(format!("{stem}.tab.c"));
+        let _ = remove_file(format!("{stem}_tab.rs"));
     }
 
     #[test]
@@ -736,7 +523,7 @@ mod test {
         assert!(out.status.success());
         let desc = read_file(&format!("{stem}.output"));
         assert!(desc.contains("Grammar"), "description file content:\n{desc}");
-        let _ = remove_file(format!("{stem}.tab.c"));
+        let _ = remove_file(format!("{stem}_tab.rs"));
         let _ = remove_file(format!("{stem}.output"));
     }
 }

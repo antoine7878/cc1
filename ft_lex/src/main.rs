@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if args.t {
         args.o = None;
     } else if args.o.is_none() {
-        args.o = Some(args.x.defalut_out_file().to_string());
+        args.o = Some("lex_yy.rs".to_string());
     }
     let parser = LexParser::new(&args.i)?;
     let mut lex = parser.run(args.c)?;

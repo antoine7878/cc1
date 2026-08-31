@@ -4,8 +4,6 @@ use std::path::Path;
 use std::process::exit;
 use std::str::Chars;
 
-use crate::generator::lang::Lang;
-
 #[derive(Debug)]
 pub enum ArgError {
     MissingValue(char),
@@ -41,18 +39,12 @@ pub struct Args {
     pub b: Option<String>,
     /// sym_prefix
     pub p: String,
-    /// write header
-    pub d: bool,
-    /// add #line
-    pub l: bool,
     /// debug
     pub t: bool,
     /// report
     pub v: bool,
     /// Generate Automaton graph
     pub g: bool,
-    /// Target language
-    pub x: Lang,
     argv: std::env::Args,
 }
 
@@ -65,12 +57,9 @@ impl Default for Args {
             b: None,
             o: None,
             p: "yy".to_string(),
-            d: false,
-            l: false,
             t: false,
             v: false,
             g: false,
-            x: Lang::C,
             argv,
         }
     }
@@ -99,15 +88,12 @@ impl Args {
 
     fn parse_char(&mut self, c: char, it: &mut Chars) -> Result<(), ArgError> {
         match c {
-            'd' => self.d = true,
-            'l' => self.l = true,
             't' => self.t = true,
             'v' => self.v = true,
             'g' => self.g = true,
             'o' => self.o = self.parse_value(it, 'o')?,
             'b' => self.b = self.parse_value(it, 'b')?,
             'p' => self.p = self.parse_value(it, 'p')?,
-            'x' => self.x = self.parse_value(it, 'x')?,
             'h' => Self::help(),
             c => return Err(ArgError::UnkownOption(c)),
         }
@@ -135,45 +121,23 @@ impl Args {
         }
         self.b
             .get_or_insert_with(|| path.file_stem().unwrap().to_str().unwrap().to_string());
-        if self.x == Lang::Rust && self.l {
-            return Err(ArgError::Process("no #line directive in rust".to_string()));
-        }
-        if self.x == Lang::Rust && self.d {
-            return Err(ArgError::Process("cannot produce header file in rust".to_string()));
-        }
-        if self.x == Lang::C && self.o.is_some() {
-            return Err(ArgError::Process("cannot use '-o' in c".to_string()));
-        }
         Ok(self)
     }
 
     pub fn get_src_file_name(&self) -> String {
         match &self.o {
             Some(name) => name.clone(),
-            None => format!("{}{}", self.b.as_ref().unwrap(), self.x.tab_extention()),
+            None => format!("{}_tab.rs", self.b.as_ref().unwrap()),
         }
-    }
-    pub fn get_hdr_file_name(&self) -> String {
-        format!("{}.tab.h", self.b.as_ref().unwrap())
-    }
-    pub fn get_hdr_include_name(&self) -> String {
-        let name = self.get_hdr_file_name();
-        let path = Path::new(&name);
-        path.file_name().unwrap().to_str().unwrap().to_string()
     }
 
     pub fn get_template_file(&self) -> &'static str {
-        match self.x {
-            Lang::C => include_str!("../../template/template.c"),
-            Lang::Rust => include_str!("../../template/template.rs"),
-        }
+        include_str!("../../template/template.rs")
     }
 
     pub fn help() {
         println!("-b [file_prefix]      specify a file_prefix for output files");
         println!("-p [sym_prefix]       specify a sym_prefix for output symboles");
-        println!("-d                    write a header file");
-        println!("-l                    produce code without #line construct");
         println!("-t                    instrument the parser for debugging");
         println!("-v                    write description file");
         println!("-g                    generate automaton graph");

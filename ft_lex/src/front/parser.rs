@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read, stdin};
 
 use crate::error::LexError;
-use crate::front::{Definition, Lex, Rule, YytextStorage};
+use crate::front::{Definition, Lex, Rule};
 use crate::regex::{Dfa, Nfa, TableDfa};
 
 #[derive(Debug, Clone, Copy)]
@@ -191,8 +191,7 @@ impl LexParser {
                 definition.indented_code += line;
                 definition.indented_code += "\n";
             }
-            "%array" => definition.yytext_storage = YytextStorage::Array,
-            "%pointer" => definition.yytext_storage = YytextStorage::Pointer,
+            "%array" | "%pointer" => (),
             "%no_main" => definition.no_main = true,
             "%no_context" => definition.no_context = false,
             "%no_yacc" => definition.no_yacc = true,

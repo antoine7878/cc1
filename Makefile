@@ -21,7 +21,7 @@ $(FT_LEX):
 	$(MAKE) -C ft_lex
 
 $(LEXER): $(LEX_FILE) | $(FT_LEX)
-	$(FT_LEX) -cx rust $(LEX_FILE) -o $(LEXER)
+	$(FT_LEX) -c $(LEX_FILE) -o $(LEXER)
 
 # ----- ft_yacc --------------------
 
@@ -29,7 +29,7 @@ $(FT_YACC):
 	$(MAKE) -C ft_yacc
 
 $(PARSER): $(YACC_FILE) | $(FT_YACC)
-	$(FT_YACC) -x rust $(YACC_FILE) -o $(PARSER)
+	$(FT_YACC) $(YACC_FILE) -o $(PARSER)
 
 # ----- test --------------------
 

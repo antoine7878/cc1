@@ -1,24 +1,11 @@
-%{
-
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-int yylex();
-void yyerror(const char *msg);
-extern FILE *yyin;
-
-%}
-
-%union {
-    int i;
-}
+%no_main
 %start prog
-%token<i> NUMBER
+%token<i32> NUMBER
 %left '\n'
 %left '+' '-'
 %left '*' '/'
 %nonassoc '(' ')'
-%type<i> expr rvalue
+%type<i32> expr rvalue
 
 
 %%
@@ -30,25 +17,32 @@ prog
     ;
 
 expr
-    : rvalue {printf ("= %d\n", $1);}
+    : rvalue {println!("= {}", $1);}
     ;
 
 rvalue
-    : rvalue '+' rvalue {$$ = $1 + $3;} %prec '*'
-    | rvalue '-' rvalue {$$ = $1 - $3;}
-    | rvalue '*' rvalue {$$ = $1 * $3;}
-    | rvalue '/' rvalue {$$ = $1 / $3;}
-    | '(' rvalue ')' {$$ = $2;}
+    : rvalue '+' rvalue {$1 + $3} %prec '*'
+    | rvalue '-' rvalue {$1 - $3}
+    | rvalue '*' rvalue {$1 * $3}
+    | rvalue '/' rvalue {$1 / $3}
+    | '(' rvalue ')' {$2}
     | NUMBER
     ;
 
 %%
 
-void yyerror(const char *msg) {
-    fprintf(stderr, "%s\n", msg);
+pub fn yyerror<D: fmt::Display, R: Read>(msg: D, yacc: &Yacc<R>) {
+    eprintln!("{}", msg);
 }
 
-int main(int argc, char **argv) {
-    yyin = fmemopen(argv[1], strlen(argv[1]), "r");
-    yyparse();
+fn main() {
+    use std::env;
+    use std::io::{Cursor, Read};
+
+    let args: Vec<String> = env::args().collect();
+    let mut reader = Cursor::new(args[1].clone());
+
+    let lexer = YYLex::with_reader(reader);
+    let mut yacc = Yacc::new(lexer);
+    yacc.yyparse();
 }

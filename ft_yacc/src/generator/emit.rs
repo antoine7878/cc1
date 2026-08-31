@@ -1,23 +1,26 @@
 use std::collections::BTreeSet;
 use std::io::{self, Write};
 
-use crate::generator::Generator;
 use crate::generator::dumper::Dumper;
 use crate::models::{Action, ActionId, Production, TokenData, Yacc};
 use crate::parser::LALRParser;
-use crate::utils::{Args, YaccError, str_of_escape};
+use crate::utils::{YaccError, str_of_escape};
 
-pub struct RSGenerator;
+pub struct Emitter;
 
-impl Generator for RSGenerator {
-    fn dump_code_before(&self, w: &mut Dumper, yacc: &Yacc, _: bool) -> Result<(), YaccError> {
+impl Emitter {
+    pub fn new() -> Emitter {
+        Emitter {}
+    }
+
+    pub fn dump_code_before(&self, w: &mut Dumper, yacc: &Yacc) -> Result<(), YaccError> {
         for (_, code) in &yacc.code_before {
             write!(w, "{}", code)?
         }
         Ok(())
     }
 
-    fn dump_tables(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
+    pub fn dump_tables(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
         writeln!(w, "const YY_ERROR_TOKEN_ID: usize = {};", Yacc::ERROR_TOKEN_ID)?;
         writeln!(w, "const YY_EOF_TOKEN_ID: usize = {};", Yacc::END_TOKEN_ID)?;
         writeln!(w, "const YY_ACCEPT_TOKEN_ID: usize = {};", Yacc::ACCEPT_TOKEN_ID)?;
@@ -31,42 +34,24 @@ impl Generator for RSGenerator {
         Ok(())
     }
 
-    fn dump_debug(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
+    pub fn dump_debug(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
         self.production_line_table(w, parser)?;
         self.is_terminal_table(w, parser)?;
         Ok(())
     }
 
-    fn dump_tokens_src(&self, w: &mut Dumper, tokens: &[TokenData]) -> Result<(), YaccError> {
+    pub fn dump_tokens_src(&self, w: &mut Dumper, tokens: &[TokenData]) -> Result<(), YaccError> {
         self.token_enum(w, tokens)?;
         self.token_indexes(w, tokens)?;
         self.token_convertions(w, tokens)?;
         Ok(())
     }
 
-    fn dump_tokens_hdr(&self, _: &mut Dumper, _: &[TokenData]) -> Result<(), YaccError> {
-        unimplemented!()
-    }
-
-    fn dump_actions(&self, w: &mut Dumper, parser: &LALRParser, _: bool) -> Result<(), YaccError> {
+    pub fn dump_actions(&self, w: &mut Dumper, parser: &LALRParser) -> Result<(), YaccError> {
         for prod in parser.yacc.productions.iter() {
             self.action(w, parser, prod)?;
         }
         Ok(())
-    }
-
-    fn dump_defines(&self, _: &mut Dumper, _: &LALRParser, _: &Args) -> Result<(), YaccError> {
-        Ok(())
-    }
-
-    fn dump_union(&self, _: &mut Dumper, _: &LALRParser) -> Result<(), YaccError> {
-        unimplemented!()
-    }
-}
-
-impl RSGenerator {
-    pub fn new() -> RSGenerator {
-        RSGenerator {}
     }
 
     fn token_enum(&self, w: &mut Dumper, tokens: &[TokenData]) -> Result<(), YaccError> {

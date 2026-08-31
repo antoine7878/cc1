@@ -9,7 +9,6 @@ use std::process::ExitCode;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::generator::dumper::Dumper;
-use crate::generator::lang::Lang;
 use crate::parser::{LALRParser, YaccParser};
 use crate::utils::{Args, Graph};
 
@@ -35,9 +34,6 @@ fn yacc() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Dumper::dump_src(&parser, &args)?;
-    if args.x == Lang::C && args.d {
-        Dumper::dump_hdr(&parser, &args)?;
-    }
 
     if !args.v {
         return Ok(());

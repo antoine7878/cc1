@@ -61,20 +61,3 @@ pub fn str_of_escape(c: char) -> String {
         c => c.to_string(),
     }
 }
-
-pub fn str_of_double_escape(c: char) -> String {
-    match c {
-        '\x07' => "\\\\a".to_string(),
-        '\x08' => "\\\\b".to_string(),
-        '\x1B' => "\\\\e".to_string(),
-        '\x0C' => "\\\\f".to_string(),
-        '\x0A' => "\\\\n".to_string(),
-        '\x0D' => "\\\\r".to_string(),
-        '\x09' => "\\\\t".to_string(),
-        '\x0B' => "\\\\v".to_string(),
-        '\x5C' => "\\\\'".to_string(),
-        '\x27' => "\\\\\\".to_string(),
-        '\x33' => "\\\\\"".to_string(),
-        c => c.to_string(),
-    }
-}

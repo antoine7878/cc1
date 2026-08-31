@@ -3,8 +3,6 @@ use std::fmt;
 use std::process::exit;
 use std::str::Chars;
 
-use crate::generator::Lang;
-
 #[derive(Debug)]
 pub enum ArgError {
     MissingValue(char),
@@ -38,8 +36,6 @@ pub struct Args {
     pub v: bool,
     /// Write the resulting program to standard output instead of in_file.
     pub t: bool,
-    /// Target language
-    pub x: Lang,
     argv: std::env::Args,
 }
 
@@ -54,7 +50,6 @@ impl Default for Args {
             n: false,
             v: false,
             t: false,
-            x: Lang::C,
             argv,
         }
     }
@@ -84,9 +79,7 @@ impl Args {
     fn parse_char(&mut self, c: char, it: &mut Chars) -> Result<(), ArgError> {
         match c {
             'o' => self.o = self.parse_value(it, 'o')?,
-            'x' => self.x = self.parse_value(it, 'x')?,
             // 'o' => self.o = Some(argv.next().ok_or(ArgError::MissingValue('o'))?),
-            // 'x' => Self::parse_value(&mut args.x, &mut argv, "-x")?,
             'c' => self.c = true,
             'n' => self.n = true,
             'v' => self.v = true,
@@ -129,7 +122,6 @@ impl Args {
         println!("-n        suppress the summary of statistics usually written with the -v option");
         println!("-v        print usage statisics");
         println!("-t        write the resulting program to standard output instead of in_file");
-        println!("-x        target langugage");
         exit(0);
     }
 }

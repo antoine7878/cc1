@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::utils::{YaccError, str_of_double_escape, str_of_escape};
+use crate::utils::{YaccError, str_of_escape};
 
 #[derive(Debug, Clone, PartialEq, Eq, Copy, PartialOrd, Ord)]
 pub enum TokenKind {
@@ -51,17 +51,6 @@ impl TokenData {
             precedence,
             value,
             line_no,
-        }
-    }
-
-    pub fn double_display_name(&self) -> String {
-        let name = self.name.as_str();
-        if name.is_empty() {
-            "''".to_string()
-        } else if self.is_char() {
-            format!("'{}'", str_of_double_escape(Self::get_char_value(name) as char))
-        } else {
-            name.to_string()
         }
     }
 
