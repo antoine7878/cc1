@@ -40,8 +40,11 @@ pub enum Diagnosis {
     CastOfNonScalar,
     IncompatibleCast,
     /// 6.3.16
-    IncompatibleAssignementTypes(QualifiedType, QualifiedType),
-    DiscardedQualifiers(Qualifier),
+    AssignementDiscardedQualifiers(Qualifier),
+    InitDiscardedQualifiers(Qualifier),
+    AssignementIncompatibleTypes(QualifiedType, QualifiedType),
+    InitIncompatibleTypes(QualifiedType, QualifiedType),
+
     AssignToRValue,
     ConstAssignement,
     // InvalidCast,
@@ -115,8 +118,10 @@ impl DiagnosisNode {
         match &self.inner {
             Diagnosis::ArrayInitTooLong => "excess elements in array initializer".to_string(),
             Diagnosis::InvalidReturnType => "Invalid return type".to_string(),
-            Diagnosis::DiscardedQualifiers(q) => format!("Assignement discard {q} qualifer" ),
-            Diagnosis::IncompatibleAssignementTypes(to, from) => format!("assignment to ‘{}’ from incompatible pointer type ‘{}’", to.describe(&ctx.sema, ctx), from.describe(&ctx.sema, ctx)),
+            Diagnosis::AssignementDiscardedQualifiers(q) => format!("Assignement discard ‘{}’ qualifer", q),
+            Diagnosis::InitDiscardedQualifiers(q) => format!("Assignement discard ‘{}’ qualifer", q),
+            Diagnosis::AssignementIncompatibleTypes(to, from) => format!("assignment to ‘{}’ from incompatible pointer type ‘{}’", to.describe(&ctx.sema, ctx), from.describe(&ctx.sema, ctx)),
+            Diagnosis::InitIncompatibleTypes(to, from) => format!("initialization of ‘{}’ from incompatible pointer type ‘{}’ ", to.describe(&ctx.sema, ctx), from.describe(&ctx.sema, ctx)),
             Diagnosis::AssignToRValue => "Cannot assign to an r-value".to_string(),
             Diagnosis::ConstAssignement => "Cannot assign to const value".to_string(),
             Diagnosis::Poisoned => "Internal error".to_string(),

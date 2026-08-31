@@ -1,5 +1,5 @@
 use crate::arena::ResolveWith;
-use crate::ast::{Expression, ExpressionNode};
+use crate::ast::{Expression, ExpressionNode, Type};
 use crate::context::Context;
 use crate::semantic::ice::try_fold;
 use crate::semantic::model::cast;
@@ -61,7 +61,11 @@ pub fn init(
     let is_null = is_null_pointer_constant(sema, ctx, init_node);
     with_operand(sema, init_node, ExpressionKind::RValue, |sema, re| {
         let mut l_re = ResolvedExpression::new(l_ty, ExpressionKind::LValue);
-        cast::assignment_conversion(sema, &mut l_re, re, is_null)
+        cast::assignment_conversion(sema, &mut l_re, re, is_null).map_err(|e| match e {
+            Diagnosis::AssignementIncompatibleTypes(a, b) => Diagnosis::InitIncompatibleTypes(a, b),
+            Diagnosis::AssignementDiscardedQualifiers(a) => Diagnosis::InitDiscardedQualifiers(a),
+            _ => e,
+        })
     })
 }
 
@@ -180,6 +184,32 @@ fn additive(
     }
 }
 
+fn cast(
+    sema: &mut Sema,
+    ctx: &Context,
+    node: &ExpressionNode,
+    ty_node: &Type,
+    operand: &ExpressionNode,
+) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
+    let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
+    let (qualif, _) = declaration::declared_type(sema, ctx, base, &ty_node.declarator).ok_or(Diagnosis::Poisoned)?;
+    let is_null = is_null_pointer_constant(sema, ctx, operand);
+    with_operand(sema, operand, ExpressionKind::RValue, |sema, re| {
+        let ty = qualif.id.resolve(sema);
+        if !matches!(ty, ResolvedType::Void) {
+            let from = re.casted_ty().id.resolve(sema);
+            if !ty.is_scalar(sema) || !from.is_scalar(sema) {
+                return Err(Diagnosis::CastToNonScalar);
+            }
+            if ty.is_pointer() != from.is_pointer() && (ty.is_floating() || from.is_floating()) {
+                return Err(Diagnosis::InvalidOperand);
+            }
+            cast::convert(sema, re, qualif.id, is_null);
+        }
+        Ok(qualif)
+    })
+}
+
 fn type_of(
     sema: &mut Sema,
     ctx: &Context,
@@ -208,26 +238,7 @@ fn type_of(
             cast::promote(sema, re);
             Ok(re.casted_ty())
         }),
-        Expression::Cast(ty_node, operand) => {
-            let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
-            let (qualif, _) =
-                declaration::declared_type(sema, ctx, base, &ty_node.declarator).ok_or(Diagnosis::Poisoned)?;
-            let is_null = is_null_pointer_constant(sema, ctx, operand);
-            with_operand(sema, operand, RValue, |sema, re| {
-                let ty = qualif.id.resolve(sema);
-                if !matches!(ty, ResolvedType::Void) {
-                    let from = re.casted_ty().id.resolve(sema);
-                    if !ty.is_scalar(sema) || !from.is_scalar(sema) {
-                        return Err(Diagnosis::CastToNonScalar);
-                    }
-                    if ty.is_pointer() != from.is_pointer() && (ty.is_floating() || from.is_floating()) {
-                        return Err(Diagnosis::InvalidOperand);
-                    }
-                    cast::convert(sema, re, qualif.id, is_null);
-                }
-                Ok(qualif)
-            })
-        }
+        Expression::Cast(ty_node, operand) => cast(sema, ctx, node, ty_node, operand),
         Expression::Assign(e1, e2) => with_assignment(sema, ctx, e1, e2, |sema, lhs, rhs, is_null| {
             cast::assignment_conversion(sema, lhs, rhs, is_null)
         }),

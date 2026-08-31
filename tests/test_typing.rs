@@ -2,7 +2,7 @@ mod common;
 
 use cc1::semantic::CastKind::*;
 use cc1::semantic::Diagnosis;
-use common::{ints, lv, none, rv, Shape, Ty, Unit};
+use common::{Shape, Ty, Unit, ints, lv, none, rv};
 
 macro_rules! shaped {
     ($name:ident, $src:expr, $shapes:expr $(,)?) => {
@@ -62,7 +62,11 @@ macro_rules! rejects_shaped {
 
 shaped!(a_constant_is_an_rvalue, "void f(void) { 1; }", vec![rv(Ty::Int)]);
 
-shaped!(an_identifier_is_an_lvalue, "int i; void f(void) { i; }", vec![lv(Ty::Int)]);
+shaped!(
+    an_identifier_is_an_lvalue,
+    "int i; void f(void) { i; }",
+    vec![lv(Ty::Int)]
+);
 
 shaped!(
     an_enumeration_constant_is_an_rvalue,
@@ -113,7 +117,9 @@ shaped!(
     a_char_operand_promotes_to_int,
     "char c; void f(void) { -c; }",
     vec![
-        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int),
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int),
         rv(Ty::Int),
     ]
 );
@@ -122,7 +128,9 @@ shaped!(
     a_short_operand_promotes_to_int,
     "short s; void f(void) { -s; }",
     vec![
-        lv(Ty::Short).then(LValueToRValue, Ty::Short).then(IntegerPromotion, Ty::Int),
+        lv(Ty::Short)
+            .then(LValueToRValue, Ty::Short)
+            .then(IntegerPromotion, Ty::Int),
         rv(Ty::Int),
     ]
 );
@@ -137,8 +145,12 @@ shaped!(
     both_operands_of_an_addition_promote,
     "char c; void f(void) { c + c; }",
     vec![
-        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int),
-        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int),
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int),
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int),
         rv(Ty::Int),
     ]
 );
@@ -151,7 +163,9 @@ shaped!(
     an_integer_and_a_double_meet_at_double,
     "int i; double d; void f(void) { i + d; }",
     vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Double),
+        lv(Ty::Int)
+            .then(LValueToRValue, Ty::Int)
+            .then(IntegerToFloating, Ty::Double),
         lv(Ty::Double).then(LValueToRValue, Ty::Double),
         rv(Ty::Double),
     ]
@@ -162,7 +176,9 @@ shaped!(
     "float g; int i; void f(void) { g + i; }",
     vec![
         lv(Ty::Float).then(LValueToRValue, Ty::Float),
-        lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Float),
+        lv(Ty::Int)
+            .then(LValueToRValue, Ty::Int)
+            .then(IntegerToFloating, Ty::Float),
         rv(Ty::Float),
     ]
 );
@@ -172,7 +188,9 @@ shaped!(
     "unsigned u; int i; void f(void) { u + i; }",
     vec![
         lv(Ty::UInt).then(LValueToRValue, Ty::UInt),
-        lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerConversion, Ty::UInt),
+        lv(Ty::Int)
+            .then(LValueToRValue, Ty::Int)
+            .then(IntegerConversion, Ty::UInt),
         rv(Ty::UInt),
     ]
 );
@@ -233,8 +251,7 @@ rejects_shaped!(
     "struct S *p; void f(void) { p + 1; }",
     Diagnosis::InvalidOperand,
     vec![
-        lv(Ty::ptr(Ty::strukt_incomplete("S")))
-            .then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
+        lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
         rv(Ty::Int),
         none(),
     ]
@@ -278,7 +295,9 @@ shaped!(
     a_cast_result_is_always_an_rvalue,
     "int i; void f(void) { (double)i; }",
     vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Double),
+        lv(Ty::Int)
+            .then(LValueToRValue, Ty::Int)
+            .then(IntegerToFloating, Ty::Double),
         rv(Ty::Double),
     ]
 );
@@ -298,7 +317,9 @@ shaped!(
     an_integer_may_be_cast_to_a_pointer,
     "int i; void f(void) { (int *)i; }",
     vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToPointer, Ty::ptr(Ty::Int)),
+        lv(Ty::Int)
+            .then(LValueToRValue, Ty::Int)
+            .then(IntegerToPointer, Ty::ptr(Ty::Int)),
         rv(Ty::ptr(Ty::Int)),
     ]
 );
@@ -401,10 +422,8 @@ rejects_shaped!(
     "struct S *p, *q; void f(void) { p - q; }",
     Diagnosis::InvalidOperand,
     vec![
-        lv(Ty::ptr(Ty::strukt_incomplete("S")))
-            .then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
-        lv(Ty::ptr(Ty::strukt_incomplete("S")))
-            .then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
+        lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
+        lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
         none(),
     ]
 );
@@ -431,7 +450,11 @@ shaped!(
 shaped!(
     assignment_converts_the_right_operand_to_the_left_operands_type,
     "int x; void f(void) { x = 3.5; }",
-    vec![lv(Ty::Int), rv(Ty::Double).then(FloatingToInteger, Ty::Int), rv(Ty::Int)]
+    vec![
+        lv(Ty::Int),
+        rv(Ty::Double).then(FloatingToInteger, Ty::Int),
+        rv(Ty::Int)
+    ]
 );
 
 shaped!(
@@ -447,7 +470,7 @@ shaped!(
 rejects_shaped!(
     assigning_an_incompatible_pointer_is_rejected,
     "char *p; int *q; void f(void) { q = p; }",
-    |u| Diagnosis::IncompatibleAssignementTypes(to, from)
+    |u| Diagnosis::AssignementIncompatibleTypes(to, from)
         if *to == u.symbol_ty("q") && *from == u.symbol_ty("p"),
     vec![
         lv(Ty::ptr(Ty::Int)),
@@ -459,7 +482,7 @@ rejects_shaped!(
 rejects_shaped!(
     assigning_away_const_through_a_pointer_is_rejected,
     "const char *p; char *q; void f(void) { q = p; }",
-    Diagnosis::DiscardedQualifiers(_),
+    Diagnosis::AssignementDiscardedQualifiers(_),
     vec![
         lv(Ty::ptr(Ty::Char)),
         lv(Ty::ptr(Ty::konst(Ty::Char))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Char))),
@@ -526,7 +549,7 @@ shaped!(
 rejects_shaped!(
     initializing_a_pointer_with_a_double_is_rejected,
     "void f(void) { int *p = 3.5; }",
-    |u| Diagnosis::IncompatibleAssignementTypes(to, from)
+    |u| Diagnosis::InitIncompatibleTypes(to, from)
         if *to == u.symbol_ty("p") && *from == u.prim("double"),
     vec![rv(Ty::Double)]
 );
@@ -534,7 +557,7 @@ rejects_shaped!(
 rejects_shaped!(
     initializing_with_an_incompatible_pointer_is_rejected,
     "void f(void) { char *p; int *q = p; }",
-    |u| Diagnosis::IncompatibleAssignementTypes(to, from)
+    |u| Diagnosis::InitIncompatibleTypes(to, from)
         if *to == u.symbol_ty("q") && *from == u.symbol_ty("p"),
     vec![lv(Ty::ptr(Ty::Char)).then(LValueToRValue, Ty::ptr(Ty::Char))]
 );
@@ -542,10 +565,8 @@ rejects_shaped!(
 rejects_shaped!(
     initializing_away_const_through_a_pointer_is_rejected,
     "void f(void) { const char *p; char *q = p; }",
-    Diagnosis::DiscardedQualifiers(_),
-    vec![
-        lv(Ty::ptr(Ty::konst(Ty::Char))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Char))),
-    ]
+    Diagnosis::InitDiscardedQualifiers(_),
+    vec![lv(Ty::ptr(Ty::konst(Ty::Char))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Char))),]
 );
 
 shaped!(

@@ -199,11 +199,11 @@ pub fn assignment_conversion(
         (&ResolvedType::Tag(id), _) if !id.resolve(sema).is_enum() && lhs.ty.is_compatible(sema, &rhs_ty) => (),
         (ResolvedType::Pointer(lp), ResolvedType::Pointer(rp)) if can_assign_pointer(sema, lp, rp) => {
             if !lp.has_qualifiers_of(rp) {
-                return Err(Diagnosis::DiscardedQualifiers(discarded_qualifier(lp, rp)));
+                return Err(Diagnosis::AssignementDiscardedQualifiers(discarded_qualifier(lp, rp)));
             }
         }
         (ResolvedType::Pointer(_), _) if is_null_ptr => (),
-        _ => return Err(Diagnosis::IncompatibleAssignementTypes(lhs.ty, rhs_ty)),
+        _ => return Err(Diagnosis::AssignementIncompatibleTypes(lhs.ty, rhs_ty)),
     }
     convert(sema, rhs, lhs.ty.id, is_null_ptr);
     Ok(lhs.ty)

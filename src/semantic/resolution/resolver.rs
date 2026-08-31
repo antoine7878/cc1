@@ -82,7 +82,7 @@ impl<'a> SymbolResolver<'a> {
     }
 
     fn with_param_types(&mut self, ty: QualifiedType, params: ParamTypes) -> QualifiedType {
-        let ret = match ty.id.resolve(&*self.sema) {
+        let ret = match ty.id.resolve(self.sema) {
             ResolvedType::Function { ret, .. } => *ret,
             _ => return ty,
         };

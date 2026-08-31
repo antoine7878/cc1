@@ -31,7 +31,6 @@ impl Context {
             return;
         }
         for diag in &self.diagnosis {
-            println!();
             let _ = diag.print(self);
         }
     }
