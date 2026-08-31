@@ -242,6 +242,11 @@ fn type_of(
         Expression::Assign(e1, e2) => with_assignment(sema, ctx, e1, e2, |sema, lhs, rhs, is_null| {
             cast::assignment_conversion(sema, lhs, rhs, is_null)
         }),
+        // Expression::FunctionCall(fn_node, args) => {
+        //     // let out;
+        //     // let Some(args) = args else { return out };
+        // }
+        // Expression::List() =>
         _ => Err(Diagnosis::Poisoned),
     }
 }

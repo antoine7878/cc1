@@ -70,7 +70,7 @@ pub enum Expression {
     AndAssign(ExpressionNode, ExpressionNode),
     XorAssign(ExpressionNode, ExpressionNode),
     OrAssign(ExpressionNode, ExpressionNode),
-    List(ExpressionNode, ExpressionNode),
+    List(Vec<ExpressionNode>),
 
     // Ternary
     Ternary(ExpressionNode, ExpressionNode, ExpressionNode),
@@ -173,6 +173,19 @@ impl ExpressionArena {
         Self::add(self.alloc(expr), span)
     }
 
+    pub fn add_list(&mut self, lhs: ExpressionNode, rhs: ExpressionNode) -> ExpressionNode {
+        match self.get_mut(lhs.id) {
+            Expression::List(v) => {
+                v.push(rhs);
+                lhs
+            }
+            _ => {
+                let span = Span::new(lhs.span.start, rhs.span.end);
+                Self::add(self.alloc(Expression::List(vec![lhs])), span)
+            }
+        }
+    }
+
     pub fn binary(&mut self, lhs: ExpressionNode, tok: YYToken, rhs: ExpressionNode, span: Span) -> ExpressionNode {
         let expr = match tok {
             YYToken::Char('+') => Expression::Add(lhs, rhs),
@@ -204,7 +217,7 @@ impl ExpressionArena {
             YYToken::AND_ASSIGN => Expression::AndAssign(lhs, rhs),
             YYToken::XOR_ASSIGN => Expression::XorAssign(lhs, rhs),
             YYToken::OR_ASSIGN => Expression::OrAssign(lhs, rhs),
-            YYToken::Char(',') => Expression::List(lhs, rhs),
+            // YYToken::Char(',') => Expression::List(lhs, rhs),
             YYToken::Char('[') => Expression::ArrayAcces(lhs, rhs),
             _ => unreachable!(),
         };
@@ -267,7 +280,7 @@ impl Display for Expression {
             Expression::AndAssign(_, _) => "AndAssign",
             Expression::OrAssign(_, _) => "OrAssign",
             Expression::XorAssign(_, _) => "XOrAssign",
-            Expression::List(_, _) => "List",
+            Expression::List(_) => "List",
             Expression::ArrayAcces(_, _) => "Array acces",
             Expression::FunctionCall(_, _) => "Fn call",
             Expression::DotAcces(_, _) => "Dot access",

@@ -328,7 +328,6 @@ pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &Exp
         | Expression::AndAssign(lhs, rhs)
         | Expression::OrAssign(lhs, rhs)
         | Expression::XorAssign(lhs, rhs)
-        | Expression::List(lhs, rhs)
         | Expression::ArrayAcces(lhs, rhs)
         | Expression::FunctionCall(lhs, Some(rhs)) => {
             v.visit_expression(ctx, lhs);
@@ -348,6 +347,11 @@ pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &Exp
             v.visit_expression(ctx, expr);
         }
         Expression::SizeofType(ty) => v.visit_type(ctx, ty),
+        Expression::List(exps) => {
+            for e in exps {
+                v.visit_expression(ctx, e);
+            }
+        }
     }
 }
 

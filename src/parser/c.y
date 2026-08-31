@@ -229,8 +229,8 @@ expression /* ExpressionNode */
 	| expression AND_ASSIGN expression                                                      { node_span!(self, expressions, binary, $1, $2, $3) }
 	| expression XOR_ASSIGN expression                                                      { node_span!(self, expressions, binary, $1, $2, $3) }
 	| expression OR_ASSIGN expression                                                       { node_span!(self, expressions, binary, $1, $2, $3) }
-    | expression ',' expression                                                             { node_span!(self, expressions, binary, $1, $2, $3) }
     | expression '?' expression ':' expression                                              { node_span!(self, expressions, ternary, $1, $3, $5) }
+    | expression ',' expression                                                             { self.lexer.ctx.arenas.expressions.add_list($1, $3) }
     ;
 
 declaration /* DeclarationNode */
