@@ -46,7 +46,11 @@ fn put(sema: &mut Sema, node: &ExpressionNode, re: ResolvedExpression) {
     sema.set_expr_resolved(node.id, Some(re));
 }
 
-fn puts(sema: &mut Sema, e1: &ExpressionNode, re1: ResolvedExpression, e2: &ExpressionNode, re2: ResolvedExpression) {
+fn puts(
+    sema: &mut Sema,
+    (e1, re1): (&ExpressionNode, ResolvedExpression),
+    (e2, re2): (&ExpressionNode, ResolvedExpression),
+) {
     put(sema, e1, re1);
     put(sema, e2, re2);
 }
@@ -98,7 +102,7 @@ where
     cast::lvalue_conversion(sema, &mut lhs, &e1.span);
     cast::lvalue_conversion(sema, &mut rhs, &e2.span);
     let out = f(sema, &mut lhs, &mut rhs);
-    puts(sema, e1, lhs, e2, rhs);
+    puts(sema, (e1, lhs), (e2, rhs));
     out.map(|q| (q, kind))
 }
 
@@ -128,7 +132,7 @@ where
         cast::lvalue_conversion(sema, &mut rhs, &e2.span);
         f(sema, &mut lhs, &mut rhs, is_null)
     });
-    puts(sema, e1, lhs, e2, rhs);
+    puts(sema, (e1, lhs), (e2, rhs));
     out.map(|q| (q, ExpressionKind::RValue))
 }
 

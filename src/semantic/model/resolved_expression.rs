@@ -19,7 +19,8 @@ impl ResolvedExpression {
         self.casts.last().map_or(self.ty, |c| c.to)
     }
 
-    pub fn new(ty: QualifiedType, kind: ExpressionKind) -> Self { Self {
+    pub fn new(ty: QualifiedType, kind: ExpressionKind) -> Self {
+        Self {
             ty,
             kind,
             casts: Vec::new(),

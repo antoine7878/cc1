@@ -37,7 +37,7 @@ ctest: $(NAME)
 
 ttest:
 	cargo build --release -p ft_lex -p ft_yacc
-	cargo nextest run -p ft_lex -p ft_yacc -p libft
+	cargo nextest run -p ft_lex -p ft_yacc -p libft -p cc1
 
 coverage: $(NAME)
 	cargo llvm-cov nextest

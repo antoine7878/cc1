@@ -267,10 +267,8 @@ impl SymbolResolver<'_> {
                     self.add_diag(Diag::only_diag(inner), &e.span);
                 }
             }
-            JumpStatement::Return(None) => {
-                if return_ty.id != self.sema.builtins.void {
-                    self.add_diag(Diag::only_diag(Diagnosis::InvalidReturnType), &node.span);
-                }
+            JumpStatement::Return(None) if return_ty.id != self.sema.builtins.void => {
+                self.add_diag(Diag::only_diag(Diagnosis::InvalidReturnType), &node.span);
             }
             _ => (),
         }
