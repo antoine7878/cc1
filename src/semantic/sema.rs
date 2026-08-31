@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::mem;
 
 use crate::arena::{ResolveMutWith, ResolveWith};
 use crate::ast::{DeclaratorId, ExpressionId, Name, Tag, Value};
@@ -9,6 +10,16 @@ use crate::semantic::{
     TagDefId,
 };
 use crate::target::{Layout, Target};
+
+#[derive(Debug, Default)]
+pub struct ExprFacts {
+    pub resolved: Option<ResolvedExpression>,
+    pub binding: Option<SymbolId>,
+    pub constant: Option<Value>,
+    pub resolved_seen: bool,
+    pub binding_seen: bool,
+    pub constant_seen: bool,
+}
 
 #[derive(Debug)]
 pub struct Sema {
@@ -21,15 +32,11 @@ pub struct Sema {
     pub tags: TagDefArena,
     pub functions: FunctionDefArena,
 
-    pub expressions: HashMap<ExpressionId, Option<ResolvedExpression>>,
-    pub bindings: HashMap<ExpressionId, Option<SymbolId>>,
-    pub constants: HashMap<ExpressionId, Option<Value>>,
+    exprs: Vec<ExprFacts>,
     pub declarations: HashMap<DeclaratorId, SymbolId>,
 
     pub layouts: HashMap<ResolvedTypeId, Layout>,
     pub target: Target,
-    pub return_type: Option<QualifiedType>,
-    pub init_type: Option<QualifiedType>,
 }
 
 impl Default for Sema {
@@ -46,14 +53,10 @@ impl Default for Sema {
             tags: TagDefArena::default(),
             functions: FunctionDefArena::default(),
 
-            expressions: HashMap::default(),
-            bindings: HashMap::default(),
+            exprs: Vec::new(),
             declarations: HashMap::default(),
-            constants: HashMap::default(),
 
             layouts: HashMap::default(),
-            return_type: None,
-            init_type: None,
             target,
         }
     }
@@ -71,6 +74,73 @@ impl Sema {
             target,
             ..Self::default()
         }
+    }
+
+    // ----- Expression table ---------
+
+    pub fn size_expr_facts(&mut self, len: usize) {
+        if self.exprs.len() < len {
+            self.exprs.resize_with(len, ExprFacts::default);
+        }
+    }
+
+    pub fn expr_facts(&self) -> &[ExprFacts] {
+        &self.exprs
+    }
+
+    fn facts(&self, id: ExpressionId) -> Option<&ExprFacts> {
+        self.exprs.get(usize::from(id))
+    }
+
+    fn facts_mut(&mut self, id: ExpressionId) -> &mut ExprFacts {
+        &mut self.exprs[usize::from(id)]
+    }
+
+    pub fn expr_seen(&self, id: ExpressionId) -> bool {
+        self.facts(id).is_some_and(|f| f.resolved_seen)
+    }
+
+    pub fn expr_poisoned(&self, id: ExpressionId) -> bool {
+        self.facts(id).is_some_and(|f| f.resolved_seen && f.resolved.is_none())
+    }
+
+    pub fn expr_resolved(&self, id: ExpressionId) -> Option<&ResolvedExpression> {
+        self.facts(id)?.resolved.as_ref()
+    }
+
+    pub fn set_expr_resolved(&mut self, id: ExpressionId, resolved: Option<ResolvedExpression>) {
+        let f = self.facts_mut(id);
+        f.resolved = resolved;
+        f.resolved_seen = true;
+    }
+
+    pub fn take_expr_resolved(&mut self, id: ExpressionId) -> Option<ResolvedExpression> {
+        mem::take(&mut self.facts_mut(id).resolved)
+    }
+
+    pub fn binding(&self, id: ExpressionId) -> Option<SymbolId> {
+        self.facts(id)?.binding
+    }
+
+    pub fn binding_seen(&self, id: ExpressionId) -> bool {
+        self.facts(id).is_some_and(|f| f.binding_seen)
+    }
+
+    pub fn set_binding(&mut self, id: ExpressionId, binding: Option<SymbolId>) {
+        let f = self.facts_mut(id);
+        f.binding = binding;
+        f.binding_seen = true;
+    }
+
+    pub fn constant_cached(&self, id: ExpressionId) -> Option<Option<Value>> {
+        let f = self.facts(id)?;
+        f.constant_seen.then_some(f.constant)
+    }
+
+    pub fn set_constant(&mut self, id: ExpressionId, constant: Option<Value>) {
+        let f = self.facts_mut(id);
+        f.constant = constant;
+        f.constant_seen = true;
     }
 
     // ----- Resolution --------------------

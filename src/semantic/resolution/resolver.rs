@@ -1,7 +1,6 @@
 use crate::arena::ResolveWith;
 use crate::ast::visit::{
-    Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_init_declarator, walk_jump_statement,
-    walk_labeled_statement,
+    Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_jump_statement, walk_labeled_statement,
 };
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Expression, ExpressionNode,
@@ -19,6 +18,7 @@ use crate::semantic::{
 #[derive(Debug)]
 pub struct SymbolResolver<'a> {
     pub sema: &'a mut Sema,
+    return_ty: Option<QualifiedType>,
 }
 
 impl DiagCollector for SymbolResolver<'_> {
@@ -29,7 +29,7 @@ impl DiagCollector for SymbolResolver<'_> {
 
 impl<'a> SymbolResolver<'a> {
     pub fn new(sema: &'a mut Sema) -> Self {
-        Self { sema }
+        Self { sema, return_ty: None }
     }
 
     fn add_function(
@@ -64,7 +64,7 @@ impl<'a> SymbolResolver<'a> {
             _ => rty,
         };
         match ty.id.resolve(self.sema) {
-            &ResolvedType::Function { ret, .. } => self.sema.return_type = Some(ret),
+            &ResolvedType::Function { ret, .. } => self.return_ty = Some(ret),
             _ => unreachable!(),
         }
         let sym = Symbol::new(name, Some(ty), Some(storage), SymbolKind::Function, true);
@@ -220,73 +220,58 @@ fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
     })
 }
 
-impl Visitor for Sema {
-    fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
-        walk_expression(self, ctx, node);
-        if self.bindings.contains_key(&node.id) {
+impl SymbolResolver<'_> {
+    fn resolve_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
+        if self.sema.binding_seen(node.id) {
             return;
         }
         if let Expression::Identifier(name) = node.id.resolve(ctx) {
-            let sym = self.scopes.lookup_ordinary(name.id);
+            let sym = self.sema.scopes.lookup_ordinary(name.id);
             if sym.is_none() {
                 self.add_diag(Diag::only_diag(Diagnosis::UndeclaredIdentifier(*name)), &node.span);
             }
-            self.bindings.insert(node.id, sym);
+            self.sema.set_binding(node.id, sym);
         }
-        expression::run(self, ctx, node);
+        expression::run(self.sema, ctx, node);
     }
 
-    fn visit_init_declarator(&mut self, ctx: &Context, node: &InitDeclaratorNode) {
-        let decl = &node.declarator;
-        let Some(&sym) = self.declarations.get(&decl.id) else { return };
-        let Some(ty) = sym.resolve(self).ty else { return };
-        self.init_type = Some(ty);
-        walk_init_declarator(self, ctx, node);
-        self.init_type = None;
-    }
-
-    fn visit_initializer(&mut self, ctx: &Context, node: &InitializerNode) {
-        let ty = self.init_type.expect("no init type");
+    fn resolve_initializer(&mut self, ctx: &Context, ty: QualifiedType, node: &InitializerNode) {
         match &node.init {
             Initializer::Single(e) => {
                 self.visit_expression(ctx, e);
-                if let Err(inner) = expression::init(self, ctx, ty, e) {
+                if let Err(inner) = expression::init(self.sema, ctx, ty, e) {
                     self.add_diag(Diag::only_diag(inner), &e.span);
                 }
             }
             Initializer::List(inits) => {
-                let (elem, len) = match ty.id.resolve(self) {
+                let (elem, len) = match ty.id.resolve(&*self.sema) {
                     &ResolvedType::Array { elem, len } => (elem, len),
                     _ => (ty, Some(1)),
                 };
-                let ty_stash = self.init_type;
-                self.init_type = Some(elem);
                 for (i, node) in inits.iter().enumerate() {
                     if len.is_some_and(|l| l <= i) {
                         self.add_diag(Diag::only_diag(Diagnosis::ArrayInitTooLong), &inits[i].span);
                         break;
                     }
-                    self.visit_initializer(ctx, node);
+                    self.resolve_initializer(ctx, elem, node);
                 }
-                self.init_type = ty_stash;
             }
         }
     }
 
-    fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode) {
-        match (&node.stmt, self.return_type) {
-            (JumpStatement::Return(Some(e)), Some(ty)) => {
+    fn resolve_return(&mut self, ctx: &Context, node: &JumpStatementNode, return_ty: QualifiedType) {
+        match &node.stmt {
+            JumpStatement::Return(Some(e)) => {
                 self.visit_expression(ctx, e);
-                if let Err(inner) = expression::init(self, ctx, ty, e) {
+                if let Err(inner) = expression::init(self.sema, ctx, return_ty, e) {
                     self.add_diag(Diag::only_diag(inner), &e.span);
                 }
             }
-            (JumpStatement::Return(None), Some(ty)) => {
-                if ty.id != self.builtins.void {
+            JumpStatement::Return(None) => {
+                if return_ty.id != self.sema.builtins.void {
                     self.add_diag(Diag::only_diag(Diagnosis::InvalidReturnType), &node.span);
                 }
             }
-            (JumpStatement::Return(_), None) => unreachable!("return outside function"),
             _ => (),
         }
     }
@@ -312,7 +297,7 @@ impl Visitor for SymbolResolver<'_> {
         }
         self.sema.functions.complete(def, parameters);
         self.visit_compound_statement(ctx, &node.body);
-        self.sema.return_type = None;
+        self.return_ty = None;
     }
 
     fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode) {
@@ -372,7 +357,9 @@ impl Visitor for SymbolResolver<'_> {
                 if let Some(e) = e {
                     self.visit_expression(ctx, e);
                 }
-                self.sema.visit_jump_statement(ctx, node);
+                if let Some(return_ty) = self.return_ty {
+                    self.resolve_return(ctx, node, return_ty);
+                }
             }
             _ => walk_jump_statement(self, ctx, node),
         }
@@ -388,10 +375,17 @@ impl Visitor for SymbolResolver<'_> {
     }
 
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
-        self.sema.visit_expression(ctx, node);
+        walk_expression(self, ctx, node);
+        self.resolve_expression(ctx, node);
     }
 
     fn visit_init_declarator(&mut self, ctx: &Context, node: &InitDeclaratorNode) {
-        self.sema.visit_init_declarator(ctx, node);
+        let decl = &node.declarator;
+        let Some(&sym) = self.sema.declarations.get(&decl.id) else { return };
+        let Some(ty) = sym.resolve(&*self.sema).ty else { return };
+        self.visit_declarator(ctx, &node.declarator);
+        if let Some(init) = &node.initializer {
+            self.resolve_initializer(ctx, ty, init);
+        }
     }
 }

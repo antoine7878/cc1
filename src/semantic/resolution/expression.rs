@@ -9,7 +9,7 @@ use crate::semantic::{
 };
 
 pub fn run(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
-    if sema.expressions.contains_key(&node.id) {
+    if sema.expr_seen(node.id) {
         return;
     }
     let resolved = match type_of(sema, ctx, node) {
@@ -19,12 +19,11 @@ pub fn run(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
             None
         }
     };
-    sema.expressions.insert(node.id, resolved);
+    sema.set_expr_resolved(node.id, resolved);
 }
 
 fn take(sema: &mut Sema, node: &ExpressionNode) -> Result<ResolvedExpression, Diagnosis> {
-    let slot = sema.expressions.get_mut(&node.id).ok_or(Diagnosis::Poisoned)?;
-    slot.take().ok_or(Diagnosis::Poisoned)
+    sema.take_expr_resolved(node.id).ok_or(Diagnosis::Poisoned)
 }
 
 fn takes(
@@ -44,7 +43,7 @@ fn takes(
 }
 
 fn put(sema: &mut Sema, node: &ExpressionNode, re: ResolvedExpression) {
-    sema.expressions.insert(node.id, Some(re));
+    sema.set_expr_resolved(node.id, Some(re));
 }
 
 fn puts(sema: &mut Sema, e1: &ExpressionNode, re1: ResolvedExpression, e2: &ExpressionNode, re2: ResolvedExpression) {
@@ -134,10 +133,7 @@ where
 }
 
 fn as_written<'a>(sema: &'a Sema, node: &ExpressionNode) -> Result<&'a ResolvedExpression, Diagnosis> {
-    sema.expressions
-        .get(&node.id)
-        .and_then(Option::as_ref)
-        .ok_or(Diagnosis::Poisoned)
+    sema.expr_resolved(node.id).ok_or(Diagnosis::Poisoned)
 }
 
 fn check_is_arithmetic(sema: &Sema, ty: ResolvedTypeId) -> Result<(), Diagnosis> {
@@ -162,7 +158,7 @@ fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNod
         }
         node = op;
     }
-    let Some(Some(re)) = sema.expressions.get(&node.id) else { return false };
+    let Some(re) = sema.expr_resolved(node.id) else { return false };
     re.casted_ty().id.resolve(sema).is_integer() && try_fold(sema, ctx, node).is_some_and(|v| v.is_zero())
 }
 
@@ -219,12 +215,7 @@ fn type_of(
 
     match node.id.resolve(ctx) {
         Expression::Identifier(_) => {
-            let id = sema
-                .bindings
-                .get(&node.id)
-                .copied()
-                .flatten()
-                .ok_or(Diagnosis::Poisoned)?;
+            let id = sema.binding(node.id).ok_or(Diagnosis::Poisoned)?;
             let sym = id.resolve(sema);
             Ok((sym.ty.ok_or(Diagnosis::Poisoned)?, sym.expression_kind()))
         }

@@ -3,7 +3,8 @@ use crate::ast::visit::Visitor;
 use crate::ast::{Expression, ExpressionNode, Fold, Tag, Value};
 use crate::context::Context;
 use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedType, Sema, SymbolKind, declaration, layout,
+    Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedType, Sema, SymbolKind, SymbolResolver,
+    declaration, layout,
 };
 
 struct Sink<'a>(&'a mut Vec<DiagnosisNode>);
@@ -15,10 +16,10 @@ impl DiagCollector for Sink<'_> {
 }
 
 pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<Value> {
-    if let Some(&cached) = sema.constants.get(&expr.id) {
+    if let Some(cached) = sema.constant_cached(expr.id) {
         return cached;
     }
-    sema.visit_expression(ctx, expr);
+    SymbolResolver::new(sema).visit_expression(ctx, expr);
     let mut collected = Vec::new();
     let folded = fold(sema, ctx, expr, &mut Sink(&mut collected));
     sema.diagnosis.append(&mut collected);
@@ -27,12 +28,12 @@ pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> O
         Err(Diagnosis::Poisoned) => None, // already reported by the type pass
         Err(diagnosis) => sema.add_diag(Diag::none_diag(diagnosis), &expr.span),
     };
-    sema.constants.insert(expr.id, value);
+    sema.set_constant(expr.id, value);
     value
 }
 
 pub fn try_fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<Value> {
-    if let Some(&cached) = sema.constants.get(&expr.id) {
+    if let Some(cached) = sema.constant_cached(expr.id) {
         return cached;
     }
     fold(sema, ctx, expr, &mut Sink(&mut Vec::new())).ok()
@@ -134,12 +135,7 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut Sink) 
     match expr.id.resolve(ctx) {
         Expression::ConstantExpression(expr) => fold(sema, ctx, expr, sink),
         Expression::Identifier(_) => {
-            let id = sema
-                .bindings
-                .get(&expr.id)
-                .copied()
-                .flatten()
-                .ok_or(Diagnosis::NonConstantExpression)?;
+            let id = sema.binding(expr.id).ok_or(Diagnosis::NonConstantExpression)?;
             let symbol = id.resolve(sema);
             if symbol.kind != SymbolKind::Variant {
                 return Err(Diagnosis::NonConstantExpression);
@@ -204,7 +200,7 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut Sink) 
         Expression::Cast(ty_node, operand) => {
             // 6.3.4's scalar-target constraint is already checked (and, if violated, reported)
             // by the type pass, which fully covers Cast; don't re-derive and re-diagnose it here.
-            if let Some(None) = sema.expressions.get(&expr.id) {
+            if sema.expr_poisoned(expr.id) {
                 return Err(Diagnosis::Poisoned);
             }
             let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &expr.span);
