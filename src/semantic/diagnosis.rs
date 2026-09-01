@@ -1,6 +1,5 @@
 use std::fmt::{self, Display};
-use std::fs::File;
-use std::io::{self, BufRead, BufReader, Write, stderr};
+use std::io::{self, Write, stderr};
 
 use crate::ast::{Name, Qualifier};
 use crate::context::Context;
@@ -243,7 +242,7 @@ pub fn report<W: Write, D: Display>(
 ) -> io::Result<()> {
     let line_no = span.start.line;
     let padding = line_no.to_string().len();
-    let mid_pad = 9 - padding;
+    let mid_pad = 9usize.saturating_sub(padding);
 
     let path = ctx.file_of(span);
     let color = severity.color();
@@ -254,8 +253,7 @@ pub fn report<W: Write, D: Display>(
         span.start.col,
     )?;
 
-    let Ok(file) = File::open(path) else { return Ok(()) };
-    let Some(Ok(line)) = BufReader::new(file).lines().nth(line_no - 1) else { return Ok(()) };
+    let Some(line) = ctx.source_line(path, line_no) else { return Ok(()) };
     let line = line.replace('\t', " ");
     let col_no = caret_end(span, &line);
 

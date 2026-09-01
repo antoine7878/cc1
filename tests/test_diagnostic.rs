@@ -296,3 +296,49 @@ reports!(
     "void f(void) { int y = x + 1; }",
     ["<test>:1:24: error: Use of undeclared identifier 'x'"]
 );
+
+use std::env::temp_dir;
+use std::fs;
+use std::process;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use cc1::context::Context;
+
+fn scratch_file(contents: &str) -> std::path::PathBuf {
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+    let path = temp_dir().join(format!("cc1-src-{}-{}.c", process::id(), nanos));
+    fs::write(&path, contents).unwrap();
+    path
+}
+
+#[test]
+fn source_line_reads_the_requested_1_based_line() {
+    let ctx = Context::default();
+    let path = scratch_file("one\ntwo\nthree\n");
+    let name = path.to_str().unwrap();
+
+    assert_eq!(ctx.source_line(name, 1).as_deref(), Some("one"));
+    assert_eq!(ctx.source_line(name, 3).as_deref(), Some("three"));
+    assert_eq!(ctx.source_line(name, 4), None);
+    assert_eq!(ctx.source_line(name, 0), None);
+
+    fs::remove_file(&path).ok();
+}
+
+#[test]
+fn source_line_reads_the_file_only_once() {
+    let ctx = Context::default();
+    let path = scratch_file("first\nsecond\n");
+    let name = path.to_str().unwrap();
+
+    assert_eq!(ctx.source_line(name, 2).as_deref(), Some("second"));
+    fs::remove_file(&path).unwrap();
+    // The line is served from the cache even though the file is now gone.
+    assert_eq!(ctx.source_line(name, 2).as_deref(), Some("second"));
+}
+
+#[test]
+fn source_line_of_a_missing_file_is_none() {
+    let ctx = Context::default();
+    assert_eq!(ctx.source_line("/cc1/no/such/source/file.c", 1), None);
+}

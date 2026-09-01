@@ -15,6 +15,13 @@ impl<Id: ArenaKey, Val> Default for Arena<Id, Val> {
             marker: PhantomData,
         }
     }
+    
+}
+
+impl<Id: ArenaKey, Val> Arena<Id, Val> {
+pub fn data(&self) -> &[Val] {
+        self.data.as_slice()
+    }
 }
 
 impl<Id: ArenaKey, Val> Arena<Id, Val> {

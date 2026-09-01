@@ -1,3 +1,7 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::fs::read_to_string;
+
 use crate::arena::{Provide, ProvideMut};
 use crate::ast::{AstArenas, Name, StringId, StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier};
 use crate::parser::{ParseState, Span};
@@ -13,6 +17,7 @@ pub struct Context {
     pub arenas: AstArenas,
     pub ast: TranslationUnitNode,
     pub sema: Sema,
+    source_cache: RefCell<HashMap<String, Option<Vec<String>>>>,
 }
 
 impl Provide<Sema> for Context {
@@ -47,6 +52,14 @@ impl Context {
 
     pub fn file_of(&self, span: Span) -> &String {
         StringId::from(span.start.file).resolve(self)
+    }
+
+    pub fn source_line(&self, path: &str, line_no: usize) -> Option<String> {
+        let mut cache = self.source_cache.borrow_mut();
+        let lines = cache
+            .entry(path.to_string())
+            .or_insert_with(|| read_to_string(path).ok().map(|text| text.lines().map(str::to_string).collect()));
+        lines.as_ref()?.get(line_no.checked_sub(1)?).cloned()
     }
 
     pub fn struct_or_union(
