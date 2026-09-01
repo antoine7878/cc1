@@ -53,6 +53,8 @@ pub enum Diagnosis {
     ArgumentIncompatibleTypes(usize, QualifiedType, QualifiedType),
     ReturnIncompatibleTypes(QualifiedType, QualifiedType),
 
+    CallingNotFunction(QualifiedType),
+
     AssignToRValue,
     ConstAssignment,
     // InvalidCast,
@@ -123,6 +125,7 @@ impl DiagnosisNode {
 
     #[rustfmt::skip]
     fn message(&self, ctx: &Context) -> String {
+        let sema = &ctx.sema;
         match &self.inner {
             Diagnosis::TooManyArguments(expected, have) => format!("too many arguments to function call, expected {expected}, have {have}"),
             Diagnosis::TooFewArguments(expected, have) => format!("too few arguments to function call, expected {expected}, have {have}"),
@@ -130,15 +133,17 @@ impl DiagnosisNode {
             Diagnosis::ArrayInitTooLong => "excess elements in array initializer".to_string(),
             Diagnosis::InvalidReturnType => "Invalid return type".to_string(),
 
-            Diagnosis::AssignmentDiscardedQualifiers(to, from) => format!("assigning to ‘{}’ from ‘{}’ discards qualifiers", to.describe(&ctx.sema, ctx), from.describe(&ctx.sema, ctx)),
-            Diagnosis::InitDiscardedQualifiers(to, from) => format!("initializing ‘{}’ with an expression of type ‘{}’ discards qualifiers", to.describe(&ctx.sema, ctx), from.describe(&ctx.sema, ctx)),
-            Diagnosis::ArgumentDiscardedQualifiers(n, to, from) => format!("passing ‘{}’ to parameter {n} of type ‘{}’ discards qualifiers", from.describe(&ctx.sema, ctx), to.describe(&ctx.sema, ctx)),
-            Diagnosis::ReturnDiscardedQualifiers(to, from) => format!("returning ‘{}’ from a function with result type ‘{}’ discards qualifiers", from.describe(&ctx.sema, ctx), to.describe(&ctx.sema, ctx)),
+            Diagnosis::AssignmentDiscardedQualifiers(to, from) => format!("assigning to ‘{}’ from ‘{}’ discards qualifiers", to.describe(&ctx.sema, ctx), from.describe(sema, ctx)),
+            Diagnosis::InitDiscardedQualifiers(to, from) => format!("initializing ‘{}’ with an expression of type ‘{}’ discards qualifiers", to.describe(sema, ctx), from.describe(sema, ctx)),
+            Diagnosis::ArgumentDiscardedQualifiers(n, to, from) => format!("passing ‘{}’ to parameter {n} of type ‘{}’ discards qualifiers", from.describe(sema, ctx), to.describe(sema, ctx)),
+            Diagnosis::ReturnDiscardedQualifiers(to, from) => format!("returning ‘{}’ from a function with result type ‘{}’ discards qualifiers", from.describe(sema, ctx), to.describe(sema, ctx)),
 
-            Diagnosis::AssignmentIncompatibleTypes(to, from) => format!("assignment to ‘{}’ from incompatible pointer type ‘{}’", to.describe(&ctx.sema, ctx), from.describe(&ctx.sema, ctx)),
-            Diagnosis::InitIncompatibleTypes(to, from) => format!("initialization of ‘{}’ from incompatible pointer type ‘{}’", to.describe(&ctx.sema, ctx), from.describe(&ctx.sema, ctx)),
-            Diagnosis::ArgumentIncompatibleTypes(n, to, from) => format!("passing ‘{}’ to parameter {n} of incompatible type ‘{}’", from.describe(&ctx.sema, ctx), to.describe(&ctx.sema, ctx)),
-            Diagnosis::ReturnIncompatibleTypes(to, from) => format!("returning ‘{}’ from a function with incompatible result type ‘{}’", from.describe(&ctx.sema, ctx), to.describe(&ctx.sema, ctx)),
+            Diagnosis::AssignmentIncompatibleTypes(to, from) => format!("assignment to ‘{}’ from incompatible pointer type ‘{}’", to.describe(sema, ctx), from.describe(sema, ctx)),
+            Diagnosis::InitIncompatibleTypes(to, from) => format!("initialization of ‘{}’ from incompatible pointer type ‘{}’", to.describe(sema, ctx), from.describe(sema, ctx)),
+            Diagnosis::ArgumentIncompatibleTypes(n, to, from) => format!("passing ‘{}’ to parameter {n} of incompatible type ‘{}’", from.describe(sema, ctx), to.describe(sema, ctx)),
+            Diagnosis::ReturnIncompatibleTypes(to, from) => format!("returning ‘{}’ from a function with incompatible result type ‘{}’", from.describe(sema, ctx), to.describe(sema, ctx)),
+
+            Diagnosis::CallingNotFunction(ty) => format!("called object type '{}' is not a function or function pointer", ty.describe(sema, ctx)),
 
             Diagnosis::AssignToRValue => "Cannot assign to an r-value".to_string(),
             Diagnosis::ConstAssignment => "Cannot assign to const value".to_string(),

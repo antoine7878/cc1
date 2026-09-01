@@ -3,6 +3,7 @@ use std::iter::zip;
 use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, Expression, ExpressionNode, Type, UnaryOp};
 use crate::context::Context;
+use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::ice::try_fold;
 use crate::semantic::model::cast;
 use crate::semantic::{
@@ -67,8 +68,26 @@ pub fn init(
     let is_null = is_null_pointer_constant(sema, ctx, init_node);
     with_operand(sema, init_node, ExpressionKind::RValue, |sema, re| {
         let mut l_re = ResolvedExpression::new(l_ty, ExpressionKind::LValue);
-        cast::assignment_conversion(sema, &mut l_re, re, is_null, assign_ctx)
+        let out = cast::assignment_conversion(sema, &mut l_re, re, is_null, assign_ctx);
+        if matches!(assign_ctx, AssignmentContext::Return)
+            && let Some(cast) = re.casts.last_mut()
+        {
+            cast.to.is_volatile = false;
+            cast.to.is_const = false;
+        }
+        out
     })
+}
+
+pub fn strip_qualifiers(sema: &mut Sema, node: &ExpressionNode) -> Result<(), Diagnosis> {
+    with_operand(sema, node, RValue, |_sema, re| {
+        if let Some(cast) = re.casts.last_mut() {
+            cast.to.is_volatile = false;
+            cast.to.is_const = false;
+        }
+        Ok(re.casted_ty())
+    })
+    .map(|_| ())
 }
 
 fn with_operand<F>(
@@ -149,20 +168,18 @@ fn check_is_arithmetic(sema: &Sema, ty: ResolvedTypeId) -> Result<(), Diagnosis>
 fn check_fn_call(
     sema: &mut Sema,
     ctx: &Context,
-    ty: ResolvedTypeId,
+    ty: QualifiedType,
     args: &[ExpressionNode],
 ) -> Result<QualifiedType, Diagnosis> {
-    let ResolvedType::Pointer(inner) = ty.resolve(sema) else {
-        return Err(Diagnosis::InvalidOperand);
+    let ResolvedType::Pointer(inner) = ty.id.resolve(sema) else {
+        return Err(Diagnosis::CallingNotFunction(ty));
     };
     let ResolvedType::Function { ret, params } = inner.id.resolve(sema).clone() else {
-        return Err(Diagnosis::InvalidOperand);
+        return Err(Diagnosis::CallingNotFunction(*inner));
     };
-    if let ResolvedType::Array { .. } = ret.id.resolve(sema) {
-        return Err(Diagnosis::InvalidOperand);
-    }
-    let ParamTypes::Prototype { params, is_variadic } = params else {
-        return Err(Diagnosis::Temprorary);
+    let (params, is_variadic) = match params {
+        ParamTypes::Prototype { params, is_variadic } => (params, is_variadic),
+        ParamTypes::Unspecified => (vec![], true),
     };
     if !is_variadic && args.len() > params.len() {
         return Err(Diagnosis::TooManyArguments(params.len(), args.len()));
@@ -170,8 +187,19 @@ fn check_fn_call(
     if args.len() < params.len() {
         return Err(Diagnosis::TooFewArguments(params.len(), args.len()));
     }
+    let param_len = params.len();
     for (n, (param_ty, arg_node)) in zip(params, args).enumerate() {
-        init(sema, ctx, param_ty, arg_node, AssignmentContext::Argument(n + 1))?;
+        let _ = init(sema, ctx, param_ty, arg_node, AssignmentContext::Argument(n + 1))
+            .map_err(|err| sema.add_diag(Diag::err((), err), &arg_node.span));
+    }
+    if !is_variadic {
+        return Ok(ret);
+    }
+    for arg_node in args.iter().skip(param_len) {
+        with_operand(sema, arg_node, ExpressionKind::RValue, |sema, re| {
+            cast::default_argument_promotions(sema, re);
+            Ok(re.casted_ty())
+        })?;
     }
     Ok(ret)
 }
@@ -273,7 +301,7 @@ fn type_of(
         }),
         Expression::List(es) => type_of(sema, ctx, es.last().unwrap()),
         Expression::FunctionCall(fn_node, args) => with_operand(sema, fn_node, RValue, |sema, re| {
-            check_fn_call(sema, ctx, re.casted_ty().id, args)
+            check_fn_call(sema, ctx, re.casted_ty(), args)
         }),
         _ => Err(Diagnosis::Poisoned),
     }

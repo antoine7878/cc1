@@ -1,8 +1,11 @@
-void max(int *a, int *b) {
-	return;
-}
+// void max(int a, ...) {
+// 	int tab[1];
+// 	int *ptr;
+// 	max(1, tab, ptr);
+// }
 
-int *fn(void) {
-	max(1, 0);
-	return 0;
+void fn(void) {
+	int x;
+	x();
+	g(1)(2);
 }

@@ -181,6 +181,7 @@ fn can_assign_pointer(sema: &Sema, lp: QualifiedType, rp: QualifiedType) -> bool
         || (rp.id == sema.builtins.void && is_object_or_incomplete(sema, lp.id))
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum AssignmentContext {
     Return,
     Assignment,
