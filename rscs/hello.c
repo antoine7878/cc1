@@ -5,7 +5,6 @@
 // }
 
 void fn(void) {
-	int x;
-	x();
-	g(1)(2);
+	int a;
+	(a, a) = 2;
 }

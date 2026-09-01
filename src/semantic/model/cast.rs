@@ -122,6 +122,12 @@ pub fn convert(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTyp
     };
     from_re.casts.push(implicit_cast)
 }
+
+pub fn to_void(sema: &Sema, re: &mut ResolvedExpression) {
+    let cast = ImplicitCast::new(CastKind::ToVoid, QualifiedType::new(sema.builtins.void, false, false));
+    re.casts.push(cast);
+}
+
 fn num_conv(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId) {
     let from = from_re.casted_ty().id;
     if from == to_id {

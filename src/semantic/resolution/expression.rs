@@ -313,7 +313,17 @@ fn type_of(
         Expression::Assign(None, e1, e2) => with_assignment(sema, ctx, e1, e2, |sema, lhs, rhs, is_null| {
             cast::assignment_conversion(sema, lhs, rhs, is_null, AssignmentContext::Assignment)
         }),
-        Expression::List(es) => type_of(sema, ctx, es.last().unwrap()),
+        Expression::List(es) => {
+            let mut it = es.iter().rev();
+            let a = it.next().unwrap();
+            for node in it {
+                let _ = with_operand(sema, node, RValue, |sema, re| {
+                    cast::to_void(sema, re);
+                    Err(Diagnosis::Poisoned)
+                })?;
+            }
+            type_of(sema, ctx, a)
+        }
         Expression::FunctionCall(fn_node, args) => with_operand(sema, fn_node, RValue, |sema, re| {
             check_fn_call(sema, ctx, re.casted_ty(), args)
         }),
