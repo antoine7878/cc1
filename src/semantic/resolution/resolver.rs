@@ -235,7 +235,8 @@ impl SymbolResolver<'_> {
         expression::resolve_expression(self.sema, ctx, node);
     }
 
-    fn resolve_initializer(&mut self, ctx: &Context, ty: QualifiedType, node: &InitializerNode) { match &node.init {
+    fn resolve_initializer(&mut self, ctx: &Context, ty: QualifiedType, node: &InitializerNode) {
+        match &node.init {
             Initializer::Single(e) => {
                 self.visit_expression(ctx, e);
                 match expression::init(self.sema, ctx, ty, e) {
