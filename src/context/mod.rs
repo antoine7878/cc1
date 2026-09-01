@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::read_to_string;
 
-use crate::arena::{Provide, ProvideMut};
 use crate::ast::{AstArenas, Name, StringId, StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier};
 use crate::parser::{ParseState, Span};
 use crate::semantic::{DiagnosisNode, Sema};
@@ -18,30 +17,6 @@ pub struct Context {
     pub ast: TranslationUnitNode,
     pub sema: Sema,
     source_cache: RefCell<HashMap<String, Option<Vec<String>>>>,
-}
-
-impl Provide<Sema> for Context {
-    fn provide(&self) -> &Sema {
-        &self.sema
-    }
-}
-
-impl ProvideMut<Sema> for Context {
-    fn provide_mut(&mut self) -> &mut Sema {
-        &mut self.sema
-    }
-}
-
-impl Provide<AstArenas> for Context {
-    fn provide(&self) -> &AstArenas {
-        &self.arenas
-    }
-}
-
-impl ProvideMut<AstArenas> for Context {
-    fn provide_mut(&mut self) -> &mut AstArenas {
-        &mut self.arenas
-    }
 }
 
 impl Context {

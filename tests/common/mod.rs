@@ -108,7 +108,6 @@ impl Unit {
         self.ctx
             .sema
             .symbols
-            .data
             .iter()
             .filter(|symbol| symbol.kind == SymbolKind::Variant)
             .map(|symbol| {
@@ -124,7 +123,6 @@ impl Unit {
         self.ctx
             .arenas
             .expressions
-            .data
             .iter()
             .filter_map(|expression| match expression {
                 Expression::StringLiteral(literal) => {
@@ -143,7 +141,6 @@ impl Unit {
         self.ctx
             .arenas
             .expressions
-            .data
             .iter()
             .map(|expression| expression.to_string())
             .collect()
@@ -242,7 +239,6 @@ impl Unit {
         self.ctx
             .sema
             .symbols
-            .data
             .iter()
             .find(|symbol| symbol.name.id.resolve(&self.ctx).as_str() == name)
             .unwrap_or_else(|| panic!("no symbol `{name}` in the unit"))
@@ -279,7 +275,7 @@ impl Unit {
             .enumerate()
             .filter(|(_, facts)| facts.binding_seen)
             .map(|(id, facts)| {
-                let name = match &self.ctx.arenas.expressions.data[id] {
+                let name = match self.ctx.arenas.expressions.iter().nth(id).unwrap() {
                     Expression::Identifier(name) => name.id.resolve(&self.ctx).clone(),
                     other => format!("{other:?}"),
                 };
@@ -292,7 +288,6 @@ impl Unit {
         self.ctx
             .sema
             .symbols
-            .data
             .iter()
             .map(|symbol| {
                 (

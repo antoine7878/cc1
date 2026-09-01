@@ -11,6 +11,7 @@ define_arena!(
     ExpressionArena,
     ExpressionId,
     crate::ast::AstArenas,
+    arenas,
     expressions
 );
 

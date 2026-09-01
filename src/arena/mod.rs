@@ -16,17 +16,9 @@ pub trait ResolveMutWith<H> {
     fn resolve_mut(self, holder: &mut H) -> &mut Self::Output;
 }
 
-pub trait Provide<H> {
-    fn provide(&self) -> &H;
-}
-
-pub trait ProvideMut<H> {
-    fn provide_mut(&mut self) -> &mut H;
-}
-
 #[macro_export]
 macro_rules! define_arena {
-    ($ty:ident, $arena:ident, $id:ident, $holder:ty, $($field:ident).+) => {
+    ($ty:ident, $arena:ident, $id:ident, $holder:ty, $ctx_field:ident, $($field:ident).+) => {
         pub type $id = $crate::arena::ArenaId<$ty>;
         pub type $arena = $crate::arena::Arena<$id, $ty>;
 
@@ -47,20 +39,7 @@ macro_rules! define_arena {
         impl $crate::arena::ResolveWith<$crate::context::Context> for $id {
             type Output = $ty;
             fn resolve(self, ctx: &$crate::context::Context) -> &$ty {
-                $crate::arena::ResolveWith::<$holder>::resolve(
-                    self,
-                    $crate::arena::Provide::<$holder>::provide(ctx),
-                )
-            }
-        }
-
-        impl $crate::arena::ResolveMutWith<$crate::context::Context> for $id {
-            type Output = $ty;
-            fn resolve_mut(self, ctx: &mut $crate::context::Context) -> &mut $ty {
-                $crate::arena::ResolveMutWith::<$holder>::resolve_mut(
-                    self,
-                    $crate::arena::ProvideMut::<$holder>::provide_mut(ctx),
-                )
+                ctx.$ctx_field.$($field).+.get(self)
             }
         }
 
@@ -74,7 +53,7 @@ macro_rules! define_arena {
 
 #[macro_export]
 macro_rules! define_interner {
-    ($ty:ident, $arena:ident, $id:ident, $holder:ty, $($field:ident).+) => {
+    ($ty:ident, $arena:ident, $id:ident, $holder:ty, $ctx_field:ident, $($field:ident).+) => {
         pub type $id = $crate::arena::ArenaId<$ty>;
         pub type $arena = $crate::arena::Interner<$id, $ty>;
 
@@ -88,10 +67,7 @@ macro_rules! define_interner {
         impl $crate::arena::ResolveWith<$crate::context::Context> for $id {
             type Output = $ty;
             fn resolve(self, ctx: &$crate::context::Context) -> &$ty {
-                $crate::arena::ResolveWith::<$holder>::resolve(
-                    self,
-                    $crate::arena::Provide::<$holder>::provide(ctx),
-                )
+                ctx.$ctx_field.$($field).+.get(self)
             }
         }
 

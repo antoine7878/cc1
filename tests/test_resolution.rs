@@ -325,7 +325,6 @@ fn identical_function_types_share_one_interned_type() {
         .ctx
         .sema
         .symbols
-        .data
         .iter()
         .filter(|symbol| symbol.kind == SymbolKind::Function)
         .map(|symbol| symbol.ty.expect("function type").id)
@@ -341,7 +340,6 @@ fn a_function_definition_records_its_parameters_in_order() {
         .ctx
         .sema
         .functions
-        .data
         .iter()
         .map(|def| {
             let parameters: Vec<_> = def
@@ -375,7 +373,7 @@ fn a_function_definition_takes_its_type_from_its_symbol() {
 #[test]
 fn an_old_style_definition_records_its_parameters_in_declarator_order() {
     let unit = accepted("int f(a, b) char b; { return a; }");
-    let def = unit.ctx.sema.functions.data.first().expect("function definition");
+    let def = unit.ctx.sema.functions.iter().next().expect("function definition");
     let parameters: Vec<_> = def
         .parameters
         .iter()

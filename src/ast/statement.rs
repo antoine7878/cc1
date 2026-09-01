@@ -9,6 +9,7 @@ define_arena!(
     StatementArena,
     StatementId,
     crate::ast::AstArenas,
+    arenas,
     statements
 );
 

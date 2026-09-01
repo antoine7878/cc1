@@ -1,10 +1,11 @@
 use std::marker::PhantomData;
+use std::slice;
 
 use crate::arena::ArenaKey;
 
 #[derive(Debug)]
 pub struct Arena<Id: ArenaKey, Val> {
-    pub data: Vec<Val>,
+    data: Vec<Val>,
     marker: PhantomData<fn() -> Id>,
 }
 
@@ -14,13 +15,6 @@ impl<Id: ArenaKey, Val> Default for Arena<Id, Val> {
             data: Vec::new(),
             marker: PhantomData,
         }
-    }
-    
-}
-
-impl<Id: ArenaKey, Val> Arena<Id, Val> {
-pub fn data(&self) -> &[Val] {
-        self.data.as_slice()
     }
 }
 
@@ -45,5 +39,9 @@ impl<Id: ArenaKey, Val> Arena<Id, Val> {
 
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
+    }
+
+    pub fn iter(&self) -> slice::Iter<'_, Val> {
+        self.data.iter()
     }
 }

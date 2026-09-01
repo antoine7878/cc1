@@ -10,7 +10,6 @@ impl Context {
         let rows: Vec<[String; 5]> = self
             .sema
             .symbols
-            .data()
             .iter()
             .map(|symbol| {
                 [

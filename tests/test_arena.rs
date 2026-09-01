@@ -61,7 +61,7 @@ fn arena_exposes_its_values_in_allocation_order() {
     let mut arena = arena();
     arena.alloc("a".to_string());
     arena.alloc("b".to_string());
-    assert_eq!(arena.data, vec!["a".to_string(), "b".to_string()]);
+    assert!(arena.iter().eq(["a".to_string(), "b".to_string()].iter()));
 }
 
 #[test]

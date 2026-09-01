@@ -10,6 +10,7 @@ define_arena!(
     DeclaratorArena,
     DeclaratorId,
     crate::ast::AstArenas,
+    arenas,
     declarators
 );
 

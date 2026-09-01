@@ -3,10 +3,10 @@ use crate::parser::Span;
 use crate::utils::{BLUE, RESET};
 use crate::{ast_node, define_arena};
 
-define_arena!(Struct, StructArena, StructId, crate::ast::AstArenas, structs);
-define_arena!(Union, UnionArena, UnionId, crate::ast::AstArenas, unions);
-define_arena!(Enum, EnumArena, EnumId, crate::ast::AstArenas, enums);
-define_arena!(Variant, VariantArena, VariantId, crate::ast::AstArenas, variants);
+define_arena!(Struct, StructArena, StructId, crate::ast::AstArenas, arenas, structs);
+define_arena!(Union, UnionArena, UnionId, crate::ast::AstArenas, arenas, unions);
+define_arena!(Enum, EnumArena, EnumId, crate::ast::AstArenas, arenas, enums);
+define_arena!(Variant, VariantArena, VariantId, crate::ast::AstArenas, arenas, variants);
 
 ast_node! {
     pub struct Struct {

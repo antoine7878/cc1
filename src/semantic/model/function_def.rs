@@ -11,6 +11,7 @@ define_arena!(
     FunctionDefArena,
     FunctionDefId,
     crate::semantic::Sema,
+    sema,
     functions
 );
 

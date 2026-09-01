@@ -10,6 +10,7 @@ define_interner!(
     ResolvedTypeArena,
     ResolvedTypeId,
     crate::semantic::Sema,
+    sema,
     types
 );
 

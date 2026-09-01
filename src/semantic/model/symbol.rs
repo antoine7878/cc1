@@ -4,7 +4,7 @@ use crate::ast::{Name, Storage};
 use crate::define_arena;
 use crate::semantic::{ExpressionKind, QualifiedType, Sema};
 
-define_arena!(Symbol, SymbolArena, SymbolId, crate::semantic::Sema, symbols);
+define_arena!(Symbol, SymbolArena, SymbolId, crate::semantic::Sema, sema, symbols);
 
 #[derive(Clone, Debug)]
 pub struct Symbol {
