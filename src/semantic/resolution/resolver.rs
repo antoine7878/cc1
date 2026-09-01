@@ -67,7 +67,7 @@ impl<'a> SymbolResolver<'a> {
             &ResolvedType::Function { ret, .. } => self.return_ty = Some(ret),
             _ => unreachable!(),
         }
-        let sym = Symbol::new(name, Some(ty), Some(storage), SymbolKind::Function, true);
+        let sym = Symbol::function(name, ty, storage);
         let sym = self.sema.declare(sym, decl_span);
         let declared = (previous == Some(sym)).then_some(declared).flatten();
         Some((self.sema.functions.declare(sym), params, declared))
@@ -140,7 +140,7 @@ impl<'a> SymbolResolver<'a> {
     fn add_parameter(&mut self, param: &ParamInfo) -> Option<SymbolId> {
         let name = param.name?;
         let storage = param.storage.unwrap_or(Storage::Auto);
-        let sym = Symbol::new(name, Some(param.ty), Some(storage), SymbolKind::Parameter, false);
+        let sym = Symbol::parameter(name, param.ty, storage);
         Some(self.sema.declare(sym, &name.span))
     }
 
@@ -180,7 +180,7 @@ impl<'a> SymbolResolver<'a> {
         missing_id
             .into_iter()
             .map(|string_id| Name::new(string_id, Span::default()))
-            .map(|name| Symbol::new(name, Some(ty), Some(Storage::Auto), SymbolKind::Parameter, false))
+            .map(|name| Symbol::parameter(name, ty, Storage::Auto))
             .for_each(|sym| {
                 let _ = self.sema.declare(sym, &Span::default());
             });
@@ -206,7 +206,7 @@ impl<'a> SymbolResolver<'a> {
         }
         let name = decl.ident(ctx)?;
         let storage = declared_storage.unwrap_or(Storage::Auto);
-        let sym = Symbol::new(name, Some(ty), Some(storage), SymbolKind::Parameter, false);
+        let sym = Symbol::parameter(name, ty, storage);
         Some(self.sema.declare(sym, &decl.span))
     }
 }
@@ -232,7 +232,7 @@ impl SymbolResolver<'_> {
             }
             self.sema.set_binding(node.id, sym);
         }
-        expression::run(self.sema, ctx, node);
+        expression::resolve_expression(self.sema, ctx, node);
     }
 
     fn resolve_initializer(&mut self, ctx: &Context, ty: QualifiedType, node: &InitializerNode) {

@@ -8,7 +8,7 @@ use crate::semantic::{
     Sema, declaration,
 };
 
-pub fn run(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
+pub fn resolve_expression(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
     if sema.expr_seen(node.id) {
         return;
     }

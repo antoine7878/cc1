@@ -49,6 +49,18 @@ impl Symbol {
         Self::with_value(name, ty, Some(value), SymbolKind::Variant)
     }
 
+    pub fn function(name: Name, ty: QualifiedType, storage: Storage) -> Self {
+        Self::new(name, Some(ty), Some(storage), SymbolKind::Function, true)
+    }
+
+    pub fn parameter(name: Name, ty: QualifiedType, storage: Storage) -> Self {
+        Self::new(name, Some(ty), Some(storage), SymbolKind::Parameter, false)
+    }
+
+    pub fn label(name: Name, is_init: bool) -> Self {
+        Self::new(name, None, None, SymbolKind::Label, is_init)
+    }
+
     pub fn is_compatible(&self, sema: &Sema, other: &Self) -> bool {
         self.name.id == other.name.id
             && self.kind == other.kind
@@ -60,19 +72,6 @@ impl Symbol {
             SymbolKind::Function | SymbolKind::Variant => ExpressionKind::RValue,
             _ => ExpressionKind::LValue,
         }
-    }
-}
-
-impl SymbolArena {
-    pub fn add(
-        &mut self,
-        name: Name,
-        ty: Option<QualifiedType>,
-        storage: Option<Storage>,
-        kind: SymbolKind,
-        is_init: bool,
-    ) -> SymbolId {
-        self.alloc(Symbol::new(name, ty, storage, kind, is_init))
     }
 }
 

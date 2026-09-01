@@ -224,7 +224,7 @@ impl Sema {
                 span,
             );
         };
-        let sym_id = self.symbols.add(name, None, None, SymbolKind::Label, is_init);
+        let sym_id = self.symbols.alloc(Symbol::label(name, is_init));
         self.scopes.insert(SymbolKind::Label, name.id, sym_id);
     }
 }

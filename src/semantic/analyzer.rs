@@ -8,7 +8,7 @@ impl Analyzer {
     pub fn analyze(mut ctx: Context) -> Context {
         let mut sema = Sema::new(ctx.target.clone());
         Self::resolve_names(&mut sema, &ctx);
-        eval::run(&mut sema, &ctx);
+        eval::check_constants(&mut sema, &ctx);
         ctx.diagnosis.append(&mut sema.diagnosis);
         ctx.sema = sema;
         ctx
