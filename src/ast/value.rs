@@ -474,10 +474,9 @@ impl<'a> Fold<'a> {
     /// the promoted left operand.
     pub fn shift_out_of_range(&self, lhs: Value, rhs: Value) -> bool {
         let count = self.convert(rhs, rhs.rank().to_integer()).to_i64();
-        match self.target.bits(&lhs.rank().to_integer().resolved()) {
-            Some(width) => count < 0 || count >= i64::from(width),
-            None => true,
-        }
+        self.target
+            .bits(&lhs.rank().to_integer().resolved())
+            .is_none_or(|width| count < 0 || count >= i64::from(width))
     }
 
     /// 6.3.5 The result of INT_MIN / -1 is not representable in the type of the operands.

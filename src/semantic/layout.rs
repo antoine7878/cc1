@@ -93,10 +93,7 @@ fn union_layout(sema: &mut Sema, members: &[Member]) -> Option<Layout> {
         if matches!(m, Member::Symbol(_)) {
             align = align.max(layout.align);
         }
-        size = size.max(match width {
-            Some(width) => width.div_ceil(8),
-            None => u64::from(layout.size),
-        });
+        size = size.max(width.map_or(u64::from(layout.size), |width| width.div_ceil(8)));
     }
 
     Some(Layout::new(round_up(size, u64::from(align)) as u32, align))

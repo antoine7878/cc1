@@ -3,14 +3,14 @@ use std::fmt::Display;
 
 use crate::ast::{EnumId, Name, StructId, UnionId};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DeclarationSpecifier {
     Type(TypeSpecifier),
     Qualifier(Qualifier),
     Storage(Storage),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TypeSpecifier {
     Void,
     Char,
@@ -27,13 +27,13 @@ pub enum TypeSpecifier {
     TypedefName(Name),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Qualifier {
     Const,
     Volatile,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Storage {
     Typedef,
     Extern,

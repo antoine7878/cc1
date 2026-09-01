@@ -78,18 +78,21 @@ impl AstPrinter {
     fn print_specifier(&mut self, ctx: &Context, spec: &DeclarationSpecifier) {
         let s = match spec {
             DeclarationSpecifier::Type(t) => match t {
-                TypeSpecifier::Struct(id) => match &id.resolve(ctx).name {
-                    Some(name) => format!("struct {}", name.id.resolve(ctx)),
-                    None => "struct".to_string(),
-                },
-                TypeSpecifier::Union(id) => match &id.resolve(ctx).name {
-                    Some(name) => format!("union {}", name.id.resolve(ctx)),
-                    None => "union".to_string(),
-                },
-                TypeSpecifier::Enum(id) => match &id.resolve(ctx).name {
-                    Some(name) => format!("enum {}", name.id.resolve(ctx)),
-                    None => "enum".to_string(),
-                },
+                TypeSpecifier::Struct(id) => id
+                    .resolve(ctx)
+                    .name
+                    .as_ref()
+                    .map_or_else(|| "struct".to_string(), |name| format!("struct {}", name.id.resolve(ctx))),
+                TypeSpecifier::Union(id) => id
+                    .resolve(ctx)
+                    .name
+                    .as_ref()
+                    .map_or_else(|| "union".to_string(), |name| format!("union {}", name.id.resolve(ctx))),
+                TypeSpecifier::Enum(id) => id
+                    .resolve(ctx)
+                    .name
+                    .as_ref()
+                    .map_or_else(|| "enum".to_string(), |name| format!("enum {}", name.id.resolve(ctx))),
                 TypeSpecifier::TypedefName(name) => name.id.resolve(ctx).clone(),
                 other => other.to_string(),
             },
