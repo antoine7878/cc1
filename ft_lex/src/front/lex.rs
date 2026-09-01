@@ -31,6 +31,7 @@ impl Lex {
             match line.trim() {
                 "/* REMOVE */" => remove = !remove,
                 "/* CONTEXT */" if self.definition.no_context => remove = !remove,
+                "/* SPAN */" if self.definition.custom_span_types => remove = !remove,
                 _ if remove => (),
                 "/* CODE_BEFORE */" => {
                     out_buffer.write_all(self.definition.percent_brace_code.as_bytes())?;

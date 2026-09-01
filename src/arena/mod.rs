@@ -1,8 +1,8 @@
-mod arena;
 mod id;
 mod interner;
+mod store;
 
-pub use arena::Arena;
+pub use store::Arena;
 pub use id::{ArenaId, ArenaKey};
 pub use interner::Interner;
 
