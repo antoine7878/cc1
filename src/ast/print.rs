@@ -20,7 +20,14 @@ use crate::utils::{CYAN, GRAY, GREEN, RESET};
 
 pub struct AstPrinter {
     depth: usize,
-    lines: Vec<(usize, String)>,
+    lines: Vec<Line>,
+    open: Vec<usize>,
+}
+
+struct Line {
+    depth: usize,
+    text: String,
+    children: usize,
 }
 
 impl AstPrinter {
@@ -32,6 +39,7 @@ impl AstPrinter {
         let mut printer = Self {
             depth: 0,
             lines: Vec::new(),
+            open: Vec::new(),
         };
         printer.visit_translation_unit(ctx, &ctx.ast);
         printer.render(&mut w)
@@ -39,7 +47,7 @@ impl AstPrinter {
 
     fn put(&mut self, args: std::fmt::Arguments) {
         use std::fmt::Write;
-        let _ = self.lines.last_mut().expect("root line").1.write_fmt(args);
+        let _ = self.lines.last_mut().expect("root line").text.write_fmt(args);
     }
 
     fn print_node<T, F>(&mut self, node: &T, f: F)
@@ -47,10 +55,20 @@ impl AstPrinter {
         T: Display,
         F: FnOnce(&mut Self),
     {
-        self.lines.push((self.depth, format!("{node} {CYAN}")));
+        let idx = self.lines.len();
+        self.lines.push(Line {
+            depth: self.depth,
+            text: format!("{node} {CYAN}"),
+            children: 0,
+        });
+        if let Some(siblings) = self.open.last_mut() {
+            *siblings += 1;
+        }
+        self.open.push(0);
         self.depth += 1;
         f(self);
         self.depth -= 1;
+        self.lines[idx].children = self.open.pop().expect("open node");
     }
 
     fn print_name_node(&mut self, ctx: &Context, name: &Name) {
@@ -76,20 +94,15 @@ impl AstPrinter {
     }
 
     fn print_specifier(&mut self, ctx: &Context, spec: &DeclarationSpecifier) {
+        let tagged = |keyword: &str, name: Option<&Name>| match name {
+            Some(name) => format!("{keyword} {}", name.id.resolve(ctx)),
+            None => keyword.to_string(),
+        };
         let s = match spec {
             DeclarationSpecifier::Type(t) => match t {
-                TypeSpecifier::Struct(id) => match &id.resolve(ctx).name {
-                    Some(name) => format!("struct {}", name.id.resolve(ctx)),
-                    None => "struct".to_string(),
-                },
-                TypeSpecifier::Union(id) => match &id.resolve(ctx).name {
-                    Some(name) => format!("union {}", name.id.resolve(ctx)),
-                    None => "union".to_string(),
-                },
-                TypeSpecifier::Enum(id) => match &id.resolve(ctx).name {
-                    Some(name) => format!("enum {}", name.id.resolve(ctx)),
-                    None => "enum".to_string(),
-                },
+                TypeSpecifier::Struct(id) => tagged("struct", id.resolve(ctx).name.as_ref()),
+                TypeSpecifier::Union(id) => tagged("union", id.resolve(ctx).name.as_ref()),
+                TypeSpecifier::Enum(id) => tagged("enum", id.resolve(ctx).name.as_ref()),
                 TypeSpecifier::TypedefName(name) => name.id.resolve(ctx).clone(),
                 other => other.to_string(),
             },
@@ -99,28 +112,27 @@ impl AstPrinter {
     }
 
     fn render<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        let mut last = vec![false; self.lines.len()];
-        let mut seen: Vec<bool> = Vec::new();
-        for (i, (depth, _)) in self.lines.iter().enumerate().rev() {
-            seen.resize(depth + 1, false);
-            last[i] = !seen[*depth];
-            seen[*depth] = true;
-        }
-
+        let mut remaining: Vec<usize> = Vec::new();
         let mut ancestors: Vec<bool> = Vec::new();
-        for (i, (depth, text)) in self.lines.iter().enumerate() {
-            if *depth == 0 {
-                write!(w, "{text}")?;
+        for line in &self.lines {
+            let depth = line.depth;
+            if depth == 0 {
+                write!(w, "{}", line.text)?;
+                remaining.clear();
+                remaining.push(line.children);
                 continue;
             }
-            ancestors.resize(*depth, false);
-            ancestors[*depth - 1] = last[i];
-            let branch = if last[i] { "`-" } else { "|-" };
+            remaining.truncate(depth);
+            remaining[depth - 1] -= 1;
+            let last = remaining[depth - 1] == 0;
+            ancestors.resize(depth, false);
+            ancestors[depth - 1] = last;
             write!(w, "\n{RESET}")?;
-            for level in &ancestors[..*depth - 1] {
+            for level in &ancestors[..depth - 1] {
                 write!(w, "{}", if *level { "  " } else { "| " })?;
             }
-            write!(w, "{branch} {text}")?;
+            write!(w, "{} {}", if last { "`-" } else { "|-" }, line.text)?;
+            remaining.push(line.children);
         }
         write!(w, "{RESET}")?;
         writeln!(w)
@@ -129,10 +141,17 @@ impl AstPrinter {
 
 impl Visitor for AstPrinter {
     fn visit_translation_unit(&mut self, ctx: &Context, node: &TranslationUnitNode) {
-        self.lines.push((0, format!("{node}")));
+        let idx = self.lines.len();
+        self.lines.push(Line {
+            depth: 0,
+            text: format!("{node}"),
+            children: 0,
+        });
+        self.open.push(0);
         self.depth += 1;
         walk_translation_unit(self, ctx, node);
         self.depth -= 1;
+        self.lines[idx].children = self.open.pop().expect("root node");
     }
 
     fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
