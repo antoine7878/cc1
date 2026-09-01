@@ -63,7 +63,7 @@ impl Dumper {
         ["parse", "lex", "error", "lval", "char", "debug", "log"]
             .iter()
             .fold(template.to_string(), |acc, name| {
-                acc.replace(&format!("yy{}", name), &format!("{}{}", &args.p, name))
+                acc.replace(&format!("yy{}", name), &format!("{}{}", args.p, name))
             })
     }
 }

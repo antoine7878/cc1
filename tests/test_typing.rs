@@ -1,6 +1,6 @@
+use crate::common::{Ty, Unit, ints, lv, none, rv};
 use cc1::semantic::CastKind::*;
 use cc1::semantic::Diagnosis;
-use crate::common::{Ty, Unit, ints, lv, none, rv};
 
 // ---- 6.3.1 primary expressions -------------------------------------------
 

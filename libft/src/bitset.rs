@@ -65,6 +65,10 @@ impl BitSet {
         (self.data[index / Self::CHK_SIZE] >> (index % Self::CHK_SIZE)) & 1 == 1
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn len(&self) -> usize {
         self.capacity
     }

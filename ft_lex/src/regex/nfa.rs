@@ -258,7 +258,7 @@ impl Nfa {
         let mut offset: StateId = ret.nodes.len();
         for mut nfa in nfas {
             nfa.shifted(offset);
-            ret.nodes.extend(nfa.nodes.into_iter());
+            ret.nodes.extend(nfa.nodes);
 
             if nfa.condition_to_start.is_empty() {
                 // connect to INITIAL and all inclusive starts

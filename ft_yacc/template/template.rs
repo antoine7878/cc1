@@ -1,4 +1,4 @@
-#![allow(unused_braces, mixed_script_confusables, unused)]
+#![allow(unknown_lints, clippy::all, unused_braces, mixed_script_confusables, unused)]
 use std::fmt;
 use std::io::Read;
 

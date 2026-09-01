@@ -1,7 +1,6 @@
 use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, Expression, ExpressionNode, Type, UnaryOp};
 use crate::context::Context;
-use crate::semantic::Diagnosis::Poisoned;
 use crate::semantic::ice::try_fold;
 use crate::semantic::model::cast;
 use crate::semantic::{
@@ -25,7 +24,7 @@ pub fn resolve_expression(sema: &mut Sema, ctx: &Context, node: &ExpressionNode)
 }
 
 fn take(sema: &mut Sema, node: &ExpressionNode) -> Result<ResolvedExpression, Diagnosis> {
-    sema.take_expr_resolved(node.id).ok_or(Diagnosis::Poisoned)
+    sema.take_expr_resolved(node.id).ok_poisoned()
 }
 
 fn takes(
@@ -139,7 +138,7 @@ where
 }
 
 fn as_written<'a>(sema: &'a Sema, node: &ExpressionNode) -> Result<&'a ResolvedExpression, Diagnosis> {
-    sema.expr_resolved(node.id).ok_or(Diagnosis::Poisoned)
+    sema.expr_resolved(node.id).ok_poisoned()
 }
 
 fn check_is_arithmetic(sema: &Sema, ty: ResolvedTypeId) -> Result<(), Diagnosis> {
@@ -215,7 +214,7 @@ fn cast(
     operand: &ExpressionNode,
 ) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
     let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
-    let (qualif, _) = declaration::declared_type(sema, ctx, base, &ty_node.declarator).ok_or(Diagnosis::Poisoned)?;
+    let (qualif, _) = declaration::declared_type(sema, ctx, base, &ty_node.declarator).ok_poisoned()?;
     let is_null = is_null_pointer_constant(sema, ctx, operand);
     with_operand(sema, operand, ExpressionKind::RValue, |sema, re| {
         let ty = qualif.id.resolve(sema);
@@ -242,9 +241,9 @@ fn type_of(
 
     match node.id.resolve(ctx) {
         Expression::Identifier(_) => {
-            let id = sema.binding(node.id).ok_or(Diagnosis::Poisoned)?;
+            let id = sema.binding(node.id).ok_poisoned()?;
             let sym = id.resolve(sema);
-            Ok((sym.ty.ok_or(Diagnosis::Poisoned)?, sym.expression_kind()))
+            Ok((sym.ty.ok_poisoned()?, sym.expression_kind()))
         }
         Expression::Constant(value) => Ok((value.ty(sema), RValue)),
         Expression::StringLiteral(value) => Ok((value.ty(sema, ctx), LValue)),
@@ -261,29 +260,27 @@ fn type_of(
         Expression::Assign(None, e1, e2) => with_assignment(sema, ctx, e1, e2, |sema, lhs, rhs, is_null| {
             cast::assignment_conversion(sema, lhs, rhs, is_null)
         }),
-        Expression::FunctionCall(fn_node, args) => {
-            let ret_type = with_operand(sema, fn_node, RValue, |sema, re| check_fn_call(sema, re.casted_ty().id))?;
-            // let Some(args) = args else {
-            //     return Ok(ret_type);
-            // };
-            // let fn_sym = sema.binding(fn_node.id).ok_or(Diagnosis::Poisoned)?;
-            // let sym = fn_sym.resolve(sema).ty.ok_or(Diagnosis::Poisoned)?;
-            // let ResolvedType::Function { ret, params } = sym.id.resolve(sema) else {
-            //     return Err(Diagnosis::Poisoned);
-            // };
-            // match args.id.resolve(ctx) {
-            //     Expression::List(v) => {
-            //         for e in v {
-            //             do_arg(sema, e)
-            //         }
-            //     }
-            //     _ => do_arg(sema, args),
-            // }
-            // let Expression::List(args) = args else {
-            //     return Err(Diagnosis)
-            // }
-            Ok(ret_type)
-        }
+        Expression::List(es) => type_of(sema, ctx, es.last().unwrap()),
+        // Expression::FunctionCall(fn_node, args) => {
+        //     let ret_type = with_operand(sema, fn_node, RValue, |sema, re| check_fn_call(sema, re.casted_ty().id))?;
+        //     let binding = sema.binding(fn_node.id).ok_poisoned()?;
+        //     for arg in args {
+        //         with_assignment(sema, ctx, arg, arg, |sema, lhs, rhs, is_null| {
+        //             cast::assignment_conversion(sema, lhs, rhs, is_null)
+        //         })?;
+        //     }
+        //     Ok(ret_type)
+        // }
         _ => Err(Diagnosis::Poisoned),
+    }
+}
+
+trait OptionPoisoned<T> {
+    fn ok_poisoned(self) -> Result<T, Diagnosis>;
+}
+
+impl<T> OptionPoisoned<T> for Option<T> {
+    fn ok_poisoned(self) -> Result<T, Diagnosis> {
+        self.ok_or(Diagnosis::Poisoned)
     }
 }
