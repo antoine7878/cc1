@@ -197,9 +197,7 @@ pub trait DiagCollector {
     fn diagnosis(&mut self) -> &mut Vec<DiagnosisNode>;
 
     fn add_diag<T>(&mut self, diag: Diag<T>, span: &Span) -> T {
-        if let Some(diagnosis) = diag.diagnosis
-            && !matches!(diagnosis, Diagnosis::Poisoned)
-        {
+        if let Some(diagnosis) = diag.diagnosis {
             self.diagnosis().push(DiagnosisNode::new(diagnosis, *span));
         }
         diag.res
@@ -212,12 +210,6 @@ pub struct Diag<T> {
     pub diagnosis: Option<Diagnosis>,
 }
 
-impl Diag<()> {
-    pub fn only_diag(diagnosis: Diagnosis) -> Self {
-        Self::new((), Some(diagnosis))
-    }
-}
-
 impl<T> Diag<T> {
     pub fn collect<C: DiagCollector>(self, collector: &mut C, span: &Span) -> T {
         collector.add_diag(self, span)
@@ -227,30 +219,12 @@ impl<T> Diag<T> {
         Self { res, diagnosis }
     }
 
-    pub fn with_diag(res: T, diagnosis: Diagnosis) -> Self {
-        Self::new(res, Some(diagnosis))
-    }
-
-    pub fn res(res: T) -> Self {
+    pub fn ok(res: T) -> Self {
         Self::new(res, None)
     }
-}
 
-impl<T> Diag<Option<T>> {
-    pub fn none_diag(diagnosis: Diagnosis) -> Self {
-        Self::new(None, Some(diagnosis))
-    }
-
-    pub fn some_diag(res: T, diagnosis: Diagnosis) -> Self {
-        Self::new(Some(res), Some(diagnosis))
-    }
-
-    pub fn none() -> Self {
-        Self::new(None, None)
-    }
-
-    pub fn some(res: T) -> Self {
-        Self::new(Some(res), None)
+    pub fn err(res: T, diagnosis: Diagnosis) -> Self {
+        Self::new(res, Some(diagnosis))
     }
 }
 

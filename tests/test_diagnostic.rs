@@ -278,3 +278,21 @@ reports!(
     "void f(void) { auto int g(void); }",
     ["<test>:1:25: error: Function in block not declared as extern"]
 );
+
+reports!(
+    poisoned_operand_does_not_leak_internal_error,
+    "void f(void) { x + 1; }",
+    ["<test>:1:16: error: Use of undeclared identifier 'x'"]
+);
+
+reports!(
+    poisoned_return_operand_does_not_leak_internal_error,
+    "int f(void) { return x + 1; }",
+    ["<test>:1:22: error: Use of undeclared identifier 'x'"]
+);
+
+reports!(
+    poisoned_initializer_operand_does_not_leak_internal_error,
+    "void f(void) { int y = x + 1; }",
+    ["<test>:1:24: error: Use of undeclared identifier 'x'"]
+);

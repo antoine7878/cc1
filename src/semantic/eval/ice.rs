@@ -26,7 +26,7 @@ pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> O
     let value = match folded {
         Ok(value) => Some(value),
         Err(Diagnosis::Poisoned) => None, // already reported by the type pass
-        Err(diagnosis) => sema.add_diag(Diag::none_diag(diagnosis), &expr.span),
+        Err(diagnosis) => sema.add_diag(Diag::err(None, diagnosis), &expr.span),
     };
     sema.set_constant(expr.id, value);
     value

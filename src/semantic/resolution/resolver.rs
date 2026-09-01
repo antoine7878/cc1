@@ -114,14 +114,14 @@ impl<'a> SymbolResolver<'a> {
             return;
         }
         self.add_diag(
-            Diag::only_diag(Diagnosis::DuplicateDeclaration(SymbolKind::Function, name)),
+            Diag::err((), Diagnosis::DuplicateDeclaration(SymbolKind::Function, name)),
             span,
         );
     }
 
     fn param_empty(&mut self, lst: &[DeclarationNode], span: &Span) -> Vec<SymbolId> {
         if !lst.is_empty() {
-            self.add_diag(Diag::only_diag(Diagnosis::ParameterTypeListWithList), span)
+            self.add_diag(Diag::err((), Diagnosis::ParameterTypeListWithList), span)
         }
         Vec::new()
     }
@@ -228,7 +228,7 @@ impl SymbolResolver<'_> {
         if let Expression::Identifier(name) = node.id.resolve(ctx) {
             let sym = self.sema.scopes.lookup_ordinary(name.id);
             if sym.is_none() {
-                self.add_diag(Diag::only_diag(Diagnosis::UndeclaredIdentifier(*name)), &node.span);
+                self.add_diag(Diag::err((), Diagnosis::UndeclaredIdentifier(*name)), &node.span);
             }
             self.sema.set_binding(node.id, sym);
         }
@@ -239,8 +239,11 @@ impl SymbolResolver<'_> {
         match &node.init {
             Initializer::Single(e) => {
                 self.visit_expression(ctx, e);
-                if let Err(inner) = expression::init(self.sema, ctx, ty, e) {
-                    self.add_diag(Diag::only_diag(inner), &e.span);
+                match expression::init(self.sema, ctx, ty, e) {
+                    Ok(_) | Err(Diagnosis::Poisoned) => {}
+                    Err(inner) => {
+                        self.add_diag(Diag::err((), inner), &e.span);
+                    }
                 }
             }
             Initializer::List(inits) => {
@@ -250,7 +253,7 @@ impl SymbolResolver<'_> {
                 };
                 for (i, node) in inits.iter().enumerate() {
                     if len.is_some_and(|l| l <= i) {
-                        self.add_diag(Diag::only_diag(Diagnosis::ArrayInitTooLong), &inits[i].span);
+                        self.add_diag(Diag::err((), Diagnosis::ArrayInitTooLong), &inits[i].span);
                         break;
                     }
                     self.resolve_initializer(ctx, elem, node);
@@ -263,12 +266,15 @@ impl SymbolResolver<'_> {
         match &node.stmt {
             JumpStatement::Return(Some(e)) => {
                 self.visit_expression(ctx, e);
-                if let Err(inner) = expression::init(self.sema, ctx, return_ty, e) {
-                    self.add_diag(Diag::only_diag(inner), &e.span);
+                match expression::init(self.sema, ctx, return_ty, e) {
+                    Ok(_) | Err(Diagnosis::Poisoned) => {}
+                    Err(inner) => {
+                        self.add_diag(Diag::err((), inner), &e.span);
+                    }
                 }
             }
             JumpStatement::Return(None) if return_ty.id != self.sema.builtins.void => {
-                self.add_diag(Diag::only_diag(Diagnosis::InvalidReturnType), &node.span);
+                self.add_diag(Diag::err((), Diagnosis::InvalidReturnType), &node.span);
             }
             _ => (),
         }
@@ -305,7 +311,7 @@ impl Visitor for SymbolResolver<'_> {
             constrain::external::check_external_specifiers(specifiers).collect(self, span);
         }
         if node.init_declarators.is_empty() && !declares_tag(ctx, specifiers) {
-            self.add_diag(Diag::only_diag(Diagnosis::EmptyDeclaration), span);
+            self.add_diag(Diag::err((), Diagnosis::EmptyDeclaration), span);
         }
         let declared_storage = constrain::declaration::get_storage(specifiers).collect(self, span);
         let qualif = declaration::base_type(self.sema, ctx, specifiers, span);

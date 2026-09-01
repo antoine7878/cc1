@@ -155,11 +155,11 @@ impl Sema {
         let sym_id = self.scopes.lookup_ordinary(name.id)?;
         let sym = sym_id.resolve(&*self);
         if sym.kind != SymbolKind::Typedef {
-            return self.add_diag(Diag::none_diag(Diagnosis::UndeclaredIdentifier(name)), span);
+            return self.add_diag(Diag::err(None, Diagnosis::UndeclaredIdentifier(name)), span);
         }
         let base = sym.ty?;
         if (is_const && base.is_const) || (is_volatile && base.is_volatile) {
-            self.add_diag(Diag::only_diag(Diagnosis::DuplicateTypeQualifiers), span)
+            self.add_diag(Diag::err((), Diagnosis::DuplicateTypeQualifiers), span)
         }
         Some(QualifiedType::new(
             base.id,
@@ -174,7 +174,7 @@ impl Sema {
         if let Some(id) = self.scopes.lookup_tag(name.id, is_definition) {
             let def = id.resolve(&*self);
             if def.kind != kind || (is_definition && def.is_complete) {
-                self.add_diag(Diag::only_diag(Diagnosis::DuplicateDeclaration(def.kind(), name)), span)
+                self.add_diag(Diag::err((), Diagnosis::DuplicateDeclaration(def.kind(), name)), span)
             }
             return id;
         }
@@ -204,7 +204,7 @@ impl Sema {
             return Some(old_id);
         }
         self.add_diag(
-            Diag::some_diag(old_id, Diagnosis::DuplicateDeclaration(sym.kind, sym.name)),
+            Diag::err(Some(old_id), Diagnosis::DuplicateDeclaration(sym.kind, sym.name)),
             span,
         )
     }
@@ -220,7 +220,7 @@ impl Sema {
                 return;
             }
             return self.add_diag(
-                Diag::only_diag(Diagnosis::DuplicateDeclaration(SymbolKind::Label, name)),
+                Diag::err((), Diagnosis::DuplicateDeclaration(SymbolKind::Label, name)),
                 span,
             );
         };

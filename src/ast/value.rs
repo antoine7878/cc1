@@ -188,9 +188,9 @@ impl Value {
     pub fn parse(s: &str, target: &Target) -> Diag<Self> {
         let lower = s.to_lowercase();
         if s.contains('\'') {
-            Diag::res(Self::parse_char(s, target))
+            Diag::ok(Self::parse_char(s, target))
         } else if !lower.starts_with("0x") && (lower.contains('.') || lower.contains('e')) {
-            Diag::res(Self::parse_float(s))
+            Diag::ok(Self::parse_float(s))
         } else {
             Self::parse_integer(s, target)
         }

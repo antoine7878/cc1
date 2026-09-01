@@ -69,7 +69,7 @@ pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
         return;
     }
     if !ty.is_complete(sema) {
-        sema.add_diag(Diag::only_diag(Diagnosis::IncompleteType), span);
+        sema.add_diag(Diag::err((), Diagnosis::IncompleteType), span);
     }
     let to = QualifiedType::new(re.ty.id, false, false);
     re.casts.push(ImplicitCast::new(CastKind::LValueToRValue, to));

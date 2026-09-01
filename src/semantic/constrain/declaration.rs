@@ -11,9 +11,9 @@ pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>>
     });
     let ret = storages.next().cloned();
     if storages.next().is_some() {
-        Diag::with_diag(ret, Diagnosis::MultipleStorageSpecifiers)
+        Diag::err(ret, Diagnosis::MultipleStorageSpecifiers)
     } else {
-        Diag::res(ret)
+        Diag::ok(ret)
     }
 }
 
@@ -21,47 +21,47 @@ pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>>
 /// The declaration of an identifier for a function that has block scope shall have no explicit storage-class specifier other than extern.
 pub fn extern_function_only(scope_type: ScopeKind, storage: Storage) -> Diag<()> {
     if matches!(scope_type, ScopeKind::Block | ScopeKind::Function) && storage != Storage::Extern {
-        Diag::with_diag((), Diagnosis::BlockScopeNotExtern)
+        Diag::err((), Diagnosis::BlockScopeNotExtern)
     } else {
-        Diag::res(())
+        Diag::ok(())
     }
 }
 
 #[rustfmt::skip]
 pub fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
     if types.is_empty() {
-        return Diag::some(ResolvedType::Int);
+        return Diag::ok(Some(ResolvedType::Int));
     }
     let Some(a) = TypeSpecifierCounter::count(types) else {
-        return Diag::with_diag(None, Diagnosis::InvalidTypeSpecifier);
+        return Diag::err(None, Diagnosis::InvalidTypeSpecifier);
     };
     //   s, u, v, c, s, i, l, f, d
     match  a {
-        [0, 0, 1, 0, 0, 0, 0, 0, 0] => Diag::some(ResolvedType::Void),
-        [0, 0, 0, 1, 0, 0, 0, 0, 0] => Diag::some(ResolvedType::Char),
-        [1, 0, 0, 1, 0, 0, 0, 0, 0] => Diag::some(ResolvedType::SignedChar),
-        [0, 1, 0, 1, 0, 0, 0, 0, 0] => Diag::some(ResolvedType::UnsignedChar),
-        [0, 0, 0, 0, 1, 0, 0, 0, 0] => Diag::some(ResolvedType::Short),
-        [0, 0, 0, 0, 1, 1, 0, 0, 0] => Diag::some(ResolvedType::Short),
-        [1, 0, 0, 0, 1, 0, 0, 0, 0] => Diag::some(ResolvedType::Short),
-        [1, 0, 0, 0, 1, 1, 0, 0, 0] => Diag::some(ResolvedType::Short),
-        [0, 1, 0, 0, 1, 0, 0, 0, 0] => Diag::some(ResolvedType::UnsignedShort),
-        [0, 1, 0, 0, 1, 1, 0, 0, 0] => Diag::some(ResolvedType::UnsignedShort),
-        [0, 0, 0, 0, 0, 1, 0, 0, 0] => Diag::some(ResolvedType::Int),
-        [1, 0, 0, 0, 0, 0, 0, 0, 0] => Diag::some(ResolvedType::Int),
-        [1, 0, 0, 0, 0, 1, 0, 0, 0] => Diag::some(ResolvedType::Int),
-        [0, 1, 0, 0, 0, 0, 0, 0, 0] => Diag::some(ResolvedType::UnsignedInt),
-        [0, 1, 0, 0, 0, 1, 0, 0, 0] => Diag::some(ResolvedType::UnsignedInt),
-        [0, 0, 0, 0, 0, 0, 1, 0, 0] => Diag::some(ResolvedType::Long),
-        [0, 0, 0, 0, 0, 1, 1, 0, 0] => Diag::some(ResolvedType::Long),
-        [1, 0, 0, 0, 0, 0, 1, 0, 0] => Diag::some(ResolvedType::Long),
-        [1, 0, 0, 0, 0, 1, 1, 0, 0] => Diag::some(ResolvedType::Long),
-        [0, 1, 0, 0, 0, 0, 1, 0, 0] => Diag::some(ResolvedType::UnsignedLong),
-        [0, 1, 0, 0, 0, 1, 1, 0, 0] => Diag::some(ResolvedType::UnsignedLong),
-        [0, 0, 0, 0, 0, 0, 0, 1, 0] => Diag::some(ResolvedType::Float),
-        [0, 0, 0, 0, 0, 0, 0, 0, 1] => Diag::some(ResolvedType::Double),
-        [0, 0, 0, 0, 0, 0, 1, 0, 1] => Diag::some(ResolvedType::LongDouble),
-        _ => Diag::with_diag(None, Diagnosis::InvalidTypeSpecifier),
+        [0, 0, 1, 0, 0, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::Void)),
+        [0, 0, 0, 1, 0, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::Char)),
+        [1, 0, 0, 1, 0, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::SignedChar)),
+        [0, 1, 0, 1, 0, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::UnsignedChar)),
+        [0, 0, 0, 0, 1, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::Short)),
+        [0, 0, 0, 0, 1, 1, 0, 0, 0] => Diag::ok(Some(ResolvedType::Short)),
+        [1, 0, 0, 0, 1, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::Short)),
+        [1, 0, 0, 0, 1, 1, 0, 0, 0] => Diag::ok(Some(ResolvedType::Short)),
+        [0, 1, 0, 0, 1, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::UnsignedShort)),
+        [0, 1, 0, 0, 1, 1, 0, 0, 0] => Diag::ok(Some(ResolvedType::UnsignedShort)),
+        [0, 0, 0, 0, 0, 1, 0, 0, 0] => Diag::ok(Some(ResolvedType::Int)),
+        [1, 0, 0, 0, 0, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::Int)),
+        [1, 0, 0, 0, 0, 1, 0, 0, 0] => Diag::ok(Some(ResolvedType::Int)),
+        [0, 1, 0, 0, 0, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::UnsignedInt)),
+        [0, 1, 0, 0, 0, 1, 0, 0, 0] => Diag::ok(Some(ResolvedType::UnsignedInt)),
+        [0, 0, 0, 0, 0, 0, 1, 0, 0] => Diag::ok(Some(ResolvedType::Long)),
+        [0, 0, 0, 0, 0, 1, 1, 0, 0] => Diag::ok(Some(ResolvedType::Long)),
+        [1, 0, 0, 0, 0, 0, 1, 0, 0] => Diag::ok(Some(ResolvedType::Long)),
+        [1, 0, 0, 0, 0, 1, 1, 0, 0] => Diag::ok(Some(ResolvedType::Long)),
+        [0, 1, 0, 0, 0, 0, 1, 0, 0] => Diag::ok(Some(ResolvedType::UnsignedLong)),
+        [0, 1, 0, 0, 0, 1, 1, 0, 0] => Diag::ok(Some(ResolvedType::UnsignedLong)),
+        [0, 0, 0, 0, 0, 0, 0, 1, 0] => Diag::ok(Some(ResolvedType::Float)),
+        [0, 0, 0, 0, 0, 0, 0, 0, 1] => Diag::ok(Some(ResolvedType::Double)),
+        [0, 0, 0, 0, 0, 0, 1, 0, 1] => Diag::ok(Some(ResolvedType::LongDouble)),
+        _ => Diag::err(None, Diagnosis::InvalidTypeSpecifier),
     }
 }
 
@@ -69,14 +69,14 @@ pub fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
 /// A bit-field is declared with a type other than int, signed int, or unsigned int (6.5.2.1).
 pub fn check_bit_width(ty: &ResolvedType, value: Option<Value>) -> Diag<Option<i32>> {
     if !matches!(ty, ResolvedType::Int | ResolvedType::UnsignedInt) {
-        return Diag::none_diag(Diagnosis::NonIntBitFieldType);
+        return Diag::err(None, Diagnosis::NonIntBitFieldType);
     };
-    let Some(value) = value else { return Diag::none() };
+    let Some(value) = value else { return Diag::ok(None) };
     let Some(int_value) = value.get_integer_value() else {
-        return Diag::none_diag(Diagnosis::NonIntegerConstantExpression);
+        return Diag::err(None, Diagnosis::NonIntegerConstantExpression);
     };
 
-    Diag::some(int_value as i32)
+    Diag::ok(Some(int_value as i32))
 }
 
 /// 6.5.3 Type qualifiers
@@ -95,9 +95,9 @@ where
     }
     let ret = (const_count >= 1, volatile_count >= 1);
     if const_count > 1 || volatile_count > 1 {
-        return Diag::with_diag(ret, Diagnosis::DuplicateTypeQualifiers);
+        return Diag::err(ret, Diagnosis::DuplicateTypeQualifiers);
     }
-    Diag::res(ret)
+    Diag::ok(ret)
 }
 
 pub fn get_qualifier(specifiers: &[DeclarationSpecifier]) -> Diag<(bool, bool)> {

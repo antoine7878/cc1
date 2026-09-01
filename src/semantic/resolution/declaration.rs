@@ -168,7 +168,7 @@ fn array_length(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option
     let value = ice::eval_constant(sema, ctx, expr)?;
     match value.get_integer_value() {
         Some(len) => Some(len as usize),
-        None => sema.add_diag(Diag::none_diag(Diagnosis::NonIntArraySize), &expr.span),
+        None => sema.add_diag(Diag::err(None, Diagnosis::NonIntArraySize), &expr.span),
     }
 }
 
@@ -189,7 +189,7 @@ pub fn struct_or_union_tag(
     let mut members: Vec<Member> = Vec::new();
     for field in fields {
         if field.struct_declarators.is_empty() {
-            sema.add_diag(Diag::only_diag(Diagnosis::EmptyDeclaration), &field.span);
+            sema.add_diag(Diag::err((), Diagnosis::EmptyDeclaration), &field.span);
         }
         let qual = base_type(sema, ctx, &field.specifiers, &field.span);
         for declarator in &field.struct_declarators {
@@ -206,7 +206,7 @@ pub fn struct_or_union_tag(
                         .any(|&m| matches!(m, Member::Symbol(id) if id.resolve(sema).name.id == name.id ))
                     {
                         sema.add_diag(
-                            Diag::only_diag(Diagnosis::DuplicateDeclaration(SymbolKind::Member, name)),
+                            Diag::err((), Diagnosis::DuplicateDeclaration(SymbolKind::Member, name)),
                             &decl.span,
                         );
                         continue;
@@ -221,7 +221,7 @@ pub fn struct_or_union_tag(
         }
     }
     if members.is_empty() || members.iter().all(|m| matches!(m, Member::Bitfield(_))) {
-        sema.add_diag(Diag::only_diag(Diagnosis::TagWithoutMember(kind.symbol_kind())), span);
+        sema.add_diag(Diag::err((), Diagnosis::TagWithoutMember(kind.symbol_kind())), span);
     }
     sema.tags.complete(tag, members);
     tag
@@ -246,7 +246,7 @@ pub fn enum_tag(sema: &mut Sema, ctx: &Context, id: EnumId) -> Option<TagDefId> 
             value = v;
         }
         if value < i32::MIN as i64 || value > i32::MAX as i64 {
-            sema.add_diag(Diag::only_diag(Diagnosis::VariantBadValue), &variant.span);
+            sema.add_diag(Diag::err((), Diagnosis::VariantBadValue), &variant.span);
             value = 0
         }
         let ty = QualifiedType::new(sema.builtins.int, false, false);
@@ -263,6 +263,6 @@ fn variant_value(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Optio
     let value = ice::eval_constant(sema, ctx, expr)?;
     match value.get_integer_value() {
         Some(v) => Some(v as i64),
-        None => sema.add_diag(Diag::none_diag(Diagnosis::NonIntegerConstantExpression), &expr.span),
+        None => sema.add_diag(Diag::err(None, Diagnosis::NonIntegerConstantExpression), &expr.span),
     }
 }

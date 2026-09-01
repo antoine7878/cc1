@@ -14,8 +14,9 @@ pub fn run(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
     }
     let resolved = match type_of(sema, ctx, node) {
         Ok((ty, kind)) => Some(ResolvedExpression::new(ty, kind)),
+        Err(Diagnosis::Poisoned) => None,
         Err(inner) => {
-            sema.add_diag(Diag::only_diag(inner), &node.span);
+            sema.add_diag(Diag::err((), inner), &node.span);
             None
         }
     };
