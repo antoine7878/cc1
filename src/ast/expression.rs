@@ -53,24 +53,20 @@ impl Display for Type {
 }
 
 impl ExpressionArena {
-    pub fn add(id: ExpressionId, span: Span) -> ExpressionNode {
-        ExpressionNode::new(id, span)
-    }
-
     pub fn identifier(&mut self, name: Name, span: Span) -> ExpressionNode {
-        Self::add(self.alloc(Expression::Identifier(name)), span)
+        ExpressionNode::new(self.alloc(Expression::Identifier(name)), span)
     }
 
     pub fn constant(&mut self, value: ValueNode, span: Span) -> ExpressionNode {
-        Self::add(self.alloc(Expression::Constant(value)), span)
+        ExpressionNode::new(self.alloc(Expression::Constant(value)), span)
     }
 
     pub fn string_literal(&mut self, literal: StringLiteralNode, span: Span) -> ExpressionNode {
-        Self::add(self.alloc(Expression::StringLiteral(literal)), span)
+        ExpressionNode::new(self.alloc(Expression::StringLiteral(literal)), span)
     }
 
     pub fn constant_expression(&mut self, node_id: ExpressionNode, span: Span) -> ExpressionNode {
-        Self::add(self.alloc(Expression::ConstantExpression(node_id)), span)
+        ExpressionNode::new(self.alloc(Expression::ConstantExpression(node_id)), span)
     }
 
     pub fn function_call(
@@ -79,37 +75,37 @@ impl ExpressionArena {
         args: Option<ExpressionNode>,
         span: Span,
     ) -> ExpressionNode {
-        Self::add(self.alloc(Expression::FunctionCall(function, args)), span)
+        ExpressionNode::new(self.alloc(Expression::FunctionCall(function, args)), span)
     }
 
     pub fn sizeof_expr(&mut self, node_node: ExpressionNode, span: Span) -> ExpressionNode {
-        Self::add(self.alloc(Expression::SizeofExpr(node_node)), span)
+        ExpressionNode::new(self.alloc(Expression::SizeofExpr(node_node)), span)
     }
 
     pub fn sizeof_type(&mut self, type_node: Type, span: Span) -> ExpressionNode {
-        Self::add(self.alloc(Expression::SizeofType(type_node)), span)
+        ExpressionNode::new(self.alloc(Expression::SizeofType(type_node)), span)
     }
 
     pub fn cast(&mut self, type_node: Type, node_id: ExpressionNode, span: Span) -> ExpressionNode {
-        Self::add(self.alloc(Expression::Cast(type_node, node_id)), span)
+        ExpressionNode::new(self.alloc(Expression::Cast(type_node, node_id)), span)
     }
 
     pub fn member(&mut self, tag: ExpressionNode, op: MemberOp, identifier: Name, span: Span) -> ExpressionNode {
-        Self::add(self.alloc(Expression::Member(op, tag, identifier)), span)
+        ExpressionNode::new(self.alloc(Expression::Member(op, tag, identifier)), span)
     }
 
     pub fn unary(&mut self, op: UnaryOp, operand: ExpressionNode, span: Span) -> ExpressionNode {
-        Self::add(self.alloc(Expression::Unary(op, operand)), span)
+        ExpressionNode::new(self.alloc(Expression::Unary(op, operand)), span)
     }
 
     pub fn array_access(&mut self, lhs: ExpressionNode, index: ExpressionNode, span: Span) -> ExpressionNode {
-        Self::add(self.alloc(Expression::ArrayAccess(lhs, index)), span)
+        ExpressionNode::new(self.alloc(Expression::ArrayAccess(lhs, index)), span)
     }
 
     pub fn add_list(&mut self, mut lhs: ExpressionNode, rhs: ExpressionNode) -> ExpressionNode {
         let Expression::List(v) = self.get_mut(lhs.id) else {
             let span = Span::new(lhs.span.start, rhs.span.end);
-            return Self::add(self.alloc(Expression::List(vec![lhs, rhs])), span);
+            return ExpressionNode::new(self.alloc(Expression::List(vec![lhs, rhs])), span);
         };
         lhs.span.end = rhs.span.end;
         v.push(rhs);
@@ -117,7 +113,7 @@ impl ExpressionArena {
     }
 
     pub fn binary(&mut self, lhs: ExpressionNode, op: BinaryOp, rhs: ExpressionNode, span: Span) -> ExpressionNode {
-        Self::add(self.alloc(Expression::Binary(op, lhs, rhs)), span)
+        ExpressionNode::new(self.alloc(Expression::Binary(op, lhs, rhs)), span)
     }
 
     pub fn assign(
@@ -127,7 +123,7 @@ impl ExpressionArena {
         rhs: ExpressionNode,
         span: Span,
     ) -> ExpressionNode {
-        Self::add(self.alloc(Expression::Assign(op, lhs, rhs)), span)
+        ExpressionNode::new(self.alloc(Expression::Assign(op, lhs, rhs)), span)
     }
 
     pub fn ternary(
@@ -137,7 +133,7 @@ impl ExpressionArena {
         or: ExpressionNode,
         span: Span,
     ) -> ExpressionNode {
-        Self::add(self.alloc(Expression::Ternary(cond, then, or)), span)
+        ExpressionNode::new(self.alloc(Expression::Ternary(cond, then, or)), span)
     }
 }
 
