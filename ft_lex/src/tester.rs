@@ -1,4 +1,3 @@
-#[allow(unused)]
 #[cfg(test)]
 mod test {
     use std::fs::{File, create_dir_all, remove_file};
@@ -77,7 +76,7 @@ mod test {
     }
 
     fn run_parser(exec_file: &str, test_input: &str, expected_output: &[u8]) {
-        let mut out = cmd_with_out(exec_file, &[test_input]);
+        let out = cmd_with_out(exec_file, &[test_input]);
         println!("-------------------------------------------");
         println!("{}", String::from_utf8_lossy(expected_output));
         println!("===========================================");
@@ -87,7 +86,7 @@ mod test {
     fn test_lex(lexfile: &str, test_input: &str, expected_output: &[u8]) {
         let test_name = &lexfile[7..(lexfile.len() - 2)];
         let exec_file = TmpFile::new("", "");
-        let mut parser_file = TmpFile::new(test_name, ".rs");
+        let parser_file = TmpFile::new(test_name, ".rs");
         ft_lex(lexfile, &parser_file.name);
         compile_parser(&parser_file.name, &exec_file.name);
         run_parser(&exec_file.name, test_input, expected_output);
@@ -190,7 +189,7 @@ mod test {
 
     fn test_lex_multi(lexfiles: &[&str], test_input: &str, expected_output: &[u8]) {
         let exec_file = TmpFile::new("", "");
-        let mut parser_file = TmpFile::new("multi_rust", ".rs");
+        let parser_file = TmpFile::new("multi_rust", ".rs");
         let mut args = vec!["-c", "-o", &parser_file.name];
 
         args.extend(lexfiles);

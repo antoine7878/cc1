@@ -211,7 +211,6 @@ impl LALRParser {
         let _ = self.conflicts(&mut stderr());
     }
 
-    #[allow(unused)]
     fn print_sets(&self) {
         let mut strings = Vec::new();
         for (state_id, state) in self.states.iter().enumerate() {

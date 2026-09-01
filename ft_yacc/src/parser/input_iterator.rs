@@ -251,11 +251,6 @@ impl InputIterator {
         }
     }
 
-    #[allow(unused)]
-    pub fn display<D: Display>(&mut self, msg: D) {
-        eprintln!("{}: {}:{}: {:?}", msg, self.line_no, self.col_no, self.peeks);
-    }
-
     fn count_peek(&mut self, c: Option<char>) {
         self.col_no += 1;
         if c == Some('\n') {

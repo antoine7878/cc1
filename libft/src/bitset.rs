@@ -150,11 +150,10 @@ impl<'a> Iterator for OnesIter<'a> {
     }
 }
 
-#[allow(unused)]
 #[cfg(test)]
 #[rustfmt::skip]
 mod test {
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::{BTreeSet};
 
     use super::*;
 

@@ -7,7 +7,6 @@ pub struct Graph {
     dot: Dot,
 }
 
-#[allow(unused)]
 impl Graph {
     fn new(name: &str) -> Self {
         Self { dot: Dot::new(name) }

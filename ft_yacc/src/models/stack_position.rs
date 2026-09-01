@@ -15,16 +15,4 @@ impl StackPosition {
             line_no,
         }
     }
-
-    #[allow(unused)]
-    pub fn len(&self) -> usize {
-        let mut ret = 2;
-        if let Some(p) = &self.stack_position {
-            ret += p.to_string().len() - 1;
-        }
-        if let Some(t) = &self.utype {
-            ret += 2 + t.len();
-        }
-        ret
-    }
 }

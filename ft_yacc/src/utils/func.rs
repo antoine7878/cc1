@@ -1,33 +1,3 @@
-#![allow(unused)]
-pub fn is_valid_char(c: char) -> bool {
-    c.is_ascii_alphanumeric() || c == '_' || c == '.'
-}
-
-pub fn is_name(s: &str) -> bool {
-    let mut it = s.chars();
-    let Some(first) = it.next() else {
-        return false;
-    };
-    if first.is_ascii_digit() || !is_valid_char(first) {
-        return false;
-    }
-    it.all(is_valid_char)
-}
-
-pub fn pairs<A>(a: A) -> impl Iterator<Item = (A::Item, A::Item)>
-where
-    A: IntoIterator + Clone,
-    A::Item: Clone,
-    A::IntoIter: Clone,
-{
-    let b = a.clone().into_iter();
-    a.into_iter().enumerate().flat_map(move |(i, x)| {
-        b.clone()
-            .enumerate()
-            .filter_map(move |(j, y)| (j > i).then_some((x.clone(), y)))
-    })
-}
-
 pub fn escape_of_char(c: char) -> char {
     match c {
         'a' => '\x07',

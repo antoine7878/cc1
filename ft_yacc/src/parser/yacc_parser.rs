@@ -49,7 +49,6 @@ impl YaccParser {
         Ok(self.yacc)
     }
 
-    #[allow(unused)]
     fn report_unused(&mut self) -> Result<(), YaccError> {
         for (_, t) in self
             .yacc

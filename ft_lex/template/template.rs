@@ -84,7 +84,6 @@ impl<R: Read> YYLex<R> {
 }
 /* CONTEXT */
 
-#[allow(unused)]
 impl<R: Read> YYLex<R> {
     pub fn new<F>(yyin: R, yycontinue: F, ctx: Context) -> Self
     where

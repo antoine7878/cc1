@@ -1,4 +1,4 @@
-#[allow(unused)]
+#[cfg(test)]
 pub fn assert_panics<F: FnOnce() + std::panic::UnwindSafe>(f: F) {
     assert!(std::panic::catch_unwind(f).is_err());
 }

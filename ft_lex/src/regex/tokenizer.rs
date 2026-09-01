@@ -162,7 +162,6 @@ pub struct Tokenizer {
     in_brackets: bool,
 }
 
-#[allow(unused)]
 impl Tokenizer {
     pub fn print(&self) {
         eprintln!("{:?}", self.clone().collect::<Vec<_>>());

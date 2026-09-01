@@ -1,3 +1,3 @@
-void f(void) {
-	x + 1;
+int f(void) {
+	return x + 1;
 }

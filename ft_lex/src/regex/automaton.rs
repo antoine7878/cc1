@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use libft::BitSet;
 use crate::regex::Graph;
+use libft::BitSet;
 
 pub type StateId = usize;
 pub type FragmentId = usize;
@@ -126,8 +126,7 @@ pub trait Automaton {
 
     /// from a set of states create the new sets of state obtained for every move
     fn move_all_bytes(&self, states: &BitSet) -> [BitSet; 256] {
-        let mut result: [BitSet; 256] =
-            std::array::from_fn(|_| BitSet::with_capacity(states.len()));
+        let mut result: [BitSet; 256] = std::array::from_fn(|_| BitSet::with_capacity(states.len()));
         for s in states.ones() {
             for tr in &self.nodes()[s].transitions {
                 for byte in tr.on.ones() {
