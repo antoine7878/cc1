@@ -74,8 +74,8 @@ impl<'a> SymbolResolver<'a> {
     }
 
     fn param_types(&self, sym: SymbolId) -> Option<ParamTypes> {
-        let ty = sym.resolve(&*self.sema).ty?;
-        match ty.id.resolve(&*self.sema) {
+        let ty = sym.resolve(self.sema).ty?;
+        match ty.id.resolve(self.sema) {
             ResolvedType::Function { params, .. } => Some(params.clone()),
             _ => None,
         }
@@ -108,7 +108,7 @@ impl<'a> SymbolResolver<'a> {
         }
         let identifiers: Vec<QualifiedType> = parameters
             .iter()
-            .filter_map(|sym| (*sym).resolve(&*self.sema).ty)
+            .filter_map(|sym| (*sym).resolve(self.sema).ty)
             .collect();
         if identifiers.len() != parameters.len() || declared.is_compatible_with_identifiers(self.sema, &identifiers) {
             return;
@@ -131,7 +131,7 @@ impl<'a> SymbolResolver<'a> {
             return Vec::new();
         }
         if let [only] = params {
-            let is_void = matches!(only.ty.id.resolve(&*self.sema), ResolvedType::Void);
+            let is_void = matches!(only.ty.id.resolve(self.sema), ResolvedType::Void);
             constrain::external::check_void_parameter(is_void).collect(self, &only.span);
         }
         params.iter().filter_map(|param| self.add_parameter(param)).collect()
@@ -163,7 +163,7 @@ impl<'a> SymbolResolver<'a> {
                         .iter()
                         .map(|decl| {
                             self.add_parameter_declarator(ctx, specifiers, &decl.declarator, span)
-                                .map(|sym_id| sym_id.resolve(&*self.sema).name.id)
+                                .map(|sym_id| sym_id.resolve(self.sema).name.id)
                         })
                         .collect::<Vec<_>>()
                 },
@@ -226,10 +226,9 @@ impl SymbolResolver<'_> {
             return;
         }
         if let Expression::Identifier(name) = node.id.resolve(ctx) {
-            let sym = self.sema.scopes.lookup_ordinary(name.id);
-            if sym.is_none() {
-                self.add_diag(Diag::err((), Diagnosis::UndeclaredIdentifier(*name)), &node.span);
-            }
+            let Some(sym) = self.sema.scopes.lookup_ordinary(name.id) else {
+                return self.add_diag(Diag::err((), Diagnosis::UndeclaredIdentifier(*name)), &node.span);
+            };
             self.sema.set_binding(node.id, sym);
         }
         expression::resolve_expression(self.sema, ctx, node);
@@ -247,7 +246,7 @@ impl SymbolResolver<'_> {
                 }
             }
             Initializer::List(inits) => {
-                let (elem, len) = match ty.id.resolve(&*self.sema) {
+                let (elem, len) = match ty.id.resolve(self.sema) {
                     &ResolvedType::Array { elem, len } => (elem, len),
                     _ => (ty, Some(1)),
                 };
@@ -319,7 +318,7 @@ impl Visitor for SymbolResolver<'_> {
             let decl = &init_declarator.declarator;
             let Some((ty, decl)) = declaration::declared_type(self.sema, ctx, qualif, decl) else { continue };
             let Some(name) = decl.ident(ctx) else { continue };
-            let is_function = matches!(ty.id.resolve(&*self.sema), ResolvedType::Function { .. });
+            let is_function = matches!(ty.id.resolve(self.sema), ResolvedType::Function { .. });
             if let Some(declared_storage) = declared_storage
                 && declared_storage != Storage::Typedef
                 && is_function
@@ -386,7 +385,7 @@ impl Visitor for SymbolResolver<'_> {
     fn visit_init_declarator(&mut self, ctx: &Context, node: &InitDeclaratorNode) {
         let decl = &node.declarator;
         let Some(&sym) = self.sema.declarations.get(&decl.id) else { return };
-        let Some(ty) = sym.resolve(&*self.sema).ty else { return };
+        let Some(ty) = sym.resolve(self.sema).ty else { return };
         self.visit_declarator(ctx, &node.declarator);
         if let Some(init) = &node.initializer {
             self.resolve_initializer(ctx, ty, init);

@@ -126,9 +126,9 @@ impl Sema {
         self.facts(id).is_some_and(|f| f.binding_seen)
     }
 
-    pub fn set_binding(&mut self, id: ExpressionId, binding: Option<SymbolId>) {
+    pub fn set_binding(&mut self, id: ExpressionId, binding: SymbolId) {
         let f = self.facts_mut(id);
-        f.binding = binding;
+        f.binding = Some(binding);
         f.binding_seen = true;
     }
 
@@ -153,7 +153,7 @@ impl Sema {
         span: &Span,
     ) -> Option<QualifiedType> {
         let sym_id = self.scopes.lookup_ordinary(name.id)?;
-        let sym = sym_id.resolve(&*self);
+        let sym = sym_id.resolve(self);
         if sym.kind != SymbolKind::Typedef {
             return self.add_diag(Diag::err(None, Diagnosis::UndeclaredIdentifier(name)), span);
         }
@@ -172,7 +172,7 @@ impl Sema {
         let Some(name) = name else { return self.tags.declare(kind, None) };
 
         if let Some(id) = self.scopes.lookup_tag(name.id, is_definition) {
-            let def = id.resolve(&*self);
+            let def = id.resolve(self);
             if def.kind != kind || (is_definition && def.is_complete) {
                 self.add_diag(Diag::err((), Diagnosis::DuplicateDeclaration(def.kind(), name)), span)
             }
@@ -196,7 +196,7 @@ impl Sema {
 
     fn dedup(&mut self, sym: &Symbol, span: &Span) -> Option<SymbolId> {
         let old_id = self.scopes.current(sym.kind, sym.name.id)?;
-        let old_symbol = old_id.resolve(&*self);
+        let old_symbol = old_id.resolve(self);
         if self.scopes.kind() == ScopeKind::File
             && old_symbol.is_compatible(self, sym)
             && !(sym.is_init && old_symbol.is_init)
@@ -211,7 +211,7 @@ impl Sema {
 
     pub fn add_label_symbol(&mut self, name: Name, span: &Span, is_init: bool) {
         if let Some(old) = self.scopes.lookup_label(name.id) {
-            let old_init = old.resolve(&*self).is_init;
+            let old_init = old.resolve(self).is_init;
             if !old_init && is_init {
                 old.resolve_mut(self).is_init = true;
                 return;

@@ -33,7 +33,7 @@ pub enum Expression {
     List(Vec<ExpressionNode>),
     Ternary(ExpressionNode, ExpressionNode, ExpressionNode),
     ArrayAccess(ExpressionNode, ExpressionNode),
-    FunctionCall(ExpressionNode, Option<ExpressionNode>),
+    FunctionCall(ExpressionNode, Vec<ExpressionNode>),
     Member(MemberOp, ExpressionNode, Name),
     SizeofExpr(ExpressionNode),
     SizeofType(Type),
@@ -69,13 +69,26 @@ impl ExpressionArena {
         ExpressionNode::new(self.alloc(Expression::ConstantExpression(node_id)), span)
     }
 
+    fn get_args(&self, args: Option<ExpressionNode>) -> Vec<ExpressionNode> {
+        let Some(args) = args else {
+            return vec![];
+        };
+        let Expression::List(v) = self.get(args.id) else {
+            return vec![args];
+        };
+        v.clone()
+    }
+
     pub fn function_call(
         &mut self,
         function: ExpressionNode,
         args: Option<ExpressionNode>,
         span: Span,
     ) -> ExpressionNode {
-        ExpressionNode::new(self.alloc(Expression::FunctionCall(function, args)), span)
+        ExpressionNode::new(
+            self.alloc(Expression::FunctionCall(function, self.get_args(args))),
+            span,
+        )
     }
 
     pub fn sizeof_expr(&mut self, node_node: ExpressionNode, span: Span) -> ExpressionNode {

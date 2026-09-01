@@ -288,14 +288,18 @@ pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &Exp
         Expression::Constant(value) => v.visit_value(ctx, value),
         Expression::ConstantExpression(expr)
         | Expression::Unary(_, expr)
-        | Expression::SizeofExpr(expr)
-        | Expression::FunctionCall(expr, None) => v.visit_expression(ctx, expr),
+        | Expression::SizeofExpr(expr) => v.visit_expression(ctx, expr),
         Expression::Binary(_, lhs, rhs)
         | Expression::Assign(_, lhs, rhs)
-        | Expression::ArrayAccess(lhs, rhs)
-        | Expression::FunctionCall(lhs, Some(rhs)) => {
+        | Expression::ArrayAccess(lhs, rhs) => {
             v.visit_expression(ctx, lhs);
             v.visit_expression(ctx, rhs);
+        }
+        Expression::FunctionCall(callee, args) => {
+            v.visit_expression(ctx, callee);
+            for arg in args {
+                v.visit_expression(ctx, arg);
+            }
         }
         Expression::Ternary(cond, then, otherwise) => {
             v.visit_expression(ctx, cond);

@@ -1,6 +1,7 @@
 use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, Expression, ExpressionNode, Type, UnaryOp};
 use crate::context::Context;
+use crate::semantic::Diagnosis::Poisoned;
 use crate::semantic::ice::try_fold;
 use crate::semantic::model::cast;
 use crate::semantic::{
@@ -161,18 +162,9 @@ fn check_fn_call(sema: &Sema, ty: ResolvedTypeId) -> Result<QualifiedType, Diagn
     Ok(*ret)
 }
 
-fn check_fn_call_args(sema: &Sema, re: &ResolvedExpression) -> Result<QualifiedType, Diagnosis> {
-    let ResolvedType::List(lst) = re. else {
-        return Err(Diagnosis::InvalidOperand);
-    };
-    // let ResolvedType::Function { ret, .. } = inner.id.resolve(sema) else {
-    //     return Err(Diagnosis::InvalidOperand);
-    // };
-    // if let ResolvedType::Array { .. } = ret.id.resolve(sema) {
-    //     return Err(Diagnosis::InvalidOperand);
-    // }
-    Ok(*ret)
-}
+// fn do_arg(sema: &Sema, e: &ExpressionNode) {
+//
+// }
 
 fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> bool {
     let mut node = node;
@@ -271,17 +263,25 @@ fn type_of(
         }),
         Expression::FunctionCall(fn_node, args) => {
             let ret_type = with_operand(sema, fn_node, RValue, |sema, re| check_fn_call(sema, re.casted_ty().id))?;
-            let Some(args) = args else {
-                return Ok(ret_type);
-            };
-            match args {
-                Expression::List(v) => v,
-                _ => &vec![args],
-            }
+            // let Some(args) = args else {
+            //     return Ok(ret_type);
+            // };
+            // let fn_sym = sema.binding(fn_node.id).ok_or(Diagnosis::Poisoned)?;
+            // let sym = fn_sym.resolve(sema).ty.ok_or(Diagnosis::Poisoned)?;
+            // let ResolvedType::Function { ret, params } = sym.id.resolve(sema) else {
+            //     return Err(Diagnosis::Poisoned);
+            // };
+            // match args.id.resolve(ctx) {
+            //     Expression::List(v) => {
+            //         for e in v {
+            //             do_arg(sema, e)
+            //         }
+            //     }
+            //     _ => do_arg(sema, args),
+            // }
             // let Expression::List(args) = args else {
             //     return Err(Diagnosis)
             // }
-            let ret_type = with_operand(sema, fn_node, RValue, |sema, re| check_fn_call(sema, re.casted_ty().id))?;
             Ok(ret_type)
         }
         _ => Err(Diagnosis::Poisoned),
