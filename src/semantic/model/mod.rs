@@ -8,8 +8,6 @@ pub mod tag_def;
 pub use cast::{CastKind, ImplicitCast};
 pub use function_def::{DeclaredParams, FunctionDef, FunctionDefArena, FunctionDefId, ParamInfo, ParamTypes};
 pub use resolved_expression::{ExpressionKind, ResolvedExpression};
-pub use resolved_type::{
-    Builtins, QualifiedType, ResolvedType, ResolvedTypeArena, ResolvedTypeId, TypeSpecifierCounter,
-};
+pub use resolved_type::{Builtins, QualifiedType, ResolvedType, ResolvedTypeArena, ResolvedTypeId};
 pub use symbol::{Symbol, SymbolArena, SymbolId, SymbolKind};
 pub use tag_def::{Member, TagDef, TagDefArena, TagDefId};

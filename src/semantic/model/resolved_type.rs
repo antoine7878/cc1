@@ -1,5 +1,5 @@
 use crate::arena::ResolveWith;
-use crate::ast::{Tag, TypeSpecifier};
+use crate::ast::Tag;
 use crate::context::Context;
 use crate::define_interner;
 use crate::semantic::{ParamTypes, Sema, TagDefId};
@@ -232,49 +232,6 @@ impl QualifiedType {
             }
             _ => false,
         }
-    }
-}
-
-#[derive(Default)]
-pub struct TypeSpecifierCounter {
-    pub void: u8,
-    pub char: u8,
-    pub short: u8,
-    pub int: u8,
-    pub long: u8,
-    pub float: u8,
-    pub double: u8,
-    pub signed: u8,
-    pub unsigned: u8,
-}
-
-impl TypeSpecifierCounter {
-    pub fn count(types: &[&TypeSpecifier]) -> Option<[u8; 9]> {
-        let mut c = Self::default();
-        for ty in types {
-            let a = match ty {
-                TypeSpecifier::Void => &mut c.void,
-                TypeSpecifier::Char => &mut c.char,
-                TypeSpecifier::Short => &mut c.short,
-                TypeSpecifier::Int => &mut c.int,
-                TypeSpecifier::Long => &mut c.long,
-                TypeSpecifier::Float => &mut c.float,
-                TypeSpecifier::Double => &mut c.double,
-                TypeSpecifier::Signed => &mut c.signed,
-                TypeSpecifier::Unsigned => &mut c.unsigned,
-                TypeSpecifier::Struct(_) => return None,
-                TypeSpecifier::Union(_) => return None,
-                TypeSpecifier::Enum(_) => return None,
-                TypeSpecifier::TypedefName(_) => return None,
-            };
-            if *a > 0 {
-                return None;
-            };
-            *a += 1;
-        }
-        Some([
-            c.signed, c.unsigned, c.void, c.char, c.short, c.int, c.long, c.float, c.double,
-        ])
     }
 }
 

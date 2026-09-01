@@ -1,6 +1,6 @@
 use crate::ast::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier, Value};
 use crate::semantic::diagnosis::{Diag, Diagnosis};
-use crate::semantic::{ResolvedType, ScopeKind, TypeSpecifierCounter};
+use crate::semantic::{ResolvedType, ScopeKind};
 
 /// 6.5.1 Storage-class specifiers
 /// At most, one storage-class specifier may be given in the declaration specifiers in a declaration
@@ -27,41 +27,50 @@ pub fn extern_function_only(scope_type: ScopeKind, storage: Storage) -> Diag<()>
     }
 }
 
+/// 6.5.2 Type specifiers
+/// Each list of type specifiers shall be one of the following sets; the type specifiers
+/// may occur in any order. "int, signed, signed int, or no type specifiers" is the empty set here.
 #[rustfmt::skip]
+const BASIC_TYPES: &[(&[TypeSpecifier], ResolvedType)] = {
+    use ResolvedType as R;
+    use TypeSpecifier::{Char, Double, Float, Int, Long, Short, Signed, Unsigned, Void};
+    &[
+        (&[],                     R::Int),
+        (&[Void],                 R::Void),
+        (&[Char],                 R::Char),
+        (&[Signed, Char],         R::SignedChar),
+        (&[Unsigned, Char],       R::UnsignedChar),
+        (&[Short],                R::Short),
+        (&[Signed, Short],        R::Short),
+        (&[Short, Int],           R::Short),
+        (&[Signed, Short, Int],   R::Short),
+        (&[Unsigned, Short],      R::UnsignedShort),
+        (&[Unsigned, Short, Int], R::UnsignedShort),
+        (&[Int],                  R::Int),
+        (&[Signed],               R::Int),
+        (&[Signed, Int],          R::Int),
+        (&[Unsigned],             R::UnsignedInt),
+        (&[Unsigned, Int],        R::UnsignedInt),
+        (&[Long],                 R::Long),
+        (&[Signed, Long],         R::Long),
+        (&[Long, Int],            R::Long),
+        (&[Signed, Long, Int],    R::Long),
+        (&[Unsigned, Long],       R::UnsignedLong),
+        (&[Unsigned, Long, Int],  R::UnsignedLong),
+        (&[Float],                R::Float),
+        (&[Double],               R::Double),
+        (&[Long, Double],         R::LongDouble),
+    ]
+};
+
+fn same_set(types: &[&TypeSpecifier], set: &[TypeSpecifier]) -> bool {
+    types.len() == set.len() && set.iter().all(|s| types.contains(&s))
+}
+
 pub fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
-    if types.is_empty() {
-        return Diag::ok(Some(ResolvedType::Int));
-    }
-    let Some(a) = TypeSpecifierCounter::count(types) else {
-        return Diag::err(None, Diagnosis::InvalidTypeSpecifier);
-    };
-    //   s, u, v, c, s, i, l, f, d
-    match  a {
-        [0, 0, 1, 0, 0, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::Void)),
-        [0, 0, 0, 1, 0, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::Char)),
-        [1, 0, 0, 1, 0, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::SignedChar)),
-        [0, 1, 0, 1, 0, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::UnsignedChar)),
-        [0, 0, 0, 0, 1, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::Short)),
-        [0, 0, 0, 0, 1, 1, 0, 0, 0] => Diag::ok(Some(ResolvedType::Short)),
-        [1, 0, 0, 0, 1, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::Short)),
-        [1, 0, 0, 0, 1, 1, 0, 0, 0] => Diag::ok(Some(ResolvedType::Short)),
-        [0, 1, 0, 0, 1, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::UnsignedShort)),
-        [0, 1, 0, 0, 1, 1, 0, 0, 0] => Diag::ok(Some(ResolvedType::UnsignedShort)),
-        [0, 0, 0, 0, 0, 1, 0, 0, 0] => Diag::ok(Some(ResolvedType::Int)),
-        [1, 0, 0, 0, 0, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::Int)),
-        [1, 0, 0, 0, 0, 1, 0, 0, 0] => Diag::ok(Some(ResolvedType::Int)),
-        [0, 1, 0, 0, 0, 0, 0, 0, 0] => Diag::ok(Some(ResolvedType::UnsignedInt)),
-        [0, 1, 0, 0, 0, 1, 0, 0, 0] => Diag::ok(Some(ResolvedType::UnsignedInt)),
-        [0, 0, 0, 0, 0, 0, 1, 0, 0] => Diag::ok(Some(ResolvedType::Long)),
-        [0, 0, 0, 0, 0, 1, 1, 0, 0] => Diag::ok(Some(ResolvedType::Long)),
-        [1, 0, 0, 0, 0, 0, 1, 0, 0] => Diag::ok(Some(ResolvedType::Long)),
-        [1, 0, 0, 0, 0, 1, 1, 0, 0] => Diag::ok(Some(ResolvedType::Long)),
-        [0, 1, 0, 0, 0, 0, 1, 0, 0] => Diag::ok(Some(ResolvedType::UnsignedLong)),
-        [0, 1, 0, 0, 0, 1, 1, 0, 0] => Diag::ok(Some(ResolvedType::UnsignedLong)),
-        [0, 0, 0, 0, 0, 0, 0, 1, 0] => Diag::ok(Some(ResolvedType::Float)),
-        [0, 0, 0, 0, 0, 0, 0, 0, 1] => Diag::ok(Some(ResolvedType::Double)),
-        [0, 0, 0, 0, 0, 0, 1, 0, 1] => Diag::ok(Some(ResolvedType::LongDouble)),
-        _ => Diag::err(None, Diagnosis::InvalidTypeSpecifier),
+    match BASIC_TYPES.iter().find(|(set, _)| same_set(types, set)) {
+        Some((_, ty)) => Diag::ok(Some(ty.clone())),
+        None => Diag::err(None, Diagnosis::InvalidTypeSpecifier),
     }
 }
 

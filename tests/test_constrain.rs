@@ -5,9 +5,8 @@ use cc1::ast::{
 };
 use cc1::ast::{DeclaratorNode, Node};
 use cc1::parser::Span;
-use cc1::semantic::TypeSpecifierCounter;
 use cc1::semantic::constrain::declaration::{
-    check_bit_width, check_qualifier, extern_function_only, get_qualifier, get_storage,
+    basic_type, check_bit_width, check_qualifier, extern_function_only, get_qualifier, get_storage,
 };
 use cc1::semantic::constrain::external::{
     check_external_specifiers, check_function_storage, is_tentative_definition, is_valid_old_style,
@@ -26,8 +25,8 @@ fn name(index: usize) -> StringId {
     StringId::from(index)
 }
 
-fn count(types: &[TypeSpecifier]) -> Option<[u8; 9]> {
-    TypeSpecifierCounter::count(&types.iter().collect::<Vec<_>>())
+fn resolve(types: &[TypeSpecifier]) -> Diag<Option<ResolvedType>> {
+    basic_type(&types.iter().collect::<Vec<_>>())
 }
 
 #[test]
@@ -274,55 +273,80 @@ fn an_unresolved_old_style_declaration_falls_back_to_implicit_int() {
 }
 
 #[test]
-fn an_empty_specifier_list_counts_nothing() {
-    assert_eq!(count(&[]), Some([0, 0, 0, 0, 0, 0, 0, 0, 0]));
+fn no_type_specifier_denotes_int() {
+    let diag = resolve(&[]);
+    assert_eq!(diag.res, Some(ResolvedType::Int));
+    assert_eq!(reported(&diag), "None");
 }
 
 #[test]
-fn specifiers_are_counted_in_a_fixed_order() {
-    assert_eq!(count(&[TypeSpecifier::Signed]), Some([1, 0, 0, 0, 0, 0, 0, 0, 0]));
-    assert_eq!(count(&[TypeSpecifier::Unsigned]), Some([0, 1, 0, 0, 0, 0, 0, 0, 0]));
-    assert_eq!(count(&[TypeSpecifier::Void]), Some([0, 0, 1, 0, 0, 0, 0, 0, 0]));
-    assert_eq!(count(&[TypeSpecifier::Char]), Some([0, 0, 0, 1, 0, 0, 0, 0, 0]));
-    assert_eq!(count(&[TypeSpecifier::Short]), Some([0, 0, 0, 0, 1, 0, 0, 0, 0]));
-    assert_eq!(count(&[TypeSpecifier::Int]), Some([0, 0, 0, 0, 0, 1, 0, 0, 0]));
-    assert_eq!(count(&[TypeSpecifier::Long]), Some([0, 0, 0, 0, 0, 0, 1, 0, 0]));
-    assert_eq!(count(&[TypeSpecifier::Float]), Some([0, 0, 0, 0, 0, 0, 0, 1, 0]));
-    assert_eq!(count(&[TypeSpecifier::Double]), Some([0, 0, 0, 0, 0, 0, 0, 0, 1]));
+fn each_single_keyword_names_its_type() {
+    use TypeSpecifier as T;
+    assert_eq!(resolve(&[T::Void]).res, Some(ResolvedType::Void));
+    assert_eq!(resolve(&[T::Char]).res, Some(ResolvedType::Char));
+    assert_eq!(resolve(&[T::Short]).res, Some(ResolvedType::Short));
+    assert_eq!(resolve(&[T::Int]).res, Some(ResolvedType::Int));
+    assert_eq!(resolve(&[T::Long]).res, Some(ResolvedType::Long));
+    assert_eq!(resolve(&[T::Float]).res, Some(ResolvedType::Float));
+    assert_eq!(resolve(&[T::Double]).res, Some(ResolvedType::Double));
+    assert_eq!(resolve(&[T::Signed]).res, Some(ResolvedType::Int));
+    assert_eq!(resolve(&[T::Unsigned]).res, Some(ResolvedType::UnsignedInt));
 }
 
 #[test]
-fn a_combination_is_counted_regardless_of_order() {
-    let expected = Some([0, 1, 0, 0, 0, 1, 1, 0, 0]);
-    assert_eq!(
-        count(&[TypeSpecifier::Unsigned, TypeSpecifier::Long, TypeSpecifier::Int]),
-        expected
-    );
-    assert_eq!(
-        count(&[TypeSpecifier::Int, TypeSpecifier::Unsigned, TypeSpecifier::Long]),
-        expected
-    );
-    assert_eq!(
-        count(&[TypeSpecifier::Long, TypeSpecifier::Int, TypeSpecifier::Unsigned]),
-        expected
-    );
+fn a_combination_resolves_regardless_of_order() {
+    use TypeSpecifier as T;
+    let want = Some(ResolvedType::UnsignedLong);
+    assert_eq!(resolve(&[T::Unsigned, T::Long, T::Int]).res, want);
+    assert_eq!(resolve(&[T::Int, T::Unsigned, T::Long]).res, want);
+    assert_eq!(resolve(&[T::Long, T::Int, T::Unsigned]).res, want);
 }
 
 #[test]
-fn a_repeated_specifier_has_no_count() {
-    assert_eq!(count(&[TypeSpecifier::Long, TypeSpecifier::Long]), None);
-    assert_eq!(count(&[TypeSpecifier::Int, TypeSpecifier::Int]), None);
+fn equivalent_spellings_resolve_to_the_same_type() {
+    use TypeSpecifier as T;
     assert_eq!(
-        count(&[TypeSpecifier::Signed, TypeSpecifier::Int, TypeSpecifier::Signed]),
-        None
+        resolve(&[T::Short]).res,
+        resolve(&[T::Signed, T::Short, T::Int]).res
     );
+    assert_eq!(resolve(&[T::Signed, T::Char]).res, Some(ResolvedType::SignedChar));
+    assert_eq!(resolve(&[T::Long, T::Double]).res, Some(ResolvedType::LongDouble));
 }
 
 #[test]
-fn a_tag_or_typedef_name_stands_alone() {
+fn a_repeated_specifier_is_rejected() {
+    use TypeSpecifier as T;
+    for types in [
+        vec![T::Long, T::Long],
+        vec![T::Int, T::Int],
+        vec![T::Signed, T::Int, T::Signed],
+    ] {
+        let diag = resolve(&types);
+        assert_eq!(diag.res, None);
+        assert_eq!(reported(&diag), "InvalidTypeSpecifier");
+    }
+}
+
+#[test]
+fn an_unlisted_combination_is_rejected() {
+    use TypeSpecifier as T;
+    for types in [
+        vec![T::Signed, T::Unsigned],
+        vec![T::Short, T::Long],
+        vec![T::Long, T::Long, T::Int],
+    ] {
+        assert_eq!(reported(&resolve(&types)), "InvalidTypeSpecifier");
+    }
+}
+
+#[test]
+fn a_tag_or_typedef_name_is_not_a_basic_type() {
     let name = Name::new(StringId::from(0usize), Span::default());
-    assert_eq!(count(&[TypeSpecifier::TypedefName(name)]), None);
-    assert_eq!(count(&[TypeSpecifier::Int, TypeSpecifier::TypedefName(name)]), None);
+    assert_eq!(reported(&resolve(&[TypeSpecifier::TypedefName(name)])), "InvalidTypeSpecifier");
+    assert_eq!(
+        reported(&resolve(&[TypeSpecifier::Int, TypeSpecifier::TypedefName(name)])),
+        "InvalidTypeSpecifier"
+    );
 }
 
 fn init_declarator(initializer: Option<InitializerNode>) -> InitDeclaratorNode {
