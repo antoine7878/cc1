@@ -29,8 +29,8 @@ $(PARSER): $(YACC_FILE) | $(FT_YACC)
 # ----- test --------------------
 
 test: $(NAME)
-	clang -E -std=c89 test/hello.c > test/hello.i
-	./$(NAME) test/hello.i
+	clang -E -std=c89 rscs/hello.c > rscs/hello.i
+	./$(NAME) rscs/hello.i
 
 ctest: $(NAME)
 	cargo nextest run -p cc1
@@ -46,17 +46,20 @@ CFF = -std=iso9899:1990 -pedantic-errors -Wno-deprecated-non-prototype -Wno-stri
 # CFF = -pedantic-errors
 
 c:
-	gcc -c $(CFF) test/hello.c -o /dev/null
+	gcc -c $(CFF) rscs/hello.c -o /dev/null
 
 cc:
-	gcc $(CFF) test/hello.c
+	gcc $(CFF) rscs/hello.c
 	./a.out
 	rm ./a.out
 
 clean:
-	cargo clean
+	cargo clean -p cc1
+	cargo clean -p ft_lex
+	cargo clean -p ft_yacc
+	cargo clean -p libft
 	rm -rf $(LEXER) $(PARSER)
 
 re: clean all
 
-.PHONY: all clean re test ttest lexer parser $(FT_LEX) $(FT_YACC) $(NAME)
+.PHONY: all clean re test ctest ttest lexer parser $(FT_LEX) $(FT_YACC) $(NAME)

@@ -7,9 +7,9 @@ use crate::semantic::{
     declaration, layout,
 };
 
-struct Sink<'a>(&'a mut Vec<DiagnosisNode>);
+struct DiagSink<'a>(&'a mut Vec<DiagnosisNode>);
 
-impl DiagCollector for Sink<'_> {
+impl DiagCollector for DiagSink<'_> {
     fn diagnosis(&mut self) -> &mut Vec<DiagnosisNode> {
         self.0
     }
@@ -21,7 +21,7 @@ pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> O
     }
     SymbolResolver::new(sema).visit_expression(ctx, expr);
     let mut collected = Vec::new();
-    let folded = fold(sema, ctx, expr, &mut Sink(&mut collected));
+    let folded = fold(sema, ctx, expr, &mut DiagSink(&mut collected));
     sema.diagnosis.append(&mut collected);
     let value = match folded {
         Ok(value) => Some(value),
@@ -36,7 +36,7 @@ pub fn try_fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option
     if let Some(cached) = sema.constant_cached(expr.id) {
         return cached;
     }
-    fold(sema, ctx, expr, &mut Sink(&mut Vec::new())).ok()
+    fold(sema, ctx, expr, &mut DiagSink(&mut Vec::new())).ok()
 }
 
 fn cast(sema: &mut Sema, qualif: QualifiedType, val: Value) -> Result<Value, Diagnosis> {
@@ -64,7 +64,7 @@ fn operands(
     ctx: &Context,
     e1: &ExpressionNode,
     e2: &ExpressionNode,
-    sink: &mut Sink,
+    sink: &mut DiagSink,
 ) -> Result<(Value, Value), Diagnosis> {
     let lhs = fold(sema, ctx, e1, sink)?;
     let rhs = fold(sema, ctx, e2, sink)?;
@@ -131,7 +131,7 @@ macro_rules! fold_compare {
     }};
 }
 
-fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut Sink) -> Result<Value, Diagnosis> {
+fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSink) -> Result<Value, Diagnosis> {
     match expr.id.resolve(ctx) {
         Expression::ConstantExpression(expr) => fold(sema, ctx, expr, sink),
         Expression::Identifier(_) => {

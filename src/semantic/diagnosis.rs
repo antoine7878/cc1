@@ -29,6 +29,7 @@ pub enum Diagnosis {
     ConstantOverflow,
     /// 6.3
     ArithmeticOverflow,
+    /// 6.3.2.2
     /// 6.3.7
     ShiftCountOutOfRange,
     /// 6.2.2.1
