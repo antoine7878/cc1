@@ -17,7 +17,7 @@ impl Context {
                     symbol.name.id.resolve(self).clone(),
                     symbol.storage.map_or(String::default(), |s| s.to_string()),
                     symbol.value.map_or("-".to_string(), |v| v.to_string()),
-                    symbol.ty.map_or(String::default(), |ty| ty.describe(&self.sema, self)),
+                    symbol.ty.map_or(String::default(), |ty| ty.describe(&self.sema, self).to_string()),
                 ]
             })
             .collect();

@@ -295,7 +295,7 @@ impl Unit {
                     symbol.kind.to_string(),
                     symbol
                         .ty
-                        .map(|ty| ty.describe(&self.ctx.sema, &self.ctx))
+                        .map(|ty| ty.describe(&self.ctx.sema, &self.ctx).to_string())
                         .unwrap_or_default(),
                 )
             })

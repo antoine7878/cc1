@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::arena::ResolveWith;
 use crate::ast::Tag;
 use crate::context::Context;
@@ -237,76 +239,91 @@ impl QualifiedType {
 }
 
 impl QualifiedType {
-    pub fn describe(&self, sema: &Sema, ctx: &Context) -> String {
-        let mut out = String::new();
-        if self.is_const {
-            out.push_str("const ");
+    pub fn describe<'a>(&'a self, sema: &'a Sema, ctx: &'a Context) -> TypeName<'a> {
+        TypeName(self, sema, ctx)
+    }
+}
+
+pub struct TypeName<'a>(&'a QualifiedType, &'a Sema, &'a Context);
+
+impl fmt::Display for TypeName<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let TypeName(ty, sema, ctx) = *self;
+        if ty.is_const {
+            f.write_str("const ")?;
         }
-        if self.is_volatile {
-            out.push_str("volatile ")
+        if ty.is_volatile {
+            f.write_str("volatile ")?;
         }
-        match self.id.resolve(sema) {
-            ResolvedType::Void => out.push_str("void"),
-            ResolvedType::Char => out.push_str("char"),
-            ResolvedType::SignedChar => out.push_str("signed char"),
-            ResolvedType::UnsignedChar => out.push_str("unsigned char"),
-            ResolvedType::Short => out.push_str("short"),
-            ResolvedType::UnsignedShort => out.push_str("unsigned short"),
-            ResolvedType::Int => out.push_str("int"),
-            ResolvedType::UnsignedInt => out.push_str("unsigned int"),
-            ResolvedType::Long => out.push_str("long"),
-            ResolvedType::UnsignedLong => out.push_str("unsigned long"),
-            ResolvedType::Float => out.push_str("float"),
-            ResolvedType::Double => out.push_str("double"),
-            ResolvedType::LongDouble => out.push_str("long double"),
+        match ty.id.resolve(sema) {
+            ResolvedType::Void => f.write_str("void"),
+            ResolvedType::Char => f.write_str("char"),
+            ResolvedType::SignedChar => f.write_str("signed char"),
+            ResolvedType::UnsignedChar => f.write_str("unsigned char"),
+            ResolvedType::Short => f.write_str("short"),
+            ResolvedType::UnsignedShort => f.write_str("unsigned short"),
+            ResolvedType::Int => f.write_str("int"),
+            ResolvedType::UnsignedInt => f.write_str("unsigned int"),
+            ResolvedType::Long => f.write_str("long"),
+            ResolvedType::UnsignedLong => f.write_str("unsigned long"),
+            ResolvedType::Float => f.write_str("float"),
+            ResolvedType::Double => f.write_str("double"),
+            ResolvedType::LongDouble => f.write_str("long double"),
             ResolvedType::Pointer(inner) => {
                 match inner.id.resolve(sema) {
                     ResolvedType::Function { .. } | ResolvedType::Array { .. } => {
-                        out.push_str(&format!("({})", inner.describe(sema, ctx)))
+                        write!(f, "({})", inner.describe(sema, ctx))?
                     }
-                    _ => out.push_str(&inner.describe(sema, ctx)),
+                    _ => write!(f, "{}", inner.describe(sema, ctx))?,
                 }
-                out.push_str(" *");
+                f.write_str(" *")
             }
             &ResolvedType::Tag(id) => {
                 let def = id.resolve(sema);
                 let name = def.name.map_or("<anonymous>", |n| n.id.resolve(ctx).as_str());
-                out.push_str(&format!("{} {}", def.kind(), name));
+                write!(f, "{} {}", def.kind(), name)?;
                 if !def.is_complete {
-                    out.push_str(" (incomplete)");
+                    f.write_str(" (incomplete)")?;
                 }
+                Ok(())
             }
             ResolvedType::Array { elem, len } => {
+                let mut base = elem;
+                while let ResolvedType::Array { elem: inner, .. } = base.id.resolve(sema) {
+                    base = inner;
+                }
+                write!(f, "{}", base.describe(sema, ctx))?;
                 let (mut elem, mut len) = (elem, len);
-                let mut dimensions = String::new();
                 loop {
-                    dimensions.push('[');
+                    f.write_str("[")?;
                     if let Some(len) = len {
-                        dimensions.push_str(&len.to_string());
+                        write!(f, "{len}")?;
                     }
-                    dimensions.push(']');
+                    f.write_str("]")?;
                     let ResolvedType::Array { elem: inner, len: size } = elem.id.resolve(sema) else { break };
                     (elem, len) = (inner, size);
                 }
-                out.push_str(&elem.describe(sema, ctx));
-                out.push_str(&dimensions);
+                Ok(())
             }
             ResolvedType::Function { ret, params } => {
-                out.push_str(&ret.describe(sema, ctx));
-                out.push('(');
+                write!(f, "{}(", ret.describe(sema, ctx))?;
                 if let ParamTypes::Prototype { params, is_variadic } = params {
-                    let described: Vec<String> = params.iter().map(|param| param.describe(sema, ctx)).collect();
-                    match described.is_empty() {
-                        true => out.push_str("void"),
-                        false => out.push_str(&described.join(", ")),
+                    if params.is_empty() {
+                        f.write_str("void")?;
+                    } else {
+                        for (i, param) in params.iter().enumerate() {
+                            if i > 0 {
+                                f.write_str(", ")?;
+                            }
+                            write!(f, "{}", param.describe(sema, ctx))?;
+                        }
                     }
                     if *is_variadic {
-                        out.push_str(", ...")
+                        f.write_str(", ...")?;
                     }
                 }
-                out.push(')');
+                f.write_str(")")
             }
         }
-        out
     }
 }
