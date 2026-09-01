@@ -97,6 +97,8 @@ fn extract_declarator(
             params,
         } => {
             let list = resolve_params(sema, ctx, params);
+            constrain::declaration::check_return_type(inner_most.id.resolve(sema), inner_most)
+                .collect(sema, &declarator.span);
             let id = sema.types.function(inner_most, list.types());
             let (ty, leaf, inner_list) = extract_declarator(sema, ctx, inner, QualifiedType::new(id, false, false));
             match inner.id.resolve(ctx) {

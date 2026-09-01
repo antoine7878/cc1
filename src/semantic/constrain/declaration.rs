@@ -1,6 +1,6 @@
 use crate::ast::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier, Value};
 use crate::semantic::diagnosis::{Diag, Diagnosis};
-use crate::semantic::{ResolvedType, ScopeKind};
+use crate::semantic::{QualifiedType, ResolvedType, ScopeKind};
 
 /// 6.5.1 Storage-class specifiers
 /// At most, one storage-class specifier may be given in the declaration specifiers in a declaration
@@ -115,4 +115,14 @@ pub fn get_qualifier(specifiers: &[DeclarationSpecifier]) -> Diag<(bool, bool)> 
         _ => None,
     });
     check_qualifier(a)
+}
+
+/// 6.5.4.3 Function declarators (including prototypes)
+/// A function declarator shall not specify a return type that is a function type or an array type.
+pub fn check_return_type(ret: &ResolvedType, ty: QualifiedType) -> Diag<()> {
+    match ret {
+        ResolvedType::Array { .. } => Diag::err((), Diagnosis::FunctionReturningArray(ty)),
+        ResolvedType::Function { .. } => Diag::err((), Diagnosis::FunctionReturningFunction(ty)),
+        _ => Diag::ok(()),
+    }
 }

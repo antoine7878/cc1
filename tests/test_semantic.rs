@@ -308,6 +308,27 @@ accept!(external_function_declaration_with_static, "static int g(void);");
 
 accept!(external_function_declaration_returning_pointer, "static int *g(void);");
 
+// ---- 6.5.4.3 function declarators ----------------------------------------
+
+// A function declarator shall not specify a return type that is a function type or an array type.
+reject!(function_returning_an_array, "int f(void)[3];");
+
+reject!(
+    function_returning_an_array_through_a_typedef,
+    "typedef int A[3]; A f(void);"
+);
+
+reject!(function_returning_a_function, "int f(void)(void);");
+
+accept!(function_returning_a_pointer_to_function, "int (*f(void))(void);");
+
+accept!(function_returning_a_pointer_to_array, "int (*f(void))[3];");
+
+accept!(
+    function_declared_with_an_incomplete_return_type,
+    "struct S; struct S f(void);"
+);
+
 // ---- 6.5.4.3 compatibility of function types -----------------------------
 
 accept!(function_both_parameter_lists_absent, "int f(); int f();");

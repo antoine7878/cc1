@@ -54,6 +54,7 @@ pub enum Diagnosis {
     ReturnIncompatibleTypes(QualifiedType, QualifiedType),
 
     CallingNotFunction(QualifiedType),
+    CallingIncompleteReturn(QualifiedType),
 
     AssignToRValue,
     ConstAssignment,
@@ -67,6 +68,9 @@ pub enum Diagnosis {
     BlockScopeNotExtern,
     InvalidTypeSpecifier,
     DuplicateTypeQualifiers,
+    /// 6.5.4.3
+    FunctionReturningArray(QualifiedType),
+    FunctionReturningFunction(QualifiedType),
     /// 6.5.2.1
     NonIntBitFieldType,
     NonIntArraySize,
@@ -144,6 +148,10 @@ impl DiagnosisNode {
             Diagnosis::ReturnIncompatibleTypes(to, from) => format!("returning ‘{}’ from a function with incompatible result type ‘{}’", from.describe(sema, ctx), to.describe(sema, ctx)),
 
             Diagnosis::CallingNotFunction(ty) => format!("called object type '{}' is not a function or function pointer", ty.describe(sema, ctx)),
+            Diagnosis::CallingIncompleteReturn(ty) => format!("calling a function with incomplete return type ‘{}’", ty.describe(sema, ctx)),
+
+            Diagnosis::FunctionReturningArray(ty) => format!("function cannot return array type ‘{}’", ty.describe(sema, ctx)),
+            Diagnosis::FunctionReturningFunction(ty) => format!("function cannot return function type ‘{}’", ty.describe(sema, ctx)),
 
             Diagnosis::AssignToRValue => "Cannot assign to an r-value".to_string(),
             Diagnosis::ConstAssignment => "Cannot assign to const value".to_string(),

@@ -356,18 +356,18 @@ rejects_shaped!(
 );
 
 // 6.3.2.2 The expression that denotes the called function shall have type pointer to function
-// returning an object type or an incomplete type other than an array type.
+// returning void or returning an object type other than an array type.
 rejects_shaped!(
     calling_an_object_is_rejected,
     "double d; void f(void) { d(); }",
-    Diagnosis::InvalidOperand,
+    Diagnosis::CallingNotFunction(_),
     vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), none()]
 );
 
 rejects_shaped!(
     calling_an_array_is_rejected,
     "int arr[3]; void f(void) { arr(); }",
-    Diagnosis::InvalidOperand,
+    Diagnosis::CallingNotFunction(_),
     vec![
         rv(Ty::Int),
         rv(Ty::Int),
@@ -379,13 +379,89 @@ rejects_shaped!(
 rejects_shaped!(
     calling_the_result_of_a_call_is_rejected,
     "int g(int); void f(void) { g(1)(2); }",
-    Diagnosis::InvalidOperand,
+    Diagnosis::CallingNotFunction(_),
     vec![
         rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
         rv(Ty::Int),
         rv(Ty::Int),
         rv(Ty::Int),
         none(),
+    ]
+);
+
+rejects_shaped!(
+    calling_a_function_with_an_incomplete_return_type_is_rejected,
+    "struct S; struct S g(void); void f(void) { g(); }",
+    Diagnosis::CallingIncompleteReturn(_),
+    vec![
+        rv(Ty::func0(Ty::strukt_incomplete("S")))
+            .then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt_incomplete("S")))),
+        none(),
+    ]
+);
+
+shaped!(
+    calling_a_function_returning_a_completed_type_is_accepted,
+    "struct S { int x; }; struct S g(void); void f(void) { g(); }",
+    vec![
+        rv(Ty::func0(Ty::strukt("S"))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt("S")))),
+        rv(Ty::strukt("S")),
+    ]
+);
+
+shaped!(
+    the_result_of_a_call_is_an_unqualified_rvalue,
+    "const int g(void); void f(void) { g(); }",
+    vec![
+        rv(Ty::func0(Ty::konst(Ty::Int))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::konst(Ty::Int)))),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.2.2 The default argument promotions are performed on trailing arguments.
+shaped!(
+    a_trailing_argument_is_promoted,
+    "int g(int, ...); void f(void) { char c; float x; g(1, c, x); }",
+    vec![
+        rv(Ty::func_variadic(Ty::Int, [Ty::Int]))
+            .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
+        rv(Ty::Int),
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int),
+        lv(Ty::Float)
+            .then(LValueToRValue, Ty::Float)
+            .then(FloatingConversion, Ty::Double),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_trailing_array_argument_becomes_a_pointer,
+    "int g(int, ...); char a[4]; void f(void) { g(1, a); }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::func_variadic(Ty::Int, [Ty::Int]))
+            .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
+        rv(Ty::Int),
+        lv(Ty::arr(Ty::Char, 4)).then(ArrayToPointer, Ty::ptr(Ty::Char)),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.2.2 If the expression that denotes the called function has a type that does not include a
+// prototype, the integral promotions are performed on each argument and arguments that have type
+// float are promoted to double.
+shaped!(
+    an_argument_of_a_call_without_a_prototype_is_promoted,
+    "int g(); void f(void) { char c; g(c); }",
+    vec![
+        rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))),
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int),
+        rv(Ty::Int),
     ]
 );
 

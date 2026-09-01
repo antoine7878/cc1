@@ -175,8 +175,14 @@ fn check_fn_call(
         return Err(Diagnosis::CallingNotFunction(ty));
     };
     let ResolvedType::Function { ret, params } = inner.id.resolve(sema).clone() else {
-        return Err(Diagnosis::CallingNotFunction(*inner));
+        return Err(Diagnosis::CallingNotFunction(ty));
     };
+    // 6.3.2.2 The expression that denotes the called function shall have type pointer to function
+    // returning void or returning an object type other than an array type.
+    let returned = ret.id.resolve(sema);
+    if !matches!(returned, ResolvedType::Void) && !returned.is_complete(sema) {
+        return Err(Diagnosis::CallingIncompleteReturn(ret));
+    }
     let (params, is_variadic) = match params {
         ParamTypes::Prototype { params, is_variadic } => (params, is_variadic),
         ParamTypes::Unspecified => (vec![], true),
@@ -188,20 +194,28 @@ fn check_fn_call(
         return Err(Diagnosis::TooFewArguments(params.len(), args.len()));
     }
     let param_len = params.len();
+    let mut rejected = false;
     for (n, (param_ty, arg_node)) in zip(params, args).enumerate() {
-        let _ = init(sema, ctx, param_ty, arg_node, AssignmentContext::Argument(n + 1))
-            .map_err(|err| sema.add_diag(Diag::err((), err), &arg_node.span));
+        if let Err(err) = init(sema, ctx, param_ty, arg_node, AssignmentContext::Argument(n + 1)) {
+            sema.add_diag(Diag::err((), err), &arg_node.span);
+            rejected = true;
+        }
     }
-    if !is_variadic {
-        return Ok(ret);
-    }
+    // 6.3.2.2 The default argument promotions are performed on trailing arguments.
     for arg_node in args.iter().skip(param_len) {
-        with_operand(sema, arg_node, ExpressionKind::RValue, |sema, re| {
+        let promoted = with_operand(sema, arg_node, ExpressionKind::RValue, |sema, re| {
             cast::default_argument_promotions(sema, re);
             Ok(re.casted_ty())
-        })?;
+        });
+        if let Err(err) = promoted {
+            sema.add_diag(Diag::err((), err), &arg_node.span);
+            rejected = true;
+        }
     }
-    Ok(ret)
+    match rejected {
+        true => Err(Diagnosis::Poisoned),
+        false => Ok(QualifiedType::new(ret.id, false, false)),
+    }
 }
 
 fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> bool {
