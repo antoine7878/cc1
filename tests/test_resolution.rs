@@ -1,48 +1,5 @@
 use cc1::semantic::{Diagnosis, FunctionDefId, SymbolKind};
-use crate::common::{Ty, Unit};
-
-fn folded(src: &str) -> Vec<String> {
-    let unit = Unit::compile(src);
-    assert!(unit.parsed(), "cc1 failed to parse:\n{src}");
-    unit.folded()
-}
-
-fn accepted(src: &str) -> Unit {
-    let unit = Unit::compile(src);
-    assert!(unit.parsed(), "cc1 failed to parse:\n{src}");
-    assert!(
-        unit.diagnosis().is_empty(),
-        "unexpected diagnosis:\n{src}\n{}",
-        unit.render()
-    );
-    unit
-}
-
-macro_rules! folds {
-    ($name:ident, $src:expr, $expected:expr) => {
-        #[test]
-        fn $name() {
-            assert_eq!(folded($src), $expected, "{}", $src);
-        }
-    };
-    (ignore $reason:literal, $name:ident, $src:expr, $expected:expr) => {
-        #[test]
-        #[ignore = $reason]
-        fn $name() {
-            assert_eq!(folded($src), $expected, "{}", $src);
-        }
-    };
-}
-
-macro_rules! tree {
-    ($name:ident, $src:expr, $symbol:expr, $ty:expr) => {
-        #[test]
-        fn $name() {
-            let unit = accepted($src);
-            assert_eq!(unit.symbol_ty_tree($symbol), $ty, "{}", $src);
-        }
-    };
-}
+use crate::common::{Ty, Unit, accepted, folded};
 
 macro_rules! renders {
     ($name:ident, $src:expr, $symbol:expr, $expected:expr) => {

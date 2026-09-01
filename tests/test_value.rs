@@ -16,46 +16,10 @@ impl FoldValue for Diag<Value> {
     }
 }
 
+/// `repr`'s common `Option<Value> -> String` formatting, wrapped for callers (like
+/// `fold!`/`fold_overflow!` below) that hand in either a bare `Value` or a `Diag<Value>`.
 fn repr(value: impl FoldValue) -> String {
-    format!("{:?}", value.fold_value())
-}
-
-/// A constant whose value is representable by one of the types of its list (6.1.3.2).
-macro_rules! literal {
-    ($name:ident, $src:expr, $expected:expr) => {
-        #[test]
-        fn $name() {
-            let Diag {
-                res: value,
-                diagnosis,
-            } = Value::parse($src, &I386);
-            assert_eq!(repr(value), $expected, "Value::parse({:?})", $src);
-            assert!(
-                diagnosis.is_none(),
-                "Value::parse({:?}) reported {diagnosis:?}",
-                $src
-            );
-        }
-    };
-}
-
-/// A constant that fits no type of its list is reported and truncated to the widest one.
-macro_rules! too_large {
-    ($name:ident, $src:expr, $expected:expr) => {
-        #[test]
-        fn $name() {
-            let Diag {
-                res: value,
-                diagnosis,
-            } = Value::parse($src, &I386);
-            assert_eq!(repr(value), $expected, "Value::parse({:?})", $src);
-            assert!(
-                matches!(diagnosis, Some(Diagnosis::IntegerConstantTooLarge)),
-                "Value::parse({:?}) reported {diagnosis:?}",
-                $src
-            );
-        }
-    };
+    crate::common::repr(Some(value.fold_value()))
 }
 
 /// Folding is done for a target: on i386 int and long are both 32 bits.
@@ -103,54 +67,54 @@ macro_rules! fold_overflow {
     };
 }
 
-literal!(literal_zero, "0", "Int(0)");
-literal!(literal_decimal, "42", "Int(42)");
-literal!(literal_int_max, "2147483647", "Int(2147483647)");
-literal!(literal_decimal_above_int_max, "2147483648", "UnsignedLong(2147483648)");
-literal!(literal_octal, "010", "Int(8)");
-literal!(literal_octal_max, "017777777777", "Int(2147483647)");
-literal!(literal_hexadecimal, "0x10", "Int(16)");
-literal!(literal_hexadecimal_upper, "0XFF", "Int(255)");
-literal!(
+constant!(literal_zero, "0", "Int(0)");
+constant!(literal_decimal, "42", "Int(42)");
+constant!(literal_int_max, "2147483647", "Int(2147483647)");
+constant!(literal_decimal_above_int_max, "2147483648", "UnsignedLong(2147483648)");
+constant!(literal_octal, "010", "Int(8)");
+constant!(literal_octal_max, "017777777777", "Int(2147483647)");
+constant!(literal_hexadecimal, "0x10", "Int(16)");
+constant!(literal_hexadecimal_upper, "0XFF", "Int(255)");
+constant!(
     literal_hexadecimal_above_int_max,
     "0x80000000",
     "UnsignedInt(2147483648)"
 );
-literal!(literal_octal_above_int_max, "020000000000", "UnsignedInt(2147483648)");
+constant!(literal_octal_above_int_max, "020000000000", "UnsignedInt(2147483648)");
 too_large!(literal_above_unsigned_int_max, "0x100000000", "UnsignedLong(0)");
 too_large!(literal_above_long_max, "0xffffffffffffffff", "UnsignedLong(4294967295)");
 
-literal!(literal_unsigned_suffix, "1u", "UnsignedInt(1)");
-literal!(literal_unsigned_suffix_upper, "1U", "UnsignedInt(1)");
+constant!(literal_unsigned_suffix, "1u", "UnsignedInt(1)");
+constant!(literal_unsigned_suffix_upper, "1U", "UnsignedInt(1)");
 too_large!(literal_unsigned_suffix_promotes, "4294967296u", "UnsignedLong(0)");
-literal!(literal_long_suffix, "1l", "Long(1)");
-literal!(literal_long_suffix_upper, "1L", "Long(1)");
-literal!(literal_unsigned_long_suffix, "1ul", "UnsignedLong(1)");
-literal!(literal_long_unsigned_suffix, "1lu", "UnsignedLong(1)");
-literal!(literal_unsigned_long_suffix_upper, "1UL", "UnsignedLong(1)");
+constant!(literal_long_suffix, "1l", "Long(1)");
+constant!(literal_long_suffix_upper, "1L", "Long(1)");
+constant!(literal_unsigned_long_suffix, "1ul", "UnsignedLong(1)");
+constant!(literal_long_unsigned_suffix, "1lu", "UnsignedLong(1)");
+constant!(literal_unsigned_long_suffix_upper, "1UL", "UnsignedLong(1)");
 
-literal!(literal_double, "1.5", "Double(1.5)");
-literal!(literal_double_leading_dot, ".5", "Double(0.5)");
-literal!(literal_double_exponent, "1e3", "Double(1000.0)");
-literal!(literal_double_negative_exponent, "1e-3", "Double(0.001)");
-literal!(literal_float_suffix, "1.5f", "Float(1.5)");
-literal!(literal_float_suffix_upper, "1.5F", "Float(1.5)");
-literal!(literal_long_double_suffix, "1.5l", "LongDouble(1.5)");
+constant!(literal_double, "1.5", "Double(1.5)");
+constant!(literal_double_leading_dot, ".5", "Double(0.5)");
+constant!(literal_double_exponent, "1e3", "Double(1000.0)");
+constant!(literal_double_negative_exponent, "1e-3", "Double(0.001)");
+constant!(literal_float_suffix, "1.5f", "Float(1.5)");
+constant!(literal_float_suffix_upper, "1.5F", "Float(1.5)");
+constant!(literal_long_double_suffix, "1.5l", "LongDouble(1.5)");
 
-literal!(literal_char, "'a'", "Int(97)");
-literal!(literal_char_digit, "'0'", "Int(48)");
-literal!(literal_char_escape_newline, "'\\n'", "Int(10)");
-literal!(literal_char_escape_tab, "'\\t'", "Int(9)");
-literal!(literal_char_escape_null, "'\\0'", "Int(0)");
-literal!(literal_char_escape_backslash, "'\\\\'", "Int(92)");
-literal!(literal_char_escape_quote, "'\\''", "Int(39)");
-literal!(literal_char_escape_octal, "'\\101'", "Int(65)");
-literal!(literal_char_escape_hexadecimal, "'\\x41'", "Int(65)");
-literal!(literal_char_is_sign_extended, "'\\377'", "Int(-1)");
-literal!(literal_char_hexadecimal_is_sign_extended, "'\\xff'", "Int(-1)");
-literal!(literal_char_multi_is_packed, "'ab'", "Int(24930)");
-literal!(literal_wide_char, "L'a'", "Int(97)");
-literal!(literal_wide_char_is_not_sign_extended, "L'\\xff'", "Int(255)");
+constant!(literal_char, "'a'", "Int(97)");
+constant!(literal_char_digit, "'0'", "Int(48)");
+constant!(literal_char_escape_newline, "'\\n'", "Int(10)");
+constant!(literal_char_escape_tab, "'\\t'", "Int(9)");
+constant!(literal_char_escape_null, "'\\0'", "Int(0)");
+constant!(literal_char_escape_backslash, "'\\\\'", "Int(92)");
+constant!(literal_char_escape_quote, "'\\''", "Int(39)");
+constant!(literal_char_escape_octal, "'\\101'", "Int(65)");
+constant!(literal_char_escape_hexadecimal, "'\\x41'", "Int(65)");
+constant!(literal_char_is_sign_extended, "'\\377'", "Int(-1)");
+constant!(literal_char_hexadecimal_is_sign_extended, "'\\xff'", "Int(-1)");
+constant!(literal_char_multi_is_packed, "'ab'", "Int(24930)");
+constant!(literal_wide_char, "L'a'", "Int(97)");
+constant!(literal_wide_char_is_not_sign_extended, "L'\\xff'", "Int(255)");
 
 fold!(add_int, add(Value::Int(1), Value::Int(2)), "Int(3)");
 fold_overflow!(add_wraps, add(Value::Int(i32::MAX), Value::Int(1)), "Int(-2147483648)");
