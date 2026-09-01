@@ -5,6 +5,6 @@
 // }
 
 void fn(void) {
-	int a;
-	(a, a) = 2;
+	const int a;
+	a = 2;
 }

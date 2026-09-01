@@ -129,7 +129,7 @@ fn check_assign_lhs(lhs: &ResolvedExpression) -> Result<(), Diagnosis> {
         return Err(Diagnosis::AssignToRValue);
     }
     if lhs.ty.is_const {
-        return Err(Diagnosis::ConstAssignment);
+        return Err(Diagnosis::ConstAssignment(lhs.ty));
     }
     Ok(())
 }
@@ -311,18 +311,20 @@ fn type_of(
         }),
         Expression::Cast(ty_node, operand) => cast(sema, ctx, node, ty_node, operand),
         Expression::Assign(None, e1, e2) => with_assignment(sema, ctx, e1, e2, |sema, lhs, rhs, is_null| {
+            println!("lhs: {:?}", lhs);
+            println!("lhs: {:?}", lhs);
             cast::assignment_conversion(sema, lhs, rhs, is_null, AssignmentContext::Assignment)
         }),
         Expression::List(es) => {
             let mut it = es.iter().rev();
-            let a = it.next().unwrap();
+            let last = it.next().unwrap().clone();
             for node in it {
                 let _ = with_operand(sema, node, RValue, |sema, re| {
                     cast::to_void(sema, re);
-                    Err(Diagnosis::Poisoned)
-                })?;
+                    Ok(re.casted_ty())
+                });
             }
-            type_of(sema, ctx, a)
+            with_operand(sema, &last, RValue, |_, re| Ok(re.casted_ty()))
         }
         Expression::FunctionCall(fn_node, args) => with_operand(sema, fn_node, RValue, |sema, re| {
             check_fn_call(sema, ctx, re.casted_ty(), args)

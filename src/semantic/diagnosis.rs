@@ -57,7 +57,7 @@ pub enum Diagnosis {
     CallingIncompleteReturn(QualifiedType),
 
     AssignToRValue,
-    ConstAssignment,
+    ConstAssignment(QualifiedType),
     // InvalidCast,
     /// 6.4
     NonConstantExpression,
@@ -153,8 +153,8 @@ impl DiagnosisNode {
             Diagnosis::FunctionReturningArray(ty) => format!("function cannot return array type ‘{}’", ty.describe(sema, ctx)),
             Diagnosis::FunctionReturningFunction(ty) => format!("function cannot return function type ‘{}’", ty.describe(sema, ctx)),
 
-            Diagnosis::AssignToRValue => "Cannot assign to an r-value".to_string(),
-            Diagnosis::ConstAssignment => "Cannot assign to const value".to_string(),
+            Diagnosis::AssignToRValue => "expression is not assignable".to_string(),
+            Diagnosis::ConstAssignment(ty) => format!("cannot assign to variable with const-qualified type '{}'", ty.describe(sema, ctx)),
             Diagnosis::Poisoned => "Internal error".to_string(),
             Diagnosis::InvalidOperand => "invalid operand".to_string(),
             Diagnosis::IncompleteType => "Incomplete type".to_string(),

@@ -803,7 +803,7 @@ rejects_shaped!(
 rejects_shaped!(
     assigning_to_a_const_variable_is_rejected,
     "void f(void) { const int x; x = 1; }",
-    Diagnosis::ConstAssignment,
+    Diagnosis::ConstAssignment(_),
     vec![lv(Ty::konst(Ty::Int)), rv(Ty::Int), none()]
 );
 
