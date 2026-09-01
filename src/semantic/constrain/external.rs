@@ -44,10 +44,10 @@ pub fn check_function_storage(storage: Storage) -> Diag<()> {
 /// The identifier declared in a function definition (which is the name of the function) shall have
 /// a function type, as specifed by the declarator portion of the function definition.
 pub fn extract_function_declarator(params: Option<DeclaredParams>) -> Diag<Option<DeclaredParams>> {
-    match params {
-        Some(params) => Diag::ok(Some(params)),
-        None => Diag::err(None, Diagnosis::NotFunctionTypeDeclarator),
-    }
+    params.map_or_else(
+        || Diag::err(None, Diagnosis::NotFunctionTypeDeclarator),
+        |params| Diag::ok(Some(params)),
+    )
 }
 
 /// 6.7.1 Function definitions

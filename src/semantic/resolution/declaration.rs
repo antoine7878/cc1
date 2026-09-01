@@ -166,10 +166,10 @@ fn resolve_parameter(sema: &mut Sema, ctx: &Context, param: &ParameterDeclaratio
 
 fn array_length(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<usize> {
     let value = ice::eval_constant(sema, ctx, expr)?;
-    match value.get_integer_value() {
-        Some(len) => Some(len as usize),
-        None => sema.add_diag(Diag::err(None, Diagnosis::NonIntArraySize), &expr.span),
-    }
+    value.get_integer_value().map_or_else(
+        || sema.add_diag(Diag::err(None, Diagnosis::NonIntArraySize), &expr.span),
+        |len| Some(len as usize),
+    )
 }
 
 pub fn struct_or_union_tag(
@@ -261,8 +261,8 @@ pub fn enum_tag(sema: &mut Sema, ctx: &Context, id: EnumId) -> Option<TagDefId> 
 
 fn variant_value(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<i64> {
     let value = ice::eval_constant(sema, ctx, expr)?;
-    match value.get_integer_value() {
-        Some(v) => Some(v as i64),
-        None => sema.add_diag(Diag::err(None, Diagnosis::NonIntegerConstantExpression), &expr.span),
-    }
+    value.get_integer_value().map_or_else(
+        || sema.add_diag(Diag::err(None, Diagnosis::NonIntegerConstantExpression), &expr.span),
+        |v| Some(v as i64),
+    )
 }
