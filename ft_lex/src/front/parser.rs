@@ -195,6 +195,7 @@ impl LexParser {
             "%no_main" => definition.no_main = true,
             "%no_context" => definition.no_context = false,
             "%no_yacc" => definition.no_yacc = true,
+            "%custom_span_types" => definition.custom_span_types = true,
             line => {
                 let parts = line.split_once([' ', '\t', '\n']);
                 let parts = match parts {

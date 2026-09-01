@@ -13,6 +13,7 @@ pub struct Definition {
     pub tokens: Vec<String>,
     pub no_context: bool,
     pub no_yacc: bool,
+    pub custom_span_types: bool,
 }
 
 impl Default for Definition {
@@ -28,6 +29,7 @@ impl Default for Definition {
             tokens: vec![],
             no_context: true,
             no_yacc: false,
+            custom_span_types: false,
         }
     }
 }

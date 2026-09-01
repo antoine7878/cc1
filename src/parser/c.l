@@ -1,12 +1,12 @@
 %no_main
+%custom_span_types
 
 %{
-use std::fmt;
-
 use crate::ast::{Name, StringLiteralNode, ValueNode, Value};
 use crate::context::Context;
+use crate::parser::span::{Position, Span};
 use crate::parser::{YYToken, YYFeedback};
-use crate::semantic::{Diag, DiagnosisNode, SymbolKind};
+use crate::semantic::{Diag, DiagnosisNode};
 
 %}
 
@@ -157,13 +157,4 @@ fn alloc_string<R: Read>(lex: &mut YYLex<R>) -> StringLiteralNode {
     let span = lex.span;
     let text = lex.yytext.clone();
     lex.ctx.arenas.names.literal(&text, span)
-}
-
-impl fmt::Display for Span {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match (self.start.line == self.end.line && self.start.col == self.end.col) {
-            false => write!(f, "<{}:{}, {}:{}>", self.start.line, self.start.col, self.end.line, self.end.col),
-            true => write!(f, "<{}:{}>", self.start.line, self.start.col),
-        }
-    }
 }

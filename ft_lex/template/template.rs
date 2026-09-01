@@ -17,6 +17,7 @@ enum LexerState {
 
 /* TOKENS */
 
+/* SPAN */
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Default)]
 pub struct Position {
     pub line: usize,
@@ -35,6 +36,7 @@ impl Span {
         Span { start, end }
     }
 }
+/* SPAN */
 
 #[derive(Debug)]
 struct AcceptData {
