@@ -334,7 +334,7 @@ rejects_shaped!(
 rejects_shaped!(
     an_argument_incompatible_with_its_parameter_is_rejected,
     "int g(char *); void f(void) { g(1); }",
-    Diagnosis::InitIncompatibleTypes(_, _),
+    Diagnosis::ArgumentIncompatibleTypes(1, _, _),
     vec![
         rv(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))
             .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))),
@@ -346,7 +346,7 @@ rejects_shaped!(
 rejects_shaped!(
     a_void_argument_is_rejected,
     "void v(void); int g(int); void f(void) { g(v()); }",
-    Diagnosis::InitIncompatibleTypes(_, _),
+    Diagnosis::ArgumentIncompatibleTypes(1, _, _),
     vec![
         rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
         rv(Ty::func0(Ty::Void)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Void))),
@@ -687,7 +687,7 @@ rejects_shaped!(
 rejects_shaped!(
     assigning_away_const_through_a_pointer_is_rejected,
     "const char *p; char *q; void f(void) { q = p; }",
-    Diagnosis::AssignmentDiscardedQualifiers(_),
+    Diagnosis::AssignmentDiscardedQualifiers(_, _),
     vec![
         lv(Ty::ptr(Ty::Char)),
         lv(Ty::ptr(Ty::konst(Ty::Char))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Char))),
@@ -770,7 +770,7 @@ rejects_shaped!(
 rejects_shaped!(
     initializing_away_const_through_a_pointer_is_rejected,
     "void f(void) { const char *p; char *q = p; }",
-    Diagnosis::InitDiscardedQualifiers(_),
+    Diagnosis::InitDiscardedQualifiers(_, _),
     vec![lv(Ty::ptr(Ty::konst(Ty::Char))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Char))),]
 );
 

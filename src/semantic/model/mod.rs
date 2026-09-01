@@ -5,7 +5,7 @@ pub mod resolved_type;
 pub mod symbol;
 pub mod tag_def;
 
-pub use cast::{CastKind, ImplicitCast};
+pub use cast::{AssignmentContext, CastKind, ImplicitCast};
 pub use function_def::{DeclaredParams, FunctionDef, FunctionDefArena, FunctionDefId, ParamInfo, ParamTypes};
 pub use resolved_expression::{ExpressionKind, ResolvedExpression};
 pub use resolved_type::{Builtins, QualifiedType, ResolvedType, ResolvedTypeArena, ResolvedTypeId};

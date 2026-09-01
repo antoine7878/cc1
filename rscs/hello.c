@@ -1,7 +1,8 @@
-int max(int a, int b) {
-	return a > b ? a : b;
+void max(int *a, int *b) {
+	return;
 }
 
-int main(void) {
-	return max(3u, 2., 3., 4.);
+int *fn(void) {
+	max(1, 0);
+	return 0;
 }

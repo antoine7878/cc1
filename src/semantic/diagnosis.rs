@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 use std::io::{self, Write, stderr};
 
-use crate::ast::{Name, Qualifier};
+use crate::ast::Name;
 use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::{QualifiedType, SymbolKind};
@@ -43,10 +43,15 @@ pub enum Diagnosis {
     CastOfNonScalar,
     IncompatibleCast,
     /// 6.3.16
-    AssignmentDiscardedQualifiers(Qualifier),
-    InitDiscardedQualifiers(Qualifier),
+    AssignmentDiscardedQualifiers(QualifiedType, QualifiedType),
+    InitDiscardedQualifiers(QualifiedType, QualifiedType),
+    ArgumentDiscardedQualifiers(usize, QualifiedType, QualifiedType),
+    ReturnDiscardedQualifiers(QualifiedType, QualifiedType),
+
     AssignmentIncompatibleTypes(QualifiedType, QualifiedType),
     InitIncompatibleTypes(QualifiedType, QualifiedType),
+    ArgumentIncompatibleTypes(usize, QualifiedType, QualifiedType),
+    ReturnIncompatibleTypes(QualifiedType, QualifiedType),
 
     AssignToRValue,
     ConstAssignment,
@@ -124,10 +129,17 @@ impl DiagnosisNode {
             Diagnosis::Temprorary =>  "TEMPRORARY DIAG".to_string(),
             Diagnosis::ArrayInitTooLong => "excess elements in array initializer".to_string(),
             Diagnosis::InvalidReturnType => "Invalid return type".to_string(),
-            Diagnosis::AssignmentDiscardedQualifiers(q) => format!("Assignment discard ‘{}’ qualifier", q),
-            Diagnosis::InitDiscardedQualifiers(q) => format!("Assignment discard ‘{}’ qualifier", q),
+
+            Diagnosis::AssignmentDiscardedQualifiers(to, from) => format!("assigning to ‘{}’ from ‘{}’ discards qualifiers", to.describe(&ctx.sema, ctx), from.describe(&ctx.sema, ctx)),
+            Diagnosis::InitDiscardedQualifiers(to, from) => format!("initializing ‘{}’ with an expression of type ‘{}’ discards qualifiers", to.describe(&ctx.sema, ctx), from.describe(&ctx.sema, ctx)),
+            Diagnosis::ArgumentDiscardedQualifiers(n, to, from) => format!("passing ‘{}’ to parameter {n} of type ‘{}’ discards qualifiers", from.describe(&ctx.sema, ctx), to.describe(&ctx.sema, ctx)),
+            Diagnosis::ReturnDiscardedQualifiers(to, from) => format!("returning ‘{}’ from a function with result type ‘{}’ discards qualifiers", from.describe(&ctx.sema, ctx), to.describe(&ctx.sema, ctx)),
+
             Diagnosis::AssignmentIncompatibleTypes(to, from) => format!("assignment to ‘{}’ from incompatible pointer type ‘{}’", to.describe(&ctx.sema, ctx), from.describe(&ctx.sema, ctx)),
-            Diagnosis::InitIncompatibleTypes(to, from) => format!("initialization of ‘{}’ from incompatible pointer type ‘{}’ ", to.describe(&ctx.sema, ctx), from.describe(&ctx.sema, ctx)),
+            Diagnosis::InitIncompatibleTypes(to, from) => format!("initialization of ‘{}’ from incompatible pointer type ‘{}’", to.describe(&ctx.sema, ctx), from.describe(&ctx.sema, ctx)),
+            Diagnosis::ArgumentIncompatibleTypes(n, to, from) => format!("passing ‘{}’ to parameter {n} of incompatible type ‘{}’", from.describe(&ctx.sema, ctx), to.describe(&ctx.sema, ctx)),
+            Diagnosis::ReturnIncompatibleTypes(to, from) => format!("returning ‘{}’ from a function with incompatible result type ‘{}’", from.describe(&ctx.sema, ctx), to.describe(&ctx.sema, ctx)),
+
             Diagnosis::AssignToRValue => "Cannot assign to an r-value".to_string(),
             Diagnosis::ConstAssignment => "Cannot assign to const value".to_string(),
             Diagnosis::Poisoned => "Internal error".to_string(),

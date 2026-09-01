@@ -6,8 +6,8 @@ use crate::context::Context;
 use crate::semantic::ice::try_fold;
 use crate::semantic::model::cast;
 use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, ExpressionKind, ParamTypes, QualifiedType, ResolvedExpression, ResolvedType,
-    ResolvedTypeId, Sema, declaration,
+    AssignmentContext, Diag, DiagCollector, Diagnosis, ExpressionKind, ParamTypes, QualifiedType, ResolvedExpression,
+    ResolvedType, ResolvedTypeId, Sema, declaration,
 };
 
 pub fn resolve_expression(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
@@ -62,15 +62,12 @@ pub fn init(
     ctx: &Context,
     l_ty: QualifiedType,
     init_node: &ExpressionNode,
+    assign_ctx: AssignmentContext,
 ) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
     let is_null = is_null_pointer_constant(sema, ctx, init_node);
     with_operand(sema, init_node, ExpressionKind::RValue, |sema, re| {
         let mut l_re = ResolvedExpression::new(l_ty, ExpressionKind::LValue);
-        cast::assignment_conversion(sema, &mut l_re, re, is_null).map_err(|e| match e {
-            Diagnosis::AssignmentIncompatibleTypes(a, b) => Diagnosis::InitIncompatibleTypes(a, b),
-            Diagnosis::AssignmentDiscardedQualifiers(a) => Diagnosis::InitDiscardedQualifiers(a),
-            _ => e,
-        })
+        cast::assignment_conversion(sema, &mut l_re, re, is_null, assign_ctx)
     })
 }
 
@@ -173,8 +170,8 @@ fn check_fn_call(
     if args.len() < params.len() {
         return Err(Diagnosis::TooFewArguments(params.len(), args.len()));
     }
-    for (param_ty, arg_node) in zip(params, args) {
-        init(sema, ctx, param_ty, arg_node)?;
+    for (n, (param_ty, arg_node)) in zip(params, args).enumerate() {
+        init(sema, ctx, param_ty, arg_node, AssignmentContext::Argument(n + 1))?;
     }
     Ok(ret)
 }
@@ -272,7 +269,7 @@ fn type_of(
         }),
         Expression::Cast(ty_node, operand) => cast(sema, ctx, node, ty_node, operand),
         Expression::Assign(None, e1, e2) => with_assignment(sema, ctx, e1, e2, |sema, lhs, rhs, is_null| {
-            cast::assignment_conversion(sema, lhs, rhs, is_null)
+            cast::assignment_conversion(sema, lhs, rhs, is_null, AssignmentContext::Assignment)
         }),
         Expression::List(es) => type_of(sema, ctx, es.last().unwrap()),
         Expression::FunctionCall(fn_node, args) => with_operand(sema, fn_node, RValue, |sema, re| {

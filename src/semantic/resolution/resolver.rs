@@ -11,8 +11,9 @@ use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::resolution::expression;
 use crate::semantic::{
-    DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo, ParamTypes, QualifiedType,
-    ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, declaration, ice,
+    AssignmentContext, DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo,
+    ParamTypes, QualifiedType, ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, declaration,
+    ice,
 };
 
 #[derive(Debug)]
@@ -239,7 +240,7 @@ impl SymbolResolver<'_> {
         match &node.init {
             Initializer::Single(e) => {
                 self.visit_expression(ctx, e);
-                if let Err(inner) = expression::init(self.sema, ctx, ty, e) {
+                if let Err(inner) = expression::init(self.sema, ctx, ty, e, AssignmentContext::Initialization) {
                     self.add_diag(Diag::err((), inner), &e.span);
                 }
             }
@@ -263,7 +264,7 @@ impl SymbolResolver<'_> {
         match &node.stmt {
             JumpStatement::Return(Some(e)) => {
                 self.visit_expression(ctx, e);
-                if let Err(inner) = expression::init(self.sema, ctx, return_ty, e) {
+                if let Err(inner) = expression::init(self.sema, ctx, return_ty, e, AssignmentContext::Return) {
                     self.add_diag(Diag::err((), inner), &e.span);
                 }
             }
