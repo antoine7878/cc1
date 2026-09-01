@@ -1,25 +1,5 @@
 use crate::common::{Unit, strip_ansi};
 
-fn messages(src: &str) -> Vec<String> {
-    Unit::compile(src).messages()
-}
-
-macro_rules! reports {
-    ($name:ident, $src:expr, $expected:expr) => {
-        #[test]
-        fn $name() {
-            assert_eq!(messages($src), $expected, "{:?}", $src);
-        }
-    };
-    (ignore $reason:literal, $name:ident, $src:expr, $expected:expr) => {
-        #[test]
-        #[ignore = $reason]
-        fn $name() {
-            assert_eq!(messages($src), $expected, "{:?}", $src);
-        }
-    };
-}
-
 reports!(
     report_undeclared_identifier,
     "void f(void) { x = 1; }",

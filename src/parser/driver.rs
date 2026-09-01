@@ -8,10 +8,14 @@ use crate::semantic::{Diagnosis, DiagnosisNode, ExpectedTokens};
 
 pub fn parse_source(ctx: Context) -> Context {
     let file = File::open(&ctx.file_name).unwrap();
-    let lexer = YYLex::new(BufReader::new(file), || None, ctx);
+    parse_reader(ctx, BufReader::new(file)).0
+}
+
+pub fn parse_reader<R: Read>(ctx: Context, reader: R) -> (Context, i32) {
+    let lexer = YYLex::new(reader, || None, ctx);
     let mut yacc = Yacc::new(lexer);
-    yacc.yyparse();
-    yacc.lexer.ctx
+    let status = yacc.yyparse();
+    (yacc.lexer.ctx, status)
 }
 
 pub fn yyerror<D: Display, R: Read>(_msg: D, yacc: &mut Yacc<R>) {

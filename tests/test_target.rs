@@ -1,6 +1,7 @@
 use cc1::ast::Value;
 use cc1::semantic::{QualifiedType, ResolvedType, ResolvedTypeId, TagDefId};
 use cc1::target::{I386, Target, X86_64};
+use crate::common::repr;
 
 fn layout(target: &Target, ty: &ResolvedType) -> Option<(u32, u32)> {
     target.scalar(ty).map(|l| (l.size, l.align))
@@ -19,13 +20,6 @@ fn array_of_int() -> ResolvedType {
 
 fn tag() -> ResolvedType {
     ResolvedType::Tag(TagDefId::from(0usize))
-}
-
-fn repr(value: Option<Value>) -> String {
-    match value {
-        Some(value) => format!("{value:?}"),
-        None => "None".to_string(),
-    }
 }
 
 #[test]

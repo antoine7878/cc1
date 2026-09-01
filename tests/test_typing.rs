@@ -1,60 +1,6 @@
 use cc1::semantic::CastKind::*;
 use cc1::semantic::Diagnosis;
-use crate::common::{Shape, Ty, Unit, ints, lv, none, rv};
-
-macro_rules! shaped {
-    ($name:ident, $src:expr, $shapes:expr $(,)?) => {
-        #[test]
-        fn $name() {
-            let unit = Unit::compile($src);
-            assert!(unit.parsed(), "cc1 failed to parse:\n{}", $src);
-            assert!(
-                unit.diagnosis().is_empty(),
-                "unexpected diagnosis:\n{}\n{}",
-                $src,
-                unit.render()
-            );
-            let expected: Vec<Shape> = $shapes;
-            assert_eq!(unit.shapes(), expected, "{}", $src);
-        }
-    };
-    (ignore $reason:literal, $name:ident, $src:expr, $shapes:expr $(,)?) => {
-        #[test]
-        #[ignore = $reason]
-        fn $name() {
-            let unit = Unit::compile($src);
-            assert!(unit.parsed(), "cc1 failed to parse:\n{}", $src);
-            let expected: Vec<Shape> = $shapes;
-            assert_eq!(unit.shapes(), expected, "{}", $src);
-        }
-    };
-}
-
-macro_rules! rejects_shaped {
-    (@build $name:ident, $src:expr, $u:ident, $diagnosis:pat, $guard:expr, $shapes:expr) => {
-        #[test]
-        fn $name() {
-            let $u = Unit::compile($src);
-            assert!($u.parsed(), "cc1 failed to parse:\n{}", $src);
-            let got: Vec<_> = $u.diagnosis().iter().map(|diag| diag.inner.clone()).collect();
-            assert!(
-                matches!(got.as_slice(), [$diagnosis] if $guard),
-                "expected one {}, got {got:?}:\n{}\n{}",
-                stringify!($diagnosis),
-                $src,
-                $u.render()
-            );
-            let expected: Vec<Shape> = $shapes;
-            assert_eq!($u.shapes(), expected, "{}", $src);
-        }
-    };
-    ($name:ident, $src:expr, |$u:ident| $diagnosis:pat if $guard:expr, $shapes:expr $(,)?) => {
-        rejects_shaped!(@build $name, $src, $u, $diagnosis, $guard, $shapes);
-    };
-    ($name:ident, $src:expr, $diagnosis:pat, $shapes:expr $(,)?) => {
-        rejects_shaped!(@build $name, $src, _u, $diagnosis, true, $shapes);
-    };
-}
+use crate::common::{Ty, Unit, ints, lv, none, rv};
 
 // ---- 6.3.1 primary expressions -------------------------------------------
 
