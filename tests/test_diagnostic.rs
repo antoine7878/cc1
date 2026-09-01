@@ -277,6 +277,30 @@ reports!(
     ["<test>:1:24: error: Use of undeclared identifier 'x'"]
 );
 
+reports!(
+    report_too_many_arguments,
+    "int g(int); void f(void) { g(1, 2); }",
+    ["<test>:1:28: error: too many arguments to function call, expected 1, have 2"]
+);
+
+reports!(
+    report_too_few_arguments,
+    "int g(int, int); void f(void) { g(1); }",
+    ["<test>:1:33: error: too few arguments to function call, expected 2, have 1"]
+);
+
+reports!(
+    report_a_prototype_with_no_parameters_takes_no_argument,
+    "int g(void); void f(void) { g(1); }",
+    ["<test>:1:29: error: too many arguments to function call, expected 0, have 1"]
+);
+
+reports!(
+    poisoned_argument_does_not_leak_internal_error,
+    "int g(int); void f(void) { g(x); }",
+    ["<test>:1:30: error: Use of undeclared identifier 'x'"]
+);
+
 use std::env::temp_dir;
 use std::fs;
 use std::process;

@@ -139,6 +139,267 @@ shaped!(
     ]
 );
 
+// ---- 6.3.2.2 function calls ----------------------------------------------
+
+shaped!(
+    a_call_has_the_return_type_of_the_function_and_is_an_rvalue,
+    "int g(void); void f(void) { g(); }",
+    vec![
+        rv(Ty::func0(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Int))),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_call_to_a_function_returning_void_has_type_void,
+    "void g(void); void f(void) { g(); }",
+    vec![
+        rv(Ty::func0(Ty::Void)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Void))),
+        rv(Ty::Void),
+    ]
+);
+
+shaped!(
+    a_call_returning_a_structure_is_an_rvalue,
+    "struct S { int a; }; struct S g(void); void f(void) { g(); }",
+    vec![
+        rv(Ty::func0(Ty::strukt("S"))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt("S")))),
+        rv(Ty::strukt("S")),
+    ]
+);
+
+shaped!(
+    an_argument_is_converted_as_if_by_assignment_to_its_parameter,
+    "int g(char, float); void f(void) { g(1, 2); }",
+    vec![
+        rv(Ty::func(Ty::Int, [Ty::Char, Ty::Float]))
+            .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Char, Ty::Float]))),
+        rv(Ty::Int).then(IntegerConversion, Ty::Char),
+        rv(Ty::Int).then(IntegerToFloating, Ty::Float),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    an_array_argument_becomes_a_pointer_to_its_first_element,
+    "int g(char *); char a[4]; void f(void) { g(a); }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))
+            .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))),
+        lv(Ty::arr(Ty::Char, 4)).then(ArrayToPointer, Ty::ptr(Ty::Char)),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_structure_argument_is_passed_by_value,
+    "struct S { int a; }; int g(struct S); struct S s; void f(void) { g(s); }",
+    vec![
+        rv(Ty::func(Ty::Int, [Ty::strukt("S")])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::strukt("S")]))),
+        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    an_argument_pointer_may_gain_the_qualifiers_of_its_parameter,
+    "int g(const char *); char *p; void f(void) { g(p); }",
+    vec![
+        rv(Ty::func(Ty::Int, [Ty::ptr(Ty::konst(Ty::Char))])).then(
+            FunctionToPointer,
+            Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::konst(Ty::Char))])),
+        ),
+        lv(Ty::ptr(Ty::Char))
+            .then(LValueToRValue, Ty::ptr(Ty::Char))
+            .then(PointerConversion, Ty::ptr(Ty::konst(Ty::Char))),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_null_pointer_constant_may_be_passed_to_a_pointer_parameter,
+    "int g(char *); void f(void) { g(0); }",
+    vec![
+        rv(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))
+            .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))),
+        rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Char)),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.5.4.3 each parameter declared with qualified type is taken as having the unqualified
+// version of its declared type
+shaped!(
+    a_parameter_qualifier_is_not_part_of_the_function_type,
+    "int g(const int); void f(void) { g(1); }",
+    vec![
+        rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
+        rv(Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    an_enumeration_parameter_takes_an_integer_argument,
+    "enum E { A }; int g(enum E); void f(void) { g(A); }",
+    vec![
+        rv(Ty::func(Ty::Int, [Ty::enom("E")])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::enom("E")]))),
+        rv(Ty::Int).then(IntegerConversion, Ty::enom("E")),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_variadic_prototype_accepts_arguments_past_its_named_parameters,
+    "int g(int, ...); void f(void) { g(1, 2, 3); }",
+    vec![
+        rv(Ty::func_variadic(Ty::Int, [Ty::Int]))
+            .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
+        rv(Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_call_may_go_through_a_pointer_to_function,
+    "int (*p)(int); void f(void) { p(1); }",
+    vec![
+        lv(Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))).then(LValueToRValue, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
+        rv(Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_call_may_go_through_a_typedefed_function_pointer,
+    "typedef int F(int); F *q; void f(void) { q(1); }",
+    vec![
+        lv(Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))).then(LValueToRValue, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
+        rv(Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.2.2 The number of arguments shall agree with the number of parameters.
+rejects_shaped!(
+    calling_a_prototype_with_too_many_arguments_is_rejected,
+    "int g(int); void f(void) { g(1, 2); }",
+    Diagnosis::TooManyArguments(1, 2),
+    vec![
+        rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
+        rv(Ty::Int),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+rejects_shaped!(
+    calling_a_prototype_with_too_few_arguments_is_rejected,
+    "int g(int, int); void f(void) { g(1); }",
+    Diagnosis::TooFewArguments(2, 1),
+    vec![
+        rv(Ty::func(Ty::Int, [Ty::Int, Ty::Int]))
+            .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int, Ty::Int])),),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+rejects_shaped!(
+    a_prototype_with_no_parameters_takes_no_argument,
+    "int g(void); void f(void) { g(1); }",
+    Diagnosis::TooManyArguments(0, 1),
+    vec![
+        rv(Ty::func0(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Int))),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+rejects_shaped!(
+    a_variadic_call_still_needs_an_argument_for_each_named_parameter,
+    "int g(int, ...); void f(void) { g(); }",
+    Diagnosis::TooFewArguments(1, 0),
+    vec![
+        rv(Ty::func_variadic(Ty::Int, [Ty::Int]))
+            .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
+        none(),
+    ]
+);
+
+rejects_shaped!(
+    an_argument_incompatible_with_its_parameter_is_rejected,
+    "int g(char *); void f(void) { g(1); }",
+    Diagnosis::InitIncompatibleTypes(_, _),
+    vec![
+        rv(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))
+            .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+rejects_shaped!(
+    a_void_argument_is_rejected,
+    "void v(void); int g(int); void f(void) { g(v()); }",
+    Diagnosis::InitIncompatibleTypes(_, _),
+    vec![
+        rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
+        rv(Ty::func0(Ty::Void)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Void))),
+        rv(Ty::Void),
+        none(),
+    ]
+);
+
+// 6.3.2.2 The expression that denotes the called function shall have type pointer to function
+// returning an object type or an incomplete type other than an array type.
+rejects_shaped!(
+    calling_an_object_is_rejected,
+    "double d; void f(void) { d(); }",
+    Diagnosis::InvalidOperand,
+    vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), none()]
+);
+
+rejects_shaped!(
+    calling_an_array_is_rejected,
+    "int arr[3]; void f(void) { arr(); }",
+    Diagnosis::InvalidOperand,
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)),
+        none(),
+    ]
+);
+
+rejects_shaped!(
+    calling_the_result_of_a_call_is_rejected,
+    "int g(int); void f(void) { g(1)(2); }",
+    Diagnosis::InvalidOperand,
+    vec![
+        rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
+        rv(Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+rejects_shaped!(
+    an_argument_without_a_type_does_not_cascade,
+    "int g(int); void f(void) { g(x); }",
+    Diagnosis::UndeclaredIdentifier(_),
+    vec![
+        rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
+        none(),
+        none(),
+    ]
+);
+
 // ---- 6.3.3.3 unary arithmetic operators ----------------------------------
 
 rejects_shaped!(

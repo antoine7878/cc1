@@ -126,9 +126,9 @@ impl Sema {
         self.facts(id).is_some_and(|f| f.binding_seen)
     }
 
-    pub fn set_binding(&mut self, id: ExpressionId, binding: SymbolId) {
+    pub fn set_binding(&mut self, id: ExpressionId, binding: Option<SymbolId>) {
         let f = self.facts_mut(id);
-        f.binding = Some(binding);
+        f.binding = binding;
         f.binding_seen = true;
     }
 

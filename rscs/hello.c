@@ -1,3 +1,7 @@
-int f(void) {
-	return x + 1;
+int max(int a, int b) {
+	return a > b ? a : b;
+}
+
+int main(void) {
+	return max(3u, 2., 3., 4.);
 }

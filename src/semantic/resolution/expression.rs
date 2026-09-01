@@ -1,11 +1,13 @@
+use std::iter::zip;
+
 use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, Expression, ExpressionNode, Type, UnaryOp};
 use crate::context::Context;
 use crate::semantic::ice::try_fold;
 use crate::semantic::model::cast;
 use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId,
-    Sema, declaration,
+    Diag, DiagCollector, Diagnosis, ExpressionKind, ParamTypes, QualifiedType, ResolvedExpression, ResolvedType,
+    ResolvedTypeId, Sema, declaration,
 };
 
 pub fn resolve_expression(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
@@ -14,7 +16,6 @@ pub fn resolve_expression(sema: &mut Sema, ctx: &Context, node: &ExpressionNode)
     }
     let resolved = match type_of(sema, ctx, node) {
         Ok((ty, kind)) => Some(ResolvedExpression::new(ty, kind)),
-        Err(Diagnosis::Poisoned) => None,
         Err(inner) => {
             sema.add_diag(Diag::err((), inner), &node.span);
             None
@@ -148,22 +149,35 @@ fn check_is_arithmetic(sema: &Sema, ty: ResolvedTypeId) -> Result<(), Diagnosis>
     }
 }
 
-fn check_fn_call(sema: &Sema, ty: ResolvedTypeId) -> Result<QualifiedType, Diagnosis> {
+fn check_fn_call(
+    sema: &mut Sema,
+    ctx: &Context,
+    ty: ResolvedTypeId,
+    args: &[ExpressionNode],
+) -> Result<QualifiedType, Diagnosis> {
     let ResolvedType::Pointer(inner) = ty.resolve(sema) else {
         return Err(Diagnosis::InvalidOperand);
     };
-    let ResolvedType::Function { ret, .. } = inner.id.resolve(sema) else {
+    let ResolvedType::Function { ret, params } = inner.id.resolve(sema).clone() else {
         return Err(Diagnosis::InvalidOperand);
     };
     if let ResolvedType::Array { .. } = ret.id.resolve(sema) {
         return Err(Diagnosis::InvalidOperand);
     }
-    Ok(*ret)
+    let ParamTypes::Prototype { params, is_variadic } = params else {
+        return Err(Diagnosis::Temprorary);
+    };
+    if !is_variadic && args.len() > params.len() {
+        return Err(Diagnosis::TooManyArguments(params.len(), args.len()));
+    }
+    if args.len() < params.len() {
+        return Err(Diagnosis::TooFewArguments(params.len(), args.len()));
+    }
+    for (param_ty, arg_node) in zip(params, args) {
+        init(sema, ctx, param_ty, arg_node)?;
+    }
+    Ok(ret)
 }
-
-// fn do_arg(sema: &Sema, e: &ExpressionNode) {
-//
-// }
 
 fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> bool {
     let mut node = node;
@@ -261,16 +275,9 @@ fn type_of(
             cast::assignment_conversion(sema, lhs, rhs, is_null)
         }),
         Expression::List(es) => type_of(sema, ctx, es.last().unwrap()),
-        // Expression::FunctionCall(fn_node, args) => {
-        //     let ret_type = with_operand(sema, fn_node, RValue, |sema, re| check_fn_call(sema, re.casted_ty().id))?;
-        //     let binding = sema.binding(fn_node.id).ok_poisoned()?;
-        //     for arg in args {
-        //         with_assignment(sema, ctx, arg, arg, |sema, lhs, rhs, is_null| {
-        //             cast::assignment_conversion(sema, lhs, rhs, is_null)
-        //         })?;
-        //     }
-        //     Ok(ret_type)
-        // }
+        Expression::FunctionCall(fn_node, args) => with_operand(sema, fn_node, RValue, |sema, re| {
+            check_fn_call(sema, ctx, re.casted_ty().id, args)
+        }),
         _ => Err(Diagnosis::Poisoned),
     }
 }

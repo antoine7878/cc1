@@ -226,9 +226,10 @@ impl SymbolResolver<'_> {
             return;
         }
         if let Expression::Identifier(name) = node.id.resolve(ctx) {
-            let Some(sym) = self.sema.scopes.lookup_ordinary(name.id) else {
-                return self.add_diag(Diag::err((), Diagnosis::UndeclaredIdentifier(*name)), &node.span);
-            };
+            let sym = self.sema.scopes.lookup_ordinary(name.id); // Option<SymbolId>
+            if sym.is_none() {
+                self.add_diag(Diag::err((), Diagnosis::UndeclaredIdentifier(*name)), &node.span);
+            }
             self.sema.set_binding(node.id, sym);
         }
         expression::resolve_expression(self.sema, ctx, node);
@@ -238,11 +239,8 @@ impl SymbolResolver<'_> {
         match &node.init {
             Initializer::Single(e) => {
                 self.visit_expression(ctx, e);
-                match expression::init(self.sema, ctx, ty, e) {
-                    Ok(_) | Err(Diagnosis::Poisoned) => {}
-                    Err(inner) => {
-                        self.add_diag(Diag::err((), inner), &e.span);
-                    }
+                if let Err(inner) = expression::init(self.sema, ctx, ty, e) {
+                    self.add_diag(Diag::err((), inner), &e.span);
                 }
             }
             Initializer::List(inits) => {
@@ -265,11 +263,8 @@ impl SymbolResolver<'_> {
         match &node.stmt {
             JumpStatement::Return(Some(e)) => {
                 self.visit_expression(ctx, e);
-                match expression::init(self.sema, ctx, return_ty, e) {
-                    Ok(_) | Err(Diagnosis::Poisoned) => {}
-                    Err(inner) => {
-                        self.add_diag(Diag::err((), inner), &e.span);
-                    }
+                if let Err(inner) = expression::init(self.sema, ctx, return_ty, e) {
+                    self.add_diag(Diag::err((), inner), &e.span);
                 }
             }
             JumpStatement::Return(None) if return_ty.id != self.sema.builtins.void => {

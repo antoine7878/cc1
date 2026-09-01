@@ -9,6 +9,7 @@ use crate::utils::{RED, RESET, YELLOW};
 
 #[derive(Clone, Debug)]
 pub enum Diagnosis {
+    Temprorary,
     InvalidReturnType,
     ArrayInitTooLong,
     Poisoned,
@@ -30,6 +31,8 @@ pub enum Diagnosis {
     /// 6.3
     ArithmeticOverflow,
     /// 6.3.2.2
+    TooManyArguments(usize, usize),
+    TooFewArguments(usize, usize),
     /// 6.3.7
     ShiftCountOutOfRange,
     /// 6.2.2.1
@@ -116,6 +119,9 @@ impl DiagnosisNode {
     #[rustfmt::skip]
     fn message(&self, ctx: &Context) -> String {
         match &self.inner {
+            Diagnosis::TooManyArguments(expected, have) => format!("too many arguments to function call, expected {expected}, have {have}"),
+            Diagnosis::TooFewArguments(expected, have) => format!("too few arguments to function call, expected {expected}, have {have}"),
+            Diagnosis::Temprorary =>  "TEMPRORARY DIAG".to_string(),
             Diagnosis::ArrayInitTooLong => "excess elements in array initializer".to_string(),
             Diagnosis::InvalidReturnType => "Invalid return type".to_string(),
             Diagnosis::AssignmentDiscardedQualifiers(q) => format!("Assignment discard ‘{}’ qualifier", q),
@@ -197,8 +203,9 @@ pub trait DiagCollector {
     fn diagnosis(&mut self) -> &mut Vec<DiagnosisNode>;
 
     fn add_diag<T>(&mut self, diag: Diag<T>, span: &Span) -> T {
-        if let Some(diagnosis) = diag.diagnosis {
-            self.diagnosis().push(DiagnosisNode::new(diagnosis, *span));
+        match diag.diagnosis {
+            Some(Diagnosis::Poisoned) | None => (),
+            Some(diagnosis) => self.diagnosis().push(DiagnosisNode::new(diagnosis, *span)),
         }
         diag.res
     }
