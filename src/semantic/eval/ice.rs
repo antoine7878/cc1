@@ -204,7 +204,7 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSi
                 fold(sema, ctx, e2, sink)
             }
         }
-        Expression::SizeofExpr(_) => Err(Diagnosis::InvalidSizeof),
+        Expression::SizeofExpr(_) => Err(Diagnosis::Poisoned),
         Expression::SizeofType(ty_node) => {
             let qualif = declaration::base_type(sema, ctx, &ty_node.specifiers, &expr.span)
                 .ok_or(Diagnosis::NonConstantExpression)?;
@@ -214,8 +214,8 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSi
                 Some(layout) => sema
                     .target
                     .cast(&sema.target.size_t, Value::UnsignedLong(layout.size.into()))
-                    .ok_or(Diagnosis::InvalidSizeof),
-                None => Err(Diagnosis::InvalidSizeof),
+                    .ok_or(Diagnosis::Poisoned),
+                None => Err(Diagnosis::Poisoned),
             }
         }
         Expression::Cast(ty_node, operand) => {

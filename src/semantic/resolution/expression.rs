@@ -158,7 +158,7 @@ fn fn_call(sema: &mut Sema, ctx: &Context, fn_node: &ExpressionNode, args: &[Exp
     }
 }
 
-fn member(sema: &mut Sema, op: MemberOp, e: &ExpressionNode, name: &Name) -> R {
+fn member(sema: &mut Sema, node: &ExpressionNode, op: MemberOp, e: &ExpressionNode, name: &Name) -> R {
     let mut ops = Operands::take(sema, [e])?;
     let (sema, [re]) = ops.parts();
     let (&tag_qty, kind) = match op {
@@ -184,6 +184,7 @@ fn member(sema: &mut Sema, op: MemberOp, e: &ExpressionNode, name: &Name) -> R {
     let Some(sym_id) = tag.get_member(sema, name) else {
         return Err(Diagnosis::AccessNotMember(tag_qty, name.id));
     };
+    sema.set_binding(node.id, Some(sym_id));
     let sym = sym_id.resolve(sema);
     let ty = sym.ty.ok_or(Diagnosis::Poisoned)?;
     let qty = QualifiedType::new(
@@ -210,12 +211,12 @@ fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &e.span);
     check_assign_lhs(re)?;
-    if let ResolvedType::Pointer(inner) = re.casted_ty().id.resolve(sema)
+    if let ResolvedType::Pointer(inner) = re.ty.id.resolve(sema)
         && !inner.is_complete(sema)
     {
         return Err(Diagnosis::IncompleteType(*inner));
     }
-    if !re.casted_ty().is_scalar(sema) {
+    if !re.ty.is_scalar(sema) {
         return Err(Diagnosis::BadPostIncDec(op, re.ty));
     }
     Ok((re.casted_ty(), RValue))
@@ -301,11 +302,14 @@ fn size_of_ty(sema: &mut Sema, ctx: &Context, ty: &Type, span: &Span) -> R {
 }
 
 fn size_t(sema: &Sema, ty: QualifiedType) -> R {
+    if ty.id == sema.builtins.void {
+        return Err(Diagnosis::SizeofVoid);
+    }
     if ty.is_function(sema) {
-        return Err(Diagnosis::IncompleteType(ty));
+        return Err(Diagnosis::SizeofFunction);
     }
     if !ty.is_complete(sema) {
-        return Err(Diagnosis::IncompleteType(ty));
+        return Err(Diagnosis::SizeofIncomplete(ty));
     }
     let qty = QualifiedType::new(sema.builtins.size_t, false, false);
     Ok((qty, RValue))
@@ -467,7 +471,7 @@ fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> R {
         Expression::ConstantExpression(e) => constant(sema, e),
         Expression::ArraySubscripting(e1, e2) => array_subscript(sema, ctx, e1, e2),
         Expression::FunctionCall(fn_node, args) => fn_call(sema, ctx, fn_node, args),
-        Expression::Member(op, e, name) => member(sema, *op, e, name),
+        Expression::Member(op, e, name) => member(sema, node, *op, e, name),
         Expression::Unary(op, e) => unary_op(sema, *op, e),
         Expression::SizeofExpr(e) => size_of_e(sema, e),
         Expression::SizeofType(ty) => size_of_ty(sema, ctx, ty, &node.span),

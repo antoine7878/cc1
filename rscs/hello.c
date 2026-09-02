@@ -1,3 +1,5 @@
-struct S;
+int a[3];
 
-enum E { A = sizeof(struct S) };
+void f(void) {
+	++a;
+}

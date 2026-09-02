@@ -585,9 +585,32 @@ shaped!(
 // 6.3.3.2 The operand shall be an lvalue that designates an object that is not a bit-field
 // and is not declared with the register storage-class specifier.
 reject!(
-    ignore "6.3.3.2: a bit-field member is reached through a Member node, which carries no binding for & to test",
     the_address_of_a_bit_field_is_rejected,
     "struct S { int x : 3; } s; void f(void) { &s.x; }"
+);
+
+reject!(
+    the_address_of_a_bit_field_reached_through_a_pointer_is_rejected,
+    "struct S { int x : 3; } *p; void f(void) { &p->x; }"
+);
+
+reject!(
+    the_address_of_a_bit_field_of_a_union_is_rejected,
+    "union U { int x : 3; } u; void f(void) { &u.x; }"
+);
+
+// 6.3.3.2 only a bit-field member is excluded: a plain member of the same structure keeps an
+// address, and so does the structure itself.
+shaped!(
+    the_address_of_a_plain_member_beside_a_bit_field_is_accepted,
+    "struct S { int x : 3; int y; } s; void f(void) { &s.y; }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::strukt("S")),
+        lv(Ty::Int),
+        rv(Ty::ptr(Ty::Int)),
+    ]
 );
 
 reject!(

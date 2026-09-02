@@ -17,22 +17,12 @@ macro_rules! accept {
             $crate::common::run_accept(stringify!($name), $src);
         });
     };
-    (ignore $reason:literal, $name:ident, $src:expr) => {
-        test_case!(ignore $reason, $name, {
-            $crate::common::run_accept(stringify!($name), $src);
-        });
-    };
 }
 
 #[macro_export]
 macro_rules! reject {
     ($name:ident, $src:expr) => {
         test_case!($name, {
-            $crate::common::run_reject(stringify!($name), $src);
-        });
-    };
-    (ignore $reason:literal, $name:ident, $src:expr) => {
-        test_case!(ignore $reason, $name, {
             $crate::common::run_reject(stringify!($name), $src);
         });
     };
