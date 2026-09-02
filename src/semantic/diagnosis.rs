@@ -169,8 +169,8 @@ impl DiagnosisNode {
 
             Diagnosis::CallingNotFunction(ty) => format!("called object type '{}' is not a function or function pointer", ty.describe(sema, ctx)),
             Diagnosis::CallingIncompleteReturn(ty) => format!("calling a function with incomplete return type ‘{}’", ty.describe(sema, ctx)),
-            Diagnosis::BadPostIncDec(UnaryOp::PostInc, ty) => format!("cannot increment value of type '{}'", ty.describe(sema, ctx)),
-            Diagnosis::BadPostIncDec(UnaryOp::PostDec, ty) => format!("cannot decrement value of type '{}'", ty.describe(sema, ctx)),
+            Diagnosis::BadPostIncDec(UnaryOp::PostInc | UnaryOp::PreInc, ty) => format!("cannot increment value of type '{}'", ty.describe(sema, ctx)),
+            Diagnosis::BadPostIncDec(UnaryOp::PostDec | UnaryOp::PreDec, ty) => format!("cannot decrement value of type '{}'", ty.describe(sema, ctx)),
             Diagnosis::BadPostIncDec(_, _) => unreachable!(),
 
             Diagnosis::InvalidUnary(ty) => format!("invalid argument type '{}' to unary expression", ty.describe(sema, ctx)),

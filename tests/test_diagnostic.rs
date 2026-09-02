@@ -272,6 +272,18 @@ reports!(
 );
 
 reports!(
+    report_pre_increment_of_a_structure,
+    "struct S { int x; } s; void f(void) { ++s; }",
+    ["<test>:1:39: error: cannot increment value of type 'struct S'"]
+);
+
+reports!(
+    report_pre_decrement_of_a_structure,
+    "struct S { int x; } s; void f(void) { --s; }",
+    ["<test>:1:39: error: cannot decrement value of type 'struct S'"]
+);
+
+reports!(
     report_constant_overflow,
     "enum E { A = (-2147483647 - 1) / -1 };",
     ["<test>:1:14: error: overflow in constant expression"]

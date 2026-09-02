@@ -1225,6 +1225,76 @@ rejects_shaped!(
     vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), none()]
 );
 
+// ---- 6.3.3.1 prefix increment and decrement operators ---------------------
+
+shaped!(
+    pre_increment_yields_the_value_of_its_operand,
+    "int i; void f(void) { ++i; }",
+    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]
+);
+
+shaped!(
+    pre_decrement_yields_the_value_of_its_operand,
+    "double d; void f(void) { --d; }",
+    vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Double)]
+);
+
+shaped!(
+    pre_increment_of_a_pointer_is_a_pointer,
+    "int *p; void f(void) { ++p; }",
+    vec![
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::ptr(Ty::Int)),
+    ]
+);
+
+shaped!(
+    pre_increment_keeps_the_type_of_its_operand,
+    "char c; void f(void) { ++c; }",
+    vec![lv(Ty::Char).then(LValueToRValue, Ty::Char), rv(Ty::Char)]
+);
+
+// 6.3.3.1 The expression ++E is equivalent to (E += 1): its result is not an lvalue.
+rejects_shaped!(
+    assigning_to_a_pre_increment_is_rejected,
+    "int i; void f(void) { ++i = 1; }",
+    Diagnosis::AssignToRValue,
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+// 6.3.3.1 The operand shall have qualified or unqualified scalar type and shall be a
+// modifiable lvalue.
+reject!(pre_increment_of_an_rvalue_is_rejected, "void f(void) { ++1; }");
+
+reject!(
+    pre_increment_of_a_const_object_is_rejected,
+    "void f(void) { const int i; ++i; }"
+);
+
+reject!(pre_increment_of_an_array_is_rejected, "int a[3]; void f(void) { ++a; }");
+
+rejects_shaped!(
+    pre_increment_of_a_structure_is_rejected,
+    "struct S { int x; } s; void f(void) { ++s; }",
+    Diagnosis::BadPostIncDec(_, _),
+    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
+);
+
+rejects_shaped!(
+    pre_decrement_of_a_pointer_to_an_incomplete_type_is_rejected,
+    "struct S; struct S *p; void f(void) { --p; }",
+    Diagnosis::IncompleteType(_),
+    vec![
+        lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
+        none(),
+    ]
+);
+
 // ---- 6.3.5 multiplicative operators ---------------------------------------
 
 shaped!(multiplying_two_constants_stays_int, "void f(void) { 2 * 3; }", ints(3));

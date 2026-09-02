@@ -1,7 +1,7 @@
 use std::iter::zip;
 
 use crate::arena::ResolveWith;
-use crate::ast::{BinaryOp, Expression, ExpressionNode, MemberOp, Name, Tag, Type, UnaryOp};
+use crate::ast::{BinaryOp, Expression, ExpressionNode, MemberOp, Name, Tag, Type, UnaryOp, Value};
 use crate::context::Context;
 use crate::semantic::ExpressionKind::{LValue, RValue};
 use crate::semantic::ice::try_fold;
@@ -199,8 +199,6 @@ fn fn_call(
         let ResolvedType::Function { ret, params } = inner.id.resolve(sema).clone() else {
             return Err(Diagnosis::CallingNotFunction(ty));
         };
-        // 6.3.2.2 The expression that denotes the called function shall have type pointer to function
-        // returning void or returning an object type other than an array type.
         let returned = ret.id.resolve(sema);
         if !matches!(returned, ResolvedType::Void) && !returned.is_complete(sema) {
             return Err(Diagnosis::CallingIncompleteReturn(ret));
@@ -223,7 +221,6 @@ fn fn_call(
                 rejected = true;
             }
         }
-        // 6.3.2.2 The default argument promotions are performed on trailing arguments.
         for arg_node in args.iter().skip(param_len) {
             let promoted = with_operand(sema, arg_node, |sema, re| {
                 cast::default_argument_promotions(sema, re);
@@ -294,13 +291,13 @@ fn member(
 
 fn unary_op(sema: &mut Sema, op: UnaryOp, e: &ExpressionNode) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
     match op {
-        UnaryOp::PostInc | UnaryOp::PostDec => postfix(sema, e, op),
+        UnaryOp::PostInc | UnaryOp::PostDec | UnaryOp::PreInc | UnaryOp::PreDec => inc_dec(sema, e, op),
         UnaryOp::Minus => minus(sema, e),
         _ => todo!(),
     }
 }
 
-fn postfix(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
+fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
     with_operand(sema, e, |sema, re| {
         check_assign_lhs(re)?;
         if let ResolvedType::Pointer(inner) = re.ty.id.resolve(sema)
@@ -340,90 +337,94 @@ fn binary_op(
     }
 }
 
-// 6.3.5 Multiplicative operators
-// Each of the operands shall have arithmetic type. The operands of the % operator shall have integral type.
-// The usual arithmetic conversions are performed on the operands.
-// The result of the / operator is the quotient from the division of the first operand by the
-// second; the result of the % operator is the remainder. In both operations. if the value of the
-// second operand is zero. the behavior is undefined.
+fn multiplicative_types(
+    sema: &mut Sema,
+    lhs: &mut ResolvedExpression,
+    rhs: &mut ResolvedExpression,
+    op: BinaryOp,
+) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
+    let l = lhs.casted_ty().id.resolve(sema);
+    let r = rhs.casted_ty().id.resolve(sema);
+    if !match op {
+        BinaryOp::Mul | BinaryOp::Div => l.is_arithmetic(sema) && r.is_arithmetic(sema),
+        BinaryOp::Mod => l.is_integral(sema) && r.is_integral(sema),
+        _ => unreachable!(),
+    } {
+        return Err(Diagnosis::InvalidBianryOperand(lhs.casted_ty(), rhs.casted_ty()));
+    }
+    cast::usual_arithmetic(sema, lhs, rhs)
+}
+
 fn multiplicative(
     sema: &mut Sema,
     e1: &ExpressionNode,
     e2: &ExpressionNode,
     op: BinaryOp,
 ) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
-    with_operands(sema, e1, e2, |sema, lhs, rhs| {
-        let l = lhs.casted_ty().id.resolve(sema);
-        let r = rhs.casted_ty().id.resolve(sema);
-        if !match op {
-            BinaryOp::Mul | BinaryOp::Div => l.is_arithmetic(sema) && r.is_arithmetic(sema),
-            BinaryOp::Mod => l.is_integral(sema) && r.is_integral(sema),
-            _ => unreachable!(),
-        } {
-            return Err(Diagnosis::InvalidBianryOperand(lhs.casted_ty(), rhs.casted_ty()));
-        }
-        cast::usual_arithmetic(sema, lhs, rhs)
-    })
+    with_operands(sema, e1, e2, |sema, lhs, rhs| multiplicative_types(sema, lhs, rhs, op))
 }
 
-// 6.3.6 Additive operators
-// For addition. either both operands shall have arithmetic type. or one operand shall be a
-// pointer to an object type and the other shall have integral type.
-// For subtraction. one of the following shall hold:
-// - both operands have arithmetic type;
-// - both operands are pointers to qualified or unqualitied versions of compatible object types
-// - the left operand is a pointer to an object type and the right operand has integral type
+fn additive_types(
+    sema: &mut Sema,
+    lhs: &mut ResolvedExpression,
+    rhs: &mut ResolvedExpression,
+    op: BinaryOp,
+) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
+    match (op, lhs.casted_ty().id.resolve(sema), rhs.casted_ty().id.resolve(sema)) {
+        (_, l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => cast::usual_arithmetic(sema, lhs, rhs),
+        (_, ResolvedType::Pointer(_), o) if o.is_integral(sema) => cast::pointer_integer_arithmetic(sema, lhs, rhs),
+        (BinaryOp::Add, o, ResolvedType::Pointer(_)) if o.is_integral(sema) => {
+            cast::pointer_integer_arithmetic(sema, rhs, lhs)
+        }
+        (BinaryOp::Sub, ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => {
+            cast::pointer_minus_pointer(sema, lhs, rhs)
+        }
+        _ => Err(Diagnosis::InvalidOperand),
+    }
+}
+
 fn additive(
     sema: &mut Sema,
     e1: &ExpressionNode,
     e2: &ExpressionNode,
     op: BinaryOp,
 ) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
-    with_operands(sema, e1, e2, |sema, lhs, rhs| {
-        match (op, lhs.casted_ty().id.resolve(sema), rhs.casted_ty().id.resolve(sema)) {
-            (_, l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => cast::usual_arithmetic(sema, lhs, rhs),
-            (_, ResolvedType::Pointer(_), o) if o.is_integral(sema) => cast::pointer_integer_arithmetic(sema, lhs, rhs),
-            (BinaryOp::Add, o, ResolvedType::Pointer(_)) if o.is_integral(sema) => {
-                cast::pointer_integer_arithmetic(sema, rhs, lhs)
-            }
-            (BinaryOp::Sub, ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => {
-                cast::pointer_minus_pointer(sema, lhs, rhs)
-            }
-            _ => Err(Diagnosis::InvalidOperand),
-        }
-    })
+    with_operands(sema, e1, e2, |sema, lhs, rhs| additive_types(sema, lhs, rhs, op))
 }
 
-// 6.3.7 Bitwise shift operators
-// The integral promotions are performed on each of the operands. The type of the result is that
-// of the promoted left operand. If the value of the right operand is negative or is greater than or
-// equal to the width in bits of the promoted left operand. the behavior is undefined.
+fn shift_types(
+    sema: &mut Sema,
+    lhs: &mut ResolvedExpression,
+    rhs: &mut ResolvedExpression,
+    count: Option<Value>,
+) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
+    let l = lhs.casted_ty().id.resolve(sema);
+    let r = rhs.casted_ty().id.resolve(sema);
+    if !l.is_integral(sema) || !r.is_integral(sema) {
+        return Err(Diagnosis::InvalidBianryOperand(lhs.casted_ty(), rhs.casted_ty()));
+    }
+    cast::promote(sema, lhs);
+    cast::promote(sema, rhs);
+    let l = lhs.casted_ty().id.resolve(sema);
+    let l_layout = sema.target.layout(l).unwrap();
+    let Some(count) = count else { return Ok((lhs.casted_ty(), RValue)) };
+    if count.is_negative() {
+        return Err(Diagnosis::ShiftCountNegative);
+    }
+    if count.is_greater_or_eq(l_layout.size * sema.target.byte_size) {
+        return Err(Diagnosis::ShiftCountOutOfRange);
+    }
+    Ok((lhs.casted_ty(), RValue))
+}
+
 fn shift(
     sema: &mut Sema,
     ctx: &Context,
     e1: &ExpressionNode,
     e2: &ExpressionNode,
 ) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
-    let v = try_fold(sema, ctx, e2);
-    with_operands(sema, e1, e2, |sema, lhs, rhs| {
-        let l = lhs.casted_ty().id.resolve(sema);
-        let r = rhs.casted_ty().id.resolve(sema);
-        if !l.is_integral(sema) || !r.is_integral(sema) {
-            return Err(Diagnosis::InvalidBianryOperand(lhs.casted_ty(), rhs.casted_ty()));
-        }
-        cast::promote(sema, lhs);
-        cast::promote(sema, rhs);
-        let l = lhs.casted_ty().id.resolve(sema);
-        let l_layout = sema.target.layout(l).unwrap();
-        let Some(v) = v else { return Ok((lhs.casted_ty(), RValue)) };
-        if v.is_negative() {
-            return Err(Diagnosis::ShiftCountNegative);
-        }
-        if v.is_greater_or_eq(l_layout.size * sema.target.byte_size) {
-            return Err(Diagnosis::ShiftCountOutOfRange);
-        }
-        Ok((lhs.casted_ty(), RValue))
-    })
+    let count = try_fold(sema, ctx, e2);
+    with_operands(sema, e1, e2, |sema, lhs, rhs| shift_types(sema, lhs, rhs, count))
 }
 
 // // 6.3.8 Relational operators
