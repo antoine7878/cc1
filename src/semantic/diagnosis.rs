@@ -31,6 +31,8 @@ pub enum Diagnosis {
     ConstantOverflow,
     /// 6.3
     ArithmeticOverflow,
+    /// 6.3.2.1
+    SubscriptNotArray,
     /// 6.3.2.2
     TooManyArguments(usize, usize),
     TooFewArguments(usize, usize),
@@ -42,10 +44,11 @@ pub enum Diagnosis {
     ShiftCountNegative,
     ShiftCountOutOfRange,
     /// 6.2.2.1
-    IncompleteType,
+    IncompleteType(QualifiedType),
 
     /// 6.3.2.4
     BadPostIncDec(UnaryOp, QualifiedType),
+    InvalidUnary(QualifiedType),
     /// 6.3.4
     CastToNonScalar,
     CastOfNonScalar,
@@ -142,6 +145,8 @@ impl DiagnosisNode {
     fn message(&self, ctx: &Context) -> String {
         let sema = &ctx.sema;
         match &self.inner {
+            Diagnosis::SubscriptNotArray => "subscripted value is not an array, pointer, or vector".to_string(),
+
             Diagnosis::TooManyArguments(expected, have) => format!("too many arguments to function call, expected {expected}, have {have}"),
             Diagnosis::TooFewArguments(expected, have) => format!("too few arguments to function call, expected {expected}, have {have}"),
 
@@ -168,6 +173,8 @@ impl DiagnosisNode {
             Diagnosis::BadPostIncDec(UnaryOp::PostDec, ty) => format!("cannot decrement value of type '{}'", ty.describe(sema, ctx)),
             Diagnosis::BadPostIncDec(_, _) => unreachable!(),
 
+            Diagnosis::InvalidUnary(ty) => format!("invalid argument type '{}' to unary expression", ty.describe(sema, ctx)),
+
             Diagnosis::FunctionReturningArray(ty) => format!("function cannot return array type ‘{}’", ty.describe(sema, ctx)),
             Diagnosis::FunctionReturningFunction(ty) => format!("function cannot return function type ‘{}’", ty.describe(sema, ctx)),
             Diagnosis::InvalidBianryOperand(lhs, rhs) => format!("invalid operands to binary expression ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
@@ -175,7 +182,7 @@ impl DiagnosisNode {
             Diagnosis::ConstAssignment(ty) => format!("cannot assign to variable with const-qualified type '{}'", ty.describe(sema, ctx)),
             Diagnosis::Poisoned => "Internal error".to_string(),
             Diagnosis::InvalidOperand => "invalid operand".to_string(),
-            Diagnosis::IncompleteType => "Incomplete type".to_string(),
+            Diagnosis::IncompleteType(ty) => format!("incomplete definition of type '{}'", ty.describe(sema, ctx)),
             Diagnosis::ModuloByZero =>  "remainder by zero is undefined".to_string(),
             Diagnosis::DivisionByZero => "division by zero is undefined".to_string(),
             Diagnosis::ConstantOverflow => "overflow in constant expression".to_string(),

@@ -27,6 +27,7 @@ pub struct Target {
     pub ptrdiff_t: ResolvedType,
     pub wchar_t: ResolvedType,
     pub char_signed: bool,
+    pub byte_size: u32,
 }
 
 pub const I386: Target = Target {
@@ -43,6 +44,7 @@ pub const I386: Target = Target {
     ptrdiff_t: ResolvedType::Int,
     wchar_t: ResolvedType::Long,
     char_signed: true,
+    byte_size: 8,
 };
 
 pub const X86_64: Target = Target {
@@ -59,6 +61,7 @@ pub const X86_64: Target = Target {
     ptrdiff_t: ResolvedType::Long,
     wchar_t: ResolvedType::Int,
     char_signed: true,
+    byte_size: 8,
 };
 
 impl Default for Target {

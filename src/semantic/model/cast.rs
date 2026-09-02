@@ -3,6 +3,7 @@ use std::fmt;
 use crate::arena::ResolveWith;
 use crate::ast::{self};
 use crate::parser::Span;
+use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId,
     Sema,
@@ -69,7 +70,7 @@ pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
         return;
     }
     if !ty.is_complete(sema) {
-        sema.add_diag(Diag::err((), Diagnosis::IncompleteType), span);
+        sema.add_diag(Diag::err((), Diagnosis::IncompleteType(re.ty)), span);
     }
     let to = QualifiedType::new(re.ty.id, false, false);
     re.casts.push(ImplicitCast::new(CastKind::LValueToRValue, to));
@@ -145,14 +146,18 @@ fn num_conv(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId
 }
 
 // 6.2.1.5 Usual arithmetic conversions
-pub fn usual_arithmetic(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) {
+pub fn usual_arithmetic(
+    sema: &mut Sema,
+    lhs: &mut ResolvedExpression,
+    rhs: &mut ResolvedExpression,
+) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
     use ResolvedType::*;
 
     let l = lhs.casted_ty().id.resolve(sema);
     let r = rhs.casted_ty().id.resolve(sema);
     // 6.3.5 If both operands have arithmetic type, the usual arithmetic conversions are performed
     if !l.is_arithmetic(sema) || !r.is_arithmetic(sema) {
-        return;
+        return Ok((lhs.casted_ty(), RValue));
     }
     // 6.2.1.5 Otherwise, the integral promotions are performed on both operands.
     if l.is_integral(sema) && r.is_integral(sema) {
@@ -160,7 +165,7 @@ pub fn usual_arithmetic(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut
         promote(sema, rhs);
     }
     if lhs.casted_ty().id == rhs.casted_ty().id {
-        return;
+        return Ok((lhs.casted_ty(), RValue));
     }
     let to = match (l, r) {
         (LongDouble, _) | (_, LongDouble) => sema.builtins.long_double,
@@ -175,6 +180,7 @@ pub fn usual_arithmetic(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut
     };
     num_conv(sema, lhs, to);
     num_conv(sema, rhs, to);
+    Ok((lhs.casted_ty(), RValue))
 }
 
 fn is_object_or_incomplete(sema: &Sema, ty: ResolvedTypeId) -> bool {
@@ -252,7 +258,7 @@ pub fn pointer_integer_arithmetic(
     sema: &mut Sema,
     pointer: &mut ResolvedExpression,
     integral: &mut ResolvedExpression,
-) -> Result<QualifiedType, Diagnosis> {
+) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
     let ResolvedType::Pointer(inner) = pointer.casted_ty().id.resolve(sema) else {
         return Err(Diagnosis::Poisoned);
     };
@@ -261,7 +267,7 @@ pub fn pointer_integer_arithmetic(
         ResolvedType::Function { .. } => Err(Diagnosis::InvalidOperand),
         _ => {
             promote(sema, integral);
-            Ok(pointer.casted_ty())
+            Ok((pointer.casted_ty(), RValue))
         }
     }
 }
@@ -270,7 +276,7 @@ pub fn pointer_minus_pointer(
     sema: &Sema,
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,
-) -> Result<QualifiedType, Diagnosis> {
+) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
     let ResolvedType::Pointer(lp) = lhs.casted_ty().id.resolve(sema) else {
         return Err(Diagnosis::Poisoned);
     };
@@ -285,7 +291,7 @@ pub fn pointer_minus_pointer(
     if !lp.is_compatible_ignoring_qualifiers(sema, rp) {
         return Err(Diagnosis::InvalidOperand);
     }
-    Ok(QualifiedType::new(sema.builtins.ptrdiff_t, false, false))
+    Ok((QualifiedType::new(sema.builtins.ptrdiff_t, false, false), RValue))
 }
 
 impl fmt::Display for CastKind {

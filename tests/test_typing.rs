@@ -35,7 +35,7 @@ shaped!(
 rejects_shaped!(
     an_array_operand_becomes_a_pointer_to_its_first_element,
     "char a[10]; void f(void) { -a; }",
-    Diagnosis::InvalidOperand,
+    Diagnosis::InvalidUnary(_),
     vec![
         rv(Ty::Int),
         rv(Ty::Int),
@@ -481,14 +481,14 @@ rejects_shaped!(
 rejects_shaped!(
     minus_rejects_a_pointer,
     "int *p; void f(void) { -p; }",
-    Diagnosis::InvalidOperand,
+    Diagnosis::InvalidUnary(_),
     vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]
 );
 
 rejects_shaped!(
     minus_rejects_a_structure,
     "struct S { int x; } s; void f(void) { -s; }",
-    Diagnosis::InvalidOperand,
+    Diagnosis::InvalidUnary(_),
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
 );
 
@@ -951,4 +951,512 @@ rejects_shaped!(
     "void f(void) { x + 1; }",
     Diagnosis::UndeclaredIdentifier(_),
     vec![none(), rv(Ty::Int), none()]
+);
+
+// ---- 6.3.2.1 array subscripting -------------------------------------------
+
+// 6.3.2.1 The expression E1[E2] is identical (by definition) to (*((E1)+(E2))).
+shaped!(
+    subscripting_an_array_designates_an_element,
+    "int a[3]; void f(void) { a[0]; }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+        lv(Ty::Int),
+    ]
+);
+
+shaped!(
+    subscripting_a_pointer_designates_the_object_it_points_to,
+    "int *p; void f(void) { p[1]; }",
+    vec![
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+        lv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_subscript_may_precede_the_array,
+    "int a[3]; void f(void) { 0[a]; }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)),
+        lv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_subscripted_element_is_assignable,
+    "int a[3]; void f(void) { a[0] = 1; }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+        lv(Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    subscripting_an_array_of_arrays_designates_a_row,
+    "int a[2][3]; void f(void) { a[0]; }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::arr(Ty::arr(Ty::Int, 3), 2)).then(ArrayToPointer, Ty::ptr(Ty::arr(Ty::Int, 3))),
+        rv(Ty::Int),
+        lv(Ty::arr(Ty::Int, 3)),
+    ]
+);
+
+rejects_shaped!(
+    subscripting_a_structure_is_rejected,
+    "struct S { int x; } s; void f(void) { s[0]; }",
+    Diagnosis::InvalidOperand,
+    vec![
+        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+// ---- 6.3.2.3 structure and union members ----------------------------------
+
+// 6.2.2.1 Except when it is the operand of the sizeof operator, the unary & operator, the ++
+// operator, the -- operator, or the left operand of the . operator or an assignment operator,
+// an lvalue that does not have array type is converted to the value stored in the designated
+// object (and is no longer an lvalue).
+
+shaped!(
+    a_member_of_a_structure_lvalue_is_an_lvalue,
+    "struct S { int x; } s; void f(void) { s.x; }",
+    vec![lv(Ty::strukt("S")), lv(Ty::Int)]
+);
+
+shaped!(
+    a_member_reached_through_a_pointer_is_an_lvalue,
+    "struct S { int x; } *p; void f(void) { p->x; }",
+    vec![
+        lv(Ty::ptr(Ty::strukt("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt("S"))),
+        lv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_union_member_has_the_type_of_the_named_member,
+    "union U { int x; double y; } u; void f(void) { u.y; }",
+    vec![lv(Ty::union("U")), lv(Ty::Double)]
+);
+
+// 6.3.2.3 The value is that of the named member, and is an lvalue if the first expression is
+// an lvalue.
+shaped!(
+    a_member_of_an_rvalue_structure_is_an_rvalue,
+    "struct S { int x; }; struct S g(void); void f(void) { g().x; }",
+    vec![
+        rv(Ty::func0(Ty::strukt("S"))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt("S")))),
+        rv(Ty::strukt("S")),
+        rv(Ty::Int),
+    ]
+);
+
+rejects_shaped!(
+    assigning_to_a_member_of_an_rvalue_structure_is_rejected,
+    "struct S { int x; }; struct S g(void); void f(void) { g().x = 1; }",
+    Diagnosis::AssignToRValue,
+    vec![
+        rv(Ty::func0(Ty::strukt("S"))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt("S")))),
+        rv(Ty::strukt("S")),
+        rv(Ty::Int),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+// 6.3.2.3 If the first expression is a pointer to a qualified type, the value has the
+// so-qualified version of the type of the designated member.
+reject!(
+    assigning_to_a_member_of_a_const_structure_is_rejected,
+    "struct S { int x; }; void f(void) { const struct S s; s.x = 1; }"
+);
+
+reject!(
+    assigning_to_a_member_through_a_pointer_to_const_is_rejected,
+    "struct S { int x; }; void f(void) { const struct S *p; p->x = 1; }"
+);
+
+// 6.3.2.3 The first operand of the . operator shall have qualified or unqualified structure or
+// union type, and the second operand shall name a member of that type.
+rejects_shaped!(
+    a_dot_applied_to_a_pointer_is_rejected,
+    "struct S { int x; } *p; void f(void) { p.x; }",
+    Diagnosis::AccessNotStuctOrUnion(_),
+    vec![lv(Ty::ptr(Ty::strukt("S"))), none()]
+);
+
+rejects_shaped!(
+    a_dot_applied_to_an_enumeration_is_rejected,
+    "enum E { A }; enum E e; void f(void) { e.x; }",
+    Diagnosis::AccessNotStuctOrUnion(_),
+    vec![lv(Ty::enom("E")), none()]
+);
+
+rejects_shaped!(
+    a_member_that_the_structure_does_not_have_is_rejected,
+    "struct S { int x; } s; void f(void) { s.y; }",
+    Diagnosis::AccessNotMember(_, _),
+    vec![lv(Ty::strukt("S")), none()]
+);
+
+// 6.3.2.3 The first operand of the -> operator shall have type pointer to qualified or
+// unqualified structure or pointer to qualified or unqualified union.
+rejects_shaped!(
+    an_arrow_applied_to_a_structure_is_rejected,
+    "struct S { int x; } s; void f(void) { s->x; }",
+    Diagnosis::AccessNotPointer(_),
+    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
+);
+
+reject!(
+    a_member_of_an_incomplete_structure_is_rejected,
+    "struct S; struct S *p; void f(void) { p->x; }"
+);
+
+// 6.3.2.3 If the first expression is a pointer to a qualified type, the value has the
+// so-qualified version of the type of the designated member.
+shaped!(
+    a_member_of_a_const_structure_is_const,
+    "struct S { int x; }; void f(void) { const struct S s; s.x; }",
+    vec![lv(Ty::konst(Ty::strukt("S"))), lv(Ty::konst(Ty::Int))]
+);
+
+shaped!(
+    a_member_reached_through_a_pointer_to_const_is_const,
+    "struct S { int x; }; void f(void) { const struct S *p; p->x; }",
+    vec![
+        lv(Ty::ptr(Ty::konst(Ty::strukt("S")))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::strukt("S")))),
+        lv(Ty::konst(Ty::Int)),
+    ]
+);
+
+shaped!(
+    a_member_of_a_volatile_structure_is_volatile,
+    "volatile struct S { int x; } s; void f(void) { s.x; }",
+    vec![lv(Ty::vol(Ty::strukt("S"))), lv(Ty::vol(Ty::Int))]
+);
+
+// ---- 6.3.2.4 postfix increment and decrement operators --------------------
+
+// 6.3.2.4 The result of the postfix ++ operator is the value of the operand.
+shaped!(
+    post_increment_yields_the_value_of_its_operand,
+    "int i; void f(void) { i++; }",
+    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]
+);
+
+shaped!(
+    post_decrement_yields_the_value_of_its_operand,
+    "double d; void f(void) { d--; }",
+    vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Double)]
+);
+
+shaped!(
+    post_increment_of_a_pointer_is_a_pointer,
+    "int *p; void f(void) { p++; }",
+    vec![
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::ptr(Ty::Int)),
+    ]
+);
+
+// 6.3.2.4 the value of the result has the type of the operand: it is not promoted.
+shaped!(
+    post_increment_keeps_the_type_of_its_operand,
+    "char c; void f(void) { c++; }",
+    vec![lv(Ty::Char).then(LValueToRValue, Ty::Char), rv(Ty::Char)]
+);
+
+// 6.3.2.4 The operand shall have qualified or unqualified scalar type and shall be a
+// modifiable lvalue.
+reject!(post_increment_of_an_rvalue_is_rejected, "void f(void) { 1++; }");
+
+reject!(
+    post_increment_of_a_const_object_is_rejected,
+    "void f(void) { const int i; i++; }"
+);
+
+reject!(
+    post_increment_of_an_array_is_rejected,
+    "int a[3]; void f(void) { a++; }"
+);
+
+rejects_shaped!(
+    post_increment_of_a_structure_is_rejected,
+    "struct S { int x; } s; void f(void) { s++; }",
+    Diagnosis::BadPostIncDec(_, _),
+    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
+);
+
+// 6.3.2.4 The value of the operand is incremented: see the discussion of additive operators,
+// which requires a pointer to an object type (6.3.6).
+rejects_shaped!(
+    post_increment_of_a_pointer_to_an_incomplete_type_is_rejected,
+    "struct S; struct S *p; void f(void) { p++; }",
+    Diagnosis::IncompleteType(_),
+    vec![
+        lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
+        none(),
+    ]
+);
+
+rejects_shaped!(
+    post_increment_of_a_pointer_to_void_is_rejected,
+    "void *p; void f(void) { p++; }",
+    Diagnosis::IncompleteType(_),
+    vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), none()]
+);
+
+// ---- 6.3.5 multiplicative operators ---------------------------------------
+
+shaped!(multiplying_two_constants_stays_int, "void f(void) { 2 * 3; }", ints(3));
+
+shaped!(
+    the_remainder_of_two_integers_is_an_integer,
+    "void f(void) { 7 % 2; }",
+    ints(3)
+);
+
+shaped!(
+    multiplication_performs_the_usual_arithmetic_conversions,
+    "int i; double d; void f(void) { i * d; }",
+    vec![
+        lv(Ty::Int)
+            .then(LValueToRValue, Ty::Int)
+            .then(IntegerToFloating, Ty::Double),
+        lv(Ty::Double).then(LValueToRValue, Ty::Double),
+        rv(Ty::Double),
+    ]
+);
+
+// 6.3.5 Each of the operands shall have arithmetic type.
+rejects_shaped!(
+    multiplying_a_structure_is_rejected,
+    "struct S { int x; } s; void f(void) { s * 1; }",
+    Diagnosis::InvalidBianryOperand(_, _),
+    vec![
+        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+rejects_shaped!(
+    multiplying_by_a_structure_is_rejected,
+    "struct S { int x; } s; void f(void) { 1 * s; }",
+    Diagnosis::InvalidBianryOperand(_, _),
+    vec![
+        rv(Ty::Int),
+        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
+        none(),
+    ]
+);
+
+rejects_shaped!(
+    dividing_a_pointer_is_rejected,
+    "int *p; void f(void) { p / 2; }",
+    Diagnosis::InvalidBianryOperand(_, _),
+    vec![
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+// 6.3.5 The operands of the % operator shall have integral type.
+rejects_shaped!(
+    a_remainder_with_a_floating_right_operand_is_rejected,
+    "void f(void) { 1 % 1.5; }",
+    Diagnosis::InvalidBianryOperand(_, _),
+    vec![rv(Ty::Int), rv(Ty::Double), none()]
+);
+
+rejects_shaped!(
+    a_remainder_with_a_floating_left_operand_is_rejected,
+    "void f(void) { 1.5 % 1; }",
+    Diagnosis::InvalidBianryOperand(_, _),
+    vec![rv(Ty::Double), rv(Ty::Int), none()]
+);
+
+// 6.3.5 In both operations, if the value of the second operand is zero, the behavior is
+// undefined: only a constant expression has to be diagnosed (6.4).
+shaped!(
+    a_floating_division_by_zero_is_accepted,
+    "void f(void) { 1 / 0.0; }",
+    vec![
+        rv(Ty::Int).then(IntegerToFloating, Ty::Double),
+        rv(Ty::Double),
+        rv(Ty::Double),
+    ]
+);
+
+// ---- 6.3.7 bitwise shift operators ----------------------------------------
+
+shaped!(a_shift_of_two_constants_is_an_int, "void f(void) { 1 << 2; }", ints(3));
+
+// 6.3.7 the behavior is undefined only when the count is negative or greater than or equal to
+// the width in bits of the promoted left operand.
+shaped!(
+    a_shift_count_below_the_width_of_the_promoted_left_operand_is_accepted,
+    "void f(void) { 1 << 5; }",
+    ints(3)
+);
+
+// 6.3.7 The integral promotions are performed on each of the operands.
+shaped!(
+    the_left_operand_of_a_shift_is_promoted,
+    "char c; void f(void) { c << 1; }",
+    vec![
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    an_enumeration_may_be_shifted,
+    "enum E { A }; enum E e; void f(void) { e << 1; }",
+    vec![
+        lv(Ty::enom("E"))
+            .then(LValueToRValue, Ty::enom("E"))
+            .then(IntegerPromotion, Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.7 The type of the result is that of the promoted left operand: the usual arithmetic
+// conversions are not performed.
+shaped!(
+    a_shift_has_the_type_of_its_promoted_left_operand,
+    "int i; long l; void f(void) { i << l; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::Long).then(LValueToRValue, Ty::Long),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    the_operands_of_a_shift_are_promoted_independently,
+    "unsigned u; void f(void) { u >> 1; }",
+    vec![lv(Ty::UInt).then(LValueToRValue, Ty::UInt), rv(Ty::Int), rv(Ty::UInt),]
+);
+
+// 6.3.7 Each of the operands shall have integral type.
+rejects_shaped!(
+    shifting_a_floating_left_operand_is_rejected,
+    "void f(void) { 1.5 << 1; }",
+    Diagnosis::InvalidBianryOperand(_, _),
+    vec![rv(Ty::Double), rv(Ty::Int), none()]
+);
+
+rejects_shaped!(
+    shifting_by_a_floating_count_is_rejected,
+    "void f(void) { 1 << 1.5; }",
+    Diagnosis::InvalidBianryOperand(_, _),
+    vec![rv(Ty::Int), rv(Ty::Double), none()]
+);
+
+// 6.3.7 the count is compared to the width in bits of the promoted left operand, not to the
+// width of the operand as written.
+shaped!(
+    a_char_left_operand_is_measured_after_its_promotion,
+    "char c; void f(void) { c << 10; }",
+    vec![
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_short_left_operand_is_measured_after_its_promotion,
+    "short s; void f(void) { s << 20; }",
+    vec![
+        lv(Ty::Short)
+            .then(LValueToRValue, Ty::Short)
+            .then(IntegerPromotion, Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_count_one_below_the_width_of_the_left_operand_is_accepted,
+    "int i; void f(void) { i << 31; }",
+    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int)]
+);
+
+// 6.3.7 the width that bounds the count is that of the left operand: the type of the count
+// itself does not bound it.
+shaped!(
+    the_type_of_the_count_does_not_bound_the_shift,
+    "int i; void f(void) { i << (short)20; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        rv(Ty::Int).then(IntegerConversion, Ty::Short),
+        rv(Ty::Short).then(IntegerPromotion, Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.7 The integral promotions are performed on each of the operands, whether or not the
+// count is a constant.
+shaped!(
+    a_shift_by_a_variable_count_promotes_its_operands,
+    "char c; int n; void f(void) { c << n; }",
+    vec![
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int),
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    an_enumeration_may_be_shifted_by_a_variable_count,
+    "enum E { A }; enum E e; int n; void f(void) { e << n; }",
+    vec![
+        lv(Ty::enom("E"))
+            .then(LValueToRValue, Ty::enom("E"))
+            .then(IntegerPromotion, Ty::Int),
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+// A rejected shift converts nothing: the operands keep the types they were written with.
+rejects_shaped!(
+    a_rejected_shift_leaves_its_operands_unpromoted,
+    "enum E { A }; enum E e; void f(void) { e << 1.5; }",
+    Diagnosis::InvalidBianryOperand(_, _),
+    vec![
+        lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")),
+        rv(Ty::Double),
+        none(),
+    ]
 );

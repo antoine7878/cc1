@@ -28,7 +28,7 @@ fn convert(
     rhs: ResolvedTypeId,
 ) -> (ResolvedTypeId, Vec<CastKind>, Vec<CastKind>) {
     let (mut lhs, mut rhs) = (rvalue(lhs), rvalue(rhs));
-    usual_arithmetic(sema, &mut lhs, &mut rhs);
+    let _ = usual_arithmetic(sema, &mut lhs, &mut rhs);
     assert_eq!(
         lhs.casted_ty().id,
         rhs.casted_ty().id,
@@ -219,7 +219,7 @@ fn a_non_arithmetic_operand_is_left_alone() {
     let b = sema.builtins;
     let s = struct_type(&mut sema);
     let (mut lhs, mut rhs) = (rvalue(s), rvalue(b.int));
-    usual_arithmetic(&mut sema, &mut lhs, &mut rhs);
+    let _ = usual_arithmetic(&mut sema, &mut lhs, &mut rhs);
     assert!(lhs.casts.is_empty());
     assert!(rhs.casts.is_empty());
 }
@@ -230,7 +230,7 @@ fn a_pointer_operand_is_left_alone() {
     let b = sema.builtins;
     let p = sema.types.pointer(QualifiedType::new(b.int, false, false));
     let (mut lhs, mut rhs) = (rvalue(p), rvalue(b.int));
-    usual_arithmetic(&mut sema, &mut lhs, &mut rhs);
+    let _ = usual_arithmetic(&mut sema, &mut lhs, &mut rhs);
     assert!(lhs.casts.is_empty());
     assert!(rhs.casts.is_empty());
 }

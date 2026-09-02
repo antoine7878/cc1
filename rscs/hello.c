@@ -1,11 +1,6 @@
-struct a {
-	int a;
-};
+struct S;
 
 void fn(void) {
-	struct a *st;
-	struct a *pst;
-	int i;
-
-	(st = pst)->a = 1;
+	struct S *a;
+	a++;
 }

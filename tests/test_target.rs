@@ -1,10 +1,10 @@
+use crate::common::repr;
 use cc1::ast::Value;
 use cc1::semantic::{QualifiedType, ResolvedType, ResolvedTypeId, TagDefId};
 use cc1::target::{I386, Target, X86_64};
-use crate::common::repr;
 
 fn layout(target: &Target, ty: &ResolvedType) -> Option<(u32, u32)> {
-    target.scalar(ty).map(|l| (l.size, l.align))
+    target.layout(ty).map(|l| (l.size, l.align))
 }
 
 fn pointer_to_int() -> ResolvedType {

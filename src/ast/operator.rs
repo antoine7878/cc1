@@ -86,6 +86,14 @@ pub enum MemberOp {
     Arrow,
 }
 
+impl MemberOp {
+    pub fn symbol(&self) -> &str {
+        match self {
+            MemberOp::Dot => ".",
+            MemberOp::Arrow => "->",
+        }
+    }
+}
 impl Display for MemberOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {

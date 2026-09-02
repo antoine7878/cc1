@@ -239,16 +239,15 @@ impl Visitor for AstPrinter {
             let expr = node.id.resolve(ctx);
             printer.put(format_args!("{} ", expr));
             printer.print_expression_type(ctx, node.id);
-            if let Expression::Member(_, tag, ident) = expr {
+            if let Expression::Member(op, tag, ident) = expr {
                 printer.visit_expression(ctx, tag);
-                printer.put(format_args!(" "));
+                printer.put(format_args!("{}", op.symbol()));
                 printer.visit_name(ctx, ident);
             } else {
                 walk_expression(printer, ctx, node);
             }
         });
     }
-
     fn visit_type(&mut self, ctx: &Context, node: &Type) {
         self.print_node(node, |printer| {
             for spec in &node.specifiers {

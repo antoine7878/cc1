@@ -72,9 +72,13 @@ fn operands(
 
 /// 6.3.5 The second operand of / and % shall not be zero, and the result shall be representable in
 /// the type of the operands.
-fn divisor(sema: &Sema, lhs: Value, rhs: Value) -> Result<(), Diagnosis> {
+fn divisor(sema: &Sema, lhs: Value, rhs: Value, op: BinaryOp) -> Result<(), Diagnosis> {
     if rhs.is_zero() {
-        return Err(Diagnosis::Poisoned);
+        match op {
+            BinaryOp::Div => return Err(Diagnosis::DivisionByZero),
+            BinaryOp::Mod => return Err(Diagnosis::ModuloByZero),
+            _ => unreachable!(),
+        }
     }
     let fold = Fold::new(&sema.target);
     match fold.eq(rhs, Value::Int(-1)) && fold.is_min(lhs) {
@@ -118,7 +122,15 @@ macro_rules! fold_checked {
 macro_rules! fold_divide {
     ($sema:ident, $ctx:ident, $sink:ident, $e1:ident, $e2:ident, $method:ident) => {{
         let (lhs, rhs) = operands($sema, $ctx, $e1, $e2, $sink)?;
-        divisor($sema, lhs, rhs)?;
+        divisor($sema, lhs, rhs, BinaryOp::Div)?;
+        Ok(Fold::new(&$sema.target).$method(lhs, rhs))
+    }};
+}
+
+macro_rules! fold_mod {
+    ($sema:ident, $ctx:ident, $sink:ident, $e1:ident, $e2:ident, $method:ident) => {{
+        let (lhs, rhs) = operands($sema, $ctx, $e1, $e2, $sink)?;
+        divisor($sema, lhs, rhs, BinaryOp::Mod)?;
         Ok(Fold::new(&$sema.target).$method(lhs, rhs))
     }};
 }
@@ -166,7 +178,7 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSi
             BinaryOp::Sub => fold_checked!(sema, ctx, sink, expr, e1, e2, sub),
             BinaryOp::Mul => fold_checked!(sema, ctx, sink, expr, e1, e2, mul),
             BinaryOp::Div => fold_divide!(sema, ctx, sink, e1, e2, div),
-            BinaryOp::Mod => fold_divide!(sema, ctx, sink, e1, e2, rem),
+            BinaryOp::Mod => fold_mod!(sema, ctx, sink, e1, e2, rem),
             BinaryOp::Left => fold_shift!(sema, ctx, sink, e1, e2, shl),
             BinaryOp::Right => fold_shift!(sema, ctx, sink, e1, e2, shr),
             BinaryOp::BitAnd => fold!(sema, ctx, sink, e1, e2, bitand),

@@ -232,13 +232,43 @@ reports!(
 reports!(
     report_shift_count_out_of_range,
     "enum E { A = 1 << 32 };",
-    ["<test>:1:14: error: shift count out of range"]
+    ["<test>:1:14: error: shift count >= width of type"]
+);
+
+reports!(
+    report_invalid_shift_operands_in_source_order,
+    "void f(void) { 1.5 << 1; }",
+    ["<test>:1:16: error: invalid operands to binary expression ('double' and 'int')"]
 );
 
 reports!(
     report_remainder_by_zero,
     "enum E { A = 1 % 0 };",
-    ["<test>:1:14: error: Division by zero"]
+    ["<test>:1:14: error: remainder by zero is undefined"]
+);
+
+reports!(
+    report_division_by_zero,
+    "enum E { A = 1 / 0 };",
+    ["<test>:1:14: error: division by zero is undefined"]
+);
+
+reports!(
+    report_shift_count_negative,
+    "enum E { A = 1 << -1 };",
+    ["<test>:1:14: error: shift count is negative"]
+);
+
+reports!(
+    report_member_of_an_incomplete_structure,
+    "struct S; void f(void) { struct S *p; p->x; }",
+    ["<test>:1:39: error: incomplete definition of type 'struct S'"]
+);
+
+reports!(
+    report_increment_of_a_pointer_to_an_incomplete_type,
+    "struct S; void f(void) { struct S *p; p++; }",
+    ["<test>:1:39: error: incomplete definition of type 'struct S'"]
 );
 
 reports!(

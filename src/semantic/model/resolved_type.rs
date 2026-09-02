@@ -242,6 +242,46 @@ impl QualifiedType {
     pub fn describe<'a>(&'a self, sema: &'a Sema, ctx: &'a Context) -> TypeName<'a> {
         TypeName(self, sema, ctx)
     }
+
+    pub fn is_complete(&self, sema: &Sema) -> bool {
+        self.id.resolve(sema).is_complete(sema)
+    }
+
+    // 6.1.2.5 Arithmetic types and pointer types are collectively called scalar types.
+    pub fn is_scalar(&self, sema: &Sema) -> bool {
+        self.id.resolve(sema).is_scalar(sema)
+    }
+
+    pub fn is_pointer(&self, sema: &Sema) -> bool {
+        self.id.resolve(sema).is_pointer()
+    }
+
+    pub fn is_function(&self, sema: &Sema) -> bool {
+        self.id.resolve(sema).is_function()
+    }
+
+    pub fn is_object(&self, sema: &Sema) -> bool {
+        self.id.resolve(sema).is_object(sema)
+    }
+
+    // 6.1.2.5 Integral and floating types are collectively called arithmetic types.
+    pub fn is_arithmetic(&self, sema: &Sema) -> bool {
+        self.id.resolve(sema).is_arithmetic(sema)
+    }
+
+    // 6.1.2.5 The type char, the signed and unsigned integer types, and the enumerated types
+    // are collectively called integral types.
+    pub fn is_integral(&self, sema: &Sema) -> bool {
+        self.id.resolve(sema).is_integral(sema)
+    }
+
+    pub fn is_floating(&self, sema: &Sema) -> bool {
+        self.id.resolve(sema).is_floating()
+    }
+
+    pub fn is_integer(&self, sema: &Sema) -> bool {
+        self.id.resolve(sema).is_integer()
+    }
 }
 
 pub struct TypeName<'a>(&'a QualifiedType, &'a Sema, &'a Context);
@@ -281,11 +321,7 @@ impl fmt::Display for TypeName<'_> {
             &ResolvedType::Tag(id) => {
                 let def = id.resolve(sema);
                 let name = def.name.map_or("<anonymous>", |n| n.id.resolve(ctx).as_str());
-                write!(f, "{} {}", def.kind(), name)?;
-                if !def.is_complete {
-                    f.write_str(" (incomplete)")?;
-                }
-                Ok(())
+                write!(f, "{} {}", def.kind(), name)
             }
             ResolvedType::Array { elem, len } => {
                 let mut base = elem;

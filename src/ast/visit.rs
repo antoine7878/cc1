@@ -293,8 +293,8 @@ pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &Exp
             v.visit_expression(ctx, lhs);
             v.visit_expression(ctx, rhs);
         }
-        Expression::FunctionCall(callee, args) => {
-            v.visit_expression(ctx, callee);
+        Expression::FunctionCall(lhs, args) => {
+            v.visit_expression(ctx, lhs);
             for arg in args {
                 v.visit_expression(ctx, arg);
             }
