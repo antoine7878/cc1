@@ -21,7 +21,7 @@ pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Option<Layout> {
             let elem = of(sema, elem.id)?;
             Layout::new(elem.size * len.unwrap_or(0) as u32, elem.align)
         }
-        ty => sema.target.scalar(ty)?,
+        ty => sema.target.layout(ty)?,
     };
     sema.layouts.insert(qualified_type, layout);
     Some(layout)

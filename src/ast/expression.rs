@@ -32,7 +32,7 @@ pub enum Expression {
     Assign(Option<BinaryOp>, ExpressionNode, ExpressionNode),
     List(Vec<ExpressionNode>),
     Ternary(ExpressionNode, ExpressionNode, ExpressionNode),
-    ArrayAccess(ExpressionNode, ExpressionNode),
+    ArraySubscripting(ExpressionNode, ExpressionNode),
     FunctionCall(ExpressionNode, Vec<ExpressionNode>),
     Member(MemberOp, ExpressionNode, Name),
     SizeofExpr(ExpressionNode),
@@ -112,7 +112,7 @@ impl ExpressionArena {
     }
 
     pub fn array_access(&mut self, lhs: ExpressionNode, index: ExpressionNode, span: Span) -> ExpressionNode {
-        ExpressionNode::new(self.alloc(Expression::ArrayAccess(lhs, index)), span)
+        ExpressionNode::new(self.alloc(Expression::ArraySubscripting(lhs, index)), span)
     }
 
     pub fn add_list(&mut self, mut lhs: ExpressionNode, rhs: ExpressionNode) -> ExpressionNode {
@@ -163,7 +163,7 @@ impl Display for Expression {
             Expression::Assign(Some(op), _, _) => write!(f, "{}Assign", op),
             Expression::List(_) => write!(f, "List"),
             Expression::Ternary(_, _, _) => write!(f, "Ternary"),
-            Expression::ArrayAccess(_, _) => write!(f, "Array access"),
+            Expression::ArraySubscripting(_, _) => write!(f, "Array access"),
             Expression::FunctionCall(_, _) => write!(f, "Fn call"),
             Expression::Member(op, _, _) => write!(f, "{}", op),
             Expression::SizeofExpr(_) | Expression::SizeofType(_) => write!(f, "Sizeof"),

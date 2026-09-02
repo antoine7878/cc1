@@ -239,6 +239,30 @@ impl Rank {
 }
 
 impl Value {
+    pub fn is_negative(&self) -> bool {
+        match *self {
+            Value::Int(i) => i < 0,
+            Value::UnsignedInt(_) => false,
+            Value::Long(i) => i < 0,
+            Value::UnsignedLong(_) => false,
+            Value::Float(i) => i < 0.,
+            Value::Double(i) => i < 0.,
+            Value::LongDouble(i) => i < 0.,
+        }
+    }
+
+    pub fn is_greater_or_eq(&self, v: u32) -> bool {
+        match *self {
+            Value::Int(i) => i >= v as i32,
+            Value::UnsignedInt(i) => i >= v,
+            Value::Long(i) => i >= v as i64,
+            Value::UnsignedLong(i) => i >= v as u64,
+            Value::Float(i) => i >= v as f32,
+            Value::Double(i) => i >= v as f64,
+            Value::LongDouble(i) => i >= v as f64,
+        }
+    }
+
     pub fn is_zero(&self) -> bool {
         match *self {
             Value::Int(i) => i == 0,

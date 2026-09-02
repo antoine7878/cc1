@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 use std::io::{self, Write, stderr};
 
-use crate::ast::Name;
+use crate::ast::{Name, StringId, UnaryOp};
 use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::{QualifiedType, SymbolKind};
@@ -14,6 +14,7 @@ pub enum Diagnosis {
     ArrayInitTooLong,
     Poisoned,
     InvalidOperand,
+    ModuloByZero,
     DivisionByZero,
     BadArgumentsCount,
     SyntaxError {
@@ -33,11 +34,18 @@ pub enum Diagnosis {
     /// 6.3.2.2
     TooManyArguments(usize, usize),
     TooFewArguments(usize, usize),
+    /// 6.3.2.3
+    AccessNotStuctOrUnion(QualifiedType),
+    AccessNotPointer(QualifiedType),
+    AccessNotMember(QualifiedType, StringId),
     /// 6.3.7
+    ShiftCountNegative,
     ShiftCountOutOfRange,
     /// 6.2.2.1
     IncompleteType,
 
+    /// 6.3.2.4
+    BadPostIncDec(UnaryOp, QualifiedType),
     /// 6.3.4
     CastToNonScalar,
     CastOfNonScalar,
@@ -55,6 +63,9 @@ pub enum Diagnosis {
 
     CallingNotFunction(QualifiedType),
     CallingIncompleteReturn(QualifiedType),
+
+    /// 6.3.5
+    InvalidBianryOperand(QualifiedType, QualifiedType),
 
     AssignToRValue,
     ConstAssignment(QualifiedType),
@@ -133,9 +144,13 @@ impl DiagnosisNode {
         match &self.inner {
             Diagnosis::TooManyArguments(expected, have) => format!("too many arguments to function call, expected {expected}, have {have}"),
             Diagnosis::TooFewArguments(expected, have) => format!("too few arguments to function call, expected {expected}, have {have}"),
+
+            Diagnosis::AccessNotStuctOrUnion(ty) => format!("member reference base type '{}' is not a structure or union", ty.describe(sema, ctx)),
+            Diagnosis::AccessNotPointer(ty) => format!("member reference base type '{}' is not pointer", ty.describe(sema, ctx)),
+            Diagnosis::AccessNotMember(ty, name_id ) => format!("no member named '{}' in '{}'", name_id.resolve(ctx), ty.describe(sema, ctx)),
+
             Diagnosis::Temprorary =>  "TEMPRORARY DIAG".to_string(),
-            Diagnosis::ArrayInitTooLong => "excess elements in array initializer".to_string(),
-            Diagnosis::InvalidReturnType => "Invalid return type".to_string(),
+            Diagnosis::ArrayInitTooLong => "excess elements in array initializer".to_string(), Diagnosis::InvalidReturnType => "Invalid return type".to_string(),
 
             Diagnosis::AssignmentDiscardedQualifiers(to, from) => format!("assigning to ‘{}’ from ‘{}’ discards qualifiers", to.describe(&ctx.sema, ctx), from.describe(sema, ctx)),
             Diagnosis::InitDiscardedQualifiers(to, from) => format!("initializing ‘{}’ with an expression of type ‘{}’ discards qualifiers", to.describe(sema, ctx), from.describe(sema, ctx)),
@@ -149,19 +164,24 @@ impl DiagnosisNode {
 
             Diagnosis::CallingNotFunction(ty) => format!("called object type '{}' is not a function or function pointer", ty.describe(sema, ctx)),
             Diagnosis::CallingIncompleteReturn(ty) => format!("calling a function with incomplete return type ‘{}’", ty.describe(sema, ctx)),
+            Diagnosis::BadPostIncDec(UnaryOp::PostInc, ty) => format!("cannot increment value of type '{}'", ty.describe(sema, ctx)),
+            Diagnosis::BadPostIncDec(UnaryOp::PostDec, ty) => format!("cannot decrement value of type '{}'", ty.describe(sema, ctx)),
+            Diagnosis::BadPostIncDec(_, _) => unreachable!(),
 
             Diagnosis::FunctionReturningArray(ty) => format!("function cannot return array type ‘{}’", ty.describe(sema, ctx)),
             Diagnosis::FunctionReturningFunction(ty) => format!("function cannot return function type ‘{}’", ty.describe(sema, ctx)),
-
+            Diagnosis::InvalidBianryOperand(lhs, rhs) => format!("invalid operands to binary expression ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
             Diagnosis::AssignToRValue => "expression is not assignable".to_string(),
             Diagnosis::ConstAssignment(ty) => format!("cannot assign to variable with const-qualified type '{}'", ty.describe(sema, ctx)),
             Diagnosis::Poisoned => "Internal error".to_string(),
             Diagnosis::InvalidOperand => "invalid operand".to_string(),
             Diagnosis::IncompleteType => "Incomplete type".to_string(),
-            Diagnosis::DivisionByZero => "Division by zero".to_string(),
+            Diagnosis::ModuloByZero =>  "remainder by zero is undefined".to_string(),
+            Diagnosis::DivisionByZero => "division by zero is undefined".to_string(),
             Diagnosis::ConstantOverflow => "overflow in constant expression".to_string(),
             Diagnosis::ArithmeticOverflow => "integer overflow in constant expression".to_string(),
-            Diagnosis::ShiftCountOutOfRange => "shift count out of range".to_string(),
+            Diagnosis::ShiftCountNegative => "shift count is negative".to_string(),
+            Diagnosis::ShiftCountOutOfRange => "shift count >= width of type".to_string(),
             Diagnosis::BadArgumentsCount => "wrong argument count".to_string(),
             Diagnosis::SyntaxError { found, expected } if expected.is_empty() => format!("syntax error, unexpected {}", token_label(found)),
             Diagnosis::SyntaxError { found, expected } => format!("syntax error, unexpected {}, expecting {expected}", token_label(found)),

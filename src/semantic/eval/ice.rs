@@ -74,7 +74,7 @@ fn operands(
 /// the type of the operands.
 fn divisor(sema: &Sema, lhs: Value, rhs: Value) -> Result<(), Diagnosis> {
     if rhs.is_zero() {
-        return Err(Diagnosis::DivisionByZero);
+        return Err(Diagnosis::Poisoned);
     }
     let fold = Fold::new(&sema.target);
     match fold.eq(rhs, Value::Int(-1)) && fold.is_min(lhs) {
@@ -87,7 +87,7 @@ fn divisor(sema: &Sema, lhs: Value, rhs: Value) -> Result<(), Diagnosis> {
 /// The right operand shall be nonnegative and less than the width in bits of the promoted left operand.
 fn shift_count(sema: &Sema, lhs: Value, rhs: Value) -> Result<(), Diagnosis> {
     match Fold::new(&sema.target).shift_out_of_range(lhs, rhs) {
-        true => Err(Diagnosis::ShiftCountOutOfRange),
+        true => Err(Diagnosis::Poisoned),
         false => Ok(()),
     }
 }
@@ -224,7 +224,7 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSi
         Expression::StringLiteral(_)
         | Expression::Assign(_, _, _)
         | Expression::List(_)
-        | Expression::ArrayAccess(_, _)
+        | Expression::ArraySubscripting(_, _)
         | Expression::FunctionCall(_, _)
         | Expression::Member(_, _, _) => Err(Diagnosis::NonConstantExpression),
     }

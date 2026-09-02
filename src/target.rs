@@ -80,7 +80,7 @@ impl Target {
         .into()
     }
 
-    pub fn scalar(&self, ty: &ResolvedType) -> Option<Layout> {
+    pub fn layout(&self, ty: &ResolvedType) -> Option<Layout> {
         let layout = match ty {
             ResolvedType::Char | ResolvedType::SignedChar | ResolvedType::UnsignedChar => self.char,
             ResolvedType::Short | ResolvedType::UnsignedShort => self.short,
@@ -134,7 +134,7 @@ impl Target {
     }
 
     pub fn bits(&self, ty: &ResolvedType) -> Option<u32> {
-        self.scalar(ty).map(|l| l.size * 8)
+        self.layout(ty).map(|l| l.size * 8)
     }
 
     pub fn max_value(&self, ty: &ResolvedType) -> Option<u64> {

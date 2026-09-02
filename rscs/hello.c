@@ -1,10 +1,11 @@
-// void max(int a, ...) {
-// 	int tab[1];
-// 	int *ptr;
-// 	max(1, tab, ptr);
-// }
+struct a {
+	int a;
+};
 
 void fn(void) {
-	const int a;
-	a = 2;
+	struct a *st;
+	struct a *pst;
+	int i;
+
+	(st = pst)->a = 1;
 }

@@ -1,6 +1,6 @@
 use crate::ast::{Name, Tag};
 use crate::define_arena;
-use crate::semantic::{SymbolId, SymbolKind};
+use crate::semantic::{Sema, SymbolId, SymbolKind};
 
 define_arena!(TagDef, TagDefArena, TagDefId, crate::semantic::Sema, sema, tags);
 
@@ -35,6 +35,13 @@ impl TagDef {
 
     pub fn is_enum(&self) -> bool {
         matches!(self.kind, Tag::Enum)
+    }
+
+    pub fn get_member(&self, sema: &Sema, name: &Name) -> Option<SymbolId> {
+        self.members.iter().find_map(|&member| {
+            let Member::Symbol(sym_id) = member else { return None };
+            (sema.symbols.get(sym_id).name.id == name.id).then_some(sym_id)
+        })
     }
 }
 
