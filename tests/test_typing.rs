@@ -476,6 +476,162 @@ rejects_shaped!(
     ]
 );
 
+// ---- 6.3.3.2 address and indirection operators ----------------------------
+
+// 6.3.3.2 The result of the unary & operator is a pointer to the object or function
+// designated by its operand.
+shaped!(
+    the_address_of_an_object_is_a_pointer_to_it,
+    "int i; void f(void) { &i; }",
+    vec![lv(Ty::Int), rv(Ty::ptr(Ty::Int))]
+);
+
+// 6.2.2.1 an lvalue operand of the unary & operator is not converted to the value it
+// designates, and an array operand does not become a pointer to its first element.
+shaped!(
+    the_address_of_an_array_is_a_pointer_to_the_array,
+    "int a[3]; void f(void) { &a; }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::arr(Ty::Int, 3)),
+        rv(Ty::ptr(Ty::arr(Ty::Int, 3))),
+    ]
+);
+
+// 6.3.3.2 The operand shall be either a function designator or an lvalue.
+shaped!(
+    the_address_of_a_function_is_a_pointer_to_function,
+    "int g(void); void f(void) { &g; }",
+    vec![rv(Ty::func0(Ty::Int)), rv(Ty::ptr(Ty::func0(Ty::Int)))]
+);
+
+// 6.3.3.2 If the operand has type "type", the result has type "pointer to type": the
+// qualifiers of the designated object are those of the pointed-to type.
+shaped!(
+    the_address_of_a_const_object_points_to_a_const_type,
+    "void f(void) { const int c; &c; }",
+    vec![lv(Ty::konst(Ty::Int)), rv(Ty::ptr(Ty::konst(Ty::Int)))]
+);
+
+shaped!(
+    the_address_of_a_volatile_object_points_to_a_volatile_type,
+    "void f(void) { volatile int v; &v; }",
+    vec![lv(Ty::vol(Ty::Int)), rv(Ty::ptr(Ty::vol(Ty::Int)))]
+);
+
+// 6.3.3.2 the result of the unary & operator is not itself an lvalue.
+rejects_shaped!(
+    assigning_to_an_address_is_rejected,
+    "int i, *p; void f(void) { &i = p; }",
+    Diagnosis::AssignToRValue,
+    vec![lv(Ty::Int), rv(Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)), none()]
+);
+
+// 6.3.3.2 The operand shall be either a function designator or an lvalue.
+rejects_shaped!(
+    the_address_of_a_constant_is_rejected,
+    "void f(void) { &1; }",
+    Diagnosis::RValueAddress(_),
+    vec![rv(Ty::Int), none()]
+);
+
+rejects_shaped!(
+    the_address_of_an_enumeration_constant_is_rejected,
+    "enum E { A }; void f(void) { &A; }",
+    Diagnosis::RValueAddress(_),
+    vec![rv(Ty::Int), none()]
+);
+
+// 6.3.3.2 an lvalue that designates a member of a structure or an element of an array is
+// still an lvalue: its address may be taken.
+shaped!(
+    the_address_of_a_member_is_a_pointer_to_it,
+    "struct S { int x; } s; void f(void) { &s.x; }",
+    vec![lv(Ty::strukt("S")), lv(Ty::Int), rv(Ty::ptr(Ty::Int))]
+);
+
+shaped!(
+    the_address_of_an_array_element_is_a_pointer_to_it,
+    "int a[3]; void f(void) { &a[0]; }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+        lv(Ty::Int),
+        rv(Ty::ptr(Ty::Int)),
+    ]
+);
+
+shaped!(
+    the_address_of_a_string_literal_is_a_pointer_to_the_array,
+    "void f(void) { &\"ab\"; }",
+    vec![lv(Ty::arr(Ty::Char, 3)), rv(Ty::ptr(Ty::arr(Ty::Char, 3)))]
+);
+
+// 6.3.3.2 If the operand is the result of a unary * operator, neither that operator nor the &
+// operator is evaluated and the result is as if both were omitted.
+shaped!(
+    the_address_of_a_dereference_is_the_pointer_itself,
+    "int *p; void f(void) { &*p; }",
+    vec![
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        lv(Ty::Int),
+        rv(Ty::ptr(Ty::Int)),
+    ]
+);
+
+// 6.3.3.2 The operand shall be an lvalue that designates an object that is not a bit-field
+// and is not declared with the register storage-class specifier.
+reject!(
+    ignore "6.3.3.2: a bit-field member is reached through a Member node, which carries no binding for & to test",
+    the_address_of_a_bit_field_is_rejected,
+    "struct S { int x : 3; } s; void f(void) { &s.x; }"
+);
+
+reject!(
+    the_address_of_a_register_object_is_rejected,
+    "void f(void) { register int i; &i; }"
+);
+
+// 6.3.3.2 The operand of the unary * operator shall have pointer type.
+reject!(indirection_on_an_integer_is_rejected, "void f(void) { int i; *i; }");
+
+reject!(
+    indirection_on_a_structure_is_rejected,
+    "struct S { int x; } s; void f(void) { *s; }"
+);
+
+// 6.3.3.2 If the operand points to an object, the result is an lvalue designating the object.
+shaped!(
+    indirection_through_a_pointer_designates_an_object,
+    "int *p; void f(void) { *p; }",
+    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::Int)]
+);
+
+accept!(a_dereferenced_pointer_is_assignable, "int *p; void f(void) { *p = 1; }");
+
+// 6.2.2.1 the operand of unary * is converted: an array becomes a pointer to its first
+// element, so *a designates the first element of a.
+accept!(
+    indirection_on_an_array_designates_its_first_element,
+    "int a[3]; void f(void) { *a = 1; }"
+);
+
+// 6.2.2.1 a function designator is converted to a pointer to function, so *g designates g.
+accept!(
+    indirection_on_a_function_designator_designates_the_function,
+    "int g(void); void f(void) { (*g)(); }"
+);
+
+// 6.3.3.2 If the operand points to an object, the result is an lvalue designating the object:
+// void is not an object type.
+reject!(
+    indirection_on_a_pointer_to_void_is_rejected,
+    "void *v; void f(void) { *v; }"
+);
+
 // ---- 6.3.3.3 unary arithmetic operators ----------------------------------
 
 rejects_shaped!(
@@ -490,6 +646,136 @@ rejects_shaped!(
     "struct S { int x; } s; void f(void) { -s; }",
     Diagnosis::InvalidUnary(_),
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
+);
+
+// 6.3.3.3 The result of the unary + operator is the value of its operand. The integral
+// promotion is performed on the operand, and the result has the promoted type.
+shaped!(
+    unary_plus_yields_the_value_of_its_operand,
+    "int i; void f(void) { +i; }",
+    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]
+);
+
+shaped!(
+    unary_plus_promotes_its_operand,
+    "void f(void) { char c; +c; }",
+    vec![
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.3.3 The operand of the unary + or - operator shall have arithmetic type.
+rejects_shaped!(
+    unary_plus_rejects_a_pointer,
+    "int *p; void f(void) { +p; }",
+    Diagnosis::InvalidUnary(_),
+    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]
+);
+
+rejects_shaped!(
+    unary_plus_rejects_a_structure,
+    "struct S { int x; } s; void f(void) { +s; }",
+    Diagnosis::InvalidUnary(_),
+    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
+);
+
+// 6.3.3.3 The integral promotion is performed on the operand of ~, and the result has the
+// promoted type.
+shaped!(
+    a_complement_yields_the_promoted_type_of_its_operand,
+    "int i; void f(void) { ~i; }",
+    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]
+);
+
+shaped!(
+    a_complement_promotes_its_operand,
+    "void f(void) { char c; ~c; }",
+    vec![
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_complement_of_an_unsigned_operand_stays_unsigned,
+    "void f(void) { unsigned u; ~u; }",
+    vec![lv(Ty::UInt).then(LValueToRValue, Ty::UInt), rv(Ty::UInt)]
+);
+
+// 6.3.3.3 The operand of the ~ operator shall have integral type.
+rejects_shaped!(
+    a_complement_rejects_a_floating_operand,
+    "void f(void) { double d; ~d; }",
+    Diagnosis::InvalidUnary(_),
+    vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), none()]
+);
+
+rejects_shaped!(
+    a_complement_rejects_a_pointer,
+    "int *p; void f(void) { ~p; }",
+    Diagnosis::InvalidUnary(_),
+    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]
+);
+
+// 6.3.3.3 The result of the logical negation operator ! is 0 or 1: the result has type int.
+shaped!(
+    a_logical_negation_has_type_int,
+    "int i; void f(void) { !i; }",
+    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]
+);
+
+shaped!(
+    a_logical_negation_of_a_floating_operand_has_type_int,
+    "void f(void) { double d; !d; }",
+    vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Int)]
+);
+
+shaped!(
+    a_logical_negation_of_a_pointer_has_type_int,
+    "int *p; void f(void) { !p; }",
+    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int)]
+);
+
+// 6.3.3.3 the result of ! has type int whatever the operand is: the operand is not promoted.
+shaped!(
+    a_logical_negation_does_not_promote_its_operand,
+    "void f(void) { char c; !c; }",
+    vec![lv(Ty::Char).then(LValueToRValue, Ty::Char), rv(Ty::Int)]
+);
+
+// 6.3.3.3 The operand of the unary ! operator shall have scalar type.
+rejects_shaped!(
+    a_logical_negation_rejects_a_structure,
+    "struct S { int x; } s; void f(void) { !s; }",
+    Diagnosis::InvalidUnary(_),
+    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
+);
+
+// 6.2.2.1 the operand of ! is converted: an array becomes a pointer to its first element and
+// a function designator becomes a pointer to function, both of which are scalar.
+shaped!(
+    a_logical_negation_of_an_array_is_accepted,
+    "int a[3]; void f(void) { !a; }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_logical_negation_of_a_function_designator_is_accepted,
+    "int g(); void f(void) { !g; }",
+    vec![
+        rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))),
+        rv(Ty::Int),
+    ]
 );
 
 // ---- 6.3.6 additive operators --------------------------------------------

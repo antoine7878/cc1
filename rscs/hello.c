@@ -1,6 +1,3 @@
 struct S;
 
-void fn(void) {
-	struct S *a;
-	a++;
-}
+enum E { A = sizeof(struct S) };

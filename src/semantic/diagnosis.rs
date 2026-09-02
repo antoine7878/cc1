@@ -49,6 +49,11 @@ pub enum Diagnosis {
     /// 6.3.2.4
     BadPostIncDec(UnaryOp, QualifiedType),
     InvalidUnary(QualifiedType),
+    /// 6.3.3.2
+    BitFieldAddress,
+    RegisterAddress,
+    RValueAddress(QualifiedType),
+
     /// 6.3.4
     CastToNonScalar,
     CastOfNonScalar,
@@ -72,6 +77,8 @@ pub enum Diagnosis {
 
     AssignToRValue,
     ConstAssignment(QualifiedType),
+    IndirectionNotPointer(QualifiedType),
+    IndirectionToVoid,
     // InvalidCast,
     /// 6.4
     NonConstantExpression,
@@ -175,6 +182,12 @@ impl DiagnosisNode {
 
             Diagnosis::InvalidUnary(ty) => format!("invalid argument type '{}' to unary expression", ty.describe(sema, ctx)),
 
+            Diagnosis::BitFieldAddress => "address of bit-field requested".to_string(),
+            Diagnosis::RegisterAddress => "address of register variable requested".to_string(),
+            Diagnosis::RValueAddress(ty) => format!( "cannot take the address of an rvalue of type '{}'", ty.describe(sema, ctx)),
+
+            Diagnosis::IndirectionNotPointer(ty) => format!("indirection requires pointer operand ('{}' invalid)", ty.describe(sema, ctx)),
+            Diagnosis::IndirectionToVoid => "ISO C does not allow indirection on operand of type 'void *'".to_string(),
             Diagnosis::FunctionReturningArray(ty) => format!("function cannot return array type ‘{}’", ty.describe(sema, ctx)),
             Diagnosis::FunctionReturningFunction(ty) => format!("function cannot return function type ‘{}’", ty.describe(sema, ctx)),
             Diagnosis::InvalidBianryOperand(lhs, rhs) => format!("invalid operands to binary expression ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
