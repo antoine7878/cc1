@@ -1,5 +1,7 @@
-use cc1::ast::{Fold, Rank, Value};
-use cc1::semantic::{Diag, Diagnosis};
+use std::cmp::Ordering;
+
+use cc1::ast::{BinaryOp, Fold, UnaryOp, Value};
+use cc1::semantic::{Diag, Diagnosis, ResolvedType};
 use cc1::target::{I386, X86_64};
 
 trait FoldValue {
@@ -13,6 +15,11 @@ impl FoldValue for Value {
 impl FoldValue for Diag<Value> {
     fn fold_value(self) -> Value {
         self.res
+    }
+}
+impl FoldValue for Option<Value> {
+    fn fold_value(self) -> Value {
+        self.expect("conversion should succeed")
     }
 }
 
@@ -112,117 +119,152 @@ constant!(literal_char_multi_is_packed, "'ab'", "Int(24930)");
 constant!(literal_wide_char, "L'a'", "Int(97)");
 constant!(literal_wide_char_is_not_sign_extended, "L'\\xff'", "Int(255)");
 
-fold!(add_int, add(Value::Int(1), Value::Int(2)), "Int(3)");
-fold_overflow!(add_wraps, add(Value::Int(i32::MAX), Value::Int(1)), "Int(-2147483648)");
+fold!(
+    add_int,
+    binary(&ResolvedType::Int, BinaryOp::Add, Value::Int(1), Value::Int(2)),
+    "Int(3)"
+);
+fold_overflow!(
+    add_wraps,
+    binary(&ResolvedType::Int, BinaryOp::Add, Value::Int(i32::MAX), Value::Int(1)),
+    "Int(-2147483648)"
+);
 fold!(
     sub_unsigned_wraps,
-    sub(Value::UnsignedInt(1), Value::UnsignedInt(2)),
+    binary(
+        &ResolvedType::UnsignedInt,
+        BinaryOp::Sub,
+        Value::UnsignedInt(1),
+        Value::UnsignedInt(2)
+    ),
     "UnsignedInt(4294967295)"
 );
-fold_overflow!(mul_wraps, mul(Value::Int(65536), Value::Int(65536)), "Int(0)");
-fold!(div_int, div(Value::Int(7), Value::Int(2)), "Int(3)");
+fold_overflow!(
+    mul_wraps,
+    binary(&ResolvedType::Int, BinaryOp::Mul, Value::Int(65536), Value::Int(65536)),
+    "Int(0)"
+);
+fold!(
+    div_int,
+    binary(&ResolvedType::Int, BinaryOp::Div, Value::Int(7), Value::Int(2)),
+    "Int(3)"
+);
 fold!(
     div_negative_truncates_toward_zero,
-    div(Value::Int(-7), Value::Int(2)),
+    binary(&ResolvedType::Int, BinaryOp::Div, Value::Int(-7), Value::Int(2)),
     "Int(-3)"
 );
-fold!(rem_int, rem(Value::Int(7), Value::Int(2)), "Int(1)");
+fold!(
+    rem_int,
+    binary(&ResolvedType::Int, BinaryOp::Mod, Value::Int(7), Value::Int(2)),
+    "Int(1)"
+);
 fold!(
     rem_keeps_sign_of_dividend,
-    rem(Value::Int(-7), Value::Int(2)),
+    binary(&ResolvedType::Int, BinaryOp::Mod, Value::Int(-7), Value::Int(2)),
     "Int(-1)"
 );
 
 fold!(
-    add_promotes_to_unsigned,
-    add(Value::Int(1), Value::UnsignedInt(0)),
-    "UnsignedInt(1)"
-);
-fold!(add_promotes_to_long, add(Value::Int(1), Value::Long(1)), "Long(2)");
-fold!(
-    unsigned_int_and_long_meet_at_unsigned_long_on_i386,
-    add(Value::UnsignedInt(1), Value::Long(-1)),
-    "UnsignedLong(0)"
+    bitand_int,
+    binary(&ResolvedType::Int, BinaryOp::BitAnd, Value::Int(6), Value::Int(3)),
+    "Int(2)"
 );
 fold!(
-    add_promotes_to_double,
-    add(Value::Int(1), Value::Double(0.5)),
-    "Double(1.5)"
+    bitor_int,
+    binary(&ResolvedType::Int, BinaryOp::BitOr, Value::Int(6), Value::Int(3)),
+    "Int(7)"
 );
 fold!(
-    div_promotes_to_double,
-    div(Value::Int(1), Value::Double(2.0)),
-    "Double(0.5)"
+    bitxor_int,
+    binary(&ResolvedType::Int, BinaryOp::BitXor, Value::Int(6), Value::Int(3)),
+    "Int(5)"
 );
 fold!(
-    add_promotes_to_long_double,
-    add(Value::Double(1.0), Value::LongDouble(1.0)),
-    "LongDouble(2.0)"
+    shift_left,
+    binary(&ResolvedType::Int, BinaryOp::Left, Value::Int(1), Value::Int(4)),
+    "Int(16)"
 );
-
-fold!(bitand_int, bitand(Value::Int(6), Value::Int(3)), "Int(2)");
-fold!(bitor_int, bitor(Value::Int(6), Value::Int(3)), "Int(7)");
-fold!(bitxor_int, bitxor(Value::Int(6), Value::Int(3)), "Int(5)");
-fold!(
-    bitand_promotes_to_unsigned,
-    bitand(Value::Int(-1), Value::UnsignedInt(255)),
-    "UnsignedInt(255)"
-);
-fold!(shift_left, shl(Value::Int(1), Value::Int(4)), "Int(16)");
 fold!(
     shift_left_into_sign_bit,
-    shl(Value::Int(1), Value::Int(31)),
+    binary(&ResolvedType::Int, BinaryOp::Left, Value::Int(1), Value::Int(31)),
     "Int(-2147483648)"
 );
-#[test]
-fn a_shift_count_at_or_past_the_operand_width_is_out_of_range() {
-    let fold = Fold::new(&I386);
-    assert!(fold.shift_out_of_range(Value::Int(1), Value::Int(32)));
-    assert!(fold.shift_out_of_range(Value::Int(1), Value::Int(-1)));
-    assert!(!fold.shift_out_of_range(Value::Int(1), Value::Int(31)));
-}
-fold!(shift_right_is_arithmetic, shr(Value::Int(-8), Value::Int(1)), "Int(-4)");
+fold!(
+    shift_right_is_arithmetic,
+    binary(&ResolvedType::Int, BinaryOp::Right, Value::Int(-8), Value::Int(1)),
+    "Int(-4)"
+);
 fold!(
     shift_right_unsigned_is_logical,
-    shr(Value::UnsignedInt(2147483648), Value::Int(31)),
+    binary(
+        &ResolvedType::UnsignedInt,
+        BinaryOp::Right,
+        Value::UnsignedInt(2147483648),
+        Value::Int(31)
+    ),
     "UnsignedInt(1)"
 );
 fold!(
     shift_keeps_left_operand_type,
-    shl(Value::Long(1), Value::Int(1)),
+    binary(&ResolvedType::Long, BinaryOp::Left, Value::Long(1), Value::Int(1)),
     "Long(2)"
 );
 
-fold!(neg_int, neg(Value::Int(1)), "Int(-1)");
-fold_overflow!(neg_wraps, neg(Value::Int(i32::MIN)), "Int(-2147483648)");
-fold!(neg_double, neg(Value::Double(1.5)), "Double(-1.5)");
-fold!(bitnot_int, bit_not(Value::Int(0)), "Int(-1)");
+fold!(
+    neg_int,
+    unary(&ResolvedType::Int, UnaryOp::Minus, Value::Int(1)),
+    "Int(-1)"
+);
+fold_overflow!(
+    neg_wraps,
+    unary(&ResolvedType::Int, UnaryOp::Minus, Value::Int(i32::MIN)),
+    "Int(-2147483648)"
+);
+fold!(
+    neg_double,
+    unary(&ResolvedType::Double, UnaryOp::Minus, Value::Double(1.5)),
+    "Double(-1.5)"
+);
+fold!(
+    bitnot_int,
+    unary(&ResolvedType::Int, UnaryOp::BitNot, Value::Int(0)),
+    "Int(-1)"
+);
 fold!(
     bitnot_unsigned,
-    bit_not(Value::UnsignedInt(0)),
+    unary(&ResolvedType::UnsignedInt, UnaryOp::BitNot, Value::UnsignedInt(0)),
     "UnsignedInt(4294967295)"
 );
 
-fold!(convert_to_int, convert(Value::Long(300), Rank::Int), "Int(300)");
+fold!(
+    convert_to_int,
+    convert(&ResolvedType::Int, Value::Long(300)),
+    "Int(300)"
+);
 fold!(
     convert_to_int_wraps,
-    convert(Value::Long(4294967297), Rank::Int),
+    convert(&ResolvedType::Int, Value::Long(4294967297)),
     "Int(1)"
 );
 fold!(
     convert_to_unsigned_long_is_32_bits_on_i386,
-    convert(Value::Int(-1), Rank::UnsignedLong),
+    convert(&ResolvedType::UnsignedLong, Value::Int(-1)),
     "UnsignedLong(4294967295)"
 );
 fold!(
     convert_to_long_is_32_bits_on_i386,
-    convert(Value::UnsignedLong(4294967296), Rank::Long),
+    convert(&ResolvedType::Long, Value::UnsignedLong(4294967296)),
     "Long(0)"
 );
-fold!(convert_to_double, convert(Value::Int(3), Rank::Double), "Double(3.0)");
+fold!(
+    convert_to_double,
+    convert(&ResolvedType::Double, Value::Int(3)),
+    "Double(3.0)"
+);
 fold!(
     convert_from_double_truncates,
-    convert(Value::Double(3.9), Rank::Int),
+    convert(&ResolvedType::Int, Value::Double(3.9)),
     "Int(3)"
 );
 
@@ -230,11 +272,11 @@ fold!(
 fn a_wider_target_keeps_the_whole_value() {
     let fold = Fold::new(&X86_64);
     assert_eq!(
-        repr(fold.convert(Value::UnsignedLong(4294967296), Rank::Long)),
+        repr(fold.convert(&ResolvedType::Long, Value::UnsignedLong(4294967296))),
         "Long(4294967296)"
     );
     assert_eq!(
-        repr(fold.convert(Value::Int(-1), Rank::UnsignedLong)),
+        repr(fold.convert(&ResolvedType::UnsignedLong, Value::Int(-1))),
         "UnsignedLong(18446744073709551615)"
     );
 }
@@ -242,7 +284,15 @@ fn a_wider_target_keeps_the_whole_value() {
 #[test]
 fn unsigned_int_and_long_meet_at_long_on_x86_64() {
     let fold = Fold::new(&X86_64);
-    assert_eq!(repr(fold.add(Value::UnsignedInt(1), Value::Long(-1))), "Long(0)");
+    assert_eq!(
+        repr(fold.binary(
+            &ResolvedType::Long,
+            BinaryOp::Add,
+            Value::UnsignedInt(1),
+            Value::Long(-1)
+        )),
+        "Long(0)"
+    );
 }
 
 #[test]
@@ -308,84 +358,80 @@ fn to_i64_and_to_u64_reinterpret() {
 }
 
 #[test]
-fn equality_applies_usual_conversions() {
+fn equality_compares_same_type_operands() {
     let fold = Fold::new(&I386);
-    assert!(fold.eq(Value::Int(1), Value::Long(1)));
-    assert!(fold.eq(Value::Int(1), Value::Double(1.0)));
-    assert!(fold.eq(Value::Int(-1), Value::UnsignedInt(u32::MAX)));
-    assert!(fold.ne(Value::Int(1), Value::Int(2)));
+    assert!(matches!(
+        fold.compare(Value::Int(1), Value::Int(1)),
+        Some(Ordering::Equal)
+    ));
+    assert!(matches!(
+        fold.compare(Value::Double(1.0), Value::Double(1.0)),
+        Some(Ordering::Equal)
+    ));
+    assert!(matches!(
+        fold.compare(Value::Int(1), Value::Int(2)),
+        Some(Ordering::Less | Ordering::Greater)
+    ));
 }
 
 #[test]
-fn ordering_applies_usual_conversions() {
+fn ordering_compares_same_type_operands() {
     let fold = Fold::new(&I386);
-    assert!(fold.lt(Value::Int(1), Value::Int(2)));
-    assert!(fold.lt(Value::Int(1), Value::Double(1.5)));
-    assert!(fold.gt(Value::Int(-1), Value::UnsignedInt(0)));
-    assert!(fold.lt(Value::Long(-1), Value::Long(0)));
-    assert!(fold.le(Value::Int(2), Value::Int(2)));
-    assert!(fold.ge(Value::Int(2), Value::Int(2)));
+    assert!(matches!(
+        fold.compare(Value::Int(1), Value::Int(2)),
+        Some(Ordering::Less)
+    ));
+    assert!(matches!(
+        fold.compare(Value::Double(1.0), Value::Double(1.5)),
+        Some(Ordering::Less)
+    ));
+    assert!(matches!(
+        fold.compare(Value::UnsignedInt(1), Value::UnsignedInt(0)),
+        Some(Ordering::Greater)
+    ));
+    assert!(matches!(
+        fold.compare(Value::Long(-1), Value::Long(0)),
+        Some(Ordering::Less)
+    ));
+    assert!(matches!(
+        fold.compare(Value::Int(2), Value::Int(2)),
+        Some(Ordering::Less | Ordering::Equal)
+    ));
+    assert!(matches!(
+        fold.compare(Value::Int(2), Value::Int(2)),
+        Some(Ordering::Greater | Ordering::Equal)
+    ));
 }
 
 #[test]
 fn every_operator_folds_in_sequence() {
     let fold = Fold::new(&I386);
+    let ty = ResolvedType::Int;
+    let steps = [
+        (BinaryOp::Add, 2, "Int(3)"),
+        (BinaryOp::Mul, 4, "Int(12)"),
+        (BinaryOp::Sub, 2, "Int(10)"),
+        (BinaryOp::Div, 3, "Int(3)"),
+        (BinaryOp::Mod, 2, "Int(1)"),
+        (BinaryOp::Left, 3, "Int(8)"),
+        (BinaryOp::Right, 1, "Int(4)"),
+        (BinaryOp::BitOr, 1, "Int(5)"),
+        (BinaryOp::BitAnd, 3, "Int(1)"),
+        (BinaryOp::BitXor, 3, "Int(2)"),
+    ];
     let mut value = Value::Int(1);
-    value = fold.add(value, Value::Int(2)).res;
-    assert_eq!(repr(value), "Int(3)");
-    value = fold.mul(value, Value::Int(4)).res;
-    assert_eq!(repr(value), "Int(12)");
-    value = fold.sub(value, Value::Int(2)).res;
-    assert_eq!(repr(value), "Int(10)");
-    value = fold.div(value, Value::Int(3));
-    assert_eq!(repr(value), "Int(3)");
-    value = fold.rem(value, Value::Int(2));
-    assert_eq!(repr(value), "Int(1)");
-    value = fold.shl(value, Value::Int(3));
-    assert_eq!(repr(value), "Int(8)");
-    value = fold.shr(value, Value::Int(1));
-    assert_eq!(repr(value), "Int(4)");
-    value = fold.bitor(value, Value::Int(1));
-    assert_eq!(repr(value), "Int(5)");
-    value = fold.bitand(value, Value::Int(3));
-    assert_eq!(repr(value), "Int(1)");
-    value = fold.bitxor(value, Value::Int(3));
-    assert_eq!(repr(value), "Int(2)");
+    for (op, rhs, expected) in steps {
+        value = fold.binary(&ty, op, value, Value::Int(rhs)).res;
+        assert_eq!(repr(value), expected, "{op:?}");
+    }
 }
 
 #[test]
 fn the_minimum_of_a_signed_type_is_recognised() {
     let fold = Fold::new(&I386);
-    assert!(fold.is_min(Value::Int(i32::MIN)));
-    assert!(fold.is_min(Value::Long(-2147483648)));
-    assert!(!fold.is_min(Value::Int(0)));
-    assert!(!fold.is_min(Value::UnsignedInt(0)));
-    assert!(!fold.is_min(Value::UnsignedLong(0)));
-}
-
-#[test]
-fn rank_is_ordered_from_int_to_long_double() {
-    assert!(Rank::Int < Rank::UnsignedInt);
-    assert!(Rank::UnsignedInt < Rank::Long);
-    assert!(Rank::Long < Rank::UnsignedLong);
-    assert!(Rank::UnsignedLong < Rank::Float);
-    assert!(Rank::Float < Rank::Double);
-    assert!(Rank::Double < Rank::LongDouble);
-}
-
-#[test]
-fn rank_is_floating_covers_the_real_ranks() {
-    assert!(Rank::Float.is_floating());
-    assert!(Rank::Double.is_floating());
-    assert!(Rank::LongDouble.is_floating());
-    assert!(!Rank::Int.is_floating());
-    assert!(!Rank::UnsignedLong.is_floating());
-}
-
-#[test]
-fn rank_to_integer_caps_at_unsigned_long() {
-    assert_eq!(Rank::Int.to_integer(), Rank::Int);
-    assert_eq!(Rank::UnsignedLong.to_integer(), Rank::UnsignedLong);
-    assert_eq!(Rank::Float.to_integer(), Rank::UnsignedLong);
-    assert_eq!(Rank::LongDouble.to_integer(), Rank::UnsignedLong);
+    assert!(fold.is_min(&ResolvedType::Int, Value::Int(i32::MIN)));
+    assert!(fold.is_min(&ResolvedType::Long, Value::Long(-2147483648)));
+    assert!(!fold.is_min(&ResolvedType::Int, Value::Int(0)));
+    assert!(!fold.is_min(&ResolvedType::UnsignedInt, Value::UnsignedInt(0)));
+    assert!(!fold.is_min(&ResolvedType::UnsignedLong, Value::UnsignedLong(0)));
 }

@@ -1,10 +1,11 @@
+use std::cmp::Ordering;
+
 use crate::arena::ResolveWith;
 use crate::ast::visit::Visitor;
 use crate::ast::{BinaryOp, Expression, ExpressionNode, Fold, Tag, UnaryOp, Value};
 use crate::context::Context;
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedType, Sema, SymbolKind, SymbolResolver,
-    declaration, layout,
 };
 
 struct DiagSink<'a>(&'a mut Vec<DiagnosisNode>);
@@ -38,195 +39,59 @@ pub fn try_fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option
     fold(sema, ctx, expr, &mut DiagSink(&mut Vec::new())).ok()
 }
 
-fn cast(sema: &mut Sema, qualif: QualifiedType, val: Value) -> Result<Value, Diagnosis> {
-    let ty = qualif.id.resolve(sema);
-    if let ResolvedType::Tag(id) = ty {
-        return match (*id).resolve(sema).kind {
-            Tag::Enum => sema
-                .target
-                .cast(&ResolvedType::Int, val)
-                .ok_or(Diagnosis::NonIntegerConstantExpression),
-            _ => Err(Diagnosis::CastToNonScalar),
+fn scalar_ty(sema: &Sema, qty: QualifiedType) -> ResolvedType {
+    let ty = qty.id.resolve(sema);
+    if let ResolvedType::Tag(id) = ty
+        && (*id).resolve(sema).kind == Tag::Enum
+    {
+        return ResolvedType::Int;
+    }
+    ty.clone()
+}
+
+fn node_ty(sema: &Sema, expr: &ExpressionNode) -> Result<QualifiedType, Diagnosis> {
+    sema.expr_resolved(expr.id).map(|re| re.ty).ok_or(Diagnosis::Poisoned)
+}
+
+fn operand(sema: &mut Sema, ctx: &Context, e: &ExpressionNode, sink: &mut DiagSink) -> Result<Value, Diagnosis> {
+    let value = fold(sema, ctx, e, sink)?;
+    let casted = sema
+        .expr_resolved(e.id)
+        .map(|re| re.casted_ty())
+        .ok_or(Diagnosis::Poisoned)?;
+    let ty = scalar_ty(sema, casted);
+    Fold::new(&sema.target)
+        .convert(&ty, value)
+        .ok_or(Diagnosis::NonIntegerConstantExpression)
+}
+
+fn divisor(sema: &Sema, ty: &ResolvedType, lhs: Value, rhs: Value, op: BinaryOp) -> Result<(), Diagnosis> {
+    if rhs.is_zero() {
+        return match op {
+            BinaryOp::Div => Err(Diagnosis::DivisionByZero),
+            BinaryOp::Mod => Err(Diagnosis::ModuloByZero),
+            _ => unreachable!(),
         };
     }
-    if let Some(casted) = sema.target.cast(ty, val) {
-        return Ok(casted);
+    if rhs.to_i64() == -1 && Fold::new(&sema.target).is_min(ty, lhs) {
+        return Err(Diagnosis::ConstantOverflow);
     }
-    match ty {
-        ResolvedType::Array { .. } | ResolvedType::Void => Err(Diagnosis::CastToNonScalar),
-        _ => Err(Diagnosis::NonIntegerConstantExpression),
-    }
-}
-
-fn operands(
-    sema: &mut Sema,
-    ctx: &Context,
-    e1: &ExpressionNode,
-    e2: &ExpressionNode,
-    sink: &mut DiagSink,
-) -> Result<(Value, Value), Diagnosis> {
-    let lhs = fold(sema, ctx, e1, sink)?;
-    let rhs = fold(sema, ctx, e2, sink)?;
-    Ok((lhs, rhs))
-}
-
-fn divisor(sema: &Sema, lhs: Value, rhs: Value, op: BinaryOp) -> Result<(), Diagnosis> {
-    if rhs.is_zero() {
-        match op {
-            BinaryOp::Div => return Err(Diagnosis::DivisionByZero),
-            BinaryOp::Mod => return Err(Diagnosis::ModuloByZero),
-            _ => unreachable!(),
-        }
-    }
-    let fold = Fold::new(&sema.target);
-    match fold.eq(rhs, Value::Int(-1)) && fold.is_min(lhs) {
-        true => Err(Diagnosis::ConstantOverflow),
-        false => Ok(()),
-    }
-}
-
-fn shift_count(sema: &Sema, lhs: Value, rhs: Value) -> Result<(), Diagnosis> {
-    match Fold::new(&sema.target).shift_out_of_range(lhs, rhs) {
-        true => Err(Diagnosis::Poisoned),
-        false => Ok(()),
-    }
-}
-
-macro_rules! fold {
-    ($sema:ident, $ctx:ident, $sink:ident, $e1:ident, $e2:ident, $method:ident) => {{
-        let (lhs, rhs) = operands($sema, $ctx, $e1, $e2, $sink)?;
-        Ok(Fold::new(&$sema.target).$method(lhs, rhs))
-    }};
-}
-
-macro_rules! fold_shift {
-    ($sema:ident, $ctx:ident, $sink:ident, $e1:ident, $e2:ident, $method:ident) => {{
-        let (lhs, rhs) = operands($sema, $ctx, $e1, $e2, $sink)?;
-        shift_count($sema, lhs, rhs)?;
-        Ok(Fold::new(&$sema.target).$method(lhs, rhs))
-    }};
-}
-
-macro_rules! fold_checked {
-    ($sema:ident, $ctx:ident, $sink:ident, $expr:ident, $e1:ident, $e2:ident, $method:ident) => {{
-        let (lhs, rhs) = operands($sema, $ctx, $e1, $e2, $sink)?;
-        let folded = Fold::new(&$sema.target).$method(lhs, rhs);
-        Ok($sink.add_diag(folded, &$expr.span))
-    }};
-}
-
-macro_rules! fold_divide {
-    ($sema:ident, $ctx:ident, $sink:ident, $e1:ident, $e2:ident, $method:ident) => {{
-        let (lhs, rhs) = operands($sema, $ctx, $e1, $e2, $sink)?;
-        divisor($sema, lhs, rhs, BinaryOp::Div)?;
-        Ok(Fold::new(&$sema.target).$method(lhs, rhs))
-    }};
-}
-
-macro_rules! fold_mod {
-    ($sema:ident, $ctx:ident, $sink:ident, $e1:ident, $e2:ident, $method:ident) => {{
-        let (lhs, rhs) = operands($sema, $ctx, $e1, $e2, $sink)?;
-        divisor($sema, lhs, rhs, BinaryOp::Mod)?;
-        Ok(Fold::new(&$sema.target).$method(lhs, rhs))
-    }};
-}
-
-macro_rules! fold_compare {
-    ($sema:ident, $ctx:ident, $sink:ident, $e1:ident, $e2:ident, $method:ident) => {{
-        let (lhs, rhs) = operands($sema, $ctx, $e1, $e2, $sink)?;
-        Ok(Value::from(Fold::new(&$sema.target).$method(lhs, rhs)))
-    }};
+    Ok(())
 }
 
 fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSink) -> Result<Value, Diagnosis> {
+    if let Some(Some(value)) = sema.constant_cached(expr.id) {
+        return Ok(value);
+    }
     match expr.id.resolve(ctx) {
-        Expression::ConstantExpression(expr) => fold(sema, ctx, expr, sink),
-        Expression::Identifier(_) => {
-            let id = sema.binding(expr.id).ok_or(Diagnosis::NonConstantExpression)?;
-            let symbol = id.resolve(sema);
-            if symbol.kind != SymbolKind::Variant {
-                return Err(Diagnosis::NonConstantExpression);
-            }
-            symbol.value.map(Value::Int).ok_or(Diagnosis::NonConstantExpression)
-        }
+        Expression::ConstantExpression(inner) => fold(sema, ctx, inner, sink),
         Expression::Constant(value_node) => Ok(value_node.value),
-        Expression::Unary(op, operand) => match op {
-            UnaryOp::Plus => fold(sema, ctx, operand, sink),
-            UnaryOp::Minus => {
-                let value = fold(sema, ctx, operand, sink)?;
-                let folded = Fold::new(&sema.target).neg(value);
-                Ok(sink.add_diag(folded, &expr.span))
-            }
-            UnaryOp::BitNot => {
-                let value = fold(sema, ctx, operand, sink)?;
-                Ok(Fold::new(&sema.target).bit_not(value))
-            }
-            UnaryOp::LogicalNot => Ok(fold(sema, ctx, operand, sink)?.logical_not()),
-            UnaryOp::PostInc
-            | UnaryOp::PostDec
-            | UnaryOp::PreInc
-            | UnaryOp::PreDec
-            | UnaryOp::Addr
-            | UnaryOp::Deref => Err(Diagnosis::NonConstantExpression),
-        },
-        Expression::Binary(op, e1, e2) => match op {
-            BinaryOp::Add => fold_checked!(sema, ctx, sink, expr, e1, e2, add),
-            BinaryOp::Sub => fold_checked!(sema, ctx, sink, expr, e1, e2, sub),
-            BinaryOp::Mul => fold_checked!(sema, ctx, sink, expr, e1, e2, mul),
-            BinaryOp::Div => fold_divide!(sema, ctx, sink, e1, e2, div),
-            BinaryOp::Mod => fold_mod!(sema, ctx, sink, e1, e2, rem),
-            BinaryOp::Left => fold_shift!(sema, ctx, sink, e1, e2, shl),
-            BinaryOp::Right => fold_shift!(sema, ctx, sink, e1, e2, shr),
-            BinaryOp::BitAnd => fold!(sema, ctx, sink, e1, e2, bitand),
-            BinaryOp::BitOr => fold!(sema, ctx, sink, e1, e2, bitor),
-            BinaryOp::BitXor => fold!(sema, ctx, sink, e1, e2, bitxor),
-            BinaryOp::Greater => fold_compare!(sema, ctx, sink, e1, e2, gt),
-            BinaryOp::Lower => fold_compare!(sema, ctx, sink, e1, e2, lt),
-            BinaryOp::GreaterEq => fold_compare!(sema, ctx, sink, e1, e2, ge),
-            BinaryOp::LowerEq => fold_compare!(sema, ctx, sink, e1, e2, le),
-            BinaryOp::Eq => fold_compare!(sema, ctx, sink, e1, e2, eq),
-            BinaryOp::Neq => fold_compare!(sema, ctx, sink, e1, e2, ne),
-            BinaryOp::LogicalAnd => Ok(Value::from(
-                fold(sema, ctx, e1, sink)?.is_true() && fold(sema, ctx, e2, sink)?.is_true(),
-            )),
-            BinaryOp::LogicalOr => Ok(Value::from(
-                fold(sema, ctx, e1, sink)?.is_true() || fold(sema, ctx, e2, sink)?.is_true(),
-            )),
-        },
-        Expression::Ternary(condition, e1, e2) => {
-            if fold(sema, ctx, condition, sink)?.is_true() {
-                fold(sema, ctx, e1, sink)
-            } else {
-                fold(sema, ctx, e2, sink)
-            }
-        }
-        Expression::SizeofExpr(_) => Err(Diagnosis::Poisoned),
-        Expression::SizeofType(ty_node) => {
-            let qualif = declaration::base_type(sema, ctx, &ty_node.specifiers, &expr.span)
-                .ok_or(Diagnosis::NonConstantExpression)?;
-            let (qualif, _) = declaration::declared_type(sema, ctx, Some(qualif), &ty_node.declarator)
-                .ok_or(Diagnosis::NonConstantExpression)?;
-            match layout::of(sema, qualif.id) {
-                Some(layout) => sema
-                    .target
-                    .cast(&sema.target.size_t, Value::UnsignedLong(layout.size.into()))
-                    .ok_or(Diagnosis::Poisoned),
-                None => Err(Diagnosis::Poisoned),
-            }
-        }
-        Expression::Cast(ty_node, operand) => {
-            if sema.expr_poisoned(expr.id) {
-                return Err(Diagnosis::Poisoned);
-            }
-            let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &expr.span);
-            let (qualif, _) = declaration::declared_type(sema, ctx, base, &ty_node.declarator)
-                .ok_or(Diagnosis::NonConstantExpression)?;
-            let val = fold(sema, ctx, operand, sink)?;
-            if val.is_floating() && !matches!(operand.id.resolve(ctx), Expression::Constant(_)) {
-                return Err(Diagnosis::NonConstantExpression);
-            }
-            cast(sema, qualif, val)
-        }
+        Expression::Identifier(_) => identifier(sema, expr),
+        Expression::Unary(op, e) => unary_op(sema, ctx, expr, *op, e, sink),
+        Expression::Binary(op, e1, e2) => binary_op(sema, ctx, expr, *op, e1, e2, sink),
+        Expression::Ternary(condition, e1, e2) => conditional(sema, ctx, condition, e1, e2, sink),
+        Expression::Cast(_, e) => cast(sema, ctx, expr, e, sink),
+        Expression::SizeofExpr(_) | Expression::SizeofType(_) => Err(Diagnosis::Poisoned),
         Expression::StringLiteral(_)
         | Expression::Assign(_, _, _)
         | Expression::List(_)
@@ -234,4 +99,177 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSi
         | Expression::FunctionCall(_, _)
         | Expression::Member(_, _, _) => Err(Diagnosis::NonConstantExpression),
     }
+}
+
+/// 6.4 An integral constant expression shall only have operands that are integer constants,
+/// enumeration constants, character constants, sizeof expressions, and floating constants that
+/// are the immediate operands of casts.
+fn identifier(sema: &Sema, expr: &ExpressionNode) -> Result<Value, Diagnosis> {
+    let id = sema.binding(expr.id).ok_or(Diagnosis::NonConstantExpression)?;
+    let symbol = id.resolve(sema);
+    if symbol.kind != SymbolKind::Variant {
+        return Err(Diagnosis::NonConstantExpression);
+    }
+    symbol.value.map(Value::Int).ok_or(Diagnosis::NonConstantExpression)
+}
+
+fn unary_op(
+    sema: &mut Sema,
+    ctx: &Context,
+    expr: &ExpressionNode,
+    op: UnaryOp,
+    e: &ExpressionNode,
+    sink: &mut DiagSink,
+) -> Result<Value, Diagnosis> {
+    match op {
+        UnaryOp::Plus => operand(sema, ctx, e, sink),
+        UnaryOp::Minus | UnaryOp::BitNot => {
+            let value = operand(sema, ctx, e, sink)?;
+            let ty = scalar_ty(sema, node_ty(sema, expr)?);
+            let folded = Fold::new(&sema.target).unary(&ty, op, value);
+            Ok(sink.add_diag(folded, &expr.span))
+        }
+        // 6.3.3.3 The result of the logical negation operator is 1 if the value of its operand
+        // compares equal to 0, 0 otherwise. The result has type int.
+        UnaryOp::LogicalNot => Ok(operand(sema, ctx, e, sink)?.logical_not()),
+        // 6.4 A constant expression shall not contain increment or decrement operators.
+        UnaryOp::PostInc | UnaryOp::PostDec | UnaryOp::PreInc | UnaryOp::PreDec | UnaryOp::Addr | UnaryOp::Deref => {
+            Err(Diagnosis::NonConstantExpression)
+        }
+    }
+}
+
+fn binary_op(
+    sema: &mut Sema,
+    ctx: &Context,
+    expr: &ExpressionNode,
+    op: BinaryOp,
+    e1: &ExpressionNode,
+    e2: &ExpressionNode,
+    sink: &mut DiagSink,
+) -> Result<Value, Diagnosis> {
+    match op {
+        BinaryOp::LogicalAnd | BinaryOp::LogicalOr => logical(sema, ctx, op, e1, e2, sink),
+        BinaryOp::Greater
+        | BinaryOp::Lower
+        | BinaryOp::GreaterEq
+        | BinaryOp::LowerEq
+        | BinaryOp::Eq
+        | BinaryOp::Neq => comparison(sema, ctx, op, e1, e2, sink),
+        BinaryOp::Div | BinaryOp::Mod => divide(sema, ctx, expr, op, e1, e2, sink),
+        _ => arithmetic(sema, ctx, expr, op, e1, e2, sink),
+    }
+}
+
+/// 6.3.13, 6.3.14 Unlike the bitwise binary operators, the && and || operators guarantee
+/// left-to-right evaluation; the second operand is not evaluated when the result is known.
+fn logical(
+    sema: &mut Sema,
+    ctx: &Context,
+    op: BinaryOp,
+    e1: &ExpressionNode,
+    e2: &ExpressionNode,
+    sink: &mut DiagSink,
+) -> Result<Value, Diagnosis> {
+    let lhs = fold(sema, ctx, e1, sink)?.is_true();
+    let value = match op {
+        BinaryOp::LogicalAnd => lhs && fold(sema, ctx, e2, sink)?.is_true(),
+        BinaryOp::LogicalOr => lhs || fold(sema, ctx, e2, sink)?.is_true(),
+        _ => unreachable!(),
+    };
+    Ok(Value::from(value))
+}
+
+/// 6.3.8, 6.3.9 Each of the operators yields 1 if the specified relation is true and 0 if it is
+/// false. The result has type int.
+fn comparison(
+    sema: &mut Sema,
+    ctx: &Context,
+    op: BinaryOp,
+    e1: &ExpressionNode,
+    e2: &ExpressionNode,
+    sink: &mut DiagSink,
+) -> Result<Value, Diagnosis> {
+    let lhs = operand(sema, ctx, e1, sink)?;
+    let rhs = operand(sema, ctx, e2, sink)?;
+    let ordering = Fold::new(&sema.target).compare(lhs, rhs);
+    let holds = match op {
+        BinaryOp::Greater => matches!(ordering, Some(Ordering::Greater)),
+        BinaryOp::Lower => matches!(ordering, Some(Ordering::Less)),
+        BinaryOp::GreaterEq => matches!(ordering, Some(Ordering::Greater | Ordering::Equal)),
+        BinaryOp::LowerEq => matches!(ordering, Some(Ordering::Less | Ordering::Equal)),
+        BinaryOp::Eq => matches!(ordering, Some(Ordering::Equal)),
+        BinaryOp::Neq => matches!(ordering, Some(Ordering::Less | Ordering::Greater)),
+        _ => unreachable!(),
+    };
+    Ok(Value::from(holds))
+}
+
+fn divide(
+    sema: &mut Sema,
+    ctx: &Context,
+    expr: &ExpressionNode,
+    op: BinaryOp,
+    e1: &ExpressionNode,
+    e2: &ExpressionNode,
+    sink: &mut DiagSink,
+) -> Result<Value, Diagnosis> {
+    let lhs = operand(sema, ctx, e1, sink)?;
+    let rhs = operand(sema, ctx, e2, sink)?;
+    let ty = scalar_ty(sema, node_ty(sema, expr)?);
+    divisor(sema, &ty, lhs, rhs, op)?;
+    Ok(Fold::new(&sema.target).binary(&ty, op, lhs, rhs).res)
+}
+
+fn arithmetic(
+    sema: &mut Sema,
+    ctx: &Context,
+    expr: &ExpressionNode,
+    op: BinaryOp,
+    e1: &ExpressionNode,
+    e2: &ExpressionNode,
+    sink: &mut DiagSink,
+) -> Result<Value, Diagnosis> {
+    let lhs = operand(sema, ctx, e1, sink)?;
+    let rhs = operand(sema, ctx, e2, sink)?;
+    let ty = scalar_ty(sema, node_ty(sema, expr)?);
+    let folded = Fold::new(&sema.target).binary(&ty, op, lhs, rhs);
+    Ok(sink.add_diag(folded, &expr.span))
+}
+
+/// 6.3.15 The first operand is evaluated; the second operand is evaluated only if the first
+/// compares unequal to 0, the third only if it compares equal to 0.
+fn conditional(
+    sema: &mut Sema,
+    ctx: &Context,
+    condition: &ExpressionNode,
+    e1: &ExpressionNode,
+    e2: &ExpressionNode,
+    sink: &mut DiagSink,
+) -> Result<Value, Diagnosis> {
+    match fold(sema, ctx, condition, sink)?.is_true() {
+        true => operand(sema, ctx, e1, sink),
+        false => operand(sema, ctx, e2, sink),
+    }
+}
+
+fn cast(
+    sema: &mut Sema,
+    ctx: &Context,
+    expr: &ExpressionNode,
+    e: &ExpressionNode,
+    sink: &mut DiagSink,
+) -> Result<Value, Diagnosis> {
+    // 6.4 An integral constant expression shall have integral type.
+    if node_ty(sema, expr)?.is_void(sema) {
+        return Err(Diagnosis::NonIntegerConstantExpression);
+    }
+    // 6.4 An integral constant expression shall only have operands that are integer constants,
+    // enumeration constants, character constants, sizeof expressions, and floating constants
+    // that are the immediate operands of casts.
+    let operand_ty = node_ty(sema, e)?;
+    if operand_ty.is_floating(sema) && !matches!(e.id.resolve(ctx), Expression::Constant(_)) {
+        return Err(Diagnosis::NonConstantExpression);
+    }
+    operand(sema, ctx, e, sink)
 }

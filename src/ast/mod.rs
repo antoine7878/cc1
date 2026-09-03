@@ -34,7 +34,7 @@ pub use tag::{
 };
 pub use type_specifier::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier};
 pub use unit::{ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode};
-pub use value::{Fold, Rank, Value, ValueNode};
+pub use value::{Fold, Value, ValueNode};
 pub use visit::Visitor;
 
 use crate::parser::Span;

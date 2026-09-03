@@ -2,7 +2,8 @@ use crate::ast_node;
 use crate::semantic::{Diag, Diagnosis, QualifiedType, ResolvedType, Sema};
 use crate::target::Target;
 use std::cmp::Ordering;
-use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Sub};
+
+use super::{BinaryOp, UnaryOp};
 
 // TODO: add custom f80
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -197,39 +198,6 @@ impl From<bool> for Value {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Rank {
-    Int,
-    UnsignedInt,
-    Long,
-    UnsignedLong,
-    Float,
-    Double,
-    LongDouble,
-}
-
-impl Rank {
-    pub fn is_floating(self) -> bool {
-        self >= Rank::Float
-    }
-
-    pub fn to_integer(self) -> Rank {
-        Rank::min(self, Rank::UnsignedLong)
-    }
-
-    fn resolved(self) -> ResolvedType {
-        match self {
-            Rank::Int => ResolvedType::Int,
-            Rank::UnsignedInt => ResolvedType::UnsignedInt,
-            Rank::Long => ResolvedType::Long,
-            Rank::UnsignedLong => ResolvedType::UnsignedLong,
-            Rank::Float => ResolvedType::Float,
-            Rank::Double => ResolvedType::Double,
-            Rank::LongDouble => ResolvedType::LongDouble,
-        }
-    }
-}
-
 impl Value {
     pub fn is_negative(&self) -> bool {
         match *self {
@@ -264,18 +232,6 @@ impl Value {
             Value::Float(i) => i == 0.,
             Value::Double(i) => i == 0.,
             Value::LongDouble(i) => i == 0.,
-        }
-    }
-
-    fn rank(self) -> Rank {
-        match self {
-            Value::Int(_) => Rank::Int,
-            Value::UnsignedInt(_) => Rank::UnsignedInt,
-            Value::Long(_) => Rank::Long,
-            Value::UnsignedLong(_) => Rank::UnsignedLong,
-            Value::Float(_) => Rank::Float,
-            Value::Double(_) => Rank::Double,
-            Value::LongDouble(_) => Rank::LongDouble,
         }
     }
 
@@ -326,7 +282,7 @@ impl Value {
     }
 
     pub fn is_floating(self) -> bool {
-        self.rank().is_floating()
+        matches!(self, Value::Float(_) | Value::Double(_) | Value::LongDouble(_))
     }
 
     pub fn is_true(self) -> bool {
@@ -342,129 +298,117 @@ pub struct Fold<'a> {
     target: &'a Target,
 }
 
-macro_rules! fold_arithmetic {
-    ($method:ident, $trait:ident, $overflowing:ident) => {
-        pub fn $method(&self, lhs: Value, rhs: Value) -> Diag<Value> {
-            let (value, overflow) = match self.usual(lhs, rhs) {
-                (Value::Int(a), Value::Int(b)) => {
-                    let (v, o) = a.$overflowing(b);
-                    (Value::Int(v), o)
-                }
-                (Value::Long(a), Value::Long(b)) => {
-                    let (v, o) = a.$overflowing(b);
-                    (Value::Long(v), o)
-                }
-                (Value::UnsignedInt(a), Value::UnsignedInt(b)) => (Value::UnsignedInt(a.$overflowing(b).0), false),
-                (Value::UnsignedLong(a), Value::UnsignedLong(b)) => (Value::UnsignedLong(a.$overflowing(b).0), false),
-                (Value::Float(a), Value::Float(b)) => (Value::Float($trait::$method(a, b)), false),
-                (Value::Double(a), Value::Double(b)) => (Value::Double($trait::$method(a, b)), false),
-                (Value::LongDouble(a), Value::LongDouble(b)) => (Value::LongDouble($trait::$method(a, b)), false),
-                _ => unreachable!(),
-            };
-            Diag::new(
-                self.narrow(value),
-                overflow.then_some(Diagnosis::ArithmeticOverflow),
-            )
-        }
-    };
-}
-
-macro_rules! fold_division {
-    ($method:ident, $trait:ident, $checked:ident) => {
-        pub fn $method(&self, lhs: Value, rhs: Value) -> Value {
-            let value = match self.usual(lhs, rhs) {
-                (Value::Int(a), Value::Int(b)) => Value::Int(a.$checked(b).unwrap_or(0)),
-                (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt(a.$checked(b).unwrap_or(0)),
-                (Value::Long(a), Value::Long(b)) => Value::Long(a.$checked(b).unwrap_or(0)),
-                (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong(a.$checked(b).unwrap_or(0)),
-                (Value::Float(a), Value::Float(b)) => Value::Float($trait::$method(a, b)),
-                (Value::Double(a), Value::Double(b)) => Value::Double($trait::$method(a, b)),
-                (Value::LongDouble(a), Value::LongDouble(b)) => Value::LongDouble($trait::$method(a, b)),
-                _ => unreachable!(),
-            };
-            self.narrow(value)
-        }
-    };
-}
-
-macro_rules! fold_bitwise {
-    ($method:ident, $trait:ident) => {
-        pub fn $method(&self, lhs: Value, rhs: Value) -> Value {
-            let value = match self.usual_integer(lhs, rhs) {
-                (Value::Int(a), Value::Int(b)) => Value::Int($trait::$method(a, b)),
-                (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt($trait::$method(a, b)),
-                (Value::Long(a), Value::Long(b)) => Value::Long($trait::$method(a, b)),
-                (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong($trait::$method(a, b)),
-                _ => unreachable!(),
-            };
-            self.narrow(value)
-        }
-    };
-}
-
-macro_rules! fold_shift {
-    ($method:ident, $wrapping:ident) => {
-        pub fn $method(&self, lhs: Value, rhs: Value) -> Value {
-            let count = self.convert(rhs, rhs.rank().to_integer()).to_u64() as u32;
-            let value = match self.convert(lhs, lhs.rank().to_integer()) {
-                Value::Int(a) => Value::Int(a.$wrapping(count)),
-                Value::UnsignedInt(a) => Value::UnsignedInt(a.$wrapping(count)),
-                Value::Long(a) => Value::Long(a.$wrapping(count)),
-                Value::UnsignedLong(a) => Value::UnsignedLong(a.$wrapping(count)),
-                _ => unreachable!(),
-            };
-            self.narrow(value)
-        }
-    };
-}
-
-macro_rules! fold_relational {
-    ($method:ident, $($ordering:path)|+) => {
-        pub fn $method(&self, lhs: Value, rhs: Value) -> bool {
-            matches!(self.cmp(lhs, rhs), $(Some($ordering))|+)
-        }
-    };
-}
-
 impl<'a> Fold<'a> {
     pub fn new(target: &'a Target) -> Self {
         Self { target }
     }
 
-    fn common(&self, lhs: Value, rhs: Value) -> Rank {
-        let (l, r) = (lhs.rank(), rhs.rank());
-        let rank = Rank::max(l, r);
-        if rank == Rank::Long && Rank::min(l, r) == Rank::UnsignedInt && self.target.long.size <= self.target.int.size {
-            return Rank::UnsignedLong;
-        }
-        rank
-    }
-
-    fn usual(&self, lhs: Value, rhs: Value) -> (Value, Value) {
-        let rank = self.common(lhs, rhs);
-        (self.convert(lhs, rank), self.convert(rhs, rank))
-    }
-
-    fn usual_integer(&self, lhs: Value, rhs: Value) -> (Value, Value) {
-        let rank = self.common(lhs, rhs).to_integer();
-        (self.convert(lhs, rank), self.convert(rhs, rank))
-    }
-
-    fn narrow(&self, value: Value) -> Value {
-        self.convert(value, value.rank())
-    }
-
-    pub fn convert(&self, value: Value, rank: Rank) -> Value {
-        match rank {
-            Rank::Float => Value::Float(value.to_f64() as f32),
-            Rank::Double => Value::Double(value.to_f64()),
-            Rank::LongDouble => Value::LongDouble(value.to_f64()),
-            _ => self.target.cast(&rank.resolved(), value).expect("an integer type"),
+    pub fn convert(&self, ty: &ResolvedType, value: Value) -> Option<Value> {
+        match ty {
+            ResolvedType::Float => Some(Value::Float(value.to_f64() as f32)),
+            ResolvedType::Double => Some(Value::Double(value.to_f64())),
+            ResolvedType::LongDouble => Some(Value::LongDouble(value.to_f64())),
+            _ => self.target.cast(ty, value),
         }
     }
 
-    pub fn cmp(&self, lhs: Value, rhs: Value) -> Option<Ordering> {
-        match self.usual(lhs, rhs) {
+    fn shift(&self, ty: &ResolvedType, op: BinaryOp, lhs: Value, rhs: Value) -> Value {
+        let count = rhs.to_i64() as u32;
+        match (op, self.convert(ty, lhs).expect("an integer type")) {
+            (BinaryOp::Left, Value::Int(a)) => Value::Int(a.wrapping_shl(count)),
+            (BinaryOp::Left, Value::UnsignedInt(a)) => Value::UnsignedInt(a.wrapping_shl(count)),
+            (BinaryOp::Left, Value::Long(a)) => Value::Long(a.wrapping_shl(count)),
+            (BinaryOp::Left, Value::UnsignedLong(a)) => Value::UnsignedLong(a.wrapping_shl(count)),
+            (BinaryOp::Right, Value::Int(a)) => Value::Int(a.wrapping_shr(count)),
+            (BinaryOp::Right, Value::UnsignedInt(a)) => Value::UnsignedInt(a.wrapping_shr(count)),
+            (BinaryOp::Right, Value::Long(a)) => Value::Long(a.wrapping_shr(count)),
+            (BinaryOp::Right, Value::UnsignedLong(a)) => Value::UnsignedLong(a.wrapping_shr(count)),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn binary(&self, ty: &ResolvedType, op: BinaryOp, lhs: Value, rhs: Value) -> Diag<Value> {
+        use BinaryOp::{Add, BitAnd, BitOr, BitXor, Div, Left, Mod, Mul, Right, Sub};
+
+        if matches!(op, Left | Right) {
+            return Diag::ok(self.shift(ty, op, lhs, rhs));
+        }
+        if ty.is_floating() {
+            let (a, b) = (lhs.to_f64(), rhs.to_f64());
+            let r = match op {
+                Add => a + b,
+                Sub => a - b,
+                Mul => a * b,
+                Div => a / b,
+                _ => unreachable!(),
+            };
+            return Diag::ok(self.convert(ty, Value::Double(r)).expect("a floating type"));
+        }
+        if !self.target.is_signed(ty) {
+            let (a, b) = (u128::from(lhs.to_u64()), u128::from(rhs.to_u64()));
+            let r = match op {
+                Add => a.wrapping_add(b),
+                Sub => a.wrapping_sub(b),
+                Mul => a.wrapping_mul(b),
+                Div => a.checked_div(b).unwrap_or(0),
+                Mod => a.checked_rem(b).unwrap_or(0),
+                BitAnd => a & b,
+                BitOr => a | b,
+                BitXor => a ^ b,
+                _ => unreachable!(),
+            };
+            let value = self
+                .convert(ty, Value::UnsignedLong(r as u64))
+                .expect("an integer type");
+            return Diag::ok(value);
+        }
+        let (a, b) = (i128::from(lhs.to_i64()), i128::from(rhs.to_i64()));
+        let r = match op {
+            Add => a + b,
+            Sub => a - b,
+            Mul => a * b,
+            Div => a.checked_div(b).unwrap_or(0),
+            Mod => a.checked_rem(b).unwrap_or(0),
+            BitAnd => a & b,
+            BitOr => a | b,
+            BitXor => a ^ b,
+            _ => unreachable!(),
+        };
+        let min = self.target.min_value(ty).unwrap_or(i64::MIN);
+        let max = self.target.max_value(ty).unwrap_or(i64::MAX as u64) as i64;
+        let overflow = matches!(op, Add | Sub | Mul) && (r < i128::from(min) || r > i128::from(max));
+        let value = self.convert(ty, Value::Long(r as i64)).expect("an integer type");
+        Diag::new(value, overflow.then_some(Diagnosis::ArithmeticOverflow))
+    }
+
+    pub fn unary(&self, ty: &ResolvedType, op: UnaryOp, value: Value) -> Diag<Value> {
+        match op {
+            UnaryOp::Minus => self.neg(ty, value),
+            UnaryOp::BitNot => Diag::ok(self.bit_not(ty, value)),
+            _ => unreachable!(),
+        }
+    }
+
+    fn neg(&self, ty: &ResolvedType, value: Value) -> Diag<Value> {
+        if ty.is_floating() {
+            let negated = self.convert(ty, Value::Double(-value.to_f64()));
+            return Diag::ok(negated.expect("a floating type"));
+        }
+        self.binary(ty, BinaryOp::Sub, Value::Int(0), value)
+    }
+
+    fn bit_not(&self, ty: &ResolvedType, value: Value) -> Value {
+        match self.convert(ty, value).expect("an integer type") {
+            Value::Int(v) => Value::Int(!v),
+            Value::UnsignedInt(v) => Value::UnsignedInt(!v),
+            Value::Long(v) => Value::Long(!v),
+            Value::UnsignedLong(v) => Value::UnsignedLong(!v),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn compare(&self, lhs: Value, rhs: Value) -> Option<Ordering> {
+        match (lhs, rhs) {
             (Value::Int(a), Value::Int(b)) => a.partial_cmp(&b),
             (Value::UnsignedInt(a), Value::UnsignedInt(b)) => a.partial_cmp(&b),
             (Value::Long(a), Value::Long(b)) => a.partial_cmp(&b),
@@ -472,81 +416,11 @@ impl<'a> Fold<'a> {
             (Value::Float(a), Value::Float(b)) => a.partial_cmp(&b),
             (Value::Double(a), Value::Double(b)) => a.partial_cmp(&b),
             (Value::LongDouble(a), Value::LongDouble(b)) => a.partial_cmp(&b),
-            _ => unreachable!(),
+            _ => None,
         }
     }
 
-    pub fn shift_out_of_range(&self, lhs: Value, rhs: Value) -> bool {
-        let count = self.convert(rhs, rhs.rank().to_integer()).to_i64();
-        self.target
-            .bits(&lhs.rank().to_integer().resolved())
-            .is_none_or(|width| count < 0 || count >= i64::from(width))
+    pub fn is_min(&self, ty: &ResolvedType, value: Value) -> bool {
+        self.target.is_signed(ty) && self.target.min_value(ty).is_some_and(|min| value.to_i64() == min)
     }
-
-    pub fn is_min(&self, value: Value) -> bool {
-        let ty = value.rank().resolved();
-        self.target.is_signed(&ty)
-            && self
-                .target
-                .min_value(&ty)
-                .is_some_and(|min| self.eq(value, Value::Long(min)))
-    }
-
-    pub fn neg(&self, value: Value) -> Diag<Value> {
-        let (value, overflow) = match value {
-            Value::Int(v) => {
-                let (r, o) = v.overflowing_neg();
-                (Value::Int(r), o)
-            }
-            Value::Long(v) => {
-                let (r, o) = v.overflowing_neg();
-                (Value::Long(r), o)
-            }
-            Value::UnsignedInt(v) => (Value::UnsignedInt(v.wrapping_neg()), false),
-            Value::UnsignedLong(v) => (Value::UnsignedLong(v.wrapping_neg()), false),
-            Value::Float(v) => (Value::Float(-v), false),
-            Value::Double(v) => (Value::Double(-v), false),
-            Value::LongDouble(v) => (Value::LongDouble(-v), false),
-        };
-        Diag::new(self.narrow(value), overflow.then_some(Diagnosis::ArithmeticOverflow))
-    }
-
-    pub fn bit_not(&self, value: Value) -> Value {
-        let value = match self.convert(value, value.rank().to_integer()) {
-            Value::Int(v) => Value::Int(!v),
-            Value::UnsignedInt(v) => Value::UnsignedInt(!v),
-            Value::Long(v) => Value::Long(!v),
-            Value::UnsignedLong(v) => Value::UnsignedLong(!v),
-            _ => unreachable!(),
-        };
-        self.narrow(value)
-    }
-
-    pub fn rem(&self, lhs: Value, rhs: Value) -> Value {
-        let value = match self.usual_integer(lhs, rhs) {
-            (Value::Int(a), Value::Int(b)) => Value::Int(a.checked_rem(b).unwrap_or(0)),
-            (Value::UnsignedInt(a), Value::UnsignedInt(b)) => Value::UnsignedInt(a.checked_rem(b).unwrap_or(0)),
-            (Value::Long(a), Value::Long(b)) => Value::Long(a.checked_rem(b).unwrap_or(0)),
-            (Value::UnsignedLong(a), Value::UnsignedLong(b)) => Value::UnsignedLong(a.checked_rem(b).unwrap_or(0)),
-            _ => unreachable!(),
-        };
-        self.narrow(value)
-    }
-
-    fold_arithmetic!(add, Add, overflowing_add);
-    fold_arithmetic!(sub, Sub, overflowing_sub);
-    fold_arithmetic!(mul, Mul, overflowing_mul);
-    fold_division!(div, Div, checked_div);
-    fold_bitwise!(bitand, BitAnd);
-    fold_bitwise!(bitor, BitOr);
-    fold_bitwise!(bitxor, BitXor);
-    fold_shift!(shl, wrapping_shl);
-    fold_shift!(shr, wrapping_shr);
-
-    fold_relational!(eq, Ordering::Equal);
-    fold_relational!(ne, Ordering::Less | Ordering::Greater);
-    fold_relational!(lt, Ordering::Less);
-    fold_relational!(gt, Ordering::Greater);
-    fold_relational!(le, Ordering::Less | Ordering::Equal);
-    fold_relational!(ge, Ordering::Greater | Ordering::Equal);
 }

@@ -40,6 +40,13 @@ folds!(
     "enum E { A = 1 ? 2 : 3, B = 0 ? 2 : 3 };",
     ["Int(2)", "Int(3)"]
 );
+// 6.3.15: the second and third operands undergo the usual arithmetic conversions, so the
+// result carries the common type even though only one branch's value is picked.
+folds!(
+    fold_ternary_converts_to_common_type,
+    "enum E { A = 1 ? 2 : 3u };",
+    ["UnsignedInt(2)"]
+);
 folds!(fold_character_constant, "enum E { A = 'a' };", ["Int(97)"]);
 folds!(
     fold_overflow_wraps,
@@ -51,11 +58,17 @@ folds!(
     "enum E { A = 1, B = A + 1 };",
     ["Int(1)", "Int(2)"]
 );
-folds!(fold_sizeof_type, "enum E { A = sizeof(int) };", ["UnsignedInt(4)"]);
+// `sizeof` is folded to a constant at typing time (so nested uses see it too), which is why
+// both the `sizeof` node and the constant-expression node wrapping it appear here.
+folds!(
+    fold_sizeof_type,
+    "enum E { A = sizeof(int) };",
+    ["UnsignedInt(4)", "UnsignedInt(4)"]
+);
 folds!(
     fold_sizeof_struct,
     "struct S { char a; int b; }; enum E { A = sizeof(struct S) };",
-    ["UnsignedInt(8)"]
+    ["UnsignedInt(8)", "UnsignedInt(8)"]
 );
 folds!(fold_cast_narrows, "enum E { A = (char)300 };", ["Int(44)"]);
 folds!(fold_cast_to_unsigned, "enum E { A = (unsigned char)-1 };", ["Int(255)"]);
@@ -64,8 +77,14 @@ folds!(fold_array_size, "int a[2 + 3];", ["Int(5)"]);
 
 #[test]
 fn fold_sizeof_of_a_pointer_type() {
-    assert_eq!(folded("enum E { A = sizeof(char *) };"), ["UnsignedInt(4)"]);
-    assert_eq!(folded("enum E { A = sizeof(int *) };"), ["UnsignedInt(4)"]);
+    assert_eq!(
+        folded("enum E { A = sizeof(char *) };"),
+        ["UnsignedInt(4)", "UnsignedInt(4)"]
+    );
+    assert_eq!(
+        folded("enum E { A = sizeof(int *) };"),
+        ["UnsignedInt(4)", "UnsignedInt(4)"]
+    );
 }
 
 #[test]

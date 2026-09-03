@@ -8,7 +8,7 @@ use crate::semantic::ExpressionKind::{LValue, RValue};
 use crate::semantic::ice::try_fold;
 use crate::semantic::{
     AssignmentContext, Diag, DiagCollector, Diagnosis, ExpressionKind, ParamTypes, QualifiedType, ResolvedExpression,
-    ResolvedType, Sema, SymbolId, SymbolKind, cast, declaration,
+    ResolvedType, Sema, SymbolId, SymbolKind, cast, declaration, layout,
 };
 
 type R = Result<(QualifiedType, ExpressionKind), Diagnosis>;
@@ -281,19 +281,26 @@ fn logic_not(sema: &mut Sema, e: &ExpressionNode) -> R {
     Ok((qty, RValue))
 }
 
-fn size_of_e(sema: &mut Sema, e: &ExpressionNode) -> R {
-    let mut ops = Operands::take(sema, [e])?;
-    let (sema, [re]) = ops.parts();
-    if is_bit_field(sema, sema.binding(e.id)) {
-        return Err(Diagnosis::SizeofBitfield);
-    }
-    size_t(sema, re.ty)
+fn size_of_e(sema: &mut Sema, node: &ExpressionNode, e: &ExpressionNode) -> R {
+    let ty = {
+        let mut ops = Operands::take(&mut *sema, [e])?;
+        let (sema, [re]) = ops.parts();
+        if is_bit_field(sema, sema.binding(e.id)) {
+            return Err(Diagnosis::SizeofBitfield);
+        }
+        re.ty
+    };
+    let result = size_t(sema, ty)?;
+    set_sizeof_constant(sema, node, ty);
+    Ok(result)
 }
 
-fn size_of_ty(sema: &mut Sema, ctx: &Context, ty: &Type, span: &Span) -> R {
+fn size_of_ty(sema: &mut Sema, ctx: &Context, node: &ExpressionNode, ty: &Type, span: &Span) -> R {
     let base = declaration::base_type(sema, ctx, &ty.specifiers, span);
     let (ty, _) = declaration::declared_type(sema, ctx, base, &ty.declarator).ok_poisoned()?;
-    size_t(sema, ty)
+    let result = size_t(sema, ty)?;
+    set_sizeof_constant(sema, node, ty);
+    Ok(result)
 }
 
 fn size_t(sema: &Sema, ty: QualifiedType) -> R {
@@ -308,6 +315,19 @@ fn size_t(sema: &Sema, ty: QualifiedType) -> R {
     }
     let qty = QualifiedType::new(sema.builtins.size_t, false, false);
     Ok((qty, RValue))
+}
+
+/// 6.3.3.4 The sizeof operator yields the size in bytes of its operand, as a constant of type
+/// size_t: recording it here lets 6.4 accept it as a constant expression without re-deriving the
+/// type, and without evaluating the operand.
+fn set_sizeof_constant(sema: &mut Sema, node: &ExpressionNode, ty: QualifiedType) {
+    if let Some(layout) = layout::of(sema, ty.id)
+        && let Some(value) = sema
+            .target
+            .cast(&sema.target.size_t, Value::UnsignedLong(layout.size.into()))
+    {
+        sema.set_constant(node.id, Some(value));
+    }
 }
 
 fn binary_op(sema: &mut Sema, ctx: &Context, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
@@ -737,8 +757,8 @@ fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> R {
         Expression::FunctionCall(fn_node, args) => fn_call(sema, ctx, fn_node, args),
         Expression::Member(op, e, name) => member(sema, node, *op, e, name),
         Expression::Unary(op, e) => unary_op(sema, *op, e),
-        Expression::SizeofExpr(e) => size_of_e(sema, e),
-        Expression::SizeofType(ty) => size_of_ty(sema, ctx, ty, &node.span),
+        Expression::SizeofExpr(e) => size_of_e(sema, node, e),
+        Expression::SizeofType(ty) => size_of_ty(sema, ctx, node, ty, &node.span),
         Expression::Binary(op, e1, e2) => binary_op(sema, ctx, op, e1, e2),
         Expression::Ternary(e1, e2, e3) => conditional(sema, ctx, e1, e2, e3),
         Expression::Assign(op, e1, e2) => assignment(sema, ctx, op, e1, e2),

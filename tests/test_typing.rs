@@ -1826,6 +1826,17 @@ shaped!(
     ]
 );
 
+// 6.3.7 The right operand shall be nonnegative and less than the width in bits of the promoted
+// left operand: an out-of-range constant count leaves the shift unresolved, so a constant
+// expression built on it is rejected rather than folded.
+// gcc: `enum E { A = 1 << 32 };` and `enum E { A = 1 >> -1 };` are both errors.
+reject!(
+    a_shift_count_at_the_width_of_the_left_operand_is_rejected,
+    "enum E { A = 1 << 32 };"
+);
+
+reject!(a_negative_shift_count_is_rejected, "enum E { A = 1 >> -1 };");
+
 shaped!(
     a_count_one_below_the_width_of_the_left_operand_is_accepted,
     "int i; void f(void) { i << 31; }",
@@ -2127,11 +2138,23 @@ rejects_shaped!(
 
 // ---- 6.3.10 to 6.3.12 bitwise AND, exclusive OR and inclusive OR ----------
 
-shaped!(a_bitwise_and_of_two_constants_is_an_int, "void f(void) { 6 & 3; }", ints(3));
+shaped!(
+    a_bitwise_and_of_two_constants_is_an_int,
+    "void f(void) { 6 & 3; }",
+    ints(3)
+);
 
-shaped!(a_bitwise_xor_of_two_constants_is_an_int, "void f(void) { 6 ^ 3; }", ints(3));
+shaped!(
+    a_bitwise_xor_of_two_constants_is_an_int,
+    "void f(void) { 6 ^ 3; }",
+    ints(3)
+);
 
-shaped!(a_bitwise_or_of_two_constants_is_an_int, "void f(void) { 6 | 3; }", ints(3));
+shaped!(
+    a_bitwise_or_of_two_constants_is_an_int,
+    "void f(void) { 6 | 3; }",
+    ints(3)
+);
 
 // 6.3.10 The usual arithmetic conversions are performed on the operands.
 shaped!(
