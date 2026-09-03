@@ -1912,6 +1912,89 @@ rejects_shaped!(
     ]
 );
 
+// 6.3.8 If both of the operands have arithmetic type, the usual arithmetic conversions are
+// performed. The result has type int.
+shaped!(
+    ordering_arithmetic_operands_performs_the_usual_arithmetic_conversions,
+    "int i; double d; void f(void) { i < d; }",
+    vec![
+        lv(Ty::Int)
+            .then(LValueToRValue, Ty::Int)
+            .then(IntegerToFloating, Ty::Double),
+        lv(Ty::Double).then(LValueToRValue, Ty::Double),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.2.2.1 an lvalue that has type "array of type" is converted to an expression that has type
+// "pointer to type" that points to the initial element of the array object.
+shaped!(
+    an_array_operand_of_an_ordering_decays_to_a_pointer,
+    "int a[3]; int *p; void f(void) { a < p; }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.5.4.2 For two array types to be compatible, both shall have compatible element types, and if
+// both size specifiers are present, they shall have the same value.
+// 6.1.2.5 An array type of unknown size is an incomplete type.
+shaped!(
+    pointers_to_compatible_incomplete_arrays_may_be_ordered,
+    "int (*p)[]; int (*q)[]; void f(void) { p < q; }",
+    vec![
+        lv(Ty::ptr(Ty::flex(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::flex(Ty::Int))),
+        lv(Ty::ptr(Ty::flex(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::flex(Ty::Int))),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.8 An array of unknown size is compatible with an array of known size, yet the two pointed
+// to types are neither both object types nor both incomplete types.
+rejects_shaped!(
+    a_pointer_to_an_incomplete_array_may_not_be_ordered_with_one_to_a_complete_array,
+    "int (*p)[]; int (*q)[3]; void f(void) { p < q; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::ptr(Ty::flex(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::flex(Ty::Int))),
+        lv(Ty::ptr(Ty::arr(Ty::Int, 3))).then(LValueToRValue, Ty::ptr(Ty::arr(Ty::Int, 3))),
+        none(),
+    ]
+);
+
+// 6.3.8 admits no null pointer constant, unlike 6.3.9 one operand is a pointer and the other is
+// a null pointer constant.
+rejects_shaped!(
+    a_pointer_may_not_be_ordered_with_a_null_pointer_constant,
+    "int *p; void f(void) { p > 0; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+// 6.3.8 admits no pointer to void against a pointer to an object type, unlike 6.3.9 one operand
+// is a pointer to an object or incomplete type and the other is a pointer to a qualified or
+// unqualified version of void.
+rejects_shaped!(
+    a_pointer_to_void_may_not_be_ordered_with_a_pointer_to_an_object,
+    "void *v; int *p; void f(void) { v < p; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![
+        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        none(),
+    ]
+);
+
 // ---- 6.3.9 equality operators --------------------------------------------
 
 // 6.3.9 one operand is a pointer and the other is a null pointer constant.

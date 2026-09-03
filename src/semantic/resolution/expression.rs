@@ -491,11 +491,10 @@ fn bitwise(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
 }
 
 fn bitwise_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) -> R {
-    if !lhs.ty.is_integral(sema) || !rhs.ty.is_integral(sema) {
+    if !lhs.casted_ty().is_integral(sema) || !rhs.casted_ty().is_integral(sema) {
         return Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty));
     }
-    cast::usual_arithmetic(sema, lhs, rhs)?;
-    Ok((lhs.casted_ty(), RValue))
+    cast::usual_arithmetic(sema, lhs, rhs)
 }
 
 fn logic(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
@@ -507,10 +506,11 @@ fn logic(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
 }
 
 fn logic_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) -> R {
-    if !lhs.ty.is_scalar(sema) || !rhs.ty.is_scalar(sema) {
+    if !lhs.casted_ty().is_scalar(sema) || !rhs.casted_ty().is_scalar(sema) {
         return Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty));
     }
-    Ok((lhs.casted_ty(), RValue))
+    let ty = QualifiedType::new(sema.builtins.int, false, false);
+    Ok((ty, RValue))
 }
 
 fn cast(sema: &mut Sema, ctx: &Context, node: &ExpressionNode, ty_node: &Type, operand: &ExpressionNode) -> R {
