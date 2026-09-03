@@ -437,14 +437,14 @@ recover!(
     &[]
 );
 
-// // 6.4 A constant expression shall not contain assignment, increment, decrement,
-// // function-call, or comma operators, except when they are contained within the operand of a
-// // sizeof operator: the size of an object is a constant known at translation time.
-// value!(
-//     sizeof_of_an_expression_is_a_constant_expression,
-//     "int i; int a[3]; struct S { char c[7]; } s; enum E { A = sizeof(i), B = sizeof(a), C = sizeof(s) };",
-//     &[("A", "4"), ("B", "12"), ("C", "7")]
-// );
+// 6.4 A constant expression shall not contain assignment, increment, decrement,
+// function-call, or comma operators, except when they are contained within the operand of a
+// sizeof operator: the size of an object is a constant known at translation time.
+value!(
+    sizeof_of_an_expression_is_a_constant_expression,
+    "int i; int a[3]; struct S { char c[7]; } s; enum E { A = sizeof(i), B = sizeof(a), C = sizeof(s) };",
+    &[("A", "4"), ("B", "12"), ("C", "7")]
+);
 
 recover!(
     sizeof_of_an_incomplete_tag,

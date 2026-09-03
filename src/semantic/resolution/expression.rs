@@ -59,17 +59,27 @@ fn check_assignable(lhs: &ResolvedExpression) -> Result<(), Diagnosis> {
     Ok(())
 }
 
+// 6.2.2.3 An integral constant expression with the value 0, or such an expression cast to type
+// void *, is called a null pointer constant.
 fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> bool {
     let mut node = node;
     if let Expression::Cast(ty_node, op) = node.id.resolve(ctx) {
         let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
-        if declaration::declared_type(sema, ctx, base, &ty_node.declarator).is_some() {
-            return false;
-        };
-        node = op;
+        if let Some((qualif, _)) = declaration::declared_type(sema, ctx, base, &ty_node.declarator)
+            && is_void_pointer(sema, qualif)
+        {
+            node = op;
+        }
     }
     let Some(re) = sema.expr_resolved(node.id) else { return false };
-    re.casted_ty().is_integer(sema) && try_fold(sema, ctx, node).is_some_and(|v| v.is_zero())
+    re.ty.is_integer(sema) && try_fold(sema, ctx, node).is_some_and(|v| v.is_zero())
+}
+
+// 6.1.2.5 The qualified or unqualified versions of a type are distinct types that belong to the
+// same type category and have the same representation and alignment requirements.
+fn is_void_pointer(sema: &Sema, qualif: QualifiedType) -> bool {
+    let ResolvedType::Pointer(inner) = qualif.id.resolve(sema) else { return false };
+    inner.is_void(sema) && !qualif.is_const && !qualif.is_volatile && !inner.is_const && !inner.is_volatile
 }
 
 fn identifier(sema: &mut Sema, node: &ExpressionNode) -> R {
@@ -183,10 +193,16 @@ fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &e.span);
     check_assignable(re)?;
+    // 6.3.6 For addition, either both operands shall have arithmetic type, or one operand shall
+    // be a pointer to an object type and the other shall have integral type. (Incrementing is
+    // equivalent to adding 1.)
     if let ResolvedType::Pointer(inner) = re.ty.id.resolve(sema)
-        && !inner.is_complete(sema)
+        && !inner.is_object(sema)
     {
-        return Err(Diagnosis::IncompleteType(*inner));
+        return Err(match inner.is_function(sema) {
+            true => Diagnosis::BadPostIncDec(op, re.ty),
+            false => Diagnosis::IncompleteType(*inner),
+        });
     }
     if !re.ty.is_scalar(sema) {
         return Err(Diagnosis::BadPostIncDec(op, re.ty));
@@ -221,13 +237,19 @@ fn address_type(sema: &mut Sema, re: &mut ResolvedExpression, sym: Option<Symbol
         if sym.storage == Some(Storage::Register) {
             return Err(Diagnosis::RegisterAddress);
         }
-        if sym.kind == SymbolKind::Member && sym.value.is_some() {
-            return Err(Diagnosis::BitFieldAddress);
-        }
+    }
+    if is_bit_field(sema, sym) {
+        return Err(Diagnosis::BitFieldAddress);
     }
     let ty = sema.types.pointer(re.ty);
     let qty = QualifiedType::new(ty, false, false);
     Ok((qty, RValue))
+}
+
+fn is_bit_field(sema: &Sema, sym: Option<SymbolId>) -> bool {
+    let Some(id) = sym else { return false };
+    let sym = id.resolve(sema);
+    sym.kind == SymbolKind::Member && sym.value.is_some()
 }
 
 fn indirection(sema: &mut Sema, e: &ExpressionNode) -> R {
@@ -240,7 +262,11 @@ fn indirection(sema: &mut Sema, e: &ExpressionNode) -> R {
     if inner.is_void(sema) {
         return Err(Diagnosis::IncompleteType(*inner));
     }
-    let kind = if inner.is_object(sema) { LValue } else { RValue };
+    // 6.3.3.2 If the operand points to a function, the result is a function designator; if it
+    // points to an object, the result is an lvalue designating the object.
+    // 6.2.2.1 An lvalue is an expression (with an object type or an incomplete type other than
+    // void) that designates an object.
+    let kind = if inner.is_function(sema) { RValue } else { LValue };
     Ok((*inner, kind))
 }
 
@@ -269,14 +295,12 @@ fn logic_not(sema: &mut Sema, e: &ExpressionNode) -> R {
 fn size_of_e(sema: &mut Sema, e: &ExpressionNode) -> R {
     let mut ops = Operands::take(sema, [e])?;
     let (sema, [re]) = ops.parts();
-
-    if let Some(id) = sema.binding(e.id) {
-        let sym = id.resolve(sema);
-        if sym.kind == SymbolKind::Member && sym.value.is_some() {
-            return Err(Diagnosis::SizeofBitfield);
-        }
+    // 6.3.3.4 The sizeof operator shall not be applied to an expression that has function type
+    // or an incomplete type, to the parenthesized name of such a type, or to an lvalue that
+    // designates a bit-field object.
+    if is_bit_field(sema, sema.binding(e.id)) {
+        return Err(Diagnosis::SizeofBitfield);
     }
-
     size_t(sema, re.ty)
 }
 
@@ -559,8 +583,11 @@ fn conditional_type(
     if l.is_arithmetic(sema) && r.is_arithmetic(sema) {
         return cast::usual_arithmetic(sema, lhs, rhs);
     }
-    if l.is_tag() && r.is_tag() && lhs.ty.is_compatible(sema, &rhs.ty) {
-        return Ok((lhs.casted_ty(), RValue));
+    // 6.3.15 both operands have compatible structure or union types.
+    // 6.2.2.1 If the lvalue has qualified type, the value has the unqualified version of the
+    // type of the lvalue.
+    if l.is_tag() && r.is_tag() && l_ty.is_compatible(sema, &r_ty) {
+        return Ok((l_ty, RValue));
     }
     if l.is_void() && r.is_void() {
         let ty = QualifiedType::new(sema.builtins.void, false, false);
