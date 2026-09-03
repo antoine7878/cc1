@@ -63,7 +63,6 @@ pub enum Diagnosis {
     IncompatibleCast,
     IncompatibleOperands(QualifiedType, QualifiedType),
     PointerMismatch(QualifiedType, QualifiedType),
-    PointerComparisonMismatch(QualifiedType, QualifiedType),
     /// 6.3.16
     AssignmentDiscardedQualifiers(QualifiedType, QualifiedType),
     InitDiscardedQualifiers(QualifiedType, QualifiedType),
@@ -81,6 +80,8 @@ pub enum Diagnosis {
     /// 6.3.5
     InvalidBinaryOperand(QualifiedType, QualifiedType),
     InvalidComparison(QualifiedType, QualifiedType),
+    OrderedFunctionPointers(QualifiedType, QualifiedType),
+    MixedCompletenessComparison(QualifiedType, QualifiedType),
 
     AssignToRValue,
     ConstAssignment(QualifiedType),
@@ -199,6 +200,8 @@ impl DiagnosisNode {
             Diagnosis::FunctionReturningFunction(ty) => format!("function cannot return function type '{}'", ty.describe(sema, ctx)),
             Diagnosis::InvalidBinaryOperand(lhs, rhs) => format!("invalid operands to binary expression ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
             Diagnosis::InvalidComparison(lhs, rhs) => format!("comparison of distinct pointer types ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
+            Diagnosis::OrderedFunctionPointers(lhs, rhs) => format!("ordered comparison of function pointers ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
+            Diagnosis::MixedCompletenessComparison(lhs, rhs) => format!("ordered comparison needs two complete or two incomplete pointee types ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
             Diagnosis::AssignToRValue => "expression is not assignable".to_string(),
             Diagnosis::ConstAssignment(ty) => format!("cannot assign to variable with const-qualified type '{}'", ty.describe(sema, ctx)),
             Diagnosis::Poisoned => "Internal error".to_string(),
@@ -227,7 +230,6 @@ impl DiagnosisNode {
             Diagnosis::IncompatibleCast => "Incompatible types".to_string(),
             Diagnosis::IncompatibleOperands(lhs, rhs) => format!("incompatible operand types ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
             Diagnosis::PointerMismatch(lhs, rhs) => format!("pointer type mismatch ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
-            Diagnosis::PointerComparisonMismatch(lhs, rhs) => format!("comparison of distinct pointer types ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
             
             
             Diagnosis::VariantBadValue => "Variant value should be in int range".to_string(),

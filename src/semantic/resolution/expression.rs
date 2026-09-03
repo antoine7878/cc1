@@ -60,7 +60,7 @@ pub fn strip_qualifiers(sema: &mut Sema, node: &ExpressionNode) -> Result<(), Di
     Ok(())
 }
 
-fn check_assign_lhs(lhs: &ResolvedExpression) -> Result<(), Diagnosis> {
+fn check_assignable(lhs: &ResolvedExpression) -> Result<(), Diagnosis> {
     if lhs.kind == ExpressionKind::RValue {
         return Err(Diagnosis::AssignToRValue);
     }
@@ -210,7 +210,7 @@ fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
     let mut ops = Operands::take(sema, [e])?;
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &e.span);
-    check_assign_lhs(re)?;
+    check_assignable(re)?;
     if let ResolvedType::Pointer(inner) = re.ty.id.resolve(sema)
         && !inner.is_complete(sema)
     {
@@ -430,7 +430,7 @@ fn relational_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut Reso
         return Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty));
     };
     if !i1.is_compatible_ignoring_qualifiers(sema, i2) {
-        return Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty));
+        return Err(Diagnosis::InvalidComparison(lhs.ty, rhs.ty));
     }
     if i1.is_object(sema) && i2.is_object(sema) {
         return ret;
@@ -438,7 +438,10 @@ fn relational_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut Reso
     if !i1.is_complete(sema) && !i2.is_complete(sema) {
         return ret;
     }
-    Err(Diagnosis::PointerComparisonMismatch(lhs.ty, rhs.ty))
+    if i1.is_function(sema) && i2.is_function(sema) {
+        return Err(Diagnosis::OrderedFunctionPointers(lhs.ty, rhs.ty));
+    }
+    Err(Diagnosis::MixedCompletenessComparison(lhs.ty, rhs.ty))
 }
 
 fn equality(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
@@ -620,7 +623,7 @@ fn assign(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNo
 }
 
 fn assign_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression, is_null: bool) -> R {
-    check_assign_lhs(lhs)?;
+    check_assignable(lhs)?;
     let q = cast::assignment_conversion(sema, lhs, rhs, is_null, AssignmentContext::Assignment)?;
     Ok((q, ExpressionKind::RValue))
 }

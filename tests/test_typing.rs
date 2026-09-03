@@ -1898,7 +1898,7 @@ shaped!(
 rejects_shaped!(
     pointers_to_functions_may_not_be_ordered,
     "int (*p)(void); int (*q)(void); void f(void) { p < q; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnosis::OrderedFunctionPointers(_, _),
     vec![
         lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))),
         lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))),
@@ -1909,7 +1909,7 @@ rejects_shaped!(
 rejects_shaped!(
     pointers_to_incompatible_types_may_not_be_ordered,
     "int *p; unsigned *q; void f(void) { p < q; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnosis::InvalidComparison(_, _),
     vec![
         lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
         lv(Ty::ptr(Ty::UInt)).then(LValueToRValue, Ty::ptr(Ty::UInt)),
@@ -1963,7 +1963,7 @@ shaped!(
 rejects_shaped!(
     a_pointer_to_an_incomplete_array_may_not_be_ordered_with_one_to_a_complete_array,
     "int (*p)[]; int (*q)[3]; void f(void) { p < q; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnosis::MixedCompletenessComparison(_, _),
     vec![
         rv(Ty::Int),
         rv(Ty::Int),
@@ -1992,7 +1992,7 @@ rejects_shaped!(
 rejects_shaped!(
     a_pointer_to_void_may_not_be_ordered_with_a_pointer_to_an_object,
     "void *v; int *p; void f(void) { v < p; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnosis::InvalidComparison(_, _),
     vec![
         lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
         lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
@@ -2079,7 +2079,7 @@ shaped!(
 rejects_shaped!(
     a_pointer_to_a_function_may_not_be_compared_to_a_void_pointer,
     "void *v; int (*p)(void); void f(void) { v == p; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnosis::InvalidComparison(_, _),
     vec![
         lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
         lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))),

@@ -9,5 +9,7 @@ struct s2 {
 void fn(void) {
 	long *a;
 	int *b;
+
 	a < b;
+	a == b;
 }
