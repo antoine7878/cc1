@@ -6,13 +6,14 @@ use cc1::ast::{
 use cc1::ast::{DeclaratorNode, Node};
 use cc1::parser::Span;
 use cc1::semantic::constrain::declaration::{
-    basic_type, check_bit_width, check_qualifier, extern_function_only, get_qualifier, get_storage,
+    basic_type, check_bit_width, check_complete_object, check_element_type, check_member_type, check_qualifier,
+    extern_function_only, get_qualifier, get_storage,
 };
 use cc1::semantic::constrain::external::{
-    check_external_specifiers, check_function_storage, is_tentative_definition, is_valid_old_style,
-    param_storage_only_register,
+    check_complete_parameter, check_definition_return, check_external_specifiers, check_function_storage,
+    is_tentative_definition, is_valid_old_style, param_storage_only_register,
 };
-use cc1::semantic::{Diag, ResolvedType, ScopeKind};
+use cc1::semantic::{Diag, QualifiedType, ResolvedType, ScopeKind, Sema};
 
 fn reported<T>(diag: &Diag<T>) -> String {
     match &diag.diagnosis {
@@ -387,4 +388,59 @@ fn a_tentative_definition_is_not_typedef_auto_or_register() {
         &init_declarator(None),
         Some(Storage::Register)
     ));
+}
+
+fn int_type() -> QualifiedType {
+    let sema = Sema::default();
+    QualifiedType::new(sema.builtins.int, false, false)
+}
+
+#[test]
+fn an_object_with_a_complete_type_is_accepted() {
+    assert_eq!(reported(&check_complete_object(true, int_type())), "None");
+}
+
+#[test]
+fn an_object_with_an_incomplete_type_is_rejected() {
+    assert!(reported(&check_complete_object(false, int_type())).starts_with("IncompleteVariable("));
+}
+
+#[test]
+fn a_member_with_an_object_type_is_accepted() {
+    assert_eq!(reported(&check_member_type(true, int_type())), "None");
+}
+
+#[test]
+fn a_member_without_an_object_type_is_rejected() {
+    assert!(reported(&check_member_type(false, int_type())).starts_with("InvalidMemberType("));
+}
+
+#[test]
+fn an_array_element_with_an_object_type_is_accepted() {
+    assert_eq!(reported(&check_element_type(true, int_type())), "None");
+}
+
+#[test]
+fn an_array_element_without_an_object_type_is_rejected() {
+    assert!(reported(&check_element_type(false, int_type())).starts_with("InvalidElementType("));
+}
+
+#[test]
+fn a_complete_parameter_is_accepted() {
+    assert_eq!(reported(&check_complete_parameter(true, int_type())), "None");
+}
+
+#[test]
+fn an_incomplete_parameter_is_rejected() {
+    assert!(reported(&check_complete_parameter(false, int_type())).starts_with("IncompleteParameter("));
+}
+
+#[test]
+fn a_valid_definition_return_type_is_accepted() {
+    assert_eq!(reported(&check_definition_return(true, int_type())), "None");
+}
+
+#[test]
+fn an_invalid_definition_return_type_is_rejected() {
+    assert!(reported(&check_definition_return(false, int_type())).starts_with("IncompleteReturn("));
 }

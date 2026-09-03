@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::ast::{DeclarationNode, DeclarationSpecifier, InitDeclaratorNode, Name, Storage, StringId};
 use crate::context::Context;
-use crate::semantic::{DeclaredParams, Diag, ParamInfo, diagnosis::Diagnosis};
+use crate::semantic::{DeclaredParams, Diag, ParamInfo, QualifiedType, diagnosis::Diagnosis};
 
 pub fn check_external_specifiers(specifiers: &[DeclarationSpecifier]) -> Diag<()> {
     if specifiers
@@ -54,6 +54,20 @@ pub fn check_void_parameter(is_void: bool) -> Diag<()> {
     match is_void {
         true => Diag::err((), Diagnosis::VoidParameter),
         false => Diag::ok(()),
+    }
+}
+
+pub fn check_complete_parameter(is_complete: bool, ty: QualifiedType) -> Diag<()> {
+    match is_complete {
+        true => Diag::ok(()),
+        false => Diag::err((), Diagnosis::IncompleteParameter(ty)),
+    }
+}
+
+pub fn check_definition_return(is_valid: bool, ty: QualifiedType) -> Diag<()> {
+    match is_valid {
+        true => Diag::ok(()),
+        false => Diag::err((), Diagnosis::IncompleteReturn(ty)),
     }
 }
 

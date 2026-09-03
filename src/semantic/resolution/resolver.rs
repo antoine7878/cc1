@@ -65,6 +65,10 @@ impl<'a> SymbolResolver<'a> {
             &ResolvedType::Function { ret, .. } => self.return_ty = Some(ret),
             _ => unreachable!(),
         }
+        if let Some(ret) = self.return_ty {
+            constrain::external::check_definition_return(ret.is_void(self.sema) || ret.is_complete(self.sema), ret)
+                .collect(self, decl_span);
+        }
         let sym = Symbol::function(name, ty, storage);
         let sym = self.sema.declare(sym, decl_span);
         let declared = (previous == Some(sym)).then_some(declared).flatten();
@@ -127,6 +131,13 @@ impl<'a> SymbolResolver<'a> {
         if let [only] = params {
             let is_void = matches!(only.ty.id.resolve(self.sema), ResolvedType::Void);
             constrain::external::check_void_parameter(is_void).collect(self, &only.span);
+        }
+        for param in params {
+            if param.ty.is_void(self.sema) {
+                continue;
+            }
+            constrain::external::check_complete_parameter(param.ty.is_complete(self.sema), param.ty)
+                .collect(self, &param.span);
         }
         params.iter().filter_map(|param| self.add_parameter(param)).collect()
     }
@@ -199,9 +210,26 @@ impl<'a> SymbolResolver<'a> {
             constrain::external::param_storage_only_register(storage).collect(self, span)?;
         }
         let name = decl.ident(ctx)?;
+        if !ty.is_void(self.sema) {
+            constrain::external::check_complete_parameter(ty.is_complete(self.sema), ty).collect(self, &decl.span);
+        }
         let storage = declared_storage.unwrap_or(Storage::Auto);
         let sym = Symbol::parameter(name, ty, storage);
         Some(self.sema.declare(sym, &decl.span))
+    }
+
+    fn requires_complete_object(&self, ty: QualifiedType, storage: Storage, is_init: bool) -> bool {
+        if ty.is_void(self.sema) {
+            return true;
+        }
+        let is_unsized_array = matches!(ty.id.resolve(self.sema), ResolvedType::Array { len: None, .. });
+        if is_init && is_unsized_array {
+            return false;
+        }
+        if is_init {
+            return true;
+        }
+        matches!(self.sema.scopes.kind(), ScopeKind::Block | ScopeKind::Function) && storage != Storage::Extern
     }
 }
 
@@ -305,7 +333,9 @@ impl Visitor for SymbolResolver<'_> {
         let qualif = declaration::base_type(self.sema, ctx, specifiers, span);
         for init_declarator in &node.init_declarators {
             let decl = &init_declarator.declarator;
+            let diag_count_before = self.sema.diagnosis.len();
             let Some((ty, decl)) = declaration::declared_type(self.sema, ctx, qualif, decl) else { continue };
+            let already_diagnosed = self.sema.diagnosis.len() != diag_count_before;
             let Some(name) = decl.ident(ctx) else { continue };
             let is_function = matches!(ty.id.resolve(self.sema), ResolvedType::Function { .. });
             if let Some(declared_storage) = declared_storage
@@ -323,6 +353,10 @@ impl Visitor for SymbolResolver<'_> {
                 _ => SymbolKind::Variable,
             };
             let is_init = init_declarator.initializer.is_some();
+            if kind == SymbolKind::Variable && !already_diagnosed && self.requires_complete_object(ty, storage, is_init)
+            {
+                constrain::declaration::check_complete_object(ty.is_complete(self.sema), ty).collect(self, &decl.span);
+            }
             let sym_id = self
                 .sema
                 .declare(Symbol::new(name, Some(ty), Some(storage), kind, is_init), &decl.span);

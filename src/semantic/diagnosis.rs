@@ -107,6 +107,9 @@ pub enum Diagnosis {
     NegativeArraySize,
     ZeroArraySize,
     TagWithoutMember(SymbolKind),
+    IncompleteVariable(QualifiedType),
+    InvalidMemberType(QualifiedType),
+    InvalidElementType(QualifiedType),
     /// 6.5.2.2
     VariantBadValue,
     // 6.7
@@ -123,6 +126,8 @@ pub enum Diagnosis {
     DuplicateParameterName,
     MissingParameterInOldStyle,
     TypedefInOldStyle,
+    IncompleteParameter(QualifiedType),
+    IncompleteReturn(QualifiedType),
 
     LabelOutsideFunction,
     DuplicateDeclaration(SymbolKind, Name),
@@ -239,6 +244,11 @@ impl DiagnosisNode {
             Diagnosis::VariantBadValue => "Variant value should be in int range".to_string(),
             Diagnosis::EmptyDeclaration => "Declaration declares nothing".to_string(),
             Diagnosis::TagWithoutMember(kind) => format!("{kind} has no named member"),
+            Diagnosis::IncompleteVariable(ty) => format!("variable has incomplete type '{}'", ty.describe(sema, ctx)),
+            Diagnosis::InvalidMemberType(ty) => format!("field has incomplete or function type '{}'", ty.describe(sema, ctx)),
+            Diagnosis::InvalidElementType(ty) => format!("array has incomplete or function element type '{}'", ty.describe(sema, ctx)),
+            Diagnosis::IncompleteParameter(ty) => format!("parameter has incomplete type '{}'", ty.describe(sema, ctx)),
+            Diagnosis::IncompleteReturn(ty) => format!("function definition has incomplete return type '{}'", ty.describe(sema, ctx)),
             Diagnosis::MultipleStorageSpecifiers => "Multiple storage class declaration".to_string(),
             Diagnosis::BlockScopeNotExtern => "Function in block not declared as extern".to_string(),
             Diagnosis::InvalidTypeSpecifier => "Invalid type specifier or combination thereof".to_string(),

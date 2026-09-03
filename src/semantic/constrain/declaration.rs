@@ -2,8 +2,6 @@ use crate::ast::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier, Value}
 use crate::semantic::diagnosis::{Diag, Diagnosis};
 use crate::semantic::{QualifiedType, ResolvedType, ScopeKind};
 
-/// 6.5.1 Storage-class specifiers
-/// At most, one storage-class specifier may be given in the declaration specifiers in a declaration
 pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>> {
     let mut storages = specifiers.iter().filter_map(|s| match s {
         DeclarationSpecifier::Storage(s) => Some(s),
@@ -17,8 +15,6 @@ pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>>
     }
 }
 
-/// 6.5.1 Storage-class specifiers
-/// The declaration of an identifier for a function that has block scope shall have no explicit storage-class specifier other than extern.
 pub fn extern_function_only(scope_type: ScopeKind, storage: Storage) -> Diag<()> {
     if matches!(scope_type, ScopeKind::Block | ScopeKind::Function) && storage != Storage::Extern {
         Diag::err((), Diagnosis::BlockScopeNotExtern)
@@ -27,9 +23,6 @@ pub fn extern_function_only(scope_type: ScopeKind, storage: Storage) -> Diag<()>
     }
 }
 
-/// 6.5.2 Type specifiers
-/// Each list of type specifiers shall be one of the following sets; the type specifiers
-/// may occur in any order. "int, signed, signed int, or no type specifiers" is the empty set here.
 #[rustfmt::skip]
 const BASIC_TYPES: &[(&[TypeSpecifier], ResolvedType)] = {
     use ResolvedType as R;
@@ -74,8 +67,6 @@ pub fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
     }
 }
 
-/// 6.5.2.1 Structure and union specifiers
-/// A bit-field is declared with a type other than int, signed int, or unsigned int (6.5.2.1).
 pub fn check_bit_width(ty: &ResolvedType, value: Option<Value>) -> Diag<Option<i32>> {
     if !matches!(ty, ResolvedType::Int | ResolvedType::UnsignedInt) {
         return Diag::err(None, Diagnosis::NonIntBitFieldType);
@@ -88,8 +79,6 @@ pub fn check_bit_width(ty: &ResolvedType, value: Option<Value>) -> Diag<Option<i
     Diag::ok(Some(int_value as i32))
 }
 
-/// 6.5.3 Type qualifiers
-/// The same type qualifier shall not appear more than once in the same specifier list or qualifier list, either directly or via one or more typedefs.
 pub fn check_qualifier<I>(qualifiers: I) -> Diag<(bool, bool)>
 where
     I: IntoIterator<Item = Qualifier>,
@@ -117,12 +106,31 @@ pub fn get_qualifier(specifiers: &[DeclarationSpecifier]) -> Diag<(bool, bool)> 
     check_qualifier(a)
 }
 
-/// 6.5.4.3 Function declarators (including prototypes)
-/// A function declarator shall not specify a return type that is a function type or an array type.
 pub fn check_return_type(ret: &ResolvedType, ty: QualifiedType) -> Diag<()> {
     match ret {
         ResolvedType::Array { .. } => Diag::err((), Diagnosis::FunctionReturningArray(ty)),
         ResolvedType::Function { .. } => Diag::err((), Diagnosis::FunctionReturningFunction(ty)),
         _ => Diag::ok(()),
+    }
+}
+
+pub fn check_complete_object(is_complete: bool, ty: QualifiedType) -> Diag<()> {
+    match is_complete {
+        true => Diag::ok(()),
+        false => Diag::err((), Diagnosis::IncompleteVariable(ty)),
+    }
+}
+
+pub fn check_member_type(is_object: bool, ty: QualifiedType) -> Diag<()> {
+    match is_object {
+        true => Diag::ok(()),
+        false => Diag::err((), Diagnosis::InvalidMemberType(ty)),
+    }
+}
+
+pub fn check_element_type(is_object: bool, ty: QualifiedType) -> Diag<()> {
+    match is_object {
+        true => Diag::ok(()),
+        false => Diag::err((), Diagnosis::InvalidElementType(ty)),
     }
 }

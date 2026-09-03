@@ -56,7 +56,7 @@ pub fn declared_type(
     inner_most: Option<QualifiedType>,
     decl: &DeclaratorNode,
 ) -> Option<(QualifiedType, DeclaratorNode)> {
-    let (ty, declarator, _) = extract_declarator(sema, ctx, decl, inner_most?);
+    let (ty, declarator, _) = extract_declarator(sema, ctx, decl, inner_most?, false);
     Some((ty, declarator))
 }
 
@@ -66,7 +66,7 @@ pub fn declared_function(
     inner_most: Option<QualifiedType>,
     decl: &DeclaratorNode,
 ) -> Option<(QualifiedType, DeclaratorNode, Option<DeclaredParams>)> {
-    Some(extract_declarator(sema, ctx, decl, inner_most?))
+    Some(extract_declarator(sema, ctx, decl, inner_most?, false))
 }
 
 fn extract_declarator(
@@ -74,21 +74,27 @@ fn extract_declarator(
     ctx: &Context,
     declarator: &DeclaratorNode,
     inner_most: QualifiedType,
+    inner_already_diagnosed: bool,
 ) -> (QualifiedType, DeclaratorNode, Option<DeclaredParams>) {
     match declarator.id.resolve(ctx) {
         Declarator::Pointer { qualifiers, inner } => {
             let (is_const, is_volatile) =
                 constrain::declaration::check_qualifier(qualifiers.iter().copied()).collect(sema, &declarator.span);
             let id = sema.types.pointer(inner_most);
-            extract_declarator(sema, ctx, inner, QualifiedType::new(id, is_const, is_volatile))
+            extract_declarator(sema, ctx, inner, QualifiedType::new(id, is_const, is_volatile), false)
         }
         Declarator::Array {
             declarator: inner,
             size,
         } => {
+            if !inner_already_diagnosed {
+                constrain::declaration::check_element_type(inner_most.is_object(sema), inner_most)
+                    .collect(sema, &declarator.span);
+            }
             let len = size.as_ref().and_then(|e| array_length(sema, ctx, e));
+            let this_level_erred = size.is_some() && len.is_none();
             let id = sema.types.array(inner_most, len);
-            extract_declarator(sema, ctx, inner, QualifiedType::new(id, false, false))
+            extract_declarator(sema, ctx, inner, QualifiedType::new(id, false, false), this_level_erred)
         }
         Declarator::Function {
             declarator: inner,
@@ -98,7 +104,8 @@ fn extract_declarator(
             constrain::declaration::check_return_type(inner_most.id.resolve(sema), inner_most)
                 .collect(sema, &declarator.span);
             let id = sema.types.function(inner_most, list.types());
-            let (ty, leaf, inner_list) = extract_declarator(sema, ctx, inner, QualifiedType::new(id, false, false));
+            let (ty, leaf, inner_list) =
+                extract_declarator(sema, ctx, inner, QualifiedType::new(id, false, false), false);
             match inner.id.resolve(ctx) {
                 Declarator::Ident(_) | Declarator::Abstract => (ty, leaf, Some(list)),
                 _ => (ty, leaf, inner_list),
@@ -193,6 +200,7 @@ pub fn struct_or_union_tag(
     }
 
     let mut members: Vec<Member> = Vec::new();
+    let mut has_rejected_member = false;
     for field in fields {
         if field.struct_declarators.is_empty() {
             sema.add_diag(Diag::err((), Diagnosis::EmptyDeclaration), &field.span);
@@ -200,11 +208,21 @@ pub fn struct_or_union_tag(
         let qual = base_type(sema, ctx, &field.specifiers, &field.span);
         for declarator in &field.struct_declarators {
             let decl = &declarator.declarator;
+            let diag_count_before = sema.diagnosis.len();
             let Some((ty, node)) = declared_type(sema, ctx, qual, decl) else { continue };
+            let already_diagnosed = sema.diagnosis.len() != diag_count_before;
             let bit_width = declarator.bit_width.as_ref().and_then(|e| {
                 let value = ice::eval_constant(sema, ctx, e);
                 constrain::declaration::check_bit_width(ty.id.resolve(sema), value).collect(sema, span)
             });
+            let is_member_object = ty.is_object(sema);
+            if !already_diagnosed {
+                constrain::declaration::check_member_type(is_member_object, ty).collect(sema, &decl.span);
+            }
+            if already_diagnosed || !is_member_object {
+                has_rejected_member = true;
+                continue;
+            }
             match (node.ident(ctx), bit_width) {
                 (Some(name), _) => {
                     if members.iter().any(|m| m.sym.is_some_and(|id| id.resolve(sema).name.id == name.id)) {
@@ -223,7 +241,7 @@ pub fn struct_or_union_tag(
             }
         }
     }
-    if members.is_empty() || members.iter().all(|m| m.sym.is_none()) {
+    if !has_rejected_member && (members.is_empty() || members.iter().all(|m| m.sym.is_none())) {
         sema.add_diag(Diag::err((), Diagnosis::TagWithoutMember(kind.symbol_kind())), span);
     }
     sema.tags.complete(tag, members);

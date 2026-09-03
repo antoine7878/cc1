@@ -131,7 +131,7 @@ recover!(
     &["O"]
 );
 
-// accept!(identifier_implicit_function_declaration, "int f(void) { return g(); }");
+accept!(identifier_implicit_function_declaration, "int f(void) { return g(); }");
 
 accept!(cast_float_constant_to_int, "enum e { A = (int)1.5 };");
 
@@ -525,3 +525,104 @@ reject!(
 );
 
 accept!(compatible_int_against_signed_int, "extern int x; extern signed int x;");
+
+// ---- 6.5 an object with no linkage must be complete by end of declarator -
+
+reject!(incomplete_void_variable, "void v;");
+
+reject!(incomplete_initialized_variable, "struct S; struct S x = { 1 };");
+
+reject!(incomplete_block_variable, "struct S; void f(void) { struct S x; }");
+
+reject!(
+    incomplete_static_block_variable,
+    "struct S; void f(void) { static struct S x; }"
+);
+
+reject!(incomplete_array_element_sized, "struct S; struct S a[3];");
+
+reject!(incomplete_array_element_unsized, "struct S; extern struct S a[];");
+
+reject!(void_array_element, "void a[3];");
+
+// ---- 6.5.2.1 a structure or union shall not contain a member with incomplete or function type ----
+
+reject!(incomplete_struct_member, "struct S; struct T { struct S s; };");
+
+reject!(void_struct_member, "struct U { void v; };");
+
+reject!(self_referential_struct_member, "struct W { struct W w; };");
+
+reject!(
+    self_referential_struct_member_no_crash,
+    "struct W { struct W w; }; enum e { P = sizeof(struct W) };"
+);
+
+reject!(
+    self_referential_struct_array_member_zero_size_no_crash,
+    "struct W { struct W w[0]; }; enum e { P = sizeof(struct W) };"
+);
+
+reject!(
+    self_referential_struct_array_member_no_crash,
+    "struct W { struct W w[3]; }; enum e { P = sizeof(struct W) };"
+);
+
+// ---- 6.7.1 the resulting parameter type shall be an object type ----------
+
+reject!(
+    incomplete_parameter_prototype,
+    "struct S; void h(struct S p) { (void)0; }"
+);
+
+reject!(
+    incomplete_parameter_old_style,
+    "struct S; void h(p) struct S p; { (void)0; }"
+);
+
+// ---- 6.7.1 a function definition's return type shall be void or complete -
+
+reject!(
+    incomplete_return_type,
+    "struct S; struct S r(void) { struct S v; return v; }"
+);
+
+reject!(incomplete_definition_parameter_array, "struct S; void f(struct S a[]);");
+
+accept!(extern_incomplete_variable, "struct S; extern struct S b;");
+
+accept!(
+    extern_incomplete_block_variable,
+    "struct S; void f(void) { extern struct S y; }"
+);
+
+accept!(pointer_to_incomplete_variable, "struct S; struct S *p;");
+
+accept!(typedef_of_incomplete_type, "struct S; typedef struct S TS;");
+
+accept!(incomplete_parameter_in_prototype_only, "struct S; void g(struct S p);");
+
+accept!(incomplete_return_in_prototype_only, "struct S; struct S ret(void);");
+
+accept!(self_referential_struct_pointer_member, "struct X { struct X *p; };");
+
+accept!(
+    tentative_definition_completed_later,
+    "struct S; struct S late; struct S { int a; };"
+);
+
+accept!(unsized_array_completed_by_initializer, "int a[] = { 1, 2 };");
+
+recover!(
+    two_dimensional_array_reports_element_incompleteness_once,
+    "struct S; struct S a[2][3];",
+    [Diagnosis::InvalidElementType(_)],
+    &[]
+);
+
+recover!(
+    incomplete_member_reports_once_without_tag_without_member,
+    "struct S; struct T { struct S s; };",
+    [Diagnosis::InvalidMemberType(_)],
+    &[]
+);
