@@ -1,5 +1,6 @@
-void f(void) {
-	extern int x;
-}
+int arr[];
 
-static int x;
+int main(void) {
+	arr[2] = 1;
+	return 0;
+}

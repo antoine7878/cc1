@@ -11,7 +11,7 @@ use crate::semantic::{
 };
 use crate::target::{Layout, Target};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct External {
     pub symbol: SymbolId,
     pub defined: Option<Span>,
@@ -41,7 +41,7 @@ pub struct Sema {
 
     exprs: Vec<ExprFacts>,
     pub declarations: HashMap<DeclaratorId, SymbolId>,
-    externals: HashMap<StringId, External>,
+    pub externals: HashMap<StringId, External>,
 
     pub layouts: HashMap<ResolvedTypeId, Layout>,
     pub target: Target,

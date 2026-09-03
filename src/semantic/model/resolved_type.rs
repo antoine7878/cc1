@@ -75,6 +75,10 @@ impl ResolvedType {
         self.is_complete(sema) && !self.is_function()
     }
 
+    pub fn is_array(&self) -> bool {
+        matches!(self, ResolvedType::Array { .. })
+    }
+
     pub fn is_arithmetic(&self, sema: &Sema) -> bool {
         self.is_integral(sema) || self.is_floating()
     }
@@ -311,6 +315,10 @@ impl QualifiedType {
 
     pub fn is_object(&self, sema: &Sema) -> bool {
         self.id.resolve(sema).is_object(sema)
+    }
+
+    pub fn is_array(&self, sema: &Sema) -> bool {
+        self.id.resolve(sema).is_array()
     }
 
     pub fn is_arithmetic(&self, sema: &Sema) -> bool {

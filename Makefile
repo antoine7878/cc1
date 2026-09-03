@@ -43,7 +43,7 @@ coverage: $(NAME)
 	cargo llvm-cov nextest
 
 CFF = -m32 -std=iso9899:1990 -pedantic-errors -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
-# CFF = -pedantic-errors
+CFF = -m32 -std=iso9899:1990
 
 c:
 	gcc -c $(CFF) rscs/hello.c -o /dev/null

@@ -96,7 +96,12 @@ impl Symbol {
         }
     }
 
-    pub fn definition_of(scope: ScopeKind, storage: Option<Storage>, has_initializer: bool, kind: SymbolKind) -> Definition {
+    pub fn definition_of(
+        scope: ScopeKind,
+        storage: Option<Storage>,
+        has_initializer: bool,
+        kind: SymbolKind,
+    ) -> Definition {
         if kind == SymbolKind::Function {
             return Definition::Declaration;
         }
