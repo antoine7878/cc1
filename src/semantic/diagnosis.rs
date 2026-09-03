@@ -104,6 +104,8 @@ pub enum Diagnosis {
     /// 6.5.2.1
     NonIntBitFieldType,
     NonIntArraySize,
+    NegativeArraySize,
+    ZeroArraySize,
     TagWithoutMember(SymbolKind),
     /// 6.5.2.2
     VariantBadValue,
@@ -257,6 +259,8 @@ impl DiagnosisNode {
             Diagnosis::DuplicateDeclaration(kind, name) => format!("duplicate declaration of {} `{}'", kind, name.id.resolve(ctx)),
             Diagnosis::NonIntBitFieldType => "Bit-field has non-integral type".to_string(),
             Diagnosis::NonIntArraySize => "Array len has non-integral type".to_string(),
+            Diagnosis::NegativeArraySize => "size of array is negative".to_string(),
+            Diagnosis::ZeroArraySize => "size of array is zero".to_string(),
         }
     }
 }

@@ -161,12 +161,21 @@ fn resolve_parameter(sema: &mut Sema, ctx: &Context, param: &ParameterDeclaratio
     })
 }
 
+/// 6.5.4.2 The expression delimited by [ and ] (which specifies the size of an array) shall be an
+/// integral constant expression that has a value greater than zero.
 fn array_length(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<usize> {
     let value = ice::eval_constant(sema, ctx, expr)?;
-    value.get_integer_value().map_or_else(
-        || sema.add_diag(Diag::err(None, Diagnosis::NonIntArraySize), &expr.span),
-        |len| Some(len as usize),
-    )
+    let Some(len) = value.get_integer_value() else {
+        return sema.add_diag(Diag::err(None, Diagnosis::NonIntArraySize), &expr.span);
+    };
+    // `get_integer_value` reinterprets the representation, so the sign is read off the value.
+    if value.is_negative() {
+        return sema.add_diag(Diag::err(None, Diagnosis::NegativeArraySize), &expr.span);
+    }
+    if value.is_zero() {
+        return sema.add_diag(Diag::err(None, Diagnosis::ZeroArraySize), &expr.span);
+    }
+    Some(len as usize)
 }
 
 pub fn struct_or_union_tag(

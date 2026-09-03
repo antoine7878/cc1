@@ -480,6 +480,58 @@ recover!(
     &[]
 );
 
+// 6.5.4.2 The expression delimited by [ and ] (which specifies the size of an array) shall be an
+// integral constant expression that has a value greater than zero.
+// gcc: `int a[-1];` is "declared as an array with a negative size", `int a[0];` is rejected under
+// -pedantic-errors as a zero-length array extension.
+recover!(
+    array_size_is_negative,
+    "int a[-1];",
+    [Diagnosis::NegativeArraySize],
+    &[]
+);
+
+recover!(
+    array_size_folds_to_a_negative_value,
+    "int a[1 - 2];",
+    [Diagnosis::NegativeArraySize],
+    &[]
+);
+
+recover!(array_size_is_zero, "int a[0];", [Diagnosis::ZeroArraySize], &[]);
+
+recover!(
+    a_member_array_size_is_zero,
+    "struct S { int a[0]; };",
+    [Diagnosis::ZeroArraySize],
+    &[]
+);
+
+recover!(
+    an_inner_array_size_is_zero,
+    "int a[1][0];",
+    [Diagnosis::ZeroArraySize],
+    &[]
+);
+
+// An abstract declarator carries the same constraint; the size it could not take leaves the array
+// incomplete, which is what the sizeof then reports.
+recover!(
+    an_abstract_array_size_is_zero,
+    "enum E { A = sizeof(int[0]) };",
+    [Diagnosis::ZeroArraySize, Diagnosis::SizeofIncomplete(_)],
+    &[]
+);
+
+// A rejected size must leave the array incomplete rather than a length of 18446744073709551615,
+// whose layout overflows.
+recover!(
+    a_rejected_array_size_leaves_no_layout_to_compute,
+    "int a[-1]; int b = sizeof(a);",
+    [Diagnosis::NegativeArraySize, Diagnosis::SizeofIncomplete(_)],
+    &[]
+);
+
 recover!(
     array_size_is_not_an_integer,
     "int a[1.5];",
