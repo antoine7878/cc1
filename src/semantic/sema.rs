@@ -13,7 +13,6 @@ use crate::target::{Layout, Target};
 
 #[derive(Debug)]
 pub struct External {
-    pub linkage: Linkage,
     pub symbol: SymbolId,
     pub defined: Option<Span>,
     pub tentative: Option<Span>,
@@ -195,7 +194,8 @@ impl Sema {
     }
 
     pub fn linkage_of_name(&self, name: StringId) -> Option<Linkage> {
-        self.externals.get(&name).map(|entry| entry.linkage)
+        let id = self.externals.get(&name)?.symbol;
+        Some(id.resolve(self).linkage)
     }
 
     pub fn declare(&mut self, sym: Symbol, span: &Span) -> SymbolId {
@@ -226,7 +226,6 @@ impl Sema {
             self.externals.insert(
                 name.id,
                 External {
-                    linkage,
                     symbol: id,
                     defined,
                     tentative,
@@ -235,7 +234,7 @@ impl Sema {
             return id;
         };
         let entry_symbol = entry.symbol;
-        let entry_linkage = entry.linkage;
+        let entry_linkage = entry_symbol.resolve(self).linkage;
 
         if entry_linkage != linkage {
             self.add_diag(Diag::err((), Diagnosis::ConflictingLinkage(name)), span);
