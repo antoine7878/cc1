@@ -207,10 +207,7 @@ pub fn struct_or_union_tag(
             });
             match (node.ident(ctx), bit_width) {
                 (Some(name), _) => {
-                    if members
-                        .iter()
-                        .any(|&m| matches!(m, Member::Symbol(id) if id.resolve(sema).name.id == name.id ))
-                    {
+                    if members.iter().any(|m| m.sym.is_some_and(|id| id.resolve(sema).name.id == name.id)) {
                         sema.add_diag(
                             Diag::err((), Diagnosis::DuplicateDeclaration(SymbolKind::Member, name)),
                             &decl.span,
@@ -219,14 +216,14 @@ pub fn struct_or_union_tag(
                     }
                     let memb = Symbol::member(name, ty, bit_width);
                     let id = sema.symbols.alloc(memb);
-                    members.push(Member::Symbol(id))
+                    members.push(Member::symbol(id, bit_width))
                 }
-                (None, Some(i)) if bit_width.is_some() => members.push(Member::Bitfield(i)),
+                (None, Some(i)) => members.push(Member::bitfield(i)),
                 _ => (),
             }
         }
     }
-    if members.is_empty() || members.iter().all(|m| matches!(m, Member::Bitfield(_))) {
+    if members.is_empty() || members.iter().all(|m| m.sym.is_none()) {
         sema.add_diag(Diag::err((), Diagnosis::TagWithoutMember(kind.symbol_kind())), span);
     }
     sema.tags.complete(tag, members);
@@ -256,8 +253,9 @@ pub fn enum_tag(sema: &mut Sema, ctx: &Context, id: EnumId) -> Option<TagDefId> 
             value = 0
         }
         let ty = QualifiedType::new(sema.builtins.int, false, false);
-        members.push(Member::Symbol(
+        members.push(Member::symbol(
             sema.declare(Symbol::variant(variant.name, ty, value as i32), &variant.span),
+            None,
         ));
         value += 1;
     }

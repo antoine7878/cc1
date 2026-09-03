@@ -283,6 +283,24 @@ impl Unit {
             .map(|(_, _, ty)| ty)
     }
 
+    pub fn tag_members(&self, tag: &str) -> Vec<(String, u32, u32)> {
+        let def = self
+            .ctx
+            .sema
+            .tags
+            .iter()
+            .find(|def| def.name.is_some_and(|name| name.id.resolve(&self.ctx).as_str() == tag))
+            .unwrap_or_else(|| panic!("no tag `{tag}` in the unit"));
+        def.members
+            .iter()
+            .filter_map(|m| {
+                let sym = m.sym?;
+                let name = self.ctx.sema.symbols.get(sym).name.id.resolve(&self.ctx).clone();
+                Some((name, m.offset, m.bit_offset))
+            })
+            .collect()
+    }
+
     pub fn messages(&self) -> Vec<String> {
         self.diagnosis()
             .iter()
@@ -412,6 +430,22 @@ pub fn run_size(name: &str, decl: &str, ty: &str, expected: u64) {
         Some(expected.to_string().as_str()),
         "`{name}` sizeof({ty}) should be {expected}:\n{decl}"
     );
+}
+
+pub fn run_offsets(name: &str, decl: &str, ty: &str, tag: &str, expected: &[(&str, u32, u32)]) {
+    let src = format!("{decl} enum layout_probe {{ PROBE = sizeof({ty}) }};");
+    let unit = Unit::compile(&src);
+
+    assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
+    assert!(
+        unit.diagnosis().is_empty(),
+        "`{name}` unexpected diagnosis:\n{src}\n{}",
+        unit.render()
+    );
+
+    let got = unit.tag_members(tag);
+    let expected: Vec<(String, u32, u32)> = expected.iter().map(|(n, o, b)| (n.to_string(), *o, *b)).collect();
+    assert_eq!(got, expected, "`{name}` member offsets in `{tag}`:\n{decl}");
 }
 
 pub fn run_literal(name: &str, src: &str, expected: &str) {

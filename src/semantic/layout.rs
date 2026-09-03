@@ -28,53 +28,67 @@ pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Option<Layout> {
 }
 
 pub fn of_tag(sema: &mut Sema, id: TagDefId) -> Option<Layout> {
-    let tag = id.resolve(sema).clone();
+    let mut tag = id.resolve(sema).clone();
     if !tag.is_complete {
         return None;
     }
-    match tag.kind {
-        Tag::Struct => struct_layout(sema, &tag.members),
-        Tag::Union => union_layout(sema, &tag.members),
-        Tag::Enum => Some(sema.target.int),
-    }
+    let layout = match tag.kind {
+        Tag::Struct => struct_layout(sema, &mut tag.members)?,
+        Tag::Union => union_layout(sema, &mut tag.members)?,
+        Tag::Enum => return Some(sema.target.int),
+    };
+    sema.tags.get_mut(id).members = tag.members;
+    Some(layout)
 }
 
 fn member(sema: &mut Sema, mem: Member) -> Option<(Layout, Option<u64>)> {
-    match mem {
-        Member::Symbol(id) => {
-            let symbol = id.resolve(sema);
-            let width = symbol.value.map(|width| width.max(0) as u64);
-            let ty = symbol.ty?;
+    let width = mem.width.map(|width| width.max(0) as u64);
+    match mem.sym {
+        Some(id) => {
+            let ty = id.resolve(sema).ty?;
             Some((of(sema, ty.id)?, width))
         }
-        Member::Bitfield(i) => {
-            let ty = sema.builtins.int;
-            Some((of(sema, ty)?, Some(i as u64)))
-        }
+        None => Some((of(sema, sema.builtins.int)?, width)),
     }
 }
 
-fn struct_layout(sema: &mut Sema, members: &[Member]) -> Option<Layout> {
+fn place_plain(m: &mut Member, bits: u64) {
+    m.offset = (bits / 8) as u32;
+    m.bit_offset = 0;
+}
+
+fn place_bitfield(m: &mut Member, bits: u64, storage: u64) {
+    let unit = bits / storage * storage;
+    m.offset = (unit / 8) as u32;
+    m.bit_offset = (bits - unit) as u32;
+}
+
+fn struct_layout(sema: &mut Sema, members: &mut [Member]) -> Option<Layout> {
     let mut bits: u64 = 0;
     let mut align: u32 = 1;
 
-    for &m in members {
-        let (layout, width) = member(sema, m)?;
+    for m in members.iter_mut() {
+        let (layout, width) = member(sema, *m)?;
         let unit = u64::from(layout.align) * 8;
-        if matches!(m, Member::Symbol(_)) {
+        if m.sym.is_some() {
             align = align.max(layout.align);
         }
         match width {
-            Some(0) => bits = round_up(bits, unit),
+            Some(0) => {
+                bits = round_up(bits, unit);
+                place_plain(m, bits);
+            }
             Some(width) => {
                 let storage = u64::from(layout.size) * 8;
                 if bits % storage + width > storage {
                     bits = round_up(bits, unit);
                 }
+                place_bitfield(m, bits, storage);
                 bits += width;
             }
             None => {
                 bits = round_up(bits, unit);
+                place_plain(m, bits);
                 bits += u64::from(layout.size) * 8;
             }
         }
@@ -84,16 +98,18 @@ fn struct_layout(sema: &mut Sema, members: &[Member]) -> Option<Layout> {
     Some(Layout::new(size as u32, align))
 }
 
-fn union_layout(sema: &mut Sema, members: &[Member]) -> Option<Layout> {
+fn union_layout(sema: &mut Sema, members: &mut [Member]) -> Option<Layout> {
     let mut size: u64 = 0;
     let mut align: u32 = 1;
 
-    for &m in members {
-        let (layout, width) = member(sema, m)?;
-        if matches!(m, Member::Symbol(_)) {
+    for m in members.iter_mut() {
+        let (layout, width) = member(sema, *m)?;
+        if m.sym.is_some() {
             align = align.max(layout.align);
         }
         size = size.max(width.map_or(u64::from(layout.size), |width| width.div_ceil(8)));
+        m.offset = 0;
+        m.bit_offset = 0;
     }
 
     Some(Layout::new(round_up(size, u64::from(align)) as u32, align))

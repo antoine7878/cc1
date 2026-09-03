@@ -13,9 +13,31 @@ pub struct TagDef {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Member {
-    Symbol(SymbolId),
-    Bitfield(i32),
+pub struct Member {
+    pub sym: Option<SymbolId>,
+    pub width: Option<i32>,
+    pub offset: u32,
+    pub bit_offset: u32,
+}
+
+impl Member {
+    pub fn symbol(sym: SymbolId, width: Option<i32>) -> Self {
+        Self {
+            sym: Some(sym),
+            width,
+            offset: 0,
+            bit_offset: 0,
+        }
+    }
+
+    pub fn bitfield(width: i32) -> Self {
+        Self {
+            sym: None,
+            width: Some(width),
+            offset: 0,
+            bit_offset: 0,
+        }
+    }
 }
 
 impl Tag {
@@ -39,7 +61,7 @@ impl TagDef {
 
     pub fn get_member(&self, sema: &Sema, name: &Name) -> Option<SymbolId> {
         self.members.iter().find_map(|&member| {
-            let Member::Symbol(sym_id) = member else { return None };
+            let sym_id = member.sym?;
             (sema.symbols.get(sym_id).name.id == name.id).then_some(sym_id)
         })
     }

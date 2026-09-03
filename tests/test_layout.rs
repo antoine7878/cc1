@@ -205,3 +205,83 @@ unnamed_size!(
     "union U",
     1
 );
+
+offsets!(
+    offset_plain_with_padding,
+    "struct S { char a; int b; };",
+    "struct S",
+    "S",
+    &[("a", 0, 0), ("b", 4, 0)]
+);
+
+offsets!(
+    offset_double_alignment,
+    "struct S { char a; double d; };",
+    "struct S",
+    "S",
+    &[("a", 0, 0), ("d", 4, 0)]
+);
+
+offsets!(
+    offset_array_member,
+    "struct S { char a; int arr[3]; };",
+    "struct S",
+    "S",
+    &[("a", 0, 0), ("arr", 4, 0)]
+);
+
+offsets!(
+    offset_nested_struct_member,
+    "struct Inner { char x; int y; }; struct S { char a; struct Inner in; };",
+    "struct S",
+    "S",
+    &[("a", 0, 0), ("in", 4, 0)]
+);
+
+offsets!(
+    offset_union_all_zero,
+    "union U { char a; int b; double d; };",
+    "union U",
+    "U",
+    &[("a", 0, 0), ("b", 0, 0), ("d", 0, 0)]
+);
+
+offsets!(
+    offset_bitfields_sharing_a_unit,
+    "struct S { int a:3; int b:4; };",
+    "struct S",
+    "S",
+    &[("a", 0, 0), ("b", 0, 3)]
+);
+
+offsets!(
+    offset_bitfield_opens_a_new_unit,
+    "struct S { int a:20; int b:20; };",
+    "struct S",
+    "S",
+    &[("a", 0, 0), ("b", 4, 0)]
+);
+
+offsets!(
+    offset_unnamed_bitfield_between_named,
+    "struct S { int a:3; int :2; int b:4; };",
+    "struct S",
+    "S",
+    &[("a", 0, 0), ("b", 0, 5)]
+);
+
+offsets!(
+    offset_zero_width_bitfield,
+    "struct S { int a:1; int :0; int b:1; };",
+    "struct S",
+    "S",
+    &[("a", 0, 0), ("b", 4, 0)]
+);
+
+offsets!(
+    offset_bitfield_after_char,
+    "struct S { char a; int b:3; };",
+    "struct S",
+    "S",
+    &[("a", 0, 0), ("b", 0, 8)]
+);
