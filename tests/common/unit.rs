@@ -283,6 +283,16 @@ impl Unit {
             .map(|(_, _, ty)| ty)
     }
 
+    pub fn uses(&self) -> Vec<(String, bool)> {
+        self.ctx
+            .sema
+            .symbols
+            .iter()
+            .filter(|symbol| matches!(symbol.kind, SymbolKind::Variable | SymbolKind::Function))
+            .map(|symbol| (symbol.name.id.resolve(&self.ctx).clone(), symbol.used))
+            .collect()
+    }
+
     pub fn tag_members(&self, tag: &str) -> Vec<(String, u32, u32)> {
         let def = self
             .ctx
@@ -446,6 +456,21 @@ pub fn run_offsets(name: &str, decl: &str, ty: &str, tag: &str, expected: &[(&st
     let got = unit.tag_members(tag);
     let expected: Vec<(String, u32, u32)> = expected.iter().map(|(n, o, b)| (n.to_string(), *o, *b)).collect();
     assert_eq!(got, expected, "`{name}` member offsets in `{tag}`:\n{decl}");
+}
+
+pub fn run_uses(name: &str, src: &str, expected: &[(&str, bool)]) {
+    let unit = Unit::compile(src);
+
+    assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
+    assert!(
+        unit.diagnosis().is_empty(),
+        "`{name}` unexpected diagnosis:\n{src}\n{}",
+        unit.render()
+    );
+
+    let got = unit.uses();
+    let expected: Vec<(String, bool)> = expected.iter().map(|(n, u)| (n.to_string(), *u)).collect();
+    assert_eq!(got, expected, "`{name}` symbol uses:\n{src}");
 }
 
 pub fn run_literal(name: &str, src: &str, expected: &str) {

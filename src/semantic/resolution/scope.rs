@@ -12,11 +12,11 @@ pub enum ScopeKind {
 }
 
 #[derive(Debug)]
-struct Scope {
+pub struct Scope {
     tags: HashMap<StringId, TagDefId>,
     labels: HashMap<StringId, SymbolId>,
     ordinaries: HashMap<StringId, SymbolId>,
-    kind: ScopeKind,
+    pub kind: ScopeKind,
 }
 
 impl Scope {

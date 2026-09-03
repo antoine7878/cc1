@@ -14,5 +14,6 @@ pub use eval::ice;
 pub use model::*;
 pub use resolution::SymbolResolver;
 pub use resolution::declaration;
-pub use resolution::scope::{ScopeKind, Scopes};
+pub use resolution::mark_uses;
+pub use resolution::scope::{Scope, ScopeKind, Scopes};
 pub use sema::Sema;

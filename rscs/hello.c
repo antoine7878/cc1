@@ -1,3 +1,5 @@
-int f(void) {
-	return g();
+void f(void) {
+	extern int x;
 }
+
+static int x;

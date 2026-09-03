@@ -42,7 +42,7 @@ ttest:
 coverage: $(NAME)
 	cargo llvm-cov nextest
 
-CFF = -std=iso9899:1990 -pedantic-errors -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
+CFF = -m32 -std=iso9899:1990 -pedantic-errors -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
 # CFF = -pedantic-errors
 
 c:

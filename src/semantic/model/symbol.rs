@@ -2,9 +2,29 @@ use std::fmt;
 
 use crate::ast::{Name, Storage};
 use crate::define_arena;
-use crate::semantic::{ExpressionKind, QualifiedType, Sema};
+use crate::semantic::{ExpressionKind, QualifiedType, Scope, ScopeKind, Sema};
 
 define_arena!(Symbol, SymbolArena, SymbolId, crate::semantic::Sema, sema, symbols);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Linkage {
+    None,
+    External,
+    Internal,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Duration {
+    Static,
+    Automatic,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Definition {
+    Tentative,
+    Definition,
+    Declaration,
+}
 
 #[derive(Clone, Debug)]
 pub struct Symbol {
@@ -13,7 +33,11 @@ pub struct Symbol {
     pub storage: Option<Storage>,
     pub kind: SymbolKind,
     pub value: Option<i32>,
+    pub linkage: Linkage,
+    pub duration: Duration,
+    pub definition: Definition,
     pub is_init: bool,
+    pub used: bool,
 }
 
 impl Symbol {
@@ -31,6 +55,56 @@ impl Symbol {
             kind,
             value: None,
             is_init,
+            linkage: Linkage::None,
+            definition: Definition::Definition,
+            duration: Duration::Automatic,
+            used: false,
+        }
+    }
+
+    pub fn linkage_of(scope: ScopeKind, storage: Option<Storage>, kind: SymbolKind, prior: Option<Linkage>) -> Linkage {
+        if !matches!(kind, SymbolKind::Variable | SymbolKind::Function) {
+            return Linkage::None;
+        }
+        if storage == Some(Storage::Extern) {
+            return prior.unwrap_or(Linkage::External);
+        }
+        if kind == SymbolKind::Function {
+            return match storage {
+                Some(Storage::Static) => Linkage::Internal,
+                _ => prior.unwrap_or(Linkage::External),
+            };
+        }
+        if scope == ScopeKind::Block || scope == ScopeKind::Function {
+            return Linkage::None;
+        }
+        if storage == Some(Storage::Static) {
+            return Linkage::Internal;
+        }
+        Linkage::External
+    }
+
+    fn duration_of(scope: &Scope, storage: Storage) -> Duration {
+        if scope.kind == ScopeKind::File || storage == Storage::Static || storage == Storage::Extern {
+            Duration::Static
+        } else {
+            Duration::Automatic
+        }
+    }
+
+    pub fn definition_of(scope: ScopeKind, storage: Option<Storage>, has_initializer: bool) -> Definition {
+        if has_initializer {
+            return Definition::Definition;
+        }
+        if scope == ScopeKind::File {
+            return match storage {
+                None | Some(Storage::Static) => Definition::Tentative,
+                _ => Definition::Declaration,
+            };
+        }
+        match storage {
+            Some(Storage::Extern) => Definition::Declaration,
+            _ => Definition::Definition,
         }
     }
 

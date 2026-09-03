@@ -115,6 +115,15 @@ macro_rules! offsets {
 }
 
 #[macro_export]
+macro_rules! uses {
+    ($name:ident, $src:expr, $expected:expr) => {
+        test_case!($name, {
+            $crate::common::run_uses(stringify!($name), $src, $expected);
+        });
+    };
+}
+
+#[macro_export]
 macro_rules! shaped {
     ($name:ident, $src:expr, $shapes:expr $(,)?) => {
         test_case!($name, {

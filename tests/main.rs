@@ -15,4 +15,5 @@ mod test_scope;
 mod test_semantic;
 mod test_target;
 mod test_typing;
+mod test_uses;
 mod test_value;

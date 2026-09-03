@@ -295,6 +295,14 @@ impl SymbolResolver<'_> {
             _ => (),
         }
     }
+
+    fn implicit_declare_function(&mut self, fn_name: &Name, span: &Span) {
+        let ret = QualifiedType::new(self.sema.builtins.int, false, false);
+        let fn_ty = self.sema.types.function(ret, ParamTypes::Unspecified);
+        let ty = QualifiedType::new(fn_ty, false, false);
+        let sym = Symbol::function(*fn_name, ty, Storage::Extern);
+        self.sema.declare(sym, span);
+    }
 }
 
 impl Visitor for SymbolResolver<'_> {
@@ -401,6 +409,12 @@ impl Visitor for SymbolResolver<'_> {
     }
 
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
+        if let Expression::FunctionCall(f, _) = node.id.resolve(ctx)
+            && let Expression::Identifier(fn_name) = f.id.resolve(ctx)
+            && self.sema.scopes.lookup_ordinary(fn_name.id).is_none()
+        {
+            self.implicit_declare_function(fn_name, &node.span);
+        }
         walk_expression(self, ctx, node);
         self.resolve_expression(ctx, node);
     }

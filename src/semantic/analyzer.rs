@@ -1,6 +1,6 @@
 use crate::ast::visit::walk_translation_unit;
 use crate::context::Context;
-use crate::semantic::{ScopeKind, Sema, SymbolResolver, eval};
+use crate::semantic::{ScopeKind, Sema, SymbolResolver, eval, mark_uses};
 
 pub struct Analyzer;
 
@@ -9,6 +9,7 @@ impl Analyzer {
         let mut sema = Sema::new(ctx.target.clone());
         Self::resolve_names(&mut sema, &ctx);
         eval::check_constants(&mut sema, &ctx);
+        mark_uses(&mut sema, &ctx);
         ctx.diagnosis.append(&mut sema.diagnosis);
         ctx.sema = sema;
         ctx
