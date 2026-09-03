@@ -7,7 +7,7 @@ impl Context {
             return;
         }
         println!();
-        let rows: Vec<[String; 5]> = self
+        let rows: Vec<[String; 8]> = self
             .sema
             .symbols
             .iter()
@@ -16,13 +16,19 @@ impl Context {
                     symbol.kind.to_string(),
                     symbol.name.id.resolve(self).clone(),
                     symbol.storage.map_or(String::default(), |s| s.to_string()),
+                    symbol.linkage.to_string(),
+                    symbol.duration.to_string(),
+                    symbol.definition.to_string(),
                     symbol.value.map_or("-".to_string(), |v| v.to_string()),
                     symbol.ty.map_or(String::default(), |ty| ty.describe(&self.sema, self).to_string()),
                 ]
             })
             .collect();
 
-        print_table(&["KIND", "NAME", "STORAGE", "VALUE", "TYPE"], &rows);
+        print_table(
+            &["KIND", "NAME", "STORAGE", "LINKAGE", "DURATION", "DEFINITION", "VALUE", "TYPE"],
+            &rows,
+        );
     }
 
     pub fn dump_diagnostics(&self) {

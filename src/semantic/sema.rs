@@ -2,14 +2,22 @@ use std::collections::HashMap;
 use std::mem;
 
 use crate::arena::{ResolveMutWith, ResolveWith};
-use crate::ast::{DeclaratorId, ExpressionId, Name, Tag, Value};
+use crate::ast::{DeclaratorId, ExpressionId, Name, StringId, Tag, Value};
 use crate::parser::Span;
 use crate::semantic::{
-    Builtins, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, QualifiedType, ResolvedExpression,
-    ResolvedTypeArena, ResolvedTypeId, ScopeKind, Scopes, Symbol, SymbolArena, SymbolId, SymbolKind, TagDefArena,
-    TagDefId,
+    Builtins, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, Linkage, QualifiedType,
+    ResolvedExpression, ResolvedTypeArena, ResolvedTypeId, ScopeKind, Scopes, Symbol, SymbolArena, SymbolId,
+    SymbolKind, TagDefArena, TagDefId,
 };
 use crate::target::{Layout, Target};
+
+#[derive(Debug)]
+pub struct External {
+    pub linkage: Linkage,
+    pub symbol: SymbolId,
+    pub defined: Option<Span>,
+    pub tentative: Option<Span>,
+}
 
 #[derive(Debug, Default)]
 pub struct ExprFacts {
@@ -34,6 +42,7 @@ pub struct Sema {
 
     exprs: Vec<ExprFacts>,
     pub declarations: HashMap<DeclaratorId, SymbolId>,
+    externals: HashMap<StringId, External>,
 
     pub layouts: HashMap<ResolvedTypeId, Layout>,
     pub target: Target,
@@ -55,6 +64,7 @@ impl Default for Sema {
 
             exprs: Vec::new(),
             declarations: HashMap::default(),
+            externals: HashMap::default(),
 
             layouts: HashMap::default(),
             target,
@@ -184,20 +194,78 @@ impl Sema {
         id
     }
 
+    pub fn linkage_of_name(&self, name: StringId) -> Option<Linkage> {
+        self.externals.get(&name).map(|entry| entry.linkage)
+    }
+
     pub fn declare(&mut self, sym: Symbol, span: &Span) -> SymbolId {
         let (name, kind) = (sym.name, sym.kind);
-        let sym_id = match self.dedup(&sym, span) {
-            Some(id) => id,
-            None => self.symbols.alloc(sym),
+        let lexical = self.dedup(&sym, span);
+        let sym_id = if sym.linkage != Linkage::None {
+            self.register_external(sym, span, lexical)
+        } else {
+            lexical.unwrap_or_else(|| self.symbols.alloc(sym))
         };
         self.scopes.insert(kind, name.id, sym_id);
         sym_id
     }
 
+    fn register_external(&mut self, sym: Symbol, span: &Span, lexical: Option<SymbolId>) -> SymbolId {
+        let name = sym.name;
+        let linkage = sym.linkage;
+        let definition = sym.definition;
+        let new_ty = sym.ty;
+
+        let Some(entry) = self.externals.get(&name.id) else {
+            let id = lexical.unwrap_or_else(|| self.symbols.alloc(sym));
+            let (defined, tentative) = match definition {
+                Definition::Definition => (Some(*span), None),
+                Definition::Tentative => (None, Some(*span)),
+                Definition::Declaration => (None, None),
+            };
+            self.externals.insert(
+                name.id,
+                External {
+                    linkage,
+                    symbol: id,
+                    defined,
+                    tentative,
+                },
+            );
+            return id;
+        };
+        let entry_symbol = entry.symbol;
+        let entry_linkage = entry.linkage;
+
+        if entry_linkage != linkage {
+            self.add_diag(Diag::err((), Diagnosis::ConflictingLinkage(name)), span);
+        }
+
+        let old_ty = entry_symbol.resolve(self).ty;
+        if let Some((old_ty, new_ty)) = Option::zip(old_ty, new_ty)
+            && let Some(merged) = old_ty.composite(self, &new_ty)
+        {
+            entry_symbol.resolve_mut(self).ty = Some(merged);
+        }
+
+        let old_definition = entry_symbol.resolve(self).definition;
+        entry_symbol.resolve_mut(self).definition = promote_definition(old_definition, definition);
+
+        let entry = self.externals.get_mut(&name.id).unwrap();
+        match definition {
+            Definition::Definition if entry.defined.is_none() => entry.defined = Some(*span),
+            Definition::Tentative if entry.tentative.is_none() => entry.tentative = Some(*span),
+            _ => (),
+        }
+
+        entry_symbol
+    }
+
     fn dedup(&mut self, sym: &Symbol, span: &Span) -> Option<SymbolId> {
         let old_id = self.scopes.current(sym.kind, sym.name.id)?;
         let old_symbol = old_id.resolve(self);
-        if self.scopes.kind() == ScopeKind::File
+        if (self.scopes.kind() == ScopeKind::File
+            || (sym.linkage != Linkage::None && old_symbol.linkage != Linkage::None))
             && old_symbol.is_compatible(self, sym)
             && !(sym.is_init && old_symbol.is_init)
         {
@@ -227,4 +295,16 @@ impl Sema {
         let sym_id = self.symbols.alloc(Symbol::label(name, is_init));
         self.scopes.insert(SymbolKind::Label, name.id, sym_id);
     }
+}
+
+fn definition_rank(definition: Definition) -> u8 {
+    match definition {
+        Definition::Declaration => 0,
+        Definition::Tentative => 1,
+        Definition::Definition => 2,
+    }
+}
+
+fn promote_definition(a: Definition, b: Definition) -> Definition {
+    if definition_rank(b) > definition_rank(a) { b } else { a }
 }

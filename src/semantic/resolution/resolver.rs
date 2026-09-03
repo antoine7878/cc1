@@ -11,9 +11,9 @@ use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::resolution::expression;
 use crate::semantic::{
-    AssignmentContext, DeclaredParams, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, ParamInfo,
-    ParamTypes, QualifiedType, ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, declaration,
-    ice,
+    AssignmentContext, DeclaredParams, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId,
+    ParamInfo, ParamTypes, QualifiedType, ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain,
+    declaration, ice,
 };
 
 #[derive(Debug)]
@@ -45,9 +45,8 @@ impl<'a> SymbolResolver<'a> {
         let (rty, decl, params) = declaration::declared_function(self.sema, ctx, qualif, &node.declarator)?;
         let params = constrain::external::extract_function_declarator(params).collect(self, decl_span)?;
 
-        let storage = constrain::declaration::get_storage(&node.specifiers)
-            .collect(self, span)
-            .unwrap_or(Storage::Extern);
+        let declared_storage = constrain::declaration::get_storage(&node.specifiers).collect(self, span);
+        let storage = declared_storage.unwrap_or(Storage::Extern);
 
         constrain::external::check_function_storage(storage).collect(self, span);
         constrain::external::check_external_specifiers(&node.specifiers).collect(self, span);
@@ -69,7 +68,11 @@ impl<'a> SymbolResolver<'a> {
             constrain::external::check_definition_return(ret.is_void(self.sema) || ret.is_complete(self.sema), ret)
                 .collect(self, decl_span);
         }
-        let sym = Symbol::function(name, ty, storage);
+        let prior = self.sema.linkage_of_name(name.id);
+        let linkage = Symbol::linkage_of(self.sema.scopes.kind(), declared_storage, SymbolKind::Function, prior);
+        let mut sym = Symbol::function(name, ty, storage);
+        sym.linkage = linkage;
+        sym.definition = Definition::Definition;
         let sym = self.sema.declare(sym, decl_span);
         let declared = (previous == Some(sym)).then_some(declared).flatten();
         Some((self.sema.functions.declare(sym), params, declared))
@@ -365,9 +368,13 @@ impl Visitor for SymbolResolver<'_> {
             {
                 constrain::declaration::check_complete_object(ty.is_complete(self.sema), ty).collect(self, &decl.span);
             }
-            let sym_id = self
-                .sema
-                .declare(Symbol::new(name, Some(ty), Some(storage), kind, is_init), &decl.span);
+            let prior = self.sema.linkage_of_name(name.id);
+            let scope_kind = self.sema.scopes.kind();
+            let mut sym = Symbol::new(name, Some(ty), Some(storage), kind, is_init);
+            sym.linkage = Symbol::linkage_of(scope_kind, declared_storage, kind, prior);
+            sym.duration = Symbol::duration_of(scope_kind, declared_storage);
+            sym.definition = Symbol::definition_of(scope_kind, declared_storage, is_init);
+            let sym_id = self.sema.declare(sym, &decl.span);
             self.sema.declarations.insert(init_declarator.declarator.id, sym_id);
         }
         walk_declaration(self, ctx, node);

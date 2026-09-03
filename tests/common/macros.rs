@@ -124,6 +124,15 @@ macro_rules! uses {
 }
 
 #[macro_export]
+macro_rules! placements {
+    ($name:ident, $src:expr, $expected:expr) => {
+        test_case!($name, {
+            $crate::common::run_placements(stringify!($name), $src, $expected);
+        });
+    };
+}
+
+#[macro_export]
 macro_rules! shaped {
     ($name:ident, $src:expr, $shapes:expr $(,)?) => {
         test_case!($name, {

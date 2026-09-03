@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::ast::{Name, Storage};
 use crate::define_arena;
-use crate::semantic::{ExpressionKind, QualifiedType, Scope, ScopeKind, Sema};
+use crate::semantic::{ExpressionKind, QualifiedType, ScopeKind, Sema};
 
 define_arena!(Symbol, SymbolArena, SymbolId, crate::semantic::Sema, sema, symbols);
 
@@ -84,8 +84,8 @@ impl Symbol {
         Linkage::External
     }
 
-    fn duration_of(scope: &Scope, storage: Storage) -> Duration {
-        if scope.kind == ScopeKind::File || storage == Storage::Static || storage == Storage::Extern {
+    pub fn duration_of(scope: ScopeKind, storage: Option<Storage>) -> Duration {
+        if scope == ScopeKind::File || storage == Some(Storage::Static) || storage == Some(Storage::Extern) {
             Duration::Static
         } else {
             Duration::Automatic
@@ -161,6 +161,35 @@ pub enum SymbolKind {
     Label,
     Typedef,
     Variant,
+}
+
+impl fmt::Display for Linkage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Linkage::None => write!(f, "none"),
+            Linkage::External => write!(f, "external"),
+            Linkage::Internal => write!(f, "internal"),
+        }
+    }
+}
+
+impl fmt::Display for Duration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Duration::Static => write!(f, "static"),
+            Duration::Automatic => write!(f, "automatic"),
+        }
+    }
+}
+
+impl fmt::Display for Definition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Definition::Declaration => write!(f, "declaration"),
+            Definition::Tentative => write!(f, "tentative"),
+            Definition::Definition => write!(f, "definition"),
+        }
+    }
 }
 
 impl fmt::Display for SymbolKind {

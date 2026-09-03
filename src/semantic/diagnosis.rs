@@ -131,6 +131,7 @@ pub enum Diagnosis {
 
     LabelOutsideFunction,
     DuplicateDeclaration(SymbolKind, Name),
+    ConflictingLinkage(Name),
 }
 
 impl Diagnosis {
@@ -267,6 +268,7 @@ impl DiagnosisNode {
             Diagnosis::TypedefInOldStyle => "Typedef unsed in old style function".to_string(),
             Diagnosis::LabelOutsideFunction => "Label outside function".to_string(),
             Diagnosis::DuplicateDeclaration(kind, name) => format!("duplicate declaration of {} `{}'", kind, name.id.resolve(ctx)),
+            Diagnosis::ConflictingLinkage(name) => format!("declaration of '{}' conflicts with the linkage of a previous declaration", name.id.resolve(ctx)),
             Diagnosis::NonIntBitFieldType => "Bit-field has non-integral type".to_string(),
             Diagnosis::NonIntArraySize => "Array len has non-integral type".to_string(),
             Diagnosis::NegativeArraySize => "size of array is negative".to_string(),

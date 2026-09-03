@@ -293,6 +293,23 @@ impl Unit {
             .collect()
     }
 
+    pub fn placements(&self) -> Vec<(String, String, String, String)> {
+        self.ctx
+            .sema
+            .symbols
+            .iter()
+            .filter(|symbol| matches!(symbol.kind, SymbolKind::Variable | SymbolKind::Function))
+            .map(|symbol| {
+                (
+                    symbol.name.id.resolve(&self.ctx).clone(),
+                    symbol.linkage.to_string(),
+                    symbol.duration.to_string(),
+                    symbol.definition.to_string(),
+                )
+            })
+            .collect()
+    }
+
     pub fn tag_members(&self, tag: &str) -> Vec<(String, u32, u32)> {
         let def = self
             .ctx
@@ -471,6 +488,24 @@ pub fn run_uses(name: &str, src: &str, expected: &[(&str, bool)]) {
     let got = unit.uses();
     let expected: Vec<(String, bool)> = expected.iter().map(|(n, u)| (n.to_string(), *u)).collect();
     assert_eq!(got, expected, "`{name}` symbol uses:\n{src}");
+}
+
+pub fn run_placements(name: &str, src: &str, expected: &[(&str, &str, &str, &str)]) {
+    let unit = Unit::compile(src);
+
+    assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
+    assert!(
+        unit.diagnosis().is_empty(),
+        "`{name}` unexpected diagnosis:\n{src}\n{}",
+        unit.render()
+    );
+
+    let got = unit.placements();
+    let expected: Vec<(String, String, String, String)> = expected
+        .iter()
+        .map(|(n, l, d, f)| (n.to_string(), l.to_string(), d.to_string(), f.to_string()))
+        .collect();
+    assert_eq!(got, expected, "`{name}` symbol placements:\n{src}");
 }
 
 pub fn run_literal(name: &str, src: &str, expected: &str) {
