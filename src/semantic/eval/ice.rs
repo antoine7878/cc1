@@ -101,9 +101,6 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSi
     }
 }
 
-/// 6.4 An integral constant expression shall only have operands that are integer constants,
-/// enumeration constants, character constants, sizeof expressions, and floating constants that
-/// are the immediate operands of casts.
 fn identifier(sema: &Sema, expr: &ExpressionNode) -> Result<Value, Diagnosis> {
     let id = sema.binding(expr.id).ok_or(Diagnosis::NonConstantExpression)?;
     let symbol = id.resolve(sema);
@@ -129,10 +126,7 @@ fn unary_op(
             let folded = Fold::new(&sema.target).unary(&ty, op, value);
             Ok(sink.add_diag(folded, &expr.span))
         }
-        // 6.3.3.3 The result of the logical negation operator is 1 if the value of its operand
-        // compares equal to 0, 0 otherwise. The result has type int.
         UnaryOp::LogicalNot => Ok(operand(sema, ctx, e, sink)?.logical_not()),
-        // 6.4 A constant expression shall not contain increment or decrement operators.
         UnaryOp::PostInc | UnaryOp::PostDec | UnaryOp::PreInc | UnaryOp::PreDec | UnaryOp::Addr | UnaryOp::Deref => {
             Err(Diagnosis::NonConstantExpression)
         }
@@ -161,8 +155,6 @@ fn binary_op(
     }
 }
 
-/// 6.3.13, 6.3.14 Unlike the bitwise binary operators, the && and || operators guarantee
-/// left-to-right evaluation; the second operand is not evaluated when the result is known.
 fn logical(
     sema: &mut Sema,
     ctx: &Context,
@@ -180,8 +172,6 @@ fn logical(
     Ok(Value::from(value))
 }
 
-/// 6.3.8, 6.3.9 Each of the operators yields 1 if the specified relation is true and 0 if it is
-/// false. The result has type int.
 fn comparison(
     sema: &mut Sema,
     ctx: &Context,
@@ -237,8 +227,6 @@ fn arithmetic(
     Ok(sink.add_diag(folded, &expr.span))
 }
 
-/// 6.3.15 The first operand is evaluated; the second operand is evaluated only if the first
-/// compares unequal to 0, the third only if it compares equal to 0.
 fn conditional(
     sema: &mut Sema,
     ctx: &Context,
@@ -260,13 +248,9 @@ fn cast(
     e: &ExpressionNode,
     sink: &mut DiagSink,
 ) -> Result<Value, Diagnosis> {
-    // 6.4 An integral constant expression shall have integral type.
     if node_ty(sema, expr)?.is_void(sema) {
         return Err(Diagnosis::NonIntegerConstantExpression);
     }
-    // 6.4 An integral constant expression shall only have operands that are integer constants,
-    // enumeration constants, character constants, sizeof expressions, and floating constants
-    // that are the immediate operands of casts.
     let operand_ty = node_ty(sema, e)?;
     if operand_ty.is_floating(sema) && !matches!(e.id.resolve(ctx), Expression::Constant(_)) {
         return Err(Diagnosis::NonConstantExpression);

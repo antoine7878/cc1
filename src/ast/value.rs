@@ -114,32 +114,45 @@ impl Value {
             b'r' => 13,
             b't' => 9,
             b'v' => 11,
-            b'x' => {
-                let mut value: u32 = 0;
-                while *i < bytes.len() && (bytes[*i] as char).is_ascii_hexdigit() {
-                    value = value.wrapping_mul(16) + (bytes[*i] as char).to_digit(16).unwrap();
-                    *i += 1;
-                }
-                value
-            }
-            b'0'..=b'7' => {
-                let mut value = (c - b'0') as u32;
-                let mut len = 1;
-                while *i < bytes.len() && len < 3 && (b'0'..=b'7').contains(&bytes[*i]) {
-                    value = value * 8 + (bytes[*i] - b'0') as u32;
-                    *i += 1;
-                    len += 1;
-                }
-                value
-            }
+            b'x' => Self::parse_hex_escape(bytes, i),
+            b'0'..=b'7' => Self::parse_octal_escape(bytes, i, c),
             _ => c as u32,
         }
+    }
+
+    fn parse_hex_escape(bytes: &[u8], i: &mut usize) -> u32 {
+        let mut value: u32 = 0;
+        while *i < bytes.len() && (bytes[*i] as char).is_ascii_hexdigit() {
+            value = value.wrapping_mul(16) + (bytes[*i] as char).to_digit(16).unwrap();
+            *i += 1;
+        }
+        value
+    }
+
+    fn parse_octal_escape(bytes: &[u8], i: &mut usize, first: u8) -> u32 {
+        let mut value = (first - b'0') as u32;
+        let mut len = 1;
+        while *i < bytes.len() && len < 3 && (b'0'..=b'7').contains(&bytes[*i]) {
+            value = value * 8 + (bytes[*i] - b'0') as u32;
+            *i += 1;
+            len += 1;
+        }
+        value
     }
 
     fn parse_char(s: &str, target: &Target) -> Self {
         let prefix = if s.starts_with("L") { "L" } else { "" };
         let s = &s[(prefix.len() + 1)..(s.len() - 1)];
-        let bytes = s.as_bytes();
+        let narrow = prefix.is_empty();
+        let (value, count) = Self::char_sequence(s.as_bytes(), narrow);
+        if narrow && count == 1 && target.char_signed && value & 0x80 != 0 {
+            Value::Int((value | 0xffffff00) as i32)
+        } else {
+            Value::Int(value as i32)
+        }
+    }
+
+    fn char_sequence(bytes: &[u8], narrow: bool) -> (u32, usize) {
         let mut i = 0;
         let mut value: u32 = 0;
         let mut count = 0;
@@ -151,14 +164,10 @@ impl Value {
                 i += 1;
                 bytes[i - 1] as u32
             };
-            value = if prefix.is_empty() { (value << 8) | (c & 0xff) } else { c };
+            value = if narrow { (value << 8) | (c & 0xff) } else { c };
             count += 1;
         }
-        if prefix.is_empty() && count == 1 && target.char_signed && value & 0x80 != 0 {
-            Value::Int((value | 0xffffff00) as i32)
-        } else {
-            Value::Int(value as i32)
-        }
+        (value, count)
     }
 
     fn parse_integer(s: &str, target: &Target) -> Diag<Self> {
@@ -166,11 +175,18 @@ impl Value {
         let (prefix, radix) = Self::get_radix(s.as_str());
         let suffix = Self::get_integer_suffix(s.as_str());
         let digits = &s[prefix.len()..(s.len() - suffix.len())];
-        let value = match digits.is_empty() {
+        let value = Self::digits_value(digits, radix);
+        Self::integer_type(value, Self::integer_candidates(suffix, radix), target)
+    }
+
+    fn digits_value(digits: &str, radix: u32) -> u64 {
+        match digits.is_empty() {
             true => 0,
             false => u64::from_str_radix(digits, radix).unwrap_or(u64::MAX),
-        };
-        let candidates = Self::integer_candidates(suffix, radix);
+        }
+    }
+
+    fn integer_type(value: u64, candidates: &[ResolvedType], target: &Target) -> Diag<Self> {
         let fitting = candidates.iter().find(|ty| target.fits(value, ty));
         let diagnosis = fitting.is_none().then_some(Diagnosis::IntegerConstantTooLarge);
         let ty = fitting
@@ -328,40 +344,54 @@ impl<'a> Fold<'a> {
     }
 
     pub fn binary(&self, ty: &ResolvedType, op: BinaryOp, lhs: Value, rhs: Value) -> Diag<Value> {
-        use BinaryOp::{Add, BitAnd, BitOr, BitXor, Div, Left, Mod, Mul, Right, Sub};
-
-        if matches!(op, Left | Right) {
+        if matches!(op, BinaryOp::Left | BinaryOp::Right) {
             return Diag::ok(self.shift(ty, op, lhs, rhs));
         }
         if ty.is_floating() {
-            let (a, b) = (lhs.to_f64(), rhs.to_f64());
-            let r = match op {
-                Add => a + b,
-                Sub => a - b,
-                Mul => a * b,
-                Div => a / b,
-                _ => unreachable!(),
-            };
-            return Diag::ok(self.convert(ty, Value::Double(r)).expect("a floating type"));
+            return Diag::ok(self.floating(ty, op, lhs, rhs));
         }
         if !self.target.is_signed(ty) {
-            let (a, b) = (u128::from(lhs.to_u64()), u128::from(rhs.to_u64()));
-            let r = match op {
-                Add => a.wrapping_add(b),
-                Sub => a.wrapping_sub(b),
-                Mul => a.wrapping_mul(b),
-                Div => a.checked_div(b).unwrap_or(0),
-                Mod => a.checked_rem(b).unwrap_or(0),
-                BitAnd => a & b,
-                BitOr => a | b,
-                BitXor => a ^ b,
-                _ => unreachable!(),
-            };
-            let value = self
-                .convert(ty, Value::UnsignedLong(r as u64))
-                .expect("an integer type");
-            return Diag::ok(value);
+            return Diag::ok(self.unsigned(ty, op, lhs, rhs));
         }
+        self.signed(ty, op, lhs, rhs)
+    }
+
+    fn floating(&self, ty: &ResolvedType, op: BinaryOp, lhs: Value, rhs: Value) -> Value {
+        use BinaryOp::{Add, Div, Mul, Sub};
+
+        let (a, b) = (lhs.to_f64(), rhs.to_f64());
+        let r = match op {
+            Add => a + b,
+            Sub => a - b,
+            Mul => a * b,
+            Div => a / b,
+            _ => unreachable!(),
+        };
+        self.convert(ty, Value::Double(r)).expect("a floating type")
+    }
+
+    fn unsigned(&self, ty: &ResolvedType, op: BinaryOp, lhs: Value, rhs: Value) -> Value {
+        use BinaryOp::{Add, BitAnd, BitOr, BitXor, Div, Mod, Mul, Sub};
+
+        let (a, b) = (u128::from(lhs.to_u64()), u128::from(rhs.to_u64()));
+        let r = match op {
+            Add => a.wrapping_add(b),
+            Sub => a.wrapping_sub(b),
+            Mul => a.wrapping_mul(b),
+            Div => a.checked_div(b).unwrap_or(0),
+            Mod => a.checked_rem(b).unwrap_or(0),
+            BitAnd => a & b,
+            BitOr => a | b,
+            BitXor => a ^ b,
+            _ => unreachable!(),
+        };
+        self.convert(ty, Value::UnsignedLong(r as u64))
+            .expect("an integer type")
+    }
+
+    fn signed(&self, ty: &ResolvedType, op: BinaryOp, lhs: Value, rhs: Value) -> Diag<Value> {
+        use BinaryOp::{Add, BitAnd, BitOr, BitXor, Div, Mod, Mul, Sub};
+
         let (a, b) = (i128::from(lhs.to_i64()), i128::from(rhs.to_i64()));
         let r = match op {
             Add => a + b,
@@ -374,11 +404,15 @@ impl<'a> Fold<'a> {
             BitXor => a ^ b,
             _ => unreachable!(),
         };
-        let min = self.target.min_value(ty).unwrap_or(i64::MIN);
-        let max = self.target.max_value(ty).unwrap_or(i64::MAX as u64) as i64;
-        let overflow = matches!(op, Add | Sub | Mul) && (r < i128::from(min) || r > i128::from(max));
         let value = self.convert(ty, Value::Long(r as i64)).expect("an integer type");
-        Diag::new(value, overflow.then_some(Diagnosis::ArithmeticOverflow))
+        Diag::new(value, self.overflow(ty, op, r))
+    }
+
+    fn overflow(&self, ty: &ResolvedType, op: BinaryOp, r: i128) -> Option<Diagnosis> {
+        let min = i128::from(self.target.min_value(ty).unwrap_or(i64::MIN));
+        let max = i128::from(self.target.max_value(ty).unwrap_or(i64::MAX as u64) as i64);
+        let out_of_range = matches!(op, BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul) && (r < min || r > max);
+        out_of_range.then_some(Diagnosis::ArithmeticOverflow)
     }
 
     pub fn unary(&self, ty: &ResolvedType, op: UnaryOp, value: Value) -> Diag<Value> {
