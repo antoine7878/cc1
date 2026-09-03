@@ -99,6 +99,27 @@ shaped!(
     ]
 );
 
+// ---- 6.1.3.2, 6.1.3.1 the type of a constant --------------------------------
+
+// gcc: sizeof(1) == 4, sizeof(1u) == 4, sizeof(1l) == 4, sizeof(1.5f) == 4, sizeof(1.5) == 8,
+// sizeof(1.5l) == 12 on i386, and each suffix picks the type the constant is folded in.
+shaped!(
+    a_constant_carries_the_type_of_its_suffix,
+    "void f(void) { 1; 1u; 1l; 1ul; 1.5f; 1.5; 1.5l; }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::UInt),
+        rv(Ty::Long),
+        rv(Ty::ULong),
+        rv(Ty::Float),
+        rv(Ty::Double),
+        rv(Ty::LDouble),
+    ]
+);
+
+// 6.1.3.4 An integer character constant has type int.
+shaped!(a_character_constant_is_an_int, "void f(void) { 'a'; }", vec![rv(Ty::Int)]);
+
 // ---- 6.2.1.5 usual arithmetic conversions --------------------------------
 
 shaped!(two_constants_stay_int, "void f(void) { 1 + 2; }", ints(3));

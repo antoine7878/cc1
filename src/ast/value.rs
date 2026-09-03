@@ -330,7 +330,7 @@ impl<'a> Fold<'a> {
 
     fn shift(&self, ty: &ResolvedType, op: BinaryOp, lhs: Value, rhs: Value) -> Value {
         let count = rhs.to_i64() as u32;
-        match (op, self.convert(ty, lhs).expect("an integer type")) {
+        let shifted = match (op, self.convert(ty, lhs).expect("an integer type")) {
             (BinaryOp::Left, Value::Int(a)) => Value::Int(a.wrapping_shl(count)),
             (BinaryOp::Left, Value::UnsignedInt(a)) => Value::UnsignedInt(a.wrapping_shl(count)),
             (BinaryOp::Left, Value::Long(a)) => Value::Long(a.wrapping_shl(count)),
@@ -340,7 +340,8 @@ impl<'a> Fold<'a> {
             (BinaryOp::Right, Value::Long(a)) => Value::Long(a.wrapping_shr(count)),
             (BinaryOp::Right, Value::UnsignedLong(a)) => Value::UnsignedLong(a.wrapping_shr(count)),
             _ => unreachable!(),
-        }
+        };
+        self.convert(ty, shifted).expect("an integer type")
     }
 
     pub fn binary(&self, ty: &ResolvedType, op: BinaryOp, lhs: Value, rhs: Value) -> Diag<Value> {
@@ -432,13 +433,14 @@ impl<'a> Fold<'a> {
     }
 
     fn bit_not(&self, ty: &ResolvedType, value: Value) -> Value {
-        match self.convert(ty, value).expect("an integer type") {
+        let complement = match self.convert(ty, value).expect("an integer type") {
             Value::Int(v) => Value::Int(!v),
             Value::UnsignedInt(v) => Value::UnsignedInt(!v),
             Value::Long(v) => Value::Long(!v),
             Value::UnsignedLong(v) => Value::UnsignedLong(!v),
             _ => unreachable!(),
-        }
+        };
+        self.convert(ty, complement).expect("an integer type")
     }
 
     pub fn compare(&self, lhs: Value, rhs: Value) -> Option<Ordering> {

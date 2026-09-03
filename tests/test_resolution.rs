@@ -16,7 +16,6 @@ folds!(fold_addition, "enum E { A = 1 + 2 };", ["Int(3)"]);
 folds!(fold_precedence, "enum E { A = 1 + 2 * 3 };", ["Int(7)"]);
 folds!(fold_parentheses, "enum E { A = (1 + 2) * 3 };", ["Int(9)"]);
 folds!(fold_division, "enum E { A = 7 / 2 };", ["Int(3)"]);
-// folds!(fold_division_by_zero, "enum E { A = 1 / 0 };", ["Int(0)"]);
 folds!(fold_remainder, "enum E { A = 7 % 2 };", ["Int(1)"]);
 folds!(fold_shift, "enum E { A = 1 << 4 };", ["Int(16)"]);
 folds!(
@@ -24,17 +23,37 @@ folds!(
     "enum E { A = 6 & 3, B = 6 | 3, C = 6 ^ 3 };",
     ["Int(2)", "Int(7)", "Int(5)"]
 );
-// folds!(
-//     fold_unary,
-//     "enum E { A = -3, B = +3, C = ~0, D = !5 };",
-//     ["Int(-3)", "Int(3)", "Int(-1)", "Int(0)"]
-// );
-// folds!(
-//     fold_relational,
-//     "enum E { A = 1 < 2, B = 1 == 2 };",
-//     ["Int(1)", "Int(0)"]
-// );
-// folds!(fold_logical, "enum E { A = 1 && 0, B = 1 || 0 };", ["Int(0)", "Int(1)"]);
+folds!(
+    fold_unary,
+    "enum E { A = -3, B = +3, C = ~0, D = !5 };",
+    ["Int(-3)", "Int(3)", "Int(-1)", "Int(0)"]
+);
+folds!(
+    fold_relational,
+    "enum E { A = 1 < 2, B = 1 == 2 };",
+    ["Int(1)", "Int(0)"]
+);
+folds!(
+    fold_every_relational_operator,
+    "enum E { A = 1 > 2, B = 1 <= 2, C = 2 >= 2, D = 1 != 2 };",
+    ["Int(0)", "Int(1)", "Int(1)", "Int(1)"]
+);
+folds!(
+    fold_every_relational_operator_when_it_does_not_hold,
+    "enum E { A = 2 < 1, B = 1 >= 2, C = 2 <= 1, D = 1 != 1, E = 1 == 1 };",
+    ["Int(0)", "Int(0)", "Int(0)", "Int(0)", "Int(1)"]
+);
+folds!(fold_logical, "enum E { A = 1 && 0, B = 1 || 0 };", ["Int(0)", "Int(1)"]);
+folds!(
+    fold_unsigned_operands,
+    "enum E { A = 7u / 2u, B = 7u % 2u, C = 6u & 3u };",
+    ["UnsignedInt(3)", "UnsignedInt(1)", "UnsignedInt(2)"]
+);
+folds!(
+    fold_long_operands,
+    "enum E { A = 1L + 2L, B = -1L };",
+    ["Long(3)", "Long(-1)"]
+);
 folds!(
     fold_ternary,
     "enum E { A = 1 ? 2 : 3, B = 0 ? 2 : 3 };",
@@ -74,6 +93,18 @@ folds!(fold_cast_narrows, "enum E { A = (char)300 };", ["Int(44)"]);
 folds!(fold_cast_to_unsigned, "enum E { A = (unsigned char)-1 };", ["Int(255)"]);
 folds!(fold_bit_field_width, "struct S { int a : 2 + 1; };", ["Int(3)"]);
 folds!(fold_array_size, "int a[2 + 3];", ["Int(5)"]);
+folds!(
+    fold_logical_short_circuits,
+    "enum E { A = 1 || 1 / 0, B = 0 && 1 / 0 };",
+    ["Int(1)", "Int(0)"]
+);
+folds!(fold_cast_of_a_floating_constant, "enum E { A = (int)1.5 };", ["Int(1)"]);
+// gcc: `1L << 31` is -2147483648 on i386, where a long is 32 bits, so it fits an enum variant.
+folds!(
+    fold_long_shift_narrows_to_the_target_width,
+    "enum E { A = 1L << 31 };",
+    ["Long(-2147483648)"]
+);
 
 #[test]
 fn fold_sizeof_of_a_pointer_type() {
@@ -476,6 +507,118 @@ recover!(
     sizeof_of_void,
     "enum E { A = sizeof(void) };",
     [Diagnosis::SizeofVoid],
+    &[]
+);
+
+recover!(
+    a_division_by_zero_is_not_constant,
+    "enum E { A = 1 / 0 };",
+    [Diagnosis::DivisionByZero],
+    &[]
+);
+
+recover!(
+    a_modulo_by_zero_is_not_constant,
+    "enum E { A = 1 % 0 };",
+    [Diagnosis::ModuloByZero],
+    &[]
+);
+
+// 6.3.5 The result shall be representable in the type of the operands.
+recover!(
+    a_quotient_outside_the_type_of_its_operands,
+    "enum E { A = (-2147483647 - 1) / -1 };",
+    [Diagnosis::ConstantOverflow],
+    &[]
+);
+
+// 6.4 A constant expression shall not contain assignment, increment, decrement, function-call,
+// or comma operators, except when they are contained within the operand of a sizeof operator.
+recover!(
+    an_assignment_is_not_constant,
+    "int x; enum E { A = (x = 1) };",
+    [Diagnosis::NonConstantExpression],
+    &[]
+);
+
+recover!(
+    a_comma_operator_is_not_constant,
+    "enum E { A = (1, 2) };",
+    [Diagnosis::NonConstantExpression],
+    &[]
+);
+
+recover!(
+    a_function_call_is_not_constant,
+    "int f(void); enum E { A = f() };",
+    [Diagnosis::NonConstantExpression],
+    &[]
+);
+
+recover!(
+    a_subscript_is_not_constant,
+    "int a[2]; enum E { A = a[0] };",
+    [Diagnosis::NonConstantExpression],
+    &[]
+);
+
+recover!(
+    a_string_literal_subscript_is_not_constant,
+    "enum E { A = \"abc\"[0] };",
+    [Diagnosis::NonConstantExpression],
+    &[]
+);
+
+recover!(
+    a_member_access_is_not_constant,
+    "struct S { int x; } s; enum E { A = s.x };",
+    [Diagnosis::NonConstantExpression],
+    &[]
+);
+
+// 6.4 ... and floating constants that are the immediate operands of casts: a cast of a folded
+// floating expression is not one.
+recover!(
+    a_cast_of_a_floating_expression_is_not_constant,
+    "enum E { A = (int)(1.5 + 1) };",
+    [Diagnosis::NonConstantExpression],
+    &[]
+);
+
+// 6.4 A constant expression shall not contain increment or decrement operators.
+recover!(
+    an_increment_is_not_constant,
+    "int x; enum E { A = ++x };",
+    [Diagnosis::NonConstantExpression],
+    &[]
+);
+
+recover!(
+    a_decrement_is_not_constant,
+    "int x; enum E { A = x-- };",
+    [Diagnosis::NonConstantExpression],
+    &[]
+);
+
+// 6.4 An integral constant expression shall have integral type: an address is not one.
+recover!(
+    an_address_is_not_an_integral_constant,
+    "int x; enum E { A = &x };",
+    [Diagnosis::NonConstantExpression],
+    &[]
+);
+
+recover!(
+    an_indirection_is_not_constant,
+    "int *p; enum E { A = *p };",
+    [Diagnosis::NonConstantExpression],
+    &[]
+);
+
+recover!(
+    sizeof_of_a_bit_field,
+    "struct S { int a : 3; } s; enum E { A = sizeof s.a };",
+    [Diagnosis::SizeofBitfield],
     &[]
 );
 
