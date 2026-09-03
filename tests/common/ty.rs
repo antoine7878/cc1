@@ -132,6 +132,7 @@ pub struct Shape {
     pub ty: Option<Ty>,
     pub lvalue: bool,
     pub casts: Vec<(CastKind, Ty)>,
+    pub result_cast: Option<(CastKind, Ty)>,
 }
 
 impl Shape {
@@ -140,6 +141,7 @@ impl Shape {
             ty: Some(ty),
             lvalue: false,
             casts: Vec::new(),
+            result_cast: None,
         }
     }
 
@@ -148,6 +150,7 @@ impl Shape {
             ty: Some(ty),
             lvalue: true,
             casts: Vec::new(),
+            result_cast: None,
         }
     }
 
@@ -156,11 +159,19 @@ impl Shape {
             ty: None,
             lvalue: false,
             casts: Vec::new(),
+            result_cast: None,
         }
     }
 
     pub fn then(mut self, kind: CastKind, to: Ty) -> Self {
         self.casts.push((kind, to));
+        self
+    }
+
+    /// The conversion applied to the value of `E1 op E2` before it is stored back into
+    /// `E1` in a compound assignment (6.3.16.2).
+    pub fn result(mut self, kind: CastKind, to: Ty) -> Self {
+        self.result_cast = Some((kind, to));
         self
     }
 }

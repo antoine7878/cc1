@@ -154,6 +154,7 @@ impl Unit {
                         .iter()
                         .map(|cast| (cast.kind, self.ty_tree(cast.to)))
                         .collect(),
+                    result_cast: resolved.result_cast.map(|cast| (cast.kind, self.ty_tree(cast.to))),
                 },
                 None => Shape::unresolved(),
             })

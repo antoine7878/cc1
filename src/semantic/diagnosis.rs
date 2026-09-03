@@ -24,6 +24,7 @@ pub enum Diagnosis {
     SizeofVoid,
     SizeofIncomplete(QualifiedType),
     SizeofFunction,
+    SizeofBitfield,
     UndeclaredIdentifier(Name),
     /// 6.1.4
     MixedWideStringConcat,
@@ -219,6 +220,7 @@ impl DiagnosisNode {
             Diagnosis::SizeofIncomplete(ty) => format!("invalid application of 'sizeof' to an incomplete type '{}'", ty.describe(sema, ctx)),
             Diagnosis::SizeofVoid => "invalid application of 'sizeof' to a void type".to_string(),
             Diagnosis::SizeofFunction => "invalid application of 'sizeof' to a function type".to_string(),
+            Diagnosis::SizeofBitfield => "invalid application of 'sizeof' to bit-field".to_string(),
             Diagnosis::UndeclaredIdentifier(name) => format!("Use of undeclared identifier '{}'", name.id.resolve(ctx)),
             Diagnosis::IntegerConstantTooLarge => "integer constant is too large for any integer type".to_string(),
             Diagnosis::MixedWideStringConcat => "concatenation of a wide and a narrow string literal is undefined".to_string(),

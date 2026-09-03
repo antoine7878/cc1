@@ -638,6 +638,24 @@ shaped!(
     vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::Int)]
 );
 
+// 6.2.2.1 An lvalue is an expression (with an object type or an incomplete type other than
+// void) that designates an object: an incomplete structure type still designates an object.
+shaped!(
+    indirection_through_a_pointer_to_an_incomplete_type_designates_an_object,
+    "struct S; struct S *p; void f(void) { *p; }",
+    vec![
+        lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
+        lv(Ty::strukt_incomplete("S")),
+    ]
+);
+
+// 6.3.3.2 If the operand is the result of a unary * operator, neither that operator nor the &
+// operator is evaluated and the result is as if both were omitted.
+accept!(
+    the_address_of_a_dereferenced_pointer_to_an_incomplete_type_is_accepted,
+    "struct S; struct S *p; struct S *f(void) { return &*p; }"
+);
+
 accept!(a_dereferenced_pointer_is_assignable, "int *p; void f(void) { *p = 1; }");
 
 // 6.2.2.1 the operand of unary * is converted: an array becomes a pointer to its first
@@ -1539,6 +1557,16 @@ rejects_shaped!(
     vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), none()]
 );
 
+reject!(
+    post_increment_of_a_pointer_to_a_function_is_rejected,
+    "void (*p)(void); void f(void) { p++; }"
+);
+
+reject!(
+    post_decrement_of_a_pointer_to_a_function_is_rejected,
+    "void (*p)(void); void f(void) { p--; }"
+);
+
 // ---- 6.3.3.1 prefix increment and decrement operators ---------------------
 
 shaped!(
@@ -1607,6 +1635,16 @@ rejects_shaped!(
         lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
         none(),
     ]
+);
+
+reject!(
+    pre_increment_of_a_pointer_to_a_function_is_rejected,
+    "void (*p)(void); void f(void) { ++p; }"
+);
+
+reject!(
+    pre_decrement_of_a_pointer_to_a_function_is_rejected,
+    "void (*p)(void); void f(void) { --p; }"
 );
 
 // ---- 6.3.5 multiplicative operators ---------------------------------------
@@ -2335,6 +2373,30 @@ shaped!(
     ]
 );
 
+// 6.2.2.1 If the lvalue has qualified type, the value has the unqualified version of the type
+// of the lvalue: a qualified operand still meets an unqualified one under 6.3.15.
+shaped!(
+    a_conditional_of_a_const_and_a_plain_structure_keeps_the_structure_type,
+    "struct S { int x; }; const struct S s; struct S t; void f(int c) { c ? s : t; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::konst(Ty::strukt("S"))).then(LValueToRValue, Ty::strukt("S")),
+        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
+        rv(Ty::strukt("S")),
+    ]
+);
+
+shaped!(
+    a_conditional_of_a_volatile_and_a_plain_union_keeps_the_union_type,
+    "union U { int x; }; volatile union U u; union U v; void f(int c) { c ? u : v; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::vol(Ty::union("U"))).then(LValueToRValue, Ty::union("U")),
+        lv(Ty::union("U")).then(LValueToRValue, Ty::union("U")),
+        rv(Ty::union("U")),
+    ]
+);
+
 // 6.3.15 If both the operands have void type, the result has void type.
 shaped!(
     a_conditional_of_two_void_operands_is_void,
@@ -2457,4 +2519,473 @@ shaped!(
         lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
         rv(Ty::ptr(Ty::Void)),
     ]
+);
+
+// ========================================================================
+// coverage — logical operators, comma operator, compound assignment,
+// and error branches of equality / conditional / subscript / sizeof
+// ========================================================================
+
+// ---- 6.3.13 logical AND operator / 6.3.14 logical OR operator -----------
+
+// 6.3.13 The result of && (6.3.14 of ||) has type int.
+shaped!(
+    a_logical_and_of_two_constants_is_an_int,
+    "void f(void) { 1 && 2; }",
+    ints(3)
+);
+
+shaped!(
+    a_logical_or_of_two_constants_is_an_int,
+    "void f(void) { 0 || 1; }",
+    ints(3)
+);
+
+// 6.3.13 the operands are not brought to a common type: each is compared against 0 in place.
+shaped!(
+    the_operands_of_a_logical_and_are_not_converted_to_a_common_type,
+    "double d; int *p; void f(void) { d && p; }",
+    vec![
+        lv(Ty::Double).then(LValueToRValue, Ty::Double),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.2.2.1 an array operand of a logical operator decays to a pointer first.
+shaped!(
+    an_array_operand_of_a_logical_or_decays_to_a_pointer,
+    "int a[3]; void f(void) { a || 0; }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.13 Each of the operands shall have scalar type.
+rejects_shaped!(
+    a_logical_and_with_a_structure_left_operand_is_rejected,
+    "struct S { int x; } s; void f(void) { s && 1; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![
+        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+rejects_shaped!(
+    a_logical_or_with_a_structure_right_operand_is_rejected,
+    "struct S { int x; } s; void f(void) { 1 || s; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![
+        rv(Ty::Int),
+        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
+        none(),
+    ]
+);
+
+// ---- 6.3.17 comma operator --------------------------------------------
+
+// 6.3.17 The left operand is evaluated as a void expression; the result has the type and
+// value of the right operand and is not an lvalue.
+shaped!(
+    a_comma_expression_has_the_type_of_its_right_operand,
+    "double d; int i; void f(void) { d, i; }",
+    vec![
+        lv(Ty::Double).then(LValueToRValue, Ty::Double).then(ToVoid, Ty::Void),
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.17 every operand but the last is discarded to void.
+shaped!(
+    every_operand_but_the_last_of_a_comma_is_discarded_to_void,
+    "void f(void) { 1, 2, 3; }",
+    vec![
+        rv(Ty::Int).then(ToVoid, Ty::Void),
+        rv(Ty::Int).then(ToVoid, Ty::Void),
+        rv(Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+// ---- 6.3.16.2 compound assignment: += and -= -------------------------
+
+// 6.3.16.2 the left operand has arithmetic type and the right has arithmetic type.
+shaped!(
+    an_additive_assignment_of_an_int_yields_an_int,
+    "int i; void f(void) { i += 1; }",
+    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int)]
+);
+
+// 6.3.16.2 E1 op= E2 is E1 = E1 op (E2): E1 op E2 is computed under the usual arithmetic
+// conversions and the result is converted back to the type of E1.
+shaped!(
+    an_additive_assignment_converts_the_result_back_to_the_left_operand_type,
+    "int i; void f(void) { i += 1.5; }",
+    vec![
+        lv(Ty::Int)
+            .then(LValueToRValue, Ty::Int)
+            .then(IntegerToFloating, Ty::Double)
+            .result(FloatingToInteger, Ty::Int),
+        rv(Ty::Double),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.16.2 the left operand is a pointer to an object type and the right has integral type.
+shaped!(
+    an_additive_assignment_to_a_pointer_stays_a_pointer,
+    "int *p; void f(void) { p += 2; }",
+    vec![
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+        rv(Ty::ptr(Ty::Int)),
+    ]
+);
+
+// 6.3.16 the assignment expression has the unqualified type of the left operand.
+shaped!(
+    an_additive_assignment_to_a_volatile_operand_has_unqualified_type,
+    "volatile int i; void f(void) { i += 1; }",
+    vec![
+        lv(Ty::vol(Ty::Int)).then(LValueToRValue, Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+accept!(
+    a_subtractive_assignment_to_a_pointer_is_accepted,
+    "int *p; void f(void) { p -= 1; }"
+);
+
+reject!(
+    an_additive_assignment_with_a_pointer_right_operand_is_rejected,
+    "int *p; int i; void f(void) { i += p; }"
+);
+
+reject!(
+    a_subtractive_assignment_of_two_pointers_is_rejected,
+    "int *p; int *q; void f(void) { p -= q; }"
+);
+
+reject!(
+    an_additive_assignment_to_a_pointer_to_an_incomplete_type_is_rejected,
+    "struct S; struct S *p; void f(void) { p += 1; }"
+);
+
+reject!(
+    an_additive_assignment_to_a_void_pointer_is_rejected,
+    "void *p; void f(void) { p += 1; }"
+);
+
+reject!(
+    an_additive_assignment_to_a_const_operand_is_rejected,
+    "void f(void) { const int i; i += 1; }"
+);
+
+reject!(
+    an_additive_assignment_to_an_rvalue_is_rejected,
+    "void f(void) { 1 += 1; }"
+);
+
+// ---- 6.3.16.2 compound assignment: *= /= %= <<= >>= &= |= ^= ---------
+
+shaped!(
+    a_multiplicative_assignment_of_an_int_yields_an_int,
+    "int i; void f(void) { i *= 2; }",
+    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int)]
+);
+
+shaped!(
+    a_multiplicative_assignment_converts_the_result_back_to_the_left_operand_type,
+    "int i; void f(void) { i *= 1.5; }",
+    vec![
+        lv(Ty::Int)
+            .then(LValueToRValue, Ty::Int)
+            .then(IntegerToFloating, Ty::Double)
+            .result(FloatingToInteger, Ty::Int),
+        rv(Ty::Double),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.16.2 a narrower left operand is promoted for the operation and the result narrows back.
+shaped!(
+    a_bitwise_assignment_promotes_the_left_operand_and_narrows_the_result,
+    "char c; void f(void) { c &= 1; }",
+    vec![
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int)
+            .result(IntegerConversion, Ty::Char),
+        rv(Ty::Int),
+        rv(Ty::Char),
+    ]
+);
+
+// 6.3.7 a shift keeps the type of its promoted left operand; the count is independent.
+shaped!(
+    a_shift_assignment_has_the_type_of_its_left_operand,
+    "int i; long n; void f(void) { i <<= n; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::Long).then(LValueToRValue, Ty::Long),
+        rv(Ty::Int),
+    ]
+);
+
+accept!(a_division_assignment_is_accepted, "int i; void f(void) { i /= 2; }");
+accept!(a_remainder_assignment_is_accepted, "int i; void f(void) { i %= 2; }");
+accept!(
+    a_right_shift_assignment_is_accepted,
+    "unsigned u; void f(void) { u >>= 1; }"
+);
+accept!(a_bitwise_or_assignment_is_accepted, "int i; void f(void) { i |= 1; }");
+accept!(a_bitwise_xor_assignment_is_accepted, "int i; void f(void) { i ^= 1; }");
+
+reject!(
+    a_remainder_assignment_with_a_floating_left_operand_is_rejected,
+    "double d; void f(void) { d %= 2; }"
+);
+
+reject!(
+    a_remainder_assignment_with_a_floating_right_operand_is_rejected,
+    "int i; void f(void) { i %= 1.5; }"
+);
+
+reject!(
+    a_bitwise_assignment_with_a_floating_operand_is_rejected,
+    "double d; void f(void) { d &= 1; }"
+);
+
+reject!(
+    a_multiplicative_assignment_to_a_pointer_is_rejected,
+    "int *p; void f(void) { p *= 2; }"
+);
+
+reject!(
+    a_shift_assignment_by_a_floating_count_is_rejected,
+    "int i; void f(void) { i <<= 1.5; }"
+);
+
+reject!(
+    a_shift_assignment_by_an_out_of_range_constant_count_is_rejected,
+    "int i; void f(void) { i <<= 40; }"
+);
+
+reject!(
+    a_compound_assignment_to_a_const_operand_is_rejected,
+    "void f(void) { const int i; i *= 2; }"
+);
+
+reject!(
+    a_compound_assignment_to_an_rvalue_is_rejected,
+    "void f(void) { 1 &= 1; }"
+);
+
+// ---- 6.3.9 equality operators: arithmetic operands and error branches ---
+
+shaped!(
+    equality_of_two_arithmetic_operands_is_an_int,
+    "void f(void) { 1 == 2; }",
+    ints(3)
+);
+
+shaped!(
+    comparing_two_compatible_object_pointers_is_an_int,
+    "int *p; int *q; void f(void) { p == q; }",
+    vec![
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.9 neither operand is arithmetic, a pointer, or a null pointer constant.
+rejects_shaped!(
+    comparing_structures_for_equality_is_rejected,
+    "struct S { int x; } s; void f(void) { s == s; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![
+        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
+        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
+        none(),
+    ]
+);
+
+// 6.2.2.3 a null pointer constant may be an integer constant expression cast to void *.
+accept!(
+    a_void_star_cast_of_zero_is_a_null_pointer_constant,
+    "int *p; void f(void) { p == (void *)0; }"
+);
+
+// 6.2.2.3 a zero cast to a type other than void * is not a null pointer constant.
+accept!(
+    an_int_star_cast_of_zero_compares_as_a_plain_pointer,
+    "int *p; void f(void) { p == (int *)0; }"
+);
+
+// 6.2.2.3 a qualified void * cast of zero is not a null pointer constant.
+accept!(
+    a_const_void_star_cast_of_zero_is_not_a_null_pointer_constant,
+    "int *p; void f(void) { p == (void *const)0; }"
+);
+
+// ---- 6.2.2.3 null pointer constants -----------------------------------
+
+// 6.2.2.3 An integral constant expression with the value 0, or such an expression cast to type
+// void *, is called a null pointer constant. If a null pointer constant is assigned to or
+// compared for equality to a pointer, the constant is converted to a pointer of that type.
+//
+// A pointer to function is where the two spellings part company: `(void *)0` is admitted only
+// as a null pointer constant, never as a plain void * operand (6.3.9, 6.3.15, 6.3.16.1 all
+// exclude a pointer to function from the void * rule).
+accept!(
+    a_void_star_cast_of_zero_may_be_assigned_to_a_pointer_to_function,
+    "void (*p)(void); void f(void) { p = (void *)0; }"
+);
+
+accept!(
+    a_void_star_cast_of_zero_may_be_compared_to_a_pointer_to_function,
+    "void (*p)(void); void f(void) { p == (void *)0; }"
+);
+
+accept!(
+    a_void_star_cast_of_zero_may_initialize_a_pointer_to_function,
+    "void (*p)(void) = (void *)0;"
+);
+
+accept!(
+    a_void_star_cast_of_zero_may_be_passed_to_a_pointer_to_function_parameter,
+    "void g(void (*)(void)); void f(void) { g((void *)0); }"
+);
+
+// 6.3.15 if one operand is a null pointer constant, the result has the type of the other operand.
+accept!(
+    a_void_star_cast_of_zero_may_be_a_conditional_operand_beside_a_pointer_to_function,
+    "void (*p)(void); void f(int c) { c ? p : (void *)0; }"
+);
+
+// 6.2.2.3 an integral constant expression with the value 0 is a null pointer constant whatever
+// integral type the cast gives it.
+accept!(
+    an_int_cast_of_zero_is_a_null_pointer_constant,
+    "int *p; void f(void) { p = (int)0; }"
+);
+
+accept!(
+    a_char_cast_of_zero_is_a_null_pointer_constant,
+    "int *p; void f(void) { p = (char)0; }"
+);
+
+accept!(
+    a_long_cast_of_zero_is_a_null_pointer_constant,
+    "int *p; void f(void) { p = (long)0; }"
+);
+
+// 6.2.2.3 the value has to be 0: a cast of a nonzero constant is an ordinary integer.
+reject!(
+    an_int_cast_of_one_is_not_a_null_pointer_constant,
+    "int *p; void f(void) { p = (int)1; }"
+);
+
+// 6.2.2.3 only one cast to void * is admitted: its operand shall be an integral constant
+// expression, and a pointer is not one.
+reject!(
+    a_void_star_cast_of_a_void_star_cast_of_zero_is_not_a_null_pointer_constant,
+    "void (*p)(void); void f(void) { p = (void *)(void *)0; }"
+);
+
+// ---- 6.3.15 conditional operator: error branches ---------------------
+
+// 6.3.15 The first operand shall have scalar type.
+rejects_shaped!(
+    a_conditional_with_a_non_scalar_controlling_expression_is_rejected,
+    "struct S { int x; } s; void f(void) { s ? 1 : 2; }",
+    Diagnosis::NotScalar(_),
+    vec![
+        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
+        rv(Ty::Int),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+// 6.3.15 an arithmetic operand and a non-null pointer operand do not meet.
+rejects_shaped!(
+    a_conditional_mixing_an_arithmetic_and_a_pointer_operand_is_rejected,
+    "int *p; void f(int c) { c ? 1 : p; }",
+    Diagnosis::IncompatibleOperands(_, _),
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        none(),
+    ]
+);
+
+// 6.3.15 two pointers to incompatible object types do not meet.
+rejects_shaped!(
+    a_conditional_between_incompatible_object_pointers_is_rejected,
+    "int *p; char *q; void f(int c) { c ? p : q; }",
+    Diagnosis::PointerMismatch(_, _),
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        lv(Ty::ptr(Ty::Char)).then(LValueToRValue, Ty::ptr(Ty::Char)),
+        none(),
+    ]
+);
+
+// ---- 6.3.2.1 array subscripting: non-array operand -------------------
+
+// 6.3.2.1 one operand shall have type "pointer to object type".
+rejects_shaped!(
+    subscripting_a_non_pointer_is_rejected,
+    "void f(void) { int i; i[0]; }",
+    Diagnosis::SubscriptNotArray,
+    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), none()]
+);
+
+// ---- 6.3.3.4 sizeof of a function designator ------------------------
+
+// 6.3.3.4 The sizeof operator shall not be applied to a function type.
+rejects_shaped!(
+    sizeof_of_a_function_designator_is_rejected,
+    "int g(void); void f(void) { sizeof g; }",
+    Diagnosis::SizeofFunction,
+    vec![rv(Ty::func0(Ty::Int)), none()]
+);
+
+// 6.3.3.4 The sizeof operator shall not be applied to an expression that has function type or
+// an incomplete type, to the parenthesized name of such a type, or to an lvalue that designates
+// a bit-field object.
+reject!(
+    sizeof_of_a_bit_field_is_rejected,
+    "struct S { int x : 3; } s; void f(void) { sizeof s.x; }"
+);
+
+reject!(
+    sizeof_of_a_bit_field_reached_through_a_pointer_is_rejected,
+    "struct S { int x : 3; } *p; void f(void) { sizeof p->x; }"
+);
+
+// 6.3.3.4 only a bit-field member is excluded: a plain member of the same structure has a size.
+accept!(
+    sizeof_of_a_plain_member_beside_a_bit_field_is_accepted,
+    "struct S { int x : 3; int y; } s; void f(void) { sizeof s.y; }"
+);
+
+// ---- 6.3.2.2 function calls: a poisoned trailing argument -----------
+
+reject!(
+    a_poisoned_variadic_argument_is_rejected,
+    "void g(int, ...); void f(void) { g(1, missing); }"
 );
