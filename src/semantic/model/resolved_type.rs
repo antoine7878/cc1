@@ -56,6 +56,10 @@ impl ResolvedType {
         }
     }
 
+    pub fn is_void(&self) -> bool {
+        self == &ResolvedType::Void
+    }
+
     // 6.1.2.5 Arithmetic types and pointer types are collectively called scalar types.
     pub fn is_scalar(&self, sema: &Sema) -> bool {
         self.is_arithmetic(sema) || self.is_pointer()
@@ -241,6 +245,10 @@ impl QualifiedType {
 impl QualifiedType {
     pub fn describe<'a>(&'a self, sema: &'a Sema, ctx: &'a Context) -> TypeName<'a> {
         TypeName(self, sema, ctx)
+    }
+
+    pub fn is_void(&self, sema: &Sema) -> bool {
+        self.id.resolve(sema).is_void()
     }
 
     pub fn is_complete(&self, sema: &Sema) -> bool {

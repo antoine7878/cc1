@@ -77,7 +77,7 @@ fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNod
         let Some((qualif, _)) = declaration::declared_type(sema, ctx, base, &ty_node.declarator) else {
             return false;
         };
-        if !matches!(qualif.id.resolve(sema), ResolvedType::Pointer(q) if q.id == sema.builtins.void)
+        if !matches!(qualif.id.resolve(sema), ResolvedType::Pointer(q) if q.is_void(sema))
             || qualif.is_const
             || qualif.is_volatile
         {
@@ -120,7 +120,7 @@ fn fn_call(sema: &mut Sema, ctx: &Context, fn_node: &ExpressionNode, args: &[Exp
         return Err(Diagnosis::CallingNotFunction(ty));
     };
     let returned = ret.id.resolve(sema);
-    if !matches!(returned, ResolvedType::Void) && !returned.is_complete(sema) {
+    if !returned.is_void() && !returned.is_complete(sema) {
         return Err(Diagnosis::CallingIncompleteReturn(ret));
     }
     let (params, is_variadic) = match params {
@@ -260,7 +260,7 @@ fn indirection(sema: &mut Sema, e: &ExpressionNode) -> R {
     let ResolvedType::Pointer(inner) = re.casted_ty().id.resolve(sema) else {
         return Err(Diagnosis::IndirectionNotPointer(re.ty));
     };
-    if inner.id == sema.builtins.void {
+    if inner.is_void(sema) {
         return Err(Diagnosis::IncompleteType(*inner));
     }
     let kind = if inner.is_object(sema) { LValue } else { RValue };
@@ -302,7 +302,7 @@ fn size_of_ty(sema: &mut Sema, ctx: &Context, ty: &Type, span: &Span) -> R {
 }
 
 fn size_t(sema: &Sema, ty: QualifiedType) -> R {
-    if ty.id == sema.builtins.void {
+    if ty.is_void(sema) {
         return Err(Diagnosis::SizeofVoid);
     }
     if ty.is_function(sema) {
@@ -320,6 +320,9 @@ fn binary_op(sema: &mut Sema, ctx: &Context, op: BinaryOp, e1: &ExpressionNode, 
         BinaryOp::Add | BinaryOp::Sub => additive(sema, e1, e2, op),
         BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => multiplicative(sema, e1, e2, op),
         BinaryOp::Right | BinaryOp::Left => shift(sema, ctx, e1, e2),
+        BinaryOp::Greater | BinaryOp::Lower | BinaryOp::GreaterEq | BinaryOp::LowerEq => relational(sema, e1, e2),
+        BinaryOp::Eq | BinaryOp::Neq => equality(sema, ctx, e1, e2),
+        BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor => bitwise(sema, e1, e2),
         _ => todo!(),
     }
 }
@@ -337,7 +340,7 @@ fn multiplicative_types(
         BinaryOp::Mod => l.is_integral(sema) && r.is_integral(sema),
         _ => unreachable!(),
     } {
-        return Err(Diagnosis::InvalidBianryOperand(lhs.casted_ty(), rhs.casted_ty()));
+        return Err(Diagnosis::InvalidBinaryOperand(lhs.casted_ty(), rhs.casted_ty()));
     }
     cast::usual_arithmetic(sema, lhs, rhs)
 }
@@ -376,7 +379,7 @@ fn shift_types(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut Resolved
     let l = lhs.casted_ty().id.resolve(sema);
     let r = rhs.casted_ty().id.resolve(sema);
     if !l.is_integral(sema) || !r.is_integral(sema) {
-        return Err(Diagnosis::InvalidBianryOperand(lhs.casted_ty(), rhs.casted_ty()));
+        return Err(Diagnosis::InvalidBinaryOperand(lhs.casted_ty(), rhs.casted_ty()));
     }
     cast::promote(sema, lhs);
     cast::promote(sema, rhs);
@@ -401,21 +404,82 @@ fn shift(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNod
     shift_types(sema, lhs, rhs, count)
 }
 
-// // 6.3.8 Relational operators
-// fn relational(
-//     sema: &mut Sema,
-//     ctx: &Context,
-//     e1: &ExpressionNode,
-//     e2: &ExpressionNode,
-// ) -> R {
-//     with_operands(sema, e1, e2, RValue, |sema, rhs, lhs| {
-//         let l = lhs.casted_ty().id.resolve(sema);
-//         let r = rhs.casted_ty().id.resolve(sema);
-//         if !l.is_integral(sema) || !r.is_integral(sema) {
-//             return Err(Diagnosis::InvalidBianryOperand(lhs.casted_ty(), rhs.casted_ty()));
-//         }
-//     })
-// }
+fn relational(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+    let mut ops = Operands::take(sema, [e1, e2])?;
+    let (sema, [lhs, rhs]) = ops.parts();
+    cast::lvalue_conversion(sema, lhs, &e1.span);
+    cast::lvalue_conversion(sema, rhs, &e2.span);
+    let l = lhs.casted_ty().id.resolve(sema);
+    let r = rhs.casted_ty().id.resolve(sema);
+    let ty = QualifiedType::new(sema.builtins.int, false, false);
+    let ret = Ok((ty, RValue));
+    if l.is_arithmetic(sema) && r.is_arithmetic(sema) {
+        cast::usual_arithmetic(sema, lhs, rhs)?;
+        return ret;
+    }
+    let (ResolvedType::Pointer(i1), ResolvedType::Pointer(i2)) = (l, r) else {
+        return Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty));
+    };
+    if !i1.is_compatible_ignoring_qualifiers(sema, i2) {
+        return Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty));
+    }
+
+    if i1.is_object(sema) && i2.is_object(sema) {
+        return ret;
+    }
+    if i1.is_complete(sema) && i2.is_complete(sema) {
+        return ret;
+    }
+    Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty))
+}
+
+fn equality(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+    let null1 = is_null_pointer_constant(sema, ctx, e1);
+    let null2 = is_null_pointer_constant(sema, ctx, e2);
+    let mut ops = Operands::take(sema, [e1, e2])?;
+    let (sema, [lhs, rhs]) = ops.parts();
+    cast::lvalue_conversion(sema, lhs, &e1.span);
+    cast::lvalue_conversion(sema, rhs, &e2.span);
+    let l = lhs.casted_ty().id.resolve(sema);
+    let r = rhs.casted_ty().id.resolve(sema);
+    let ty = QualifiedType::new(sema.builtins.int, false, false);
+    let ret = Ok((ty, RValue));
+    if l.is_arithmetic(sema) && r.is_arithmetic(sema) {
+        cast::usual_arithmetic(sema, lhs, rhs)?;
+        return ret;
+    }
+    let (ResolvedType::Pointer(i1), ResolvedType::Pointer(i2)) = (l, r) else {
+        return Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty));
+    };
+    if i1.is_compatible_ignoring_qualifiers(sema, i2) {
+        return ret;
+    }
+    if i1.is_void(sema) && !i2.is_function(sema) {
+        cast::convert(sema, rhs, lhs.casted_ty().id, false);
+        return ret;
+    }
+    if i2.is_void(sema) && !i1.is_function(sema) {
+        cast::convert(sema, lhs, rhs.casted_ty().id, false);
+        return ret;
+    }
+
+    if null1 || null2 {
+        return ret;
+    }
+    Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty))
+}
+
+fn bitwise(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+    let mut ops = Operands::take(sema, [e1, e2])?;
+    let (sema, [lhs, rhs]) = ops.parts();
+    cast::lvalue_conversion(sema, lhs, &e1.span);
+    cast::lvalue_conversion(sema, rhs, &e2.span);
+    if !lhs.ty.is_integral(sema) || !rhs.ty.is_integral(sema) {
+        return Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty));
+    }
+    cast::usual_arithmetic(sema, lhs, rhs)?;
+    Ok((lhs.casted_ty(), RValue))
+}
 
 fn cast(sema: &mut Sema, ctx: &Context, node: &ExpressionNode, ty_node: &Type, operand: &ExpressionNode) -> R {
     let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
@@ -425,7 +489,7 @@ fn cast(sema: &mut Sema, ctx: &Context, node: &ExpressionNode, ty_node: &Type, o
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &operand.span);
     let ty = qualif.id.resolve(sema);
-    if !matches!(ty, ResolvedType::Void) {
+    if !ty.is_void() {
         let from = re.casted_ty().id.resolve(sema);
         if !ty.is_scalar(sema) || !from.is_scalar(sema) {
             return Err(Diagnosis::CastToNonScalar);

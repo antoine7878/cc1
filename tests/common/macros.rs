@@ -221,7 +221,6 @@ macro_rules! constant {
     };
 }
 
-/// A constant that fits no type of its list is reported and truncated to the widest one.
 #[macro_export]
 macro_rules! too_large {
     ($name:ident, $src:expr, $expected:expr) => {

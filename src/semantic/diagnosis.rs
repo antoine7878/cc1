@@ -75,7 +75,7 @@ pub enum Diagnosis {
     CallingIncompleteReturn(QualifiedType),
 
     /// 6.3.5
-    InvalidBianryOperand(QualifiedType, QualifiedType),
+    InvalidBinaryOperand(QualifiedType, QualifiedType),
 
     AssignToRValue,
     ConstAssignment(QualifiedType),
@@ -192,7 +192,7 @@ impl DiagnosisNode {
             Diagnosis::IndirectionToVoid => "ISO C does not allow indirection on operand of type 'void *'".to_string(),
             Diagnosis::FunctionReturningArray(ty) => format!("function cannot return array type ‘{}’", ty.describe(sema, ctx)),
             Diagnosis::FunctionReturningFunction(ty) => format!("function cannot return function type ‘{}’", ty.describe(sema, ctx)),
-            Diagnosis::InvalidBianryOperand(lhs, rhs) => format!("invalid operands to binary expression ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
+            Diagnosis::InvalidBinaryOperand(lhs, rhs) => format!("invalid operands to binary expression ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
             Diagnosis::AssignToRValue => "expression is not assignable".to_string(),
             Diagnosis::ConstAssignment(ty) => format!("cannot assign to variable with const-qualified type '{}'", ty.describe(sema, ctx)),
             Diagnosis::Poisoned => "Internal error".to_string(),

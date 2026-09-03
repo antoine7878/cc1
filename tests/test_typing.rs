@@ -1630,7 +1630,7 @@ shaped!(
 rejects_shaped!(
     multiplying_a_structure_is_rejected,
     "struct S { int x; } s; void f(void) { s * 1; }",
-    Diagnosis::InvalidBianryOperand(_, _),
+    Diagnosis::InvalidBinaryOperand(_, _),
     vec![
         lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
         rv(Ty::Int),
@@ -1641,7 +1641,7 @@ rejects_shaped!(
 rejects_shaped!(
     multiplying_by_a_structure_is_rejected,
     "struct S { int x; } s; void f(void) { 1 * s; }",
-    Diagnosis::InvalidBianryOperand(_, _),
+    Diagnosis::InvalidBinaryOperand(_, _),
     vec![
         rv(Ty::Int),
         lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
@@ -1652,7 +1652,7 @@ rejects_shaped!(
 rejects_shaped!(
     dividing_a_pointer_is_rejected,
     "int *p; void f(void) { p / 2; }",
-    Diagnosis::InvalidBianryOperand(_, _),
+    Diagnosis::InvalidBinaryOperand(_, _),
     vec![
         lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
         rv(Ty::Int),
@@ -1664,14 +1664,14 @@ rejects_shaped!(
 rejects_shaped!(
     a_remainder_with_a_floating_right_operand_is_rejected,
     "void f(void) { 1 % 1.5; }",
-    Diagnosis::InvalidBianryOperand(_, _),
+    Diagnosis::InvalidBinaryOperand(_, _),
     vec![rv(Ty::Int), rv(Ty::Double), none()]
 );
 
 rejects_shaped!(
     a_remainder_with_a_floating_left_operand_is_rejected,
     "void f(void) { 1.5 % 1; }",
-    Diagnosis::InvalidBianryOperand(_, _),
+    Diagnosis::InvalidBinaryOperand(_, _),
     vec![rv(Ty::Double), rv(Ty::Int), none()]
 );
 
@@ -1746,14 +1746,14 @@ shaped!(
 rejects_shaped!(
     shifting_a_floating_left_operand_is_rejected,
     "void f(void) { 1.5 << 1; }",
-    Diagnosis::InvalidBianryOperand(_, _),
+    Diagnosis::InvalidBinaryOperand(_, _),
     vec![rv(Ty::Double), rv(Ty::Int), none()]
 );
 
 rejects_shaped!(
     shifting_by_a_floating_count_is_rejected,
     "void f(void) { 1 << 1.5; }",
-    Diagnosis::InvalidBianryOperand(_, _),
+    Diagnosis::InvalidBinaryOperand(_, _),
     vec![rv(Ty::Int), rv(Ty::Double), none()]
 );
 
@@ -1832,7 +1832,7 @@ shaped!(
 rejects_shaped!(
     a_rejected_shift_leaves_its_operands_unpromoted,
     "enum E { A }; enum E e; void f(void) { e << 1.5; }",
-    Diagnosis::InvalidBianryOperand(_, _),
+    Diagnosis::InvalidBinaryOperand(_, _),
     vec![
         lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")),
         rv(Ty::Double),
