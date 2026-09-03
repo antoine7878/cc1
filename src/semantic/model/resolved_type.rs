@@ -77,13 +77,14 @@ impl ResolvedType {
         self.is_complete(sema) && !self.is_function()
     }
 
-    // 6.1.2.5 Integral and floating types are collectively called arithmetic types.
     pub fn is_arithmetic(&self, sema: &Sema) -> bool {
         self.is_integral(sema) || self.is_floating()
     }
 
-    // 6.1.2.5 The type char, the signed and unsigned integer types, and the enumerated types
-    // are collectively called integral types.
+    pub fn is_tag(&self) -> bool {
+        matches!(self, ResolvedType::Tag(_))
+    }
+
     pub fn is_integral(&self, sema: &Sema) -> bool {
         match self {
             ResolvedType::Tag(id) => (*id).resolve(sema).kind == Tag::Enum,
@@ -272,13 +273,14 @@ impl QualifiedType {
         self.id.resolve(sema).is_object(sema)
     }
 
-    // 6.1.2.5 Integral and floating types are collectively called arithmetic types.
     pub fn is_arithmetic(&self, sema: &Sema) -> bool {
         self.id.resolve(sema).is_arithmetic(sema)
     }
 
-    // 6.1.2.5 The type char, the signed and unsigned integer types, and the enumerated types
-    // are collectively called integral types.
+    pub fn is_tag(&self, sema: &Sema) -> bool {
+        self.id.resolve(sema).is_tag()
+    }
+
     pub fn is_integral(&self, sema: &Sema) -> bool {
         self.id.resolve(sema).is_integral(sema)
     }

@@ -2081,3 +2081,140 @@ rejects_shaped!(
         none(),
     ]
 );
+
+// ---- 6.3.10 to 6.3.12 bitwise AND, exclusive OR and inclusive OR ----------
+
+shaped!(a_bitwise_and_of_two_constants_is_an_int, "void f(void) { 6 & 3; }", ints(3));
+
+shaped!(a_bitwise_xor_of_two_constants_is_an_int, "void f(void) { 6 ^ 3; }", ints(3));
+
+shaped!(a_bitwise_or_of_two_constants_is_an_int, "void f(void) { 6 | 3; }", ints(3));
+
+// 6.3.10 The usual arithmetic conversions are performed on the operands.
+shaped!(
+    the_operands_of_a_bitwise_and_are_promoted,
+    "char c; void f(void) { c & c; }",
+    vec![
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int),
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.11 Unlike a shift, both operands meet at a common type.
+shaped!(
+    a_bitwise_xor_converts_its_operands_to_a_common_type,
+    "int i; unsigned u; void f(void) { i ^ u; }",
+    vec![
+        lv(Ty::Int)
+            .then(LValueToRValue, Ty::Int)
+            .then(IntegerConversion, Ty::UInt),
+        lv(Ty::UInt).then(LValueToRValue, Ty::UInt),
+        rv(Ty::UInt),
+    ]
+);
+
+shaped!(
+    a_bitwise_or_with_a_long_operand_meets_at_long,
+    "int i; long l; void f(void) { i | l; }",
+    vec![
+        lv(Ty::Int)
+            .then(LValueToRValue, Ty::Int)
+            .then(IntegerConversion, Ty::Long),
+        lv(Ty::Long).then(LValueToRValue, Ty::Long),
+        rv(Ty::Long),
+    ]
+);
+
+// 6.1.2.5 The type char, the signed and unsigned integer types, and the enumerated types are
+// collectively called integral types.
+shaped!(
+    an_enumeration_may_be_combined_bitwise,
+    "enum E { A }; enum E e; void f(void) { e & 1; }",
+    vec![
+        lv(Ty::enom("E"))
+            .then(LValueToRValue, Ty::enom("E"))
+            .then(IntegerPromotion, Ty::Int),
+        rv(Ty::Int),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.10 Each of the operands shall have integral type.
+rejects_shaped!(
+    a_bitwise_and_with_a_floating_left_operand_is_rejected,
+    "void f(void) { 1.5 & 1; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![rv(Ty::Double), rv(Ty::Int), none()]
+);
+
+rejects_shaped!(
+    a_bitwise_xor_with_a_floating_right_operand_is_rejected,
+    "void f(void) { 1 ^ 1.5; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![rv(Ty::Int), rv(Ty::Double), none()]
+);
+
+rejects_shaped!(
+    a_bitwise_or_with_a_pointer_operand_is_rejected,
+    "int *p; void f(void) { p | 1; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+rejects_shaped!(
+    combining_two_pointers_bitwise_is_rejected,
+    "int *p; void f(void) { p & p; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        none(),
+    ]
+);
+
+rejects_shaped!(
+    a_bitwise_and_with_a_structure_operand_is_rejected,
+    "struct S { int x; } s; void f(void) { s & 1; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![
+        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+// 6.2.2.1 An array operand is converted to a pointer to its first element before the operand is
+// tested: the pointer it becomes is not an integral type either.
+rejects_shaped!(
+    an_array_operand_of_a_bitwise_or_is_rejected_after_it_decays,
+    "char a[10]; void f(void) { a | 1; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::arr(Ty::Char, 10)).then(ArrayToPointer, Ty::ptr(Ty::Char)),
+        rv(Ty::Int),
+        none(),
+    ]
+);
+
+// A rejected operation converts nothing: the operands keep the types they were written with.
+rejects_shaped!(
+    a_rejected_bitwise_and_leaves_its_operands_unpromoted,
+    "enum E { A }; enum E e; void f(void) { e & 1.5; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![
+        lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")),
+        rv(Ty::Double),
+        none(),
+    ]
+);

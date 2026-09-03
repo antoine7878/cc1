@@ -19,11 +19,11 @@ folds!(fold_division, "enum E { A = 7 / 2 };", ["Int(3)"]);
 // folds!(fold_division_by_zero, "enum E { A = 1 / 0 };", ["Int(0)"]);
 folds!(fold_remainder, "enum E { A = 7 % 2 };", ["Int(1)"]);
 folds!(fold_shift, "enum E { A = 1 << 4 };", ["Int(16)"]);
-// folds!(
-//     fold_bitwise,
-//     "enum E { A = 6 & 3, B = 6 | 3, C = 6 ^ 3 };",
-//     ["Int(2)", "Int(7)", "Int(5)"]
-// );
+folds!(
+    fold_bitwise,
+    "enum E { A = 6 & 3, B = 6 | 3, C = 6 ^ 3 };",
+    ["Int(2)", "Int(7)", "Int(5)"]
+);
 // folds!(
 //     fold_unary,
 //     "enum E { A = -3, B = +3, C = ~0, D = !5 };",

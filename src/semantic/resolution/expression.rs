@@ -1,3 +1,4 @@
+use std::fs::TryLockError::WouldBlock;
 use std::iter::zip;
 
 use crate::arena::ResolveWith;
@@ -513,6 +514,48 @@ fn logic_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedE
     Ok((ty, RValue))
 }
 
+fn conditional(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode, e3: &ExpressionNode) -> R {
+    let null2 = is_null_pointer_constant(sema, ctx, e2);
+    let null3 = is_null_pointer_constant(sema, ctx, e3);
+    let mut ops = Operands::take(sema, [e1, e2, e3])?;
+    let (sema, [condition, lhs, rhs]) = ops.parts();
+    cast::lvalue_conversion(sema, lhs, &e1.span);
+    cast::lvalue_conversion(sema, lhs, &e1.span);
+    cast::lvalue_conversion(sema, rhs, &e2.span);
+    conditional_type(sema, condition, lhs, rhs, null2, null3)
+}
+
+fn conditional_type(
+    sema: &mut Sema,
+    conditional: &mut ResolvedExpression,
+    lhs: &mut ResolvedExpression,
+    rhs: &mut ResolvedExpression,
+    n2: bool,
+    n3: bool,
+) -> R {
+    if !conditional.ty.is_scalar(sema) {
+        return Err(Diagnosis::DivisionByZero);
+    }
+    let l = lhs.casted_ty().id.resolve(sema);
+    let r = rhs.casted_ty().id.resolve(sema);
+    if l.is_arithmetic(sema) && r.is_arithmetic(sema) {
+        return cast::usual_arithmetic(sema, lhs, rhs);
+    }
+    if l.is_tag() && r.is_tag() && lhs.ty.is_compatible(sema, &rhs.ty) {
+        return Ok((lhs.casted_ty(), RValue));
+    }
+    if l.is_void() && r.is_void() {
+        return Ok((lhs.casted_ty(), RValue));
+    }
+    let (ResolvedType::Pointer(p1), ResolvedType::Pointer(p2)) = (l, r) else {
+        return Err(Diagnosis::DivisionByZero);
+    };
+    if p1.is_compatible(sema, p2) {
+        return Ok((lhs.casted_ty(), RValue));
+    }
+    return Ok((lhs.casted_ty(), RValue));
+}
+
 fn cast(sema: &mut Sema, ctx: &Context, node: &ExpressionNode, ty_node: &Type, operand: &ExpressionNode) -> R {
     let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
     let (qualif, _) = declaration::declared_type(sema, ctx, base, &ty_node.declarator).ok_poisoned()?;
@@ -580,6 +623,7 @@ fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> R {
         Expression::SizeofExpr(e) => size_of_e(sema, e),
         Expression::SizeofType(ty) => size_of_ty(sema, ctx, ty, &node.span),
         Expression::Binary(op, e1, e2) => binary_op(sema, ctx, *op, e1, e2),
+        Expression::Ternary(e1, e2, e3) => conditional(sema, ctx, e1, e2, e3),
         Expression::Cast(ty_node, operand) => cast(sema, ctx, node, ty_node, operand),
         Expression::Assign(None, e1, e2) => assign(sema, ctx, e1, e2),
         Expression::List(es) => list(sema, es),
