@@ -130,19 +130,23 @@ pub fn to_void(sema: &Sema, re: &mut ResolvedExpression) {
 }
 
 fn num_conv(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId) {
-    let from = from_re.casted_ty().id;
-    if from == to_id {
-        return;
+    if let Some(cast) = arithmetic_conversion(sema, from_re.casted_ty(), convert_type(to_id)) {
+        from_re.casts.push(cast);
     }
-    let from = from.resolve(sema);
-    let to = to_id.resolve(sema);
-    let kind = match (from.is_integral(sema), to.is_integral(sema)) {
-        (true, true) => CastKind::IntegerConversion,    // 6.2.1.2
-        (true, false) => CastKind::IntegerToFloating,   // 6.2.1.3
-        (false, true) => CastKind::FloatingToInteger,   // 6.2.1.4
-        (false, false) => CastKind::FloatingConversion, // 6.2.1.4
+}
+
+pub fn arithmetic_conversion(sema: &Sema, from: QualifiedType, to: QualifiedType) -> Option<ImplicitCast> {
+    if from.id == to.id {
+        return None;
+    }
+    let (f, t) = (from.id.resolve(sema), to.id.resolve(sema));
+    let kind = match (f.is_integral(sema), t.is_integral(sema)) {
+        (true, true) => CastKind::IntegerConversion,
+        (true, false) => CastKind::IntegerToFloating,
+        (false, true) => CastKind::FloatingToInteger,
+        (false, false) => CastKind::FloatingConversion,
     };
-    from_re.casts.push(ImplicitCast::new(kind, convert_type(to_id)))
+    Some(ImplicitCast::new(kind, convert_type(to.id)))
 }
 
 // 6.2.1.5 Usual arithmetic conversions

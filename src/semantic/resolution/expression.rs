@@ -102,7 +102,7 @@ fn constant(sema: &mut Sema, e: &ExpressionNode) -> R {
 }
 
 fn array_subscript(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let (qty, _) = binary_op(sema, ctx, BinaryOp::Add, e1, e2)?;
+    let (qty, _) = binary_op(sema, ctx, &BinaryOp::Add, e1, e2)?;
     let ResolvedType::Pointer(inner) = qty.id.resolve(sema) else {
         return Err(Diagnosis::SubscriptNotArray);
     };
@@ -193,17 +193,6 @@ fn member(sema: &mut Sema, node: &ExpressionNode, op: MemberOp, e: &ExpressionNo
         ty.is_volatile || tag_qty.is_volatile,
     );
     Ok((qty, kind))
-}
-
-fn unary_op(sema: &mut Sema, op: UnaryOp, e: &ExpressionNode) -> R {
-    match op {
-        UnaryOp::PostInc | UnaryOp::PostDec | UnaryOp::PreInc | UnaryOp::PreDec => inc_dec(sema, e, op),
-        UnaryOp::Plus | UnaryOp::Minus => sign(sema, e),
-        UnaryOp::Addr => address(sema, e),
-        UnaryOp::Deref => indirection(sema, e),
-        UnaryOp::BitNot => bit_not(sema, e),
-        UnaryOp::LogicalNot => logic_not(sema, e),
-    }
 }
 
 fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
@@ -320,10 +309,10 @@ fn size_t(sema: &Sema, ty: QualifiedType) -> R {
     Ok((qty, RValue))
 }
 
-fn binary_op(sema: &mut Sema, ctx: &Context, op: BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+fn binary_op(sema: &mut Sema, ctx: &Context, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     match op {
-        BinaryOp::Add | BinaryOp::Sub => additive(sema, e1, e2, op),
-        BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => multiplicative(sema, e1, e2, op),
+        BinaryOp::Add | BinaryOp::Sub => additive(sema, op, e1, e2),
+        BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => multiplicative(sema, op, e1, e2),
         BinaryOp::Right | BinaryOp::Left => shift(sema, ctx, e1, e2),
         BinaryOp::Greater | BinaryOp::Lower | BinaryOp::GreaterEq | BinaryOp::LowerEq => relational(sema, e1, e2),
         BinaryOp::Eq | BinaryOp::Neq => equality(sema, ctx, e1, e2),
@@ -332,19 +321,48 @@ fn binary_op(sema: &mut Sema, ctx: &Context, op: BinaryOp, e1: &ExpressionNode, 
     }
 }
 
-fn multiplicative(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode, op: BinaryOp) -> R {
+fn unary_op(sema: &mut Sema, op: UnaryOp, e: &ExpressionNode) -> R {
+    match op {
+        UnaryOp::PostInc | UnaryOp::PostDec | UnaryOp::PreInc | UnaryOp::PreDec => inc_dec(sema, e, op),
+        UnaryOp::Plus | UnaryOp::Minus => sign(sema, e),
+        UnaryOp::Addr => address(sema, e),
+        UnaryOp::Deref => indirection(sema, e),
+        UnaryOp::BitNot => bit_not(sema, e),
+        UnaryOp::LogicalNot => logic_not(sema, e),
+    }
+}
+
+fn assignment(sema: &mut Sema, ctx: &Context, op: &Option<BinaryOp>, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+    match op {
+        None => simple_assignment(sema, ctx, e1, e2),
+        Some(op @ (BinaryOp::Add | BinaryOp::Sub)) => additive_assignment(sema, op, e1, e2),
+        Some(
+            BinaryOp::Mul
+            | BinaryOp::Div
+            | BinaryOp::Mod
+            | BinaryOp::Left
+            | BinaryOp::Right
+            | BinaryOp::BitAnd
+            | BinaryOp::BitOr
+            | BinaryOp::BitXor,
+        ) => coumpound_assignment(sema, ctx, e1, e2),
+        _ => unreachable!(),
+    }
+}
+
+fn multiplicative(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let mut ops = Operands::take(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, lhs, &e1.span);
     cast::lvalue_conversion(sema, rhs, &e2.span);
-    multiplicative_types(sema, lhs, rhs, op)
+    multiplicative_types(sema, op, lhs, rhs)
 }
 
 fn multiplicative_types(
     sema: &mut Sema,
+    op: &BinaryOp,
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,
-    op: BinaryOp,
 ) -> R {
     let l = lhs.casted_ty().id.resolve(sema);
     let r = rhs.casted_ty().id.resolve(sema);
@@ -358,15 +376,15 @@ fn multiplicative_types(
     cast::usual_arithmetic(sema, lhs, rhs)
 }
 
-fn additive(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode, op: BinaryOp) -> R {
+fn additive(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let mut ops = Operands::take(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, lhs, &e1.span);
     cast::lvalue_conversion(sema, rhs, &e2.span);
-    additive_types(sema, lhs, rhs, op)
+    additive_types(sema, op, lhs, rhs)
 }
 
-fn additive_types(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression, op: BinaryOp) -> R {
+fn additive_types(sema: &mut Sema, op: &BinaryOp, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) -> R {
     match (op, lhs.casted_ty().id.resolve(sema), rhs.casted_ty().id.resolve(sema)) {
         (_, l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => cast::usual_arithmetic(sema, lhs, rhs),
         (_, ResolvedType::Pointer(_), o) if o.is_integral(sema) => cast::pointer_integer_arithmetic(sema, lhs, rhs),
@@ -614,15 +632,82 @@ fn cast_type(sema: &mut Sema, qualif: QualifiedType, re: &mut ResolvedExpression
     Ok((qualif, RValue))
 }
 
-fn assign(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+fn simple_assignment(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let is_null = is_null_pointer_constant(sema, ctx, e2);
     let mut ops = Operands::take(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, rhs, &e2.span);
-    assign_type(sema, lhs, rhs, is_null)
+    simple_assignation_type(sema, lhs, rhs, is_null)
 }
 
-fn assign_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression, is_null: bool) -> R {
+fn simple_assignation_type(
+    sema: &mut Sema,
+    lhs: &mut ResolvedExpression,
+    rhs: &mut ResolvedExpression,
+    is_null: bool,
+) -> R {
+    check_assignable(lhs)?;
+    let q = cast::assignment_conversion(sema, lhs, rhs, is_null, AssignmentContext::Assignment)?;
+    Ok((q, ExpressionKind::RValue))
+}
+
+fn additive_assignment(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+    let mut ops = Operands::take(sema, [e1, e2])?;
+    let (sema, [lhs, rhs]) = ops.parts();
+    cast::lvalue_conversion(sema, rhs, &e2.span);
+    additive_assignation_type(sema, op, lhs, rhs, &e1.span)
+}
+
+// For the operators += and -= only.
+// either the left operand shall be a pointer to an object type and the right shall have integra1 type,
+//
+// or the left operand shall have qualified or unqualified arithmetic type and the right shall have arithmetic type.
+//
+// For the other operators, each operand shall have arithmetic type consistent with those allowed
+// by the corresponding binary operator.
+
+fn additive_assignation_type(
+    sema: &mut Sema,
+    op: &BinaryOp,
+    lhs: &mut ResolvedExpression,
+    rhs: &mut ResolvedExpression,
+    span: &Span,
+) -> R {
+    check_assignable(lhs)?;
+    let target = lhs.ty.unqualified();
+    let l = lhs.ty.id.resolve(sema);
+    let r = rhs.casted_ty().id.resolve(sema);
+
+    let prt_case = matches!(l, ResolvedType::Pointer(inner) if inner.is_object(sema)) && r.is_integral(sema);
+    let arithmetic_case = l.is_arithmetic(sema) && r.is_arithmetic(sema);
+    if !prt_case && !arithmetic_case {
+        return Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.casted_ty()));
+    }
+    cast::lvalue_conversion(sema, lhs, span);
+    additive_types(sema, op, lhs, rhs)?;
+    if prt_case {
+        cast::pointer_integer_arithmetic(sema, lhs, rhs)?;
+    } else {
+        cast::usual_arithmetic(sema, lhs, rhs)?;
+        lhs.result_cast = cast::arithmetic_conversion(sema, lhs.casted_ty(), target);
+    }
+    Ok((target, ExpressionKind::RValue))
+}
+
+fn coumpound_assignment(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+    let is_null = is_null_pointer_constant(sema, ctx, e2);
+    let mut ops = Operands::take(sema, [e1, e2])?;
+    let (sema, [lhs, rhs]) = ops.parts();
+    cast::lvalue_conversion(sema, rhs, &e2.span);
+    coumpound_assignation_type(sema, lhs, rhs, is_null)
+}
+
+fn coumpound_assignation_type(
+    sema: &mut Sema,
+    lhs: &mut ResolvedExpression,
+    rhs: &mut ResolvedExpression,
+    is_null: bool,
+) -> R {
     check_assignable(lhs)?;
     let q = cast::assignment_conversion(sema, lhs, rhs, is_null, AssignmentContext::Assignment)?;
     Ok((q, ExpressionKind::RValue))
@@ -655,12 +740,11 @@ fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> R {
         Expression::Unary(op, e) => unary_op(sema, *op, e),
         Expression::SizeofExpr(e) => size_of_e(sema, e),
         Expression::SizeofType(ty) => size_of_ty(sema, ctx, ty, &node.span),
-        Expression::Binary(op, e1, e2) => binary_op(sema, ctx, *op, e1, e2),
+        Expression::Binary(op, e1, e2) => binary_op(sema, ctx, op, e1, e2),
         Expression::Ternary(e1, e2, e3) => conditional(sema, ctx, e1, e2, e3),
+        Expression::Assign(op, e1, e2) => assignment(sema, ctx, op, e1, e2),
         Expression::Cast(ty_node, operand) => cast(sema, ctx, node, ty_node, operand),
-        Expression::Assign(None, e1, e2) => assign(sema, ctx, e1, e2),
         Expression::List(es) => list(sema, es),
-        _ => Err(Diagnosis::Poisoned),
     }
 }
 
