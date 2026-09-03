@@ -372,8 +372,8 @@ impl Visitor for SymbolResolver<'_> {
             let scope_kind = self.sema.scopes.kind();
             let mut sym = Symbol::new(name, Some(ty), Some(storage), kind, is_init);
             sym.linkage = Symbol::linkage_of(scope_kind, declared_storage, kind, prior);
-            sym.duration = Symbol::duration_of(scope_kind, declared_storage);
-            sym.definition = Symbol::definition_of(scope_kind, declared_storage, is_init);
+            sym.duration = Symbol::duration_of(scope_kind, declared_storage, kind);
+            sym.definition = Symbol::definition_of(scope_kind, declared_storage, is_init, kind);
             let sym_id = self.sema.declare(sym, &decl.span);
             self.sema.declarations.insert(init_declarator.declarator.id, sym_id);
         }

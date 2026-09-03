@@ -24,7 +24,7 @@ placements!(
     placement_block_scope_mix,
     "void f(void) { int a; static int b; extern int c; }",
     &[
-        ("f", "external", "automatic", "definition"),
+        ("f", "external", "none", "definition"),
         ("a", "none", "automatic", "definition"),
         ("b", "none", "static", "definition"),
         ("c", "external", "static", "declaration"),
@@ -34,7 +34,25 @@ placements!(
 placements!(
     placement_static_then_definition_one_entry,
     "static int sf(void); int sf(void) { return 0; }",
-    &[("sf", "internal", "static", "definition")]
+    &[("sf", "internal", "none", "definition")]
+);
+
+placements!(
+    placement_function_declaration_no_duration,
+    "int fn(void);",
+    &[("fn", "external", "none", "declaration")]
+);
+
+placements!(
+    placement_function_definition_no_duration,
+    "int fn(void) { return 0; }",
+    &[("fn", "external", "none", "definition")]
+);
+
+placements!(
+    placement_static_function_definition_no_duration,
+    "static int sfn(void) { return 0; }",
+    &[("sfn", "internal", "none", "definition")]
 );
 
 reject!(linkage_reject_extern_then_static, "extern int a; static int a;");

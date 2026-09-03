@@ -15,6 +15,7 @@ pub enum Linkage {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Duration {
+    None,
     Static,
     Automatic,
 }
@@ -57,7 +58,7 @@ impl Symbol {
             is_init,
             linkage: Linkage::None,
             definition: Definition::Definition,
-            duration: Duration::Automatic,
+            duration: Duration::None,
             used: false,
         }
     }
@@ -84,7 +85,10 @@ impl Symbol {
         Linkage::External
     }
 
-    pub fn duration_of(scope: ScopeKind, storage: Option<Storage>) -> Duration {
+    pub fn duration_of(scope: ScopeKind, storage: Option<Storage>, kind: SymbolKind) -> Duration {
+        if !matches!(kind, SymbolKind::Variable | SymbolKind::Parameter) {
+            return Duration::None;
+        }
         if scope == ScopeKind::File || storage == Some(Storage::Static) || storage == Some(Storage::Extern) {
             Duration::Static
         } else {
@@ -92,7 +96,10 @@ impl Symbol {
         }
     }
 
-    pub fn definition_of(scope: ScopeKind, storage: Option<Storage>, has_initializer: bool) -> Definition {
+    pub fn definition_of(scope: ScopeKind, storage: Option<Storage>, has_initializer: bool, kind: SymbolKind) -> Definition {
+        if kind == SymbolKind::Function {
+            return Definition::Declaration;
+        }
         if has_initializer {
             return Definition::Definition;
         }
@@ -128,7 +135,10 @@ impl Symbol {
     }
 
     pub fn parameter(name: Name, ty: QualifiedType, storage: Storage) -> Self {
-        Self::new(name, Some(ty), Some(storage), SymbolKind::Parameter, false)
+        Self {
+            duration: Duration::Automatic,
+            ..Self::new(name, Some(ty), Some(storage), SymbolKind::Parameter, false)
+        }
     }
 
     pub fn label(name: Name, is_init: bool) -> Self {
@@ -176,6 +186,7 @@ impl fmt::Display for Linkage {
 impl fmt::Display for Duration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Duration::None => write!(f, "none"),
             Duration::Static => write!(f, "static"),
             Duration::Automatic => write!(f, "automatic"),
         }
