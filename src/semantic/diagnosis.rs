@@ -59,7 +59,11 @@ pub enum Diagnosis {
     /// 6.3.4
     CastToNonScalar,
     CastOfNonScalar,
+    NotScalar(QualifiedType),
     IncompatibleCast,
+    IncompatibleOperands(QualifiedType, QualifiedType),
+    PointerMismatch(QualifiedType, QualifiedType),
+    PointerComparisonMismatch(QualifiedType, QualifiedType),
     /// 6.3.16
     AssignmentDiscardedQualifiers(QualifiedType, QualifiedType),
     InitDiscardedQualifiers(QualifiedType, QualifiedType),
@@ -76,6 +80,7 @@ pub enum Diagnosis {
 
     /// 6.3.5
     InvalidBinaryOperand(QualifiedType, QualifiedType),
+    InvalidComparison(QualifiedType, QualifiedType),
 
     AssignToRValue,
     ConstAssignment(QualifiedType),
@@ -166,18 +171,18 @@ impl DiagnosisNode {
             Diagnosis::Temprorary =>  "TEMPRORARY DIAG".to_string(),
             Diagnosis::ArrayInitTooLong => "excess elements in array initializer".to_string(), Diagnosis::InvalidReturnType => "Invalid return type".to_string(),
 
-            Diagnosis::AssignmentDiscardedQualifiers(to, from) => format!("assigning to ‘{}’ from ‘{}’ discards qualifiers", to.describe(&ctx.sema, ctx), from.describe(sema, ctx)),
-            Diagnosis::InitDiscardedQualifiers(to, from) => format!("initializing ‘{}’ with an expression of type ‘{}’ discards qualifiers", to.describe(sema, ctx), from.describe(sema, ctx)),
-            Diagnosis::ArgumentDiscardedQualifiers(n, to, from) => format!("passing ‘{}’ to parameter {n} of type ‘{}’ discards qualifiers", from.describe(sema, ctx), to.describe(sema, ctx)),
-            Diagnosis::ReturnDiscardedQualifiers(to, from) => format!("returning ‘{}’ from a function with result type ‘{}’ discards qualifiers", from.describe(sema, ctx), to.describe(sema, ctx)),
+            Diagnosis::AssignmentDiscardedQualifiers(to, from) => format!("assigning to '{}' from '{}' discards qualifiers", to.describe(&ctx.sema, ctx), from.describe(sema, ctx)),
+            Diagnosis::InitDiscardedQualifiers(to, from) => format!("initializing '{}' with an expression of type '{}' discards qualifiers", to.describe(sema, ctx), from.describe(sema, ctx)),
+            Diagnosis::ArgumentDiscardedQualifiers(n, to, from) => format!("passing '{}' to parameter {n} of type '{}' discards qualifiers", from.describe(sema, ctx), to.describe(sema, ctx)),
+            Diagnosis::ReturnDiscardedQualifiers(to, from) => format!("returning '{}' from a function with result type '{}' discards qualifiers", from.describe(sema, ctx), to.describe(sema, ctx)),
 
-            Diagnosis::AssignmentIncompatibleTypes(to, from) => format!("assignment to ‘{}’ from incompatible pointer type ‘{}’", to.describe(sema, ctx), from.describe(sema, ctx)),
-            Diagnosis::InitIncompatibleTypes(to, from) => format!("initialization of ‘{}’ from incompatible pointer type ‘{}’", to.describe(sema, ctx), from.describe(sema, ctx)),
-            Diagnosis::ArgumentIncompatibleTypes(n, to, from) => format!("passing ‘{}’ to parameter {n} of incompatible type ‘{}’", from.describe(sema, ctx), to.describe(sema, ctx)),
-            Diagnosis::ReturnIncompatibleTypes(to, from) => format!("returning ‘{}’ from a function with incompatible result type ‘{}’", from.describe(sema, ctx), to.describe(sema, ctx)),
+            Diagnosis::AssignmentIncompatibleTypes(to, from) => format!("assignment to '{}' from incompatible pointer type '{}'", to.describe(sema, ctx), from.describe(sema, ctx)),
+            Diagnosis::InitIncompatibleTypes(to, from) => format!("initialization of '{}' from incompatible pointer type '{}'", to.describe(sema, ctx), from.describe(sema, ctx)),
+            Diagnosis::ArgumentIncompatibleTypes(n, to, from) => format!("passing '{}' to parameter {n} of incompatible type '{}'", from.describe(sema, ctx), to.describe(sema, ctx)),
+            Diagnosis::ReturnIncompatibleTypes(to, from) => format!("returning '{}' from a function with incompatible result type '{}'", from.describe(sema, ctx), to.describe(sema, ctx)),
 
             Diagnosis::CallingNotFunction(ty) => format!("called object type '{}' is not a function or function pointer", ty.describe(sema, ctx)),
-            Diagnosis::CallingIncompleteReturn(ty) => format!("calling a function with incomplete return type ‘{}’", ty.describe(sema, ctx)),
+            Diagnosis::CallingIncompleteReturn(ty) => format!("calling a function with incomplete return type '{}'", ty.describe(sema, ctx)),
             Diagnosis::BadPostIncDec(UnaryOp::PostInc | UnaryOp::PreInc, ty) => format!("cannot increment value of type '{}'", ty.describe(sema, ctx)),
             Diagnosis::BadPostIncDec(UnaryOp::PostDec | UnaryOp::PreDec, ty) => format!("cannot decrement value of type '{}'", ty.describe(sema, ctx)),
             Diagnosis::BadPostIncDec(_, _) => unreachable!(),
@@ -190,9 +195,10 @@ impl DiagnosisNode {
 
             Diagnosis::IndirectionNotPointer(ty) => format!("indirection requires pointer operand ('{}' invalid)", ty.describe(sema, ctx)),
             Diagnosis::IndirectionToVoid => "ISO C does not allow indirection on operand of type 'void *'".to_string(),
-            Diagnosis::FunctionReturningArray(ty) => format!("function cannot return array type ‘{}’", ty.describe(sema, ctx)),
-            Diagnosis::FunctionReturningFunction(ty) => format!("function cannot return function type ‘{}’", ty.describe(sema, ctx)),
+            Diagnosis::FunctionReturningArray(ty) => format!("function cannot return array type '{}'", ty.describe(sema, ctx)),
+            Diagnosis::FunctionReturningFunction(ty) => format!("function cannot return function type '{}'", ty.describe(sema, ctx)),
             Diagnosis::InvalidBinaryOperand(lhs, rhs) => format!("invalid operands to binary expression ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
+            Diagnosis::InvalidComparison(lhs, rhs) => format!("comparison of distinct pointer types ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
             Diagnosis::AssignToRValue => "expression is not assignable".to_string(),
             Diagnosis::ConstAssignment(ty) => format!("cannot assign to variable with const-qualified type '{}'", ty.describe(sema, ctx)),
             Diagnosis::Poisoned => "Internal error".to_string(),
@@ -217,7 +223,13 @@ impl DiagnosisNode {
             Diagnosis::NonIntegerConstantExpression => "Non integer constant expression".to_string(),
             Diagnosis::CastToNonScalar => "Conversion to non scalar type".to_string(),
             Diagnosis::CastOfNonScalar => "Conversion of non scalar type".to_string(),
+            Diagnosis::NotScalar(ty) => format!("used type '{}' where arithmetic or pointer type is required", ty.describe(sema, ctx)),
             Diagnosis::IncompatibleCast => "Incompatible types".to_string(),
+            Diagnosis::IncompatibleOperands(lhs, rhs) => format!("incompatible operand types ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
+            Diagnosis::PointerMismatch(lhs, rhs) => format!("pointer type mismatch ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
+            Diagnosis::PointerComparisonMismatch(lhs, rhs) => format!("comparison of distinct pointer types ('{}' and '{}')", lhs.describe(sema, ctx), rhs.describe(sema, ctx)),
+            
+            
             Diagnosis::VariantBadValue => "Variant value should be in int range".to_string(),
             Diagnosis::EmptyDeclaration => "Declaration declares nothing".to_string(),
             Diagnosis::TagWithoutMember(kind) => format!("{kind} has no named member"),

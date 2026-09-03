@@ -1,5 +1,13 @@
-int a[3];
+struct s1 {
+	int *a;
+};
 
-void f(void) {
-	++a;
+struct s2 {
+	int *a;
+};
+
+void fn(void) {
+	long *a;
+	int *b;
+	a < b;
 }

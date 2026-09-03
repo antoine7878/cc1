@@ -1,4 +1,3 @@
-use std::fs::TryLockError::WouldBlock;
 use std::iter::zip;
 
 use crate::arena::ResolveWith;
@@ -9,7 +8,7 @@ use crate::semantic::ExpressionKind::{LValue, RValue};
 use crate::semantic::ice::try_fold;
 use crate::semantic::{
     AssignmentContext, Diag, DiagCollector, Diagnosis, ExpressionKind, ParamTypes, QualifiedType, ResolvedExpression,
-    ResolvedType, Sema, SymbolKind, cast, declaration,
+    ResolvedType, Sema, SymbolId, SymbolKind, cast, declaration,
 };
 
 type R = Result<(QualifiedType, ExpressionKind), Diagnosis>;
@@ -235,12 +234,17 @@ fn sign(sema: &mut Sema, e: &ExpressionNode) -> R {
 }
 
 fn address(sema: &mut Sema, e: &ExpressionNode) -> R {
+    let id = sema.binding(e.id);
     let mut ops = Operands::take(sema, [e])?;
     let (sema, [re]) = ops.parts();
+    address_type(sema, re, id)
+}
+
+fn address_type(sema: &mut Sema, re: &mut ResolvedExpression, sym: Option<SymbolId>) -> R {
     if re.kind == RValue && !re.casted_ty().is_function(sema) {
         return Err(Diagnosis::RValueAddress(re.ty));
     }
-    if let Some(id) = sema.binding(e.id) {
+    if let Some(id) = sym {
         let sym = id.resolve(sema);
         if sym.storage == Some(Storage::Register) {
             return Err(Diagnosis::RegisterAddress);
@@ -434,7 +438,7 @@ fn relational_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut Reso
     if !i1.is_complete(sema) && !i2.is_complete(sema) {
         return ret;
     }
-    Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty))
+    Err(Diagnosis::PointerComparisonMismatch(lhs.ty, rhs.ty))
 }
 
 fn equality(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
@@ -480,7 +484,7 @@ fn equality_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut Resolv
         cast::convert(sema, lhs, r_ty.id, false);
         return ret;
     }
-    Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty))
+    Err(Diagnosis::InvalidComparison(lhs.ty, rhs.ty))
 }
 
 fn bitwise(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
@@ -519,9 +523,9 @@ fn conditional(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &Express
     let null3 = is_null_pointer_constant(sema, ctx, e3);
     let mut ops = Operands::take(sema, [e1, e2, e3])?;
     let (sema, [condition, lhs, rhs]) = ops.parts();
-    cast::lvalue_conversion(sema, lhs, &e1.span);
-    cast::lvalue_conversion(sema, lhs, &e1.span);
-    cast::lvalue_conversion(sema, rhs, &e2.span);
+    cast::lvalue_conversion(sema, condition, &e1.span);
+    cast::lvalue_conversion(sema, lhs, &e2.span);
+    cast::lvalue_conversion(sema, rhs, &e3.span);
     conditional_type(sema, condition, lhs, rhs, null2, null3)
 }
 
@@ -533,11 +537,13 @@ fn conditional_type(
     n2: bool,
     n3: bool,
 ) -> R {
-    if !conditional.ty.is_scalar(sema) {
-        return Err(Diagnosis::DivisionByZero);
+    if !conditional.casted_ty().is_scalar(sema) {
+        return Err(Diagnosis::NotScalar(conditional.ty));
     }
-    let l = lhs.casted_ty().id.resolve(sema);
-    let r = rhs.casted_ty().id.resolve(sema);
+    let l_ty = lhs.casted_ty();
+    let r_ty = rhs.casted_ty();
+    let l = l_ty.id.resolve(sema);
+    let r = r_ty.id.resolve(sema);
     if l.is_arithmetic(sema) && r.is_arithmetic(sema) {
         return cast::usual_arithmetic(sema, lhs, rhs);
     }
@@ -545,15 +551,39 @@ fn conditional_type(
         return Ok((lhs.casted_ty(), RValue));
     }
     if l.is_void() && r.is_void() {
+        let ty = QualifiedType::new(sema.builtins.void, false, false);
+        return Ok((ty, RValue));
+    }
+
+    if l.is_pointer() && n3 {
+        cast::convert(sema, rhs, l_ty.id, true);
         return Ok((lhs.casted_ty(), RValue));
     }
-    let (ResolvedType::Pointer(p1), ResolvedType::Pointer(p2)) = (l, r) else {
-        return Err(Diagnosis::DivisionByZero);
+    if r.is_pointer() && n2 {
+        cast::convert(sema, lhs, r_ty.id, true);
+        return Ok((lhs.casted_ty(), RValue));
+    }
+    let (ResolvedType::Pointer(i1), ResolvedType::Pointer(i2)) = (l, r) else {
+        return Err(Diagnosis::IncompatibleOperands(lhs.ty, rhs.ty));
     };
-    if p1.is_compatible(sema, p2) {
+
+    if i1.is_compatible_ignoring_qualifiers(sema, i2) {
+        let (i1, i2) = (*i1, *i2);
+        let inner = i1.unqualified().composite(sema, &i2.unqualified()).ok_poisoned()?;
+        let inner = QualifiedType::new(inner.id, i1.is_const || i2.is_const, i1.is_volatile || i2.is_volatile);
+        let ty = sema.types.pointer(inner);
+        return Ok((QualifiedType::new(ty, false, false), RValue));
+    }
+
+    if i1.is_void(sema) && !i2.is_function(sema) {
+        cast::convert(sema, rhs, l_ty.id, false);
         return Ok((lhs.casted_ty(), RValue));
     }
-    return Ok((lhs.casted_ty(), RValue));
+    if i2.is_void(sema) && !i1.is_function(sema) {
+        cast::convert(sema, lhs, r_ty.id, false);
+        return Ok((lhs.casted_ty(), RValue));
+    }
+    Err(Diagnosis::PointerMismatch(lhs.ty, rhs.ty))
 }
 
 fn cast(sema: &mut Sema, ctx: &Context, node: &ExpressionNode, ty_node: &Type, operand: &ExpressionNode) -> R {

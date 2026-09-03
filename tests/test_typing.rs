@@ -525,7 +525,12 @@ rejects_shaped!(
     assigning_to_an_address_is_rejected,
     "int i, *p; void f(void) { &i = p; }",
     Diagnosis::AssignToRValue,
-    vec![lv(Ty::Int), rv(Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)), none()]
+    vec![
+        lv(Ty::Int),
+        rv(Ty::ptr(Ty::Int)),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        none(),
+    ]
 );
 
 // 6.3.3.2 The operand shall be either a function designator or an lvalue.
@@ -2216,5 +2221,240 @@ rejects_shaped!(
         lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")),
         rv(Ty::Double),
         none(),
+    ]
+);
+
+// ---- 6.3.15 conditional operator ------------------------------------------
+
+// 6.3.15 If both the operands have pointer type, the result type is a pointer to a type that has
+// the composite type (6.1.2.6) of the two types pointed to.
+shaped!(
+    a_conditional_of_two_pointers_to_the_same_type_keeps_that_type,
+    "int *p, *q; void f(int c) { c ? p : q; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::ptr(Ty::Int)),
+    ]
+);
+
+// 6.1.2.6 If one type is an array of known size, the composite type is an array of that size.
+shaped!(
+    a_conditional_of_pointers_to_array_takes_the_known_size,
+    "int a[3]; extern int b[]; void f(int c) { c ? &a : &b; }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::arr(Ty::Int, 3)),
+        rv(Ty::ptr(Ty::arr(Ty::Int, 3))),
+        lv(Ty::flex(Ty::Int)),
+        rv(Ty::ptr(Ty::flex(Ty::Int))),
+        rv(Ty::ptr(Ty::arr(Ty::Int, 3))),
+    ]
+);
+
+shaped!(
+    a_conditional_of_pointers_to_unsized_arrays_stays_unsized,
+    "extern int b[]; extern int d[]; void f(int c) { c ? &b : &d; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::flex(Ty::Int)),
+        rv(Ty::ptr(Ty::flex(Ty::Int))),
+        lv(Ty::flex(Ty::Int)),
+        rv(Ty::ptr(Ty::flex(Ty::Int))),
+        rv(Ty::ptr(Ty::flex(Ty::Int))),
+    ]
+);
+
+// 6.1.2.6 If only one type is a function type with a parameter type list, the composite type is a
+// function prototype with the parameter type list.
+shaped!(
+    a_conditional_of_function_pointers_keeps_the_parameter_type_list,
+    "int g(int); int h(); void f(int c) { c ? g : h; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
+        rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))),
+        rv(Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
+    ]
+);
+
+// 6.3.15 the result type is a pointer to a type qualified with all the type qualifiers of the types
+// pointed-to by both operands.
+shaped!(
+    a_conditional_of_pointers_unions_the_qualifiers_of_the_pointed_to_types,
+    "volatile int *vp; const int *cp; void f(int c) { c ? vp : cp; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::ptr(Ty::vol(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::vol(Ty::Int))),
+        lv(Ty::ptr(Ty::konst(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Int))),
+        rv(Ty::ptr(Ty::konst(Ty::vol(Ty::Int)))),
+    ]
+);
+
+// 6.1.2.6 These rules apply recursively to the types from which the two types are derived.
+shaped!(
+    the_composite_type_is_built_recursively,
+    "int (*x[])(int); int (*y[])(); void f(int c) { c ? &x : &y; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::flex(Ty::ptr(Ty::func(Ty::Int, [Ty::Int])))),
+        rv(Ty::ptr(Ty::flex(Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))))),
+        lv(Ty::flex(Ty::ptr(Ty::noproto(Ty::Int)))),
+        rv(Ty::ptr(Ty::flex(Ty::ptr(Ty::noproto(Ty::Int))))),
+        rv(Ty::ptr(Ty::flex(Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))))),
+    ]
+);
+
+// 6.3.15 If both the second and third operands have arithmetic type, the usual arithmetic
+// conversions are performed to bring them to a common type, and the result has that type.
+shaped!(
+    a_conditional_of_arithmetic_operands_meets_at_a_common_type,
+    "int i; double d; void f(int c) { c ? i : d; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::Int)
+            .then(LValueToRValue, Ty::Int)
+            .then(IntegerToFloating, Ty::Double),
+        lv(Ty::Double).then(LValueToRValue, Ty::Double),
+        rv(Ty::Double),
+    ]
+);
+
+// 6.3.15 If both the operands have structure or union type, the result has that type.
+shaped!(
+    a_conditional_of_two_structures_keeps_the_structure_type,
+    "struct S { int x; } s, t; void f(int c) { c ? s : t; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
+        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
+        rv(Ty::strukt("S")),
+    ]
+);
+
+// 6.3.15 If both the operands have void type, the result has void type.
+shaped!(
+    a_conditional_of_two_void_operands_is_void,
+    "void g(void); void h(void); void f(int c) { c ? g() : h(); }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        rv(Ty::func0(Ty::Void)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Void))),
+        rv(Ty::Void),
+        rv(Ty::func0(Ty::Void)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Void))),
+        rv(Ty::Void),
+        rv(Ty::Void),
+    ]
+);
+
+// 6.3.15 If one operand is a null pointer constant, the result has the type of the other operand.
+shaped!(
+    a_conditional_with_a_null_pointer_constant_takes_the_other_pointer_type,
+    "int *p; void f(int c) { c ? p : 0; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)),
+        rv(Ty::ptr(Ty::Int)),
+    ]
+);
+
+// 6.3.15 If one operand is a pointer to void, the other operand is converted to that type.
+shaped!(
+    a_conditional_of_a_void_pointer_and_an_object_pointer_is_a_void_pointer,
+    "void *vp; int *p; void f(int c) { c ? vp : p; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
+        lv(Ty::ptr(Ty::Int))
+            .then(LValueToRValue, Ty::ptr(Ty::Int))
+            .then(PointerConversion, Ty::ptr(Ty::Void)),
+        rv(Ty::ptr(Ty::Void)),
+    ]
+);
+
+// 6.1.2.6 If both types have parameter type lists, the type of each parameter in the composite
+// parameter type list is the composite type of the corresponding parameters.
+shaped!(
+    a_composite_parameter_list_composes_each_parameter,
+    "int g(int (*)[3]); int h(int (*)[]); void f(int c) { c ? g : h; }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        rv(Ty::func(Ty::Int, [Ty::ptr(Ty::arr(Ty::Int, 3))])).then(
+            FunctionToPointer,
+            Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::arr(Ty::Int, 3))]))
+        ),
+        rv(Ty::func(Ty::Int, [Ty::ptr(Ty::flex(Ty::Int))])).then(
+            FunctionToPointer,
+            Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::flex(Ty::Int))]))
+        ),
+        rv(Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::arr(Ty::Int, 3))]))),
+    ]
+);
+
+shaped!(
+    a_conditional_of_two_unspecified_functions_stays_unspecified,
+    "int g(); int h(); void f(int c) { c ? g : h; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))),
+        rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))),
+        rv(Ty::ptr(Ty::noproto(Ty::Int))),
+    ]
+);
+
+shaped!(
+    a_composite_prototype_keeps_the_ellipsis,
+    "int g(int, ...); int h(int, ...); void f(int c) { c ? g : h; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        rv(Ty::func_variadic(Ty::Int, [Ty::Int]))
+            .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
+        rv(Ty::func_variadic(Ty::Int, [Ty::Int]))
+            .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
+        rv(Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
+    ]
+);
+
+shaped!(
+    the_return_type_of_a_composite_function_is_composite,
+    "int (*g(void))[3]; int (*h(void))[]; void f(int c) { c ? g : h; }",
+    vec![
+        rv(Ty::Int),
+        rv(Ty::Int),
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        rv(Ty::func0(Ty::ptr(Ty::arr(Ty::Int, 3))))
+            .then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::ptr(Ty::arr(Ty::Int, 3))))),
+        rv(Ty::func0(Ty::ptr(Ty::flex(Ty::Int))))
+            .then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::ptr(Ty::flex(Ty::Int))))),
+        rv(Ty::ptr(Ty::func0(Ty::ptr(Ty::arr(Ty::Int, 3))))),
+    ]
+);
+
+shaped!(
+    a_null_pointer_constant_may_be_the_second_operand,
+    "int *p; void f(int c) { c ? 0 : p; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::ptr(Ty::Int)),
+    ]
+);
+
+shaped!(
+    a_void_pointer_may_be_the_third_operand,
+    "void *vp; int *p; void f(int c) { c ? p : vp; }",
+    vec![
+        lv(Ty::Int).then(LValueToRValue, Ty::Int),
+        lv(Ty::ptr(Ty::Int))
+            .then(LValueToRValue, Ty::ptr(Ty::Int))
+            .then(PointerConversion, Ty::ptr(Ty::Void)),
+        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
+        rv(Ty::ptr(Ty::Void)),
     ]
 );

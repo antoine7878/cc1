@@ -1,4 +1,5 @@
 use std::fmt;
+use std::iter::zip;
 
 use crate::arena::ResolveWith;
 use crate::ast::Tag;
@@ -45,8 +46,6 @@ pub struct QualifiedType {
 }
 
 impl ResolvedType {
-    // 6.1.2.5 An array type of unknown size is an incomplete type. A structure or union type of
-    // unknown content is an incomplete type.
     pub fn is_complete(&self, sema: &Sema) -> bool {
         match self {
             ResolvedType::Void => false,
@@ -212,6 +211,56 @@ impl QualifiedType {
         self.is_const >= other.is_const && self.is_volatile >= other.is_volatile
     }
 
+    pub fn composite(&self, sema: &mut Sema, other: &Self) -> Option<Self> {
+        if !self.is_compatible(sema, other) {
+            return None;
+        }
+        if self == other {
+            return Some(*self);
+        }
+        let l = self.id.resolve(sema).clone();
+        let r = other.id.resolve(sema).clone();
+        match (l, r) {
+            (ResolvedType::Array { elem: e1, len: l1 }, ResolvedType::Array { elem: e2, len: l2 }) => {
+                let elem = Self::composite(&e1, sema, &e2)?;
+                let ty = sema.types.array(elem, l1.or(l2));
+                Some(QualifiedType::new(ty, self.is_const, self.is_volatile))
+            }
+            (ResolvedType::Pointer(i1), ResolvedType::Pointer(i2)) => {
+                let inner = Self::composite(&i1, sema, &i2)?;
+                let ty = sema.types.pointer(inner);
+                Some(QualifiedType::new(ty, self.is_const, self.is_volatile))
+            }
+            (ResolvedType::Function { params: p1, ret: r1 }, ResolvedType::Function { params: p2, ret: r2 }) => {
+                let ret = Self::composite(&r1, sema, &r2)?;
+                let params = match (p1, p2) {
+                    (ParamTypes::Unspecified, ParamTypes::Unspecified) => ParamTypes::Unspecified,
+                    (p @ ParamTypes::Prototype { .. }, ParamTypes::Unspecified)
+                    | (ParamTypes::Unspecified, p @ ParamTypes::Prototype { .. }) => p,
+                    (
+                        ParamTypes::Prototype {
+                            params: p1,
+                            is_variadic,
+                        },
+                        ParamTypes::Prototype { params: p2, .. },
+                    ) => ParamTypes::Prototype {
+                        params: zip(&p1, &p2)
+                            .map(|(t1, t2)| QualifiedType::composite(t1, sema, t2))
+                            .collect::<Option<Vec<_>>>()?,
+                        is_variadic,
+                    },
+                };
+                let ty = sema.types.function(ret, params);
+                Some(QualifiedType::new(ty, self.is_const, self.is_volatile))
+            }
+            _ => Some(*self),
+        }
+    }
+
+    pub fn unqualified(&self) -> Self {
+        QualifiedType::new(self.id, false, false)
+    }
+
     pub fn is_compatible(&self, sema: &Sema, other: &Self) -> bool {
         self.same_qualifiers_as(other) && self.is_compatible_ignoring_qualifiers(sema, other)
     }
@@ -221,20 +270,13 @@ impl QualifiedType {
             return true;
         }
         match (self.id.resolve(sema), other.id.resolve(sema)) {
-            // 6.5.4.3 For two function types to be compatible, both shall specify compatible return types. Moreover...
             (ResolvedType::Function { ret: r1, params: p1 }, ResolvedType::Function { ret: r2, params: p2 }) => {
                 r1.is_compatible(sema, r2) && p1.is_compatible(sema, p2)
             }
-            // 6.5.4.2 For two array types to be compatible, both shall have compatible element types, and
-            // if both size specifiers are present, they shall have the same value.
             (ResolvedType::Array { elem: e1, len: l1 }, ResolvedType::Array { elem: e2, len: l2 }) => {
                 e1.is_compatible(sema, e2) && (l1.is_none() || l2.is_none() || l1 == l2)
             }
-            // 6.5.4.1 For two pointer types to be compatible, both shall be identically qualified and both
-            // shall be pointers to compatible types.
             (ResolvedType::Pointer(l), ResolvedType::Pointer(r)) => l.is_compatible(sema, r),
-            // 6.5.2.2 Each enumerated type shall be compatible with an integer type, the choice of type is
-            // implementation-defined.
             (ResolvedType::Tag(id), ResolvedType::Int) | (ResolvedType::Int, ResolvedType::Tag(id)) => {
                 (*id).resolve(sema).kind == Tag::Enum
             }
