@@ -39,10 +39,6 @@ pub enum CastKind {
     PointerConversion, // 6.3.16.1
 }
 
-// 6.2.2.1 an lvalue that does not have array type is converted to the value stored in the
-// designated object (and is no longer an lvalue). If the lvalue has qualified type, the value
-// has the unqualified version of the type of the lvalue.
-// 6.2.2.1 If the lvalue has an incomplete type and does not have array type, the behavior is undefined.
 pub fn lvalue_conversion(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
     function_to_pointer(sema, re);
     array_to_pointer(sema, re);
@@ -76,12 +72,6 @@ pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
     re.casts.push(ImplicitCast::new(CastKind::LValueToRValue, to));
 }
 
-// 6.2.1.1
-// A char, a short int. or an int bit-field. or their signed or unsigned varieties. or an
-// enumeration type. may be used in an expression wherever an int or unsigned int may be
-// used If an int can represent all values of the original type. the value is converted to an inf;
-// otherwise, it is converted to an unsigned int. These are called the integral p~wnotions.”
-// All other arithmetic types are unchanged by the integral promotions.
 pub fn promote(sema: &Sema, re: &mut ResolvedExpression) {
     use ResolvedType::*;
 
@@ -97,8 +87,6 @@ pub fn promote(sema: &Sema, re: &mut ResolvedExpression) {
     re.casts.push(ImplicitCast::new(kind, to));
 }
 
-// 6.2.2.1 If the lvalue has qualified type, the value has the unqualified version of the type
-// of the lvalue: otherwise, the value has the type of the lvalue.
 fn convert_type(ty: ResolvedTypeId) -> QualifiedType {
     QualifiedType::new(ty, false, false)
 }
@@ -149,7 +137,6 @@ pub fn arithmetic_conversion(sema: &Sema, from: QualifiedType, to: QualifiedType
     Some(ImplicitCast::new(kind, convert_type(to.id)))
 }
 
-// 6.2.1.5 Usual arithmetic conversions
 pub fn usual_arithmetic(
     sema: &mut Sema,
     lhs: &mut ResolvedExpression,
@@ -159,11 +146,9 @@ pub fn usual_arithmetic(
 
     let l = lhs.casted_ty().id.resolve(sema);
     let r = rhs.casted_ty().id.resolve(sema);
-    // 6.3.5 If both operands have arithmetic type, the usual arithmetic conversions are performed
     if !l.is_arithmetic(sema) || !r.is_arithmetic(sema) {
         return Ok((lhs.casted_ty(), RValue));
     }
-    // 6.2.1.5 Otherwise, the integral promotions are performed on both operands.
     if l.is_integral(sema) && r.is_integral(sema) {
         promote(sema, lhs);
         promote(sema, rhs);

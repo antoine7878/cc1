@@ -55,9 +55,6 @@ impl<'a> SymbolResolver<'a> {
         let name = decl.ident(ctx)?;
         let previous = self.sema.scopes.current(SymbolKind::Function, name.id);
         let declared = previous.and_then(|id| self.param_types(id));
-        // 6.5.4.3 If one type has a parameter type list and the other type is specified by a function
-        // definition that contains a (possibly empty) identifier list: the parameter half of that
-        // comparison needs the identifiers, so only the return type is compared here.
         let ty = match &declared {
             Some(declared) if !matches!(params, DeclaredParams::Prototype { .. }) => {
                 self.with_param_types(rty, declared.clone())
@@ -90,10 +87,6 @@ impl<'a> SymbolResolver<'a> {
         QualifiedType::new(self.sema.types.function(ret, params), ty.is_const, ty.is_volatile)
     }
 
-    // 6.5.4.3 If one type has a parameter type list and the other type is specified by a function
-    // definition that contains a (possibly empty) identifier list, both shall agree in the number of
-    // parameters, and the type of each prototype parameter shall be compatible with the type that results
-    // from the application of the default argument promotions to the type of the corresponding identifier.
     fn check_identifier_list(
         &mut self,
         declared: &ParamTypes,
@@ -227,7 +220,7 @@ impl SymbolResolver<'_> {
             return;
         }
         if let Expression::Identifier(name) = node.id.resolve(ctx) {
-            let sym = self.sema.scopes.lookup_ordinary(name.id); // Option<SymbolId>
+            let sym = self.sema.scopes.lookup_ordinary(name.id);
             if sym.is_none() {
                 self.add_diag(Diag::err((), Diagnosis::UndeclaredIdentifier(*name)), &node.span);
             }

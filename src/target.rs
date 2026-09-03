@@ -111,9 +111,6 @@ impl Target {
         })
     }
 
-    /// 6.1.3.2 Integer constants
-    /// The type of an integer constant is the first of the corresponding list in which its value
-    /// can be represented.
     pub fn fits(&self, value: u64, ty: &ResolvedType) -> bool {
         self.max_value(ty).is_some_and(|max| value <= max)
     }

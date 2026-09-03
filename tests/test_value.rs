@@ -16,13 +16,10 @@ impl FoldValue for Diag<Value> {
     }
 }
 
-/// `repr`'s common `Option<Value> -> String` formatting, wrapped for callers (like
-/// `fold!`/`fold_overflow!` below) that hand in either a bare `Value` or a `Diag<Value>`.
 fn repr(value: impl FoldValue) -> String {
     crate::common::repr(Some(value.fold_value()))
 }
 
-/// Folding is done for a target: on i386 int and long are both 32 bits.
 macro_rules! fold {
     ($name:ident, $method:ident($($arg:expr),* $(,)?), $expected:expr) => {
         #[test]
@@ -51,7 +48,6 @@ macro_rules! fold {
     };
 }
 
-/// A signed arithmetic result outside its type wraps and is reported (6.3).
 macro_rules! fold_overflow {
     ($name:ident, $method:ident($($arg:expr),* $(,)?), $expected:expr) => {
         #[test]
@@ -143,8 +139,6 @@ fold!(
     "UnsignedInt(1)"
 );
 fold!(add_promotes_to_long, add(Value::Int(1), Value::Long(1)), "Long(2)");
-// 6.2.1.5 a long int that cannot represent every unsigned int meets it at unsigned long int, which
-// is the case on i386 where both are 32 bits.
 fold!(
     unsigned_int_and_long_meet_at_unsigned_long_on_i386,
     add(Value::UnsignedInt(1), Value::Long(-1)),
@@ -175,7 +169,11 @@ fold!(
     "UnsignedInt(255)"
 );
 fold!(shift_left, shl(Value::Int(1), Value::Int(4)), "Int(16)");
-fold!(shift_left_into_sign_bit, shl(Value::Int(1), Value::Int(31)), "Int(-2147483648)");
+fold!(
+    shift_left_into_sign_bit,
+    shl(Value::Int(1), Value::Int(31)),
+    "Int(-2147483648)"
+);
 #[test]
 fn a_shift_count_at_or_past_the_operand_width_is_out_of_range() {
     let fold = Fold::new(&I386);
@@ -205,7 +203,6 @@ fold!(
     "UnsignedInt(4294967295)"
 );
 
-// 6.2.1.2 an integral conversion truncates to the width the target gives the destination type.
 fold!(convert_to_int, convert(Value::Long(300), Rank::Int), "Int(300)");
 fold!(
     convert_to_int_wraps,
@@ -242,7 +239,6 @@ fn a_wider_target_keeps_the_whole_value() {
     );
 }
 
-// 6.2.1.5 on a target whose long int represents every unsigned int the pair meets at long int.
 #[test]
 fn unsigned_int_and_long_meet_at_long_on_x86_64() {
     let fold = Fold::new(&X86_64);
@@ -357,7 +353,6 @@ fn every_operator_folds_in_sequence() {
     assert_eq!(repr(value), "Int(2)");
 }
 
-// 6.3.5 INT_MIN / -1 is not representable in the type of the operands.
 #[test]
 fn the_minimum_of_a_signed_type_is_recognised() {
     let fold = Fold::new(&I386);

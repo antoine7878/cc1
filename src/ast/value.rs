@@ -4,9 +4,7 @@ use crate::target::Target;
 use std::cmp::Ordering;
 use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Sub};
 
-// TODO add custom f80
-/// `PartialEq` compares the representation, which is what an AST node needs; comparing two
-/// constants the way C does is `Fold::eq`, since that needs the usual arithmetic conversions.
+// TODO: add custom f80
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Value {
     Int(i32),
@@ -82,9 +80,6 @@ impl Value {
         }
     }
 
-    /// 6.1.3.2 Integer constants
-    /// The type of an integer constant is the first of the corresponding list in which its value
-    /// can be represented.
     fn integer_candidates(suffix: &str, radix: u32) -> &'static [ResolvedType] {
         use ResolvedType::{Int, Long, UnsignedInt, UnsignedLong};
         match suffix {
@@ -184,7 +179,6 @@ impl Value {
         Diag::new(value, diagnosis)
     }
 
-    /// 6.1.3 Constants
     pub fn parse(s: &str, target: &Target) -> Diag<Self> {
         let lower = s.to_lowercase();
         if s.contains('\'') {
@@ -203,8 +197,6 @@ impl From<bool> for Value {
     }
 }
 
-/// 6.2.1.1 Characters and integers / 6.2.1.5 Usual arithmetic conversions
-/// The ranks are ordered so that the greater of two operand ranks is the common type.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Rank {
     Int,
@@ -346,17 +338,12 @@ impl Value {
     }
 }
 
-/// 6.2.1.5 Usual arithmetic conversions
-/// Folding needs the target: both the common type of two operands and the width a result is
-/// truncated to depend on the size of the integer types.
 pub struct Fold<'a> {
     target: &'a Target,
 }
 
 macro_rules! fold_arithmetic {
     ($method:ident, $trait:ident, $overflowing:ident) => {
-        /// 6.3 A signed result outside the range representable in its type is undefined; cc1 wraps
-        /// and reports it.
         pub fn $method(&self, lhs: Value, rhs: Value) -> Diag<Value> {
             let (value, overflow) = match self.usual(lhs, rhs) {
                 (Value::Int(a), Value::Int(b)) => {
@@ -444,8 +431,6 @@ impl<'a> Fold<'a> {
         Self { target }
     }
 
-    /// 6.2.1.5 The greater rank of the two operands is the common type, except that a long int
-    /// which cannot represent every value of an unsigned int meets it at unsigned long int.
     fn common(&self, lhs: Value, rhs: Value) -> Rank {
         let (l, r) = (lhs.rank(), rhs.rank());
         let rank = Rank::max(l, r);
@@ -465,13 +450,10 @@ impl<'a> Fold<'a> {
         (self.convert(lhs, rank), self.convert(rhs, rank))
     }
 
-    /// A result is representable in the type of the operands it was computed from.
     fn narrow(&self, value: Value) -> Value {
         self.convert(value, value.rank())
     }
 
-    /// 6.2.1.2 When a value of integral type is converted to another integral type, the value is
-    /// truncated to the width the target gives that type.
     pub fn convert(&self, value: Value, rank: Rank) -> Value {
         match rank {
             Rank::Float => Value::Float(value.to_f64() as f32),
@@ -494,8 +476,6 @@ impl<'a> Fold<'a> {
         }
     }
 
-    /// 6.3.7 The right operand of a shift shall be nonnegative and less than the width in bits of
-    /// the promoted left operand.
     pub fn shift_out_of_range(&self, lhs: Value, rhs: Value) -> bool {
         let count = self.convert(rhs, rhs.rank().to_integer()).to_i64();
         self.target
@@ -503,7 +483,6 @@ impl<'a> Fold<'a> {
             .is_none_or(|width| count < 0 || count >= i64::from(width))
     }
 
-    /// 6.3.5 The result of INT_MIN / -1 is not representable in the type of the operands.
     pub fn is_min(&self, value: Value) -> bool {
         let ty = value.rank().resolved();
         self.target.is_signed(&ty)
@@ -543,7 +522,6 @@ impl<'a> Fold<'a> {
         self.narrow(value)
     }
 
-    /// 6.3.5 The operands of the % operator shall have integral type.
     pub fn rem(&self, lhs: Value, rhs: Value) -> Value {
         let value = match self.usual_integer(lhs, rhs) {
             (Value::Int(a), Value::Int(b)) => Value::Int(a.checked_rem(b).unwrap_or(0)),

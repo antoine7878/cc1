@@ -1,5 +1,3 @@
-// ---- 6.5.2.1 scalar members are laid out in declaration order -------------
-
 size!(size_single_char, "struct S { char a; };", "struct S", 1);
 
 size!(size_single_short, "struct S { short a; };", "struct S", 2);
@@ -13,8 +11,6 @@ size!(size_single_pointer, "struct S { int *p; };", "struct S", 4);
 size!(size_three_chars, "struct S { char a; char b; char c; };", "struct S", 3);
 
 size!(size_two_ints, "struct S { int a; int b; };", "struct S", 8);
-
-// ---- a member is padded up to its own alignment ---------------------------
 
 size!(size_char_then_short, "struct S { char a; short b; };", "struct S", 4);
 
@@ -32,8 +28,6 @@ size!(size_short_then_int, "struct S { short a; int b; };", "struct S", 8);
 size!(size_char_then_double, "struct S { char a; double b; };", "struct S", 12);
 
 size!(size_char_then_pointer, "struct S { char a; int *p; };", "struct S", 8);
-
-// ---- the struct is padded up to the alignment of its widest member --------
 
 size!(size_int_then_char, "struct S { int a; char b; };", "struct S", 8);
 
@@ -57,8 +51,6 @@ size!(
     16
 );
 
-// ---- 6.5.2.1 a union is as large as its widest member ---------------------
-
 size!(size_union_char_int, "union U { char a; int b; };", "union U", 4);
 
 size!(size_union_char_double, "union U { char a; double b; };", "union U", 8);
@@ -74,13 +66,9 @@ size!(
 
 size!(size_union_of_bitfield, "union U { int a:3; char b; };", "union U", 4);
 
-// ---- array members contribute their whole extent -------------------------
-
 size!(size_array_of_char, "struct S { char a[3]; };", "struct S", 3);
 size!(size_array_then_int, "struct S { char a[3]; int b; };", "struct S", 8);
 size!(size_array_of_int, "struct S { int a[4]; };", "struct S", 16);
-
-// ---- an aggregate member keeps its own layout ----------------------------
 
 size!(
     size_nested_struct,
@@ -103,8 +91,6 @@ size!(
     8
 );
 
-// ---- 6.5.2.2 an enumeration has the size of int --------------------------
-
 size!(size_enum, "enum E { A };", "enum E", 4);
 
 size!(
@@ -113,8 +99,6 @@ size!(
     "struct S",
     8
 );
-
-// ---- an array is aligned like its element, not like its extent ------------
 
 size!(
     size_char_then_double_array,
@@ -129,8 +113,6 @@ size!(
     "struct S",
     28
 );
-
-// ---- 6.5.2.1 bit-fields are packed in bits inside an int allocation unit --
 
 size!(size_bitfield_single, "struct S { int a:3; };", "struct S", 4);
 
@@ -158,8 +140,6 @@ size!(
 size!(size_char_then_bitfield, "struct S { char c; int a:1; };", "struct S", 4);
 
 size!(size_bitfield_then_char, "struct S { int a:1; char c; };", "struct S", 4);
-
-// ---- 6.5.2.1 an unnamed bit-field takes up bits but is never named -------
 
 macro_rules! unnamed_size {
     ($name:ident, $decl:expr, $ty:expr, $expected:expr) => {
@@ -197,8 +177,6 @@ unnamed_size!(
     "struct S",
     4
 );
-
-// ---- an unnamed bit-field does not raise the alignment of the aggregate ---
 
 unnamed_size!(
     size_unnamed_bitfield_keeps_alignment,

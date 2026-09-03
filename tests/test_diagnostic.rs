@@ -379,7 +379,6 @@ fn source_line_reads_the_file_only_once() {
 
     assert_eq!(ctx.source_line(name, 2).as_deref(), Some("second"));
     fs::remove_file(&path).unwrap();
-    // The line is served from the cache even though the file is now gone.
     assert_eq!(ctx.source_line(name, 2).as_deref(), Some("second"));
 }
 

@@ -2,8 +2,6 @@ use crate::ast::{
     DeclaratorArena, EnumArena, ExpressionArena, StatementArena, StringArena, StructArena, UnionArena, VariantArena,
 };
 
-/// Arenas for AST nodes, populated by the lexer and parser and never mutated
-/// afterwards. Arenas produced by later phases live elsewhere (e.g. `Sema`).
 #[derive(Debug, Default)]
 pub struct AstArenas {
     pub names: StringArena,

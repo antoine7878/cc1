@@ -70,8 +70,6 @@ fn operands(
     Ok((lhs, rhs))
 }
 
-/// 6.3.5 The second operand of / and % shall not be zero, and the result shall be representable in
-/// the type of the operands.
 fn divisor(sema: &Sema, lhs: Value, rhs: Value, op: BinaryOp) -> Result<(), Diagnosis> {
     if rhs.is_zero() {
         match op {
@@ -87,8 +85,6 @@ fn divisor(sema: &Sema, lhs: Value, rhs: Value, op: BinaryOp) -> Result<(), Diag
     }
 }
 
-/// 6.3.7 Bitwise shift operators
-/// The right operand shall be nonnegative and less than the width in bits of the promoted left operand.
 fn shift_count(sema: &Sema, lhs: Value, rhs: Value) -> Result<(), Diagnosis> {
     match Fold::new(&sema.target).shift_out_of_range(lhs, rhs) {
         true => Err(Diagnosis::Poisoned),
@@ -219,8 +215,6 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSi
             }
         }
         Expression::Cast(ty_node, operand) => {
-            // 6.3.4's scalar-target constraint is already checked (and, if violated, reported)
-            // by the type pass, which fully covers Cast; don't re-derive and re-diagnose it here.
             if sema.expr_poisoned(expr.id) {
                 return Err(Diagnosis::Poisoned);
             }

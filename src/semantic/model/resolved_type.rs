@@ -59,7 +59,6 @@ impl ResolvedType {
         self == &ResolvedType::Void
     }
 
-    // 6.1.2.5 Arithmetic types and pointer types are collectively called scalar types.
     pub fn is_scalar(&self, sema: &Sema) -> bool {
         self.is_arithmetic(sema) || self.is_pointer()
     }
@@ -298,7 +297,6 @@ impl QualifiedType {
         self.id.resolve(sema).is_complete(sema)
     }
 
-    // 6.1.2.5 Arithmetic types and pointer types are collectively called scalar types.
     pub fn is_scalar(&self, sema: &Sema) -> bool {
         self.id.resolve(sema).is_scalar(sema)
     }

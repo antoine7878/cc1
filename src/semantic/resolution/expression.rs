@@ -59,8 +59,6 @@ fn check_assignable(lhs: &ResolvedExpression) -> Result<(), Diagnosis> {
     Ok(())
 }
 
-// 6.2.2.3 An integral constant expression with the value 0, or such an expression cast to type
-// void *, is called a null pointer constant.
 fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> bool {
     let mut node = node;
     if let Expression::Cast(ty_node, op) = node.id.resolve(ctx) {
@@ -75,8 +73,6 @@ fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNod
     re.ty.is_integer(sema) && try_fold(sema, ctx, node).is_some_and(|v| v.is_zero())
 }
 
-// 6.1.2.5 The qualified or unqualified versions of a type are distinct types that belong to the
-// same type category and have the same representation and alignment requirements.
 fn is_void_pointer(sema: &Sema, qualif: QualifiedType) -> bool {
     let ResolvedType::Pointer(inner) = qualif.id.resolve(sema) else { return false };
     inner.is_void(sema) && !qualif.is_const && !qualif.is_volatile && !inner.is_const && !inner.is_volatile
@@ -193,9 +189,6 @@ fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &e.span);
     check_assignable(re)?;
-    // 6.3.6 For addition, either both operands shall have arithmetic type, or one operand shall
-    // be a pointer to an object type and the other shall have integral type. (Incrementing is
-    // equivalent to adding 1.)
     if let ResolvedType::Pointer(inner) = re.ty.id.resolve(sema)
         && !inner.is_object(sema)
     {
@@ -262,10 +255,6 @@ fn indirection(sema: &mut Sema, e: &ExpressionNode) -> R {
     if inner.is_void(sema) {
         return Err(Diagnosis::IncompleteType(*inner));
     }
-    // 6.3.3.2 If the operand points to a function, the result is a function designator; if it
-    // points to an object, the result is an lvalue designating the object.
-    // 6.2.2.1 An lvalue is an expression (with an object type or an incomplete type other than
-    // void) that designates an object.
     let kind = if inner.is_function(sema) { RValue } else { LValue };
     Ok((*inner, kind))
 }
@@ -295,9 +284,6 @@ fn logic_not(sema: &mut Sema, e: &ExpressionNode) -> R {
 fn size_of_e(sema: &mut Sema, e: &ExpressionNode) -> R {
     let mut ops = Operands::take(sema, [e])?;
     let (sema, [re]) = ops.parts();
-    // 6.3.3.4 The sizeof operator shall not be applied to an expression that has function type
-    // or an incomplete type, to the parenthesized name of such a type, or to an lvalue that
-    // designates a bit-field object.
     if is_bit_field(sema, sema.binding(e.id)) {
         return Err(Diagnosis::SizeofBitfield);
     }
@@ -583,9 +569,6 @@ fn conditional_type(
     if l.is_arithmetic(sema) && r.is_arithmetic(sema) {
         return cast::usual_arithmetic(sema, lhs, rhs);
     }
-    // 6.3.15 both operands have compatible structure or union types.
-    // 6.2.2.1 If the lvalue has qualified type, the value has the unqualified version of the
-    // type of the lvalue.
     if l.is_tag() && r.is_tag() && l_ty.is_compatible(sema, &r_ty) {
         return Ok((l_ty, RValue));
     }
@@ -675,14 +658,6 @@ fn additive_assignment(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode
     cast::lvalue_conversion(sema, rhs, &e2.span);
     additive_assignation_type(sema, lhs, rhs, &e1.span)
 }
-
-// For the operators += and -= only.
-// either the left operand shall be a pointer to an object type and the right shall have integra1 type,
-//
-// or the left operand shall have qualified or unqualified arithmetic type and the right shall have arithmetic type.
-//
-// For the other operators, each operand shall have arithmetic type consistent with those allowed
-// by the corresponding binary operator.
 
 fn additive_assignation_type(
     sema: &mut Sema,

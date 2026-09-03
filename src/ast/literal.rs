@@ -58,8 +58,6 @@ impl StringLiteralNode {
 }
 
 impl StringArena {
-    /// 6.1.4 String literals
-    /// The token still carries its optional `L` prefix and its delimiters.
     pub fn literal(&mut self, text: &str, span: Span) -> StringLiteralNode {
         let is_wide = text.starts_with('L');
         let constructor = if is_wide { StringLiteral::new_wide } else { StringLiteral::new };
@@ -68,8 +66,6 @@ impl StringArena {
         StringLiteralNode::new(constructor(name), span)
     }
 
-    /// 6.1.4 String literals
-    /// Adjacent character string literal tokens are concatenated into a single literal.
     pub fn concat(&mut self, lhs: StringLiteralNode, rhs: StringLiteralNode, span: Span) -> StringLiteralNode {
         let is_wide = lhs.is_wide() || rhs.is_wide();
         let constructor = if is_wide { StringLiteral::new_wide } else { StringLiteral::new };

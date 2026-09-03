@@ -10,8 +10,6 @@ use crate::semantic::{
     SymbolKind, TagDefId, constrain, ice,
 };
 
-/// 6.5.2 Type specifiers
-/// Each list of type specifiers shall be one of the following sets...
 pub fn base_type(
     sema: &mut Sema,
     ctx: &Context,
@@ -119,9 +117,6 @@ fn resolve_params(sema: &mut Sema, ctx: &Context, params: &FunctionParametersNod
     }
 }
 
-/// 6.5.4.3 Function declarators
-/// The special case of an unnamed parameter of type void as the only item in the list specifies
-/// that the function has no parameters.
 fn resolve_prototype(
     sema: &mut Sema,
     ctx: &Context,
