@@ -1839,3 +1839,162 @@ rejects_shaped!(
         none(),
     ]
 );
+
+// ---- 6.3.8 relational operators ------------------------------------------
+
+// 6.3.8 both operands are pointers to qualified or unqualified versions of compatible object
+// types.
+shaped!(
+    pointers_to_compatible_object_types_may_be_ordered,
+    "int *p; int *q; void f(void) { p < q; }",
+    vec![
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    ordering_pointers_disregards_the_qualifiers_of_the_pointed_to_type,
+    "const int *p; int *q; void f(void) { p < q; }",
+    vec![
+        lv(Ty::ptr(Ty::konst(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Int))),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.8 both operands are pointers to qualified or unqualified versions of compatible incomplete
+// types.
+shaped!(
+    pointers_to_an_incomplete_structure_may_be_ordered,
+    "struct S; struct S *p; struct S *q; void f(void) { p >= q; }",
+    vec![
+        lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
+        lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.1.2.5 The void type comprises an empty set of values. it is an incomplete type that cannot be
+// completed.
+shaped!(
+    pointers_to_void_may_be_ordered,
+    "void *p; void *q; void f(void) { p > q; }",
+    vec![
+        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
+        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.1.2.5 Types are partitioned into object types, function types, and incomplete types: a
+// function type is neither of the two the constraint admits.
+rejects_shaped!(
+    pointers_to_functions_may_not_be_ordered,
+    "int (*p)(void); int (*q)(void); void f(void) { p < q; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![
+        lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))),
+        lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))),
+        none(),
+    ]
+);
+
+rejects_shaped!(
+    pointers_to_incompatible_types_may_not_be_ordered,
+    "int *p; unsigned *q; void f(void) { p < q; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        lv(Ty::ptr(Ty::UInt)).then(LValueToRValue, Ty::ptr(Ty::UInt)),
+        none(),
+    ]
+);
+
+// ---- 6.3.9 equality operators --------------------------------------------
+
+// 6.3.9 one operand is a pointer and the other is a null pointer constant.
+shaped!(
+    a_pointer_compared_to_a_null_pointer_constant_converts_the_constant,
+    "int *p; void f(void) { p == 0; }",
+    vec![
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    a_null_pointer_constant_may_be_the_left_operand,
+    "int *p; void f(void) { 0 != p; }",
+    vec![
+        rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)),
+        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.9 puts no restriction on the pointed to type of the pointer compared to a null pointer
+// constant.
+shaped!(
+    a_pointer_to_a_function_may_be_compared_to_a_null_pointer_constant,
+    "int (*p)(void); void f(void) { p == 0; }",
+    vec![
+        lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))),
+        rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::func0(Ty::Int))),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.9 one of the operands is a pointer to an object or incomplete type and the other has type
+// pointer to a qualified or unqualified version of void; the pointer to an object or incomplete
+// type is converted to the type of the other operand.
+shaped!(
+    an_object_pointer_compared_to_a_void_pointer_is_converted_to_void_pointer,
+    "void *v; int *p; void f(void) { v == p; }",
+    vec![
+        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
+        lv(Ty::ptr(Ty::Int))
+            .then(LValueToRValue, Ty::ptr(Ty::Int))
+            .then(PointerConversion, Ty::ptr(Ty::Void)),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    an_incomplete_pointer_compared_to_a_void_pointer_is_converted_to_void_pointer,
+    "struct S; struct S *p; void *v; void f(void) { p != v; }",
+    vec![
+        lv(Ty::ptr(Ty::strukt_incomplete("S")))
+            .then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S")))
+            .then(PointerConversion, Ty::ptr(Ty::Void)),
+        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
+        rv(Ty::Int),
+    ]
+);
+
+shaped!(
+    comparing_a_qualified_pointer_to_a_void_pointer_discards_its_qualifiers,
+    "void *v; const int *p; void f(void) { v == p; }",
+    vec![
+        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
+        lv(Ty::ptr(Ty::konst(Ty::Int)))
+            .then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Int)))
+            .then(PointerConversion, Ty::ptr(Ty::Void)),
+        rv(Ty::Int),
+    ]
+);
+
+// 6.3.9 admits a pointer to an object or incomplete type against a pointer to void, never a
+// pointer to a function type.
+rejects_shaped!(
+    a_pointer_to_a_function_may_not_be_compared_to_a_void_pointer,
+    "void *v; int (*p)(void); void f(void) { v == p; }",
+    Diagnosis::InvalidBinaryOperand(_, _),
+    vec![
+        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
+        lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))),
+        none(),
+    ]
+);
