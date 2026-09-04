@@ -1,8 +1,10 @@
-use crate::arena::ResolveMutWith;
+use crate::ast::StringId;
 use crate::ast::visit::walk_translation_unit;
 use crate::context::Context;
+use crate::semantic::sema::External;
 use crate::semantic::{
-    Diagnosis, Linkage, QualifiedType, ResolvedType, ScopeKind, Sema, SymbolResolver, eval, mark_uses,
+    Definition, Diag, DiagCollector, Diagnosis, Linkage, QualifiedType, ResolvedType, ScopeKind, Sema, SymbolResolver,
+    eval, mark_uses,
 };
 
 pub struct Analyzer;
@@ -13,6 +15,7 @@ impl Analyzer {
         Self::resolve_names(&mut sema, &ctx);
         eval::check_constants(&mut sema, &ctx);
         mark_uses(&mut sema, &ctx);
+        finish(&mut sema);
         ctx.diagnosis.append(&mut sema.diagnosis);
         ctx.sema = sema;
         ctx
@@ -28,41 +31,41 @@ impl Analyzer {
     }
 }
 
-fn finish(sema: &mut Sema) -> Result<(), Diagnosis> {
-    for ext in sema.externals.values() {
+fn finish(sema: &mut Sema) {
+    let mut entries: Vec<(StringId, External)> =
+        sema.externals.iter().map(|(&name, ext)| (name, ext.clone())).collect();
+    entries.sort_by_key(|(_, ext)| {
+        let p = ext.tentative.or(ext.defined).unwrap_or_default().start;
+        (p.file, p.line, p.col)
+    });
+    for (i, ext) in entries {
         let sym_id = ext.symbol;
-        let sym = sema.symbols.get(sym_id);
-        let Some(qty) = sym.ty else { continue };
-        // if Object and defined_at is unset and tentative_at is set:
-        if qty.is_object(sema) && ext.defined.is_none() && ext.tentative.is_some() {
+        let Some(mut qty) = sema.symbols.get(sym_id).ty else { continue };
+        let mut defined = ext.defined;
+        if !qty.is_function(sema)
+            && defined.is_none()
+            && let Some(span) = ext.tentative
+        {
             let ty = sema.types.get(qty.id);
-            // if type is an array of unknown size -> complete it with one element
             if let ResolvedType::Array { elem, len: None } = ty {
                 let ty = sema.types.array(*elem, Some(1));
-                sema.symbols.get_mut(sym_id).ty = Some(QualifiedType::new(ty, false, false));
+                qty = QualifiedType::new(ty, qty.is_const, qty.is_volatile);
+                sema.symbols.get_mut(sym_id).ty = Some(qty);
             }
-            let ty = sema.types.get(qty.id);
-            // if type is still incomplete -> error TentativeNeverCompleted(name, type)
-            if !ty.is_complete(sema) {
-                return Err(Diagnosis::DivisionByZero);
+            if !qty.is_complete(sema) {
+                sema.add_diag(Diag::err((), Diagnosis::TentativeNeverCompleted(qty)), &span);
+                continue;
             }
-            // else mark defined, with an implicit all-zero initialiser
+            sema.symbols.get_mut(sym_id).definition = Definition::Definition;
+            defined = Some(span);
+            if let Some(e) = sema.externals.get_mut(&i) {
+                e.defined = Some(span);
+            }
         }
         let sym = sema.symbols.get(sym_id);
-        // if used and defined_at is unset and linkage is Internal:
-        if sym.used && ext.defined.is_none() && sym.linkage == Linkage::Internal {
-            // error InternalNeverDefined(kind, name)
-            return Err(Diagnosis::DivisionByZero);
+        if sym.used && defined.is_none() && sym.linkage == Linkage::Internal {
+            let span = sym.name.span;
+            sema.add_diag(Diag::err((), Diagnosis::InternalNeverDefined(sym.name)), &span);
         }
     }
-    Ok(())
 }
-
-// finish_unit():
-//     for each entry:
-//         if Object and defined_at is unset and tentative_at is set:
-//             if type is an array of unknown size -> complete it with one element
-//             if type is still incomplete -> error TentativeNeverCompleted(name, type)
-//             else mark defined, with an implicit all-zero initialiser
-//         if used and defined_at is unset and linkage is Internal:
-//             error InternalNeverDefined(kind, name)

@@ -1,6 +1,7 @@
-int arr[];
 
-int main(void) {
-	arr[2] = 1;
-	return 0;
+
+static int sf(void);
+
+int use(void) {
+	return sf();
 }

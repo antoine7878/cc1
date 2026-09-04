@@ -303,12 +303,19 @@ tree!(
     "a",
     Ty::arr(Ty::arr(Ty::arr(Ty::Int, 7), 5), 3)
 );
-tree!(describe_incomplete_array, "int a[];", "a", Ty::flex(Ty::Int));
+tree!(describe_incomplete_array, "extern int a[];", "a", Ty::flex(Ty::Int));
 tree!(
     describe_incomplete_array_of_array,
-    "int a[][5];",
+    "extern int a[][5];",
     "a",
     Ty::flex(Ty::arr(Ty::Int, 5))
+);
+tree!(describe_tentative_array_completed, "int a[];", "a", Ty::arr(Ty::Int, 1));
+tree!(
+    describe_tentative_array_of_array_completed,
+    "int a[][5];",
+    "a",
+    Ty::arr(Ty::arr(Ty::Int, 5), 1)
 );
 tree!(
     describe_array_of_pointer,
