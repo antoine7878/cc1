@@ -8,14 +8,7 @@ use crate::define_interner;
 use crate::semantic::{ParamTypes, Sema, TagDefId};
 use crate::target::Target;
 
-define_interner!(
-    ResolvedType,
-    ResolvedTypeArena,
-    ResolvedTypeId,
-    crate::semantic::Sema,
-    sema,
-    types
-);
+define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, Sema, sema, types);
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum ResolvedType {

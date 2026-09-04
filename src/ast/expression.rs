@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use crate::ast::{
-    BinaryOp, DeclarationSpecifier, DeclaratorNode, MemberOp, Name, StringLiteralNode, UnaryOp, ValueNode,
+    AstArenas, BinaryOp, DeclarationSpecifier, DeclaratorNode, MemberOp, Name, StringLiteralNode, UnaryOp, ValueNode,
 };
 use crate::parser::Span;
 use crate::{ast_node, define_arena};
@@ -10,7 +10,7 @@ define_arena!(
     Expression,
     ExpressionArena,
     ExpressionId,
-    crate::ast::AstArenas,
+    AstArenas,
     arenas,
     expressions
 );

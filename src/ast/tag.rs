@@ -1,19 +1,12 @@
-use crate::ast::{DeclarationSpecifier, DeclaratorNode, ExpressionNode, Name};
+use crate::ast::{AstArenas, DeclarationSpecifier, DeclaratorNode, ExpressionNode, Name};
 use crate::parser::Span;
 use crate::utils::{BLUE, RESET};
 use crate::{ast_node, define_arena};
 
-define_arena!(Struct, StructArena, StructId, crate::ast::AstArenas, arenas, structs);
-define_arena!(Union, UnionArena, UnionId, crate::ast::AstArenas, arenas, unions);
-define_arena!(Enum, EnumArena, EnumId, crate::ast::AstArenas, arenas, enums);
-define_arena!(
-    Variant,
-    VariantArena,
-    VariantId,
-    crate::ast::AstArenas,
-    arenas,
-    variants
-);
+define_arena!(Struct, StructArena, StructId, AstArenas, arenas, structs);
+define_arena!(Union, UnionArena, UnionId, AstArenas, arenas, unions);
+define_arena!(Enum, EnumArena, EnumId, AstArenas, arenas, enums);
+define_arena!(Variant, VariantArena, VariantId, AstArenas, arenas, variants);
 
 ast_node! {
     pub struct Struct {

@@ -5,7 +5,7 @@ use crate::ast::visit::{
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Expression, ExpressionNode,
     FunctionDefinitionNode, InitDeclaratorNode, Initializer, InitializerNode, JumpStatement, JumpStatementNode,
-    Labeled, LabeledStatementNode, Name, Storage, TypeSpecifier,
+    Labeled, LabeledStatementNode, Name, Storage, Tag, TypeSpecifier,
 };
 use crate::context::Context;
 use crate::parser::Span;
@@ -259,6 +259,26 @@ impl SymbolResolver<'_> {
         }
         expression::resolve_expression(self.sema, ctx, node);
     }
+
+    fn walk(self, ty: ResolvedType, cursor: bool) {
+        let target = match ty {
+            ResolvedType::Tag(tag_id) if matches!(tag_id.resolve(self.sema).kind, Tag::Struct | Tag::Union) => (),
+            ResolvedType::Array { elem, len } => elem,
+            _ => [ty],
+        };
+        for t in target {
+            if 
+        }
+    }
+
+    // walk(ty, cursor):
+    // if ty is struct/union: targets = members (union: first member only)
+    // elif ty is array:      targets = elements
+    // else:                  targets = [ty]           # scalar
+    // for each target:
+    //     if next initializer is a brace list -> recurse into it, must not overflow
+    //     else -> consume flat items from the cursor (brace elision)
+    // leftover initializers -> ExcessInitializers      # 6.5.7 "no more initializers than objects"
 
     fn resolve_initializer(&mut self, ctx: &Context, ty: QualifiedType, node: &InitializerNode) {
         match &node.init {

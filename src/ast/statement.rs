@@ -1,17 +1,10 @@
 use std::fmt::Display;
 
-use crate::ast::{DeclarationNode, ExpressionNode, Name};
+use crate::ast::{AstArenas, DeclarationNode, ExpressionNode, Name};
 use crate::parser::Span;
 use crate::{ast_node, define_arena};
 
-define_arena!(
-    Statement,
-    StatementArena,
-    StatementId,
-    crate::ast::AstArenas,
-    arenas,
-    statements
-);
+define_arena!(Statement, StatementArena, StatementId, AstArenas, arenas, statements);
 
 ast_node! {
     pub struct StatementNode {

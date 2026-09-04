@@ -5,9 +5,9 @@ use crate::arena::{ResolveMutWith, ResolveWith};
 use crate::ast::{DeclaratorId, ExpressionId, Name, StringId, Tag, Value};
 use crate::parser::Span;
 use crate::semantic::{
-    Builtins, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, Linkage, QualifiedType,
-    ResolvedExpression, ResolvedTypeArena, ResolvedTypeId, ScopeKind, Scopes, Symbol, SymbolArena, SymbolId,
-    SymbolKind, TagDefArena, TagDefId,
+    Builtins, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, InitilizerArena, Linkage,
+    QualifiedType, ResolvedExpression, ResolvedTypeArena, ResolvedTypeId, ScopeKind, Scopes, Symbol, SymbolArena,
+    SymbolId, SymbolKind, TagDefArena, TagDefId,
 };
 use crate::target::{Layout, Target};
 
@@ -38,6 +38,7 @@ pub struct Sema {
     pub builtins: Builtins,
     pub tags: TagDefArena,
     pub functions: FunctionDefArena,
+    pub inits: InitilizerArena,
 
     exprs: Vec<ExprFacts>,
     pub declarations: HashMap<DeclaratorId, SymbolId>,
@@ -60,6 +61,7 @@ impl Default for Sema {
             builtins,
             tags: TagDefArena::default(),
             functions: FunctionDefArena::default(),
+            inits: InitilizerArena::default(),
 
             exprs: Vec::new(),
             declarations: HashMap::default(),

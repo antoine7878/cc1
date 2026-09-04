@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::ast::{DeclarationSpecifier, ExpressionNode, FunctionParametersNode, Name, Qualifier};
+use crate::ast::{AstArenas, DeclarationSpecifier, ExpressionNode, FunctionParametersNode, Name, Qualifier};
 use crate::context::Context;
 use crate::parser::Span;
 use crate::{ast_node, define_arena};
@@ -9,7 +9,7 @@ define_arena!(
     Declarator,
     DeclaratorArena,
     DeclaratorId,
-    crate::ast::AstArenas,
+    AstArenas,
     arenas,
     declarators
 );

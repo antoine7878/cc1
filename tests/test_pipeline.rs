@@ -52,7 +52,7 @@ fn a_pass_that_reports_an_error_does_not_stop_the_pipeline() {
 
 #[test]
 fn a_check_after_an_error_stops_the_pipeline() {
-    let pipeline = Pipeline::default().pass(mark).pass(fail).check();
+    let pipeline = Pipeline::default().pass(mark).pass(fail).checkpoint();
     assert!(pipeline.stopped());
     let (ctx, stopped) = pipeline.pass(mark).pass(mark).finish();
     assert_eq!(ctx.file_name, "m");
@@ -62,7 +62,7 @@ fn a_check_after_an_error_stops_the_pipeline() {
 
 #[test]
 fn a_check_stays_stopped_once_an_earlier_pass_failed() {
-    let pipeline = Pipeline::default().pass(fail).check().pass(mark).check();
+    let pipeline = Pipeline::default().pass(fail).checkpoint().pass(mark).checkpoint();
     assert!(pipeline.stopped());
     let (ctx, _) = pipeline.finish();
     assert_eq!(ctx.file_name, "");
@@ -70,7 +70,7 @@ fn a_check_stays_stopped_once_an_earlier_pass_failed() {
 
 #[test]
 fn a_check_on_a_clean_pipeline_leaves_it_running() {
-    let pipeline = Pipeline::default().pass(mark).check();
+    let pipeline = Pipeline::default().pass(mark).checkpoint();
     assert!(!pipeline.failed());
     assert!(!pipeline.stopped());
     let (ctx, stopped) = pipeline.pass(mark).finish();
@@ -93,7 +93,7 @@ fn a_report_runs_after_an_error_until_a_check_stops_the_pipeline() {
         .pass(mark)
         .pass(fail)
         .report(tap_checked)
-        .check()
+        .checkpoint()
         .report(tap_checked)
         .finish();
     assert_eq!(CHECKED.load(Ordering::SeqCst), 2);

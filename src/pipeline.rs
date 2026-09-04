@@ -26,7 +26,7 @@ impl Pipeline {
         self
     }
 
-    pub fn check(mut self) -> Self {
+    pub fn checkpoint(mut self) -> Self {
         self.stopped |= self.failed();
         self
     }
