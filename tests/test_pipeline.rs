@@ -6,6 +6,7 @@ use cc1::pipeline::Pipeline;
 use cc1::semantic::{Diagnosis, DiagnosisNode, ExpectedTokens};
 
 static TAPPED: AtomicUsize = AtomicUsize::new(0);
+static CHECKED: AtomicUsize = AtomicUsize::new(0);
 
 fn mark(mut ctx: Context) -> Context {
     ctx.file_name.push('m');
@@ -27,6 +28,10 @@ fn tap(ctx: &Context) {
     TAPPED.fetch_add(ctx.file_name.len() + 1, Ordering::SeqCst);
 }
 
+fn tap_checked(ctx: &Context) {
+    CHECKED.fetch_add(ctx.file_name.len() + 1, Ordering::SeqCst);
+}
+
 #[test]
 fn a_clean_pipeline_runs_every_pass_in_order() {
     let (ctx, stopped) = Pipeline::default().pass(mark).pass(mark).pass(mark).finish();
@@ -35,8 +40,19 @@ fn a_clean_pipeline_runs_every_pass_in_order() {
 }
 
 #[test]
-fn a_pass_that_reports_an_error_stops_the_pipeline() {
+fn a_pass_that_reports_an_error_does_not_stop_the_pipeline() {
     let pipeline = Pipeline::default().pass(mark).pass(fail);
+    assert!(pipeline.failed());
+    assert!(!pipeline.stopped());
+    let (ctx, stopped) = pipeline.pass(mark).pass(mark).finish();
+    assert_eq!(ctx.file_name, "mmm");
+    assert_eq!(ctx.diagnosis.len(), 1);
+    assert!(!stopped);
+}
+
+#[test]
+fn a_check_after_an_error_stops_the_pipeline() {
+    let pipeline = Pipeline::default().pass(mark).pass(fail).check();
     assert!(pipeline.stopped());
     let (ctx, stopped) = pipeline.pass(mark).pass(mark).finish();
     assert_eq!(ctx.file_name, "m");
@@ -45,11 +61,43 @@ fn a_pass_that_reports_an_error_stops_the_pipeline() {
 }
 
 #[test]
+fn a_check_stays_stopped_once_an_earlier_pass_failed() {
+    let pipeline = Pipeline::default().pass(fail).check().pass(mark).check();
+    assert!(pipeline.stopped());
+    let (ctx, _) = pipeline.finish();
+    assert_eq!(ctx.file_name, "");
+}
+
+#[test]
+fn a_check_on_a_clean_pipeline_leaves_it_running() {
+    let pipeline = Pipeline::default().pass(mark).check();
+    assert!(!pipeline.failed());
+    assert!(!pipeline.stopped());
+    let (ctx, stopped) = pipeline.pass(mark).finish();
+    assert_eq!(ctx.file_name, "mm");
+    assert!(!stopped);
+}
+
+#[test]
 fn a_pass_that_reports_nothing_leaves_the_pipeline_running() {
     let pipeline = Pipeline::default().pass(mark);
     assert!(!pipeline.stopped());
     let (_, stopped) = pipeline.finish();
     assert!(!stopped);
+}
+
+#[test]
+fn a_report_runs_after_an_error_until_a_check_stops_the_pipeline() {
+    CHECKED.store(0, Ordering::SeqCst);
+    let (_, stopped) = Pipeline::default()
+        .pass(mark)
+        .pass(fail)
+        .report(tap_checked)
+        .check()
+        .report(tap_checked)
+        .finish();
+    assert_eq!(CHECKED.load(Ordering::SeqCst), 2);
+    assert!(stopped);
 }
 
 #[test]

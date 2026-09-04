@@ -9,22 +9,30 @@ use crate::semantic::{Diagnosis, DiagnosisNode};
 pub struct Pipeline {
     ctx: Context,
     exit_code: i32,
+    stopped: bool,
 }
 
 impl Pipeline {
     pub fn pass(mut self, pass: fn(Context) -> Context) -> Self {
-        if self.stopped() {
+        if self.stopped {
             return self;
         }
         let watermark = self.ctx.diagnosis.len();
         self.ctx = pass(self.ctx);
         debug_assert!(self.ctx.diagnosis.len() >= watermark);
-        self.exit_code = if self.ctx.diagnosis[watermark..].iter().any(DiagnosisNode::is_error) { 1 } else { 0 };
+        if self.ctx.diagnosis[watermark..].iter().any(DiagnosisNode::is_error) {
+            self.exit_code = 1;
+        }
+        self
+    }
+
+    pub fn check(mut self) -> Self {
+        self.stopped |= self.failed();
         self
     }
 
     pub fn report(self, obse: fn(&Context)) -> Self {
-        if self.stopped() {
+        if self.stopped {
             return self;
         }
         obse(&self.ctx);
@@ -37,11 +45,15 @@ impl Pipeline {
     }
 
     pub fn finish(self) -> (Context, bool) {
-        let stopped = self.stopped();
+        let stopped = self.stopped;
         (self.ctx, stopped)
     }
 
     pub fn stopped(&self) -> bool {
+        self.stopped
+    }
+
+    pub fn failed(&self) -> bool {
         self.exit_code > 0
     }
 }
