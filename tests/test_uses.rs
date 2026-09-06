@@ -1,4 +1,8 @@
-uses!(use_plain_read, "int x; int f(void) { return x; }", &[("x", true), ("f", false)]);
+uses!(
+    use_plain_read,
+    "int x; int f(void) { return x; }",
+    &[("x", true), ("f", false)]
+);
 
 uses!(
     use_sizeof_ident_not_used,

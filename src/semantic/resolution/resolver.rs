@@ -1,14 +1,15 @@
-use crate::arena::ResolveWith;
+use crate::arena::{ResolveMutWith, ResolveWith};
 use crate::ast::visit::{
     Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_jump_statement, walk_labeled_statement,
 };
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Expression, ExpressionNode,
-    FunctionDefinitionNode, InitDeclaratorNode, Initializer, InitializerNode, JumpStatement, JumpStatementNode,
-    Labeled, LabeledStatementNode, Name, Storage, Tag, TypeSpecifier,
+    FunctionDefinitionNode, InitDeclaratorNode, InitializerNode, JumpStatement, JumpStatementNode, Labeled,
+    LabeledStatementNode, Name, Storage, TypeSpecifier,
 };
 use crate::context::Context;
 use crate::parser::Span;
+use crate::semantic::model::initializer;
 use crate::semantic::resolution::expression;
 use crate::semantic::{
     AssignmentContext, DeclaredParams, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId,
@@ -260,48 +261,17 @@ impl SymbolResolver<'_> {
         expression::resolve_expression(self.sema, ctx, node);
     }
 
-    fn walk(self, ty: ResolvedType, cursor: bool) {
-        let target = match ty {
-            ResolvedType::Tag(tag_id) if matches!(tag_id.resolve(self.sema).kind, Tag::Struct | Tag::Union) => (),
-            ResolvedType::Array { elem, len } => elem,
-            _ => [ty],
-        };
-        for t in target {
-            if 
+    fn resolve_initializer(&mut self, ctx: &Context, sym_id: SymbolId, ty: QualifiedType, node: &InitializerNode) {
+        let duration = sym_id.resolve(self.sema).duration;
+        let init = initializer::resolve(self, ctx, ty, node, duration);
+        if let ResolvedType::Array { elem, len: None } = ty.id.resolve(self.sema)
+            && let Some(len) = init.len(ctx)
+        {
+            let id = self.sema.types.array(*elem, Some(len));
+            sym_id.resolve_mut(self.sema).ty = Some(QualifiedType::new(id, ty.is_const, ty.is_volatile));
         }
-    }
-
-    // walk(ty, cursor):
-    // if ty is struct/union: targets = members (union: first member only)
-    // elif ty is array:      targets = elements
-    // else:                  targets = [ty]           # scalar
-    // for each target:
-    //     if next initializer is a brace list -> recurse into it, must not overflow
-    //     else -> consume flat items from the cursor (brace elision)
-    // leftover initializers -> ExcessInitializers      # 6.5.7 "no more initializers than objects"
-
-    fn resolve_initializer(&mut self, ctx: &Context, ty: QualifiedType, node: &InitializerNode) {
-        match &node.init {
-            Initializer::Single(e) => {
-                self.visit_expression(ctx, e);
-                if let Err(inner) = expression::init(self.sema, ctx, ty, e, AssignmentContext::Initialization) {
-                    self.add_diag(Diag::err((), inner), &e.span);
-                }
-            }
-            Initializer::List(inits) => {
-                let (elem, len) = match ty.id.resolve(self.sema) {
-                    &ResolvedType::Array { elem, len } => (elem, len),
-                    _ => (ty, Some(1)),
-                };
-                for (i, node) in inits.iter().enumerate() {
-                    if len.is_some_and(|l| l <= i) {
-                        self.add_diag(Diag::err((), Diagnosis::ArrayInitTooLong), &inits[i].span);
-                        break;
-                    }
-                    self.resolve_initializer(ctx, elem, node);
-                }
-            }
-        }
+        let id = self.sema.inits.alloc(init);
+        sym_id.resolve_mut(self.sema).initializer = Some(id);
     }
 
     fn resolve_return(&mut self, ctx: &Context, node: &JumpStatementNode, return_ty: QualifiedType) {
@@ -452,7 +422,7 @@ impl Visitor for SymbolResolver<'_> {
         let Some(ty) = sym.resolve(self.sema).ty else { return };
         self.visit_declarator(ctx, &node.declarator);
         if let Some(init) = &node.initializer {
-            self.resolve_initializer(ctx, ty, init);
+            self.resolve_initializer(ctx, sym, ty, init);
         }
     }
 }

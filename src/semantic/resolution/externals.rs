@@ -1,6 +1,6 @@
 use crate::ast::StringId;
 use crate::semantic::sema::External;
-use crate::semantic::{Diag, DiagCollector, Definition, Diagnosis, Linkage, QualifiedType, ResolvedType, Sema};
+use crate::semantic::{Definition, Diag, DiagCollector, Diagnosis, Linkage, QualifiedType, ResolvedType, Sema};
 
 pub fn finish_externals(sema: &mut Sema) {
     let mut entries: Vec<(StringId, External)> =

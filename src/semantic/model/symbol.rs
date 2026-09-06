@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::ast::{Name, Storage};
 use crate::define_arena;
-use crate::semantic::{ExpressionKind, InitilizerId, QualifiedType, ScopeKind, Sema};
+use crate::semantic::{ExpressionKind, InitializerId, QualifiedType, ScopeKind, Sema};
 
 define_arena!(Symbol, SymbolArena, SymbolId, Sema, sema, symbols);
 
@@ -39,7 +39,7 @@ pub struct Symbol {
     pub definition: Definition,
     pub is_init: bool,
     pub used: bool,
-    pub initiazer: Option<InitilizerId>,
+    pub initializer: Option<InitializerId>,
 }
 
 impl Symbol {
@@ -61,7 +61,7 @@ impl Symbol {
             definition: Definition::Definition,
             duration: Duration::None,
             used: false,
-            initiazer: None,
+            initializer: None,
         }
     }
     pub fn linkage_of(scope: ScopeKind, storage: Option<Storage>, kind: SymbolKind, prior: Option<Linkage>) -> Linkage {

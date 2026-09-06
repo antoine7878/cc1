@@ -80,6 +80,13 @@ impl ResolvedType {
         matches!(self, ResolvedType::Tag(_))
     }
 
+    pub fn is_char(&self) -> bool {
+        matches!(
+            self,
+            ResolvedType::Char | ResolvedType::UnsignedChar | ResolvedType::SignedChar
+        )
+    }
+
     pub fn is_integral(&self, sema: &Sema) -> bool {
         match self {
             ResolvedType::Tag(id) => (*id).resolve(sema).kind == Tag::Enum,
@@ -197,6 +204,10 @@ impl QualifiedType {
             is_const,
             is_volatile,
         }
+    }
+
+    pub fn is_char(&self, sema: &Sema) -> bool {
+        self.id.resolve(sema).is_char()
     }
 
     pub fn same_qualifiers_as(&self, other: &Self) -> bool {

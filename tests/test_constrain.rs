@@ -306,10 +306,7 @@ fn a_combination_resolves_regardless_of_order() {
 #[test]
 fn equivalent_spellings_resolve_to_the_same_type() {
     use TypeSpecifier as T;
-    assert_eq!(
-        resolve(&[T::Short]).res,
-        resolve(&[T::Signed, T::Short, T::Int]).res
-    );
+    assert_eq!(resolve(&[T::Short]).res, resolve(&[T::Signed, T::Short, T::Int]).res);
     assert_eq!(resolve(&[T::Signed, T::Char]).res, Some(ResolvedType::SignedChar));
     assert_eq!(resolve(&[T::Long, T::Double]).res, Some(ResolvedType::LongDouble));
 }
@@ -343,7 +340,10 @@ fn an_unlisted_combination_is_rejected() {
 #[test]
 fn a_tag_or_typedef_name_is_not_a_basic_type() {
     let name = Name::new(StringId::from(0usize), Span::default());
-    assert_eq!(reported(&resolve(&[TypeSpecifier::TypedefName(name)])), "InvalidTypeSpecifier");
+    assert_eq!(
+        reported(&resolve(&[TypeSpecifier::TypedefName(name)])),
+        "InvalidTypeSpecifier"
+    );
     assert_eq!(
         reported(&resolve(&[TypeSpecifier::Int, TypeSpecifier::TypedefName(name)])),
         "InvalidTypeSpecifier"

@@ -118,7 +118,11 @@ shaped!(
 );
 
 // 6.1.3.4 An integer character constant has type int.
-shaped!(a_character_constant_is_an_int, "void f(void) { 'a'; }", vec![rv(Ty::Int)]);
+shaped!(
+    a_character_constant_is_an_int,
+    "void f(void) { 'a'; }",
+    vec![rv(Ty::Int)]
+);
 
 // ---- 6.2.1.5 usual arithmetic conversions --------------------------------
 

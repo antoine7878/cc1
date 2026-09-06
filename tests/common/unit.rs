@@ -1,6 +1,6 @@
 use std::io::Cursor;
-use std::process::{Command, Stdio};
 use std::io::Write;
+use std::process::{Command, Stdio};
 
 use cc1::ast::{Expression, Name, Tag, Value};
 use cc1::context::Context;

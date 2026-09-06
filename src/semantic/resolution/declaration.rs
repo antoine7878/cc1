@@ -225,7 +225,10 @@ pub fn struct_or_union_tag(
             }
             match (node.ident(ctx), bit_width) {
                 (Some(name), _) => {
-                    if members.iter().any(|m| m.sym.is_some_and(|id| id.resolve(sema).name.id == name.id)) {
+                    if members
+                        .iter()
+                        .any(|m| m.sym.is_some_and(|id| id.resolve(sema).name.id == name.id))
+                    {
                         sema.add_diag(
                             Diag::err((), Diagnosis::DuplicateDeclaration(SymbolKind::Member, name)),
                             &decl.span,
