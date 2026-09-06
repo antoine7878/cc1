@@ -2,7 +2,7 @@ use std::io::Cursor;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-use cc1::ast::{Expression, Name, Tag, Value};
+use cc1::ast::{Expression, ExpressionId, Name, Tag, Value};
 use cc1::context::Context;
 use cc1::parser::parse_reader;
 use cc1::semantic::{
@@ -124,12 +124,10 @@ impl Unit {
     }
 
     pub fn const_values(&self) -> Vec<Option<Value>> {
-        self.ctx
-            .sema
-            .expr_facts()
-            .iter()
-            .filter(|facts| facts.constant_seen)
-            .map(|facts| facts.constant)
+        (0..self.ctx.sema.expr_consts.len())
+            .map(ExpressionId::from)
+            .filter(|&id| self.ctx.sema.expr_consts.seen(id))
+            .map(|id| self.ctx.sema.expr_consts.get(id).copied())
             .collect()
     }
 
@@ -140,12 +138,10 @@ impl Unit {
     pub fn shapes(&self) -> Vec<crate::common::ty::Shape> {
         use crate::common::ty::Shape;
 
-        self.ctx
-            .sema
-            .expr_facts()
-            .iter()
-            .filter(|facts| facts.resolved_seen)
-            .map(|facts| match &facts.resolved {
+        (0..self.ctx.sema.expr_types.len())
+            .map(ExpressionId::from)
+            .filter(|&id| self.ctx.sema.expr_types.seen(id))
+            .map(|id| match self.ctx.sema.expr_types.get(id) {
                 Some(resolved) => Shape {
                     ty: Some(self.ty_tree(resolved.ty)),
                     lvalue: matches!(resolved.kind, ExpressionKind::LValue),
@@ -242,18 +238,15 @@ impl Unit {
     }
 
     pub fn bindings(&self) -> Vec<(String, Option<usize>)> {
-        self.ctx
-            .sema
-            .expr_facts()
-            .iter()
-            .enumerate()
-            .filter(|(_, facts)| facts.binding_seen)
-            .map(|(id, facts)| {
-                let name = match self.ctx.arenas.expressions.iter().nth(id).unwrap() {
+        (0..self.ctx.sema.expr_bindings.len())
+            .map(ExpressionId::from)
+            .filter(|&id| self.ctx.sema.expr_bindings.seen(id))
+            .map(|id| {
+                let name = match self.ctx.arenas.expressions.iter().nth(id.into()).unwrap() {
                     Expression::Identifier(name) => name.id.resolve(&self.ctx).clone(),
                     other => format!("{other:?}"),
                 };
-                (name, facts.binding.map(usize::from))
+                (name, self.ctx.sema.expr_bindings.get(id).copied().map(usize::from))
             })
             .collect()
     }

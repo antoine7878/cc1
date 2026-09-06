@@ -327,7 +327,7 @@ fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
 
 impl SymbolResolver<'_> {
     fn resolve_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
-        if self.sema.binding_seen(node.id) {
+        if self.sema.expr_bindings.seen(node.id) {
             return;
         }
         if let Expression::Identifier(name) = node.id.resolve(ctx) {
@@ -335,7 +335,7 @@ impl SymbolResolver<'_> {
             if sym.is_none() {
                 self.add_diag(Diag::err((), Diagnosis::UndeclaredIdentifier(*name)), &node.span);
             }
-            self.sema.set_binding(node.id, sym);
+            self.sema.expr_bindings.set(node.id, sym);
         }
         expression::resolve_expression(self.sema, ctx, node);
     }

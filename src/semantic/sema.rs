@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::mem::take;
 
-use crate::arena::{ResolveMutWith, ResolveWith};
-use crate::ast::{DeclaratorId, ExpressionId, Name, StringId, Tag, Value};
+use crate::arena::{Facts, HasFacts, ResolveMutWith, ResolveWith};
+use crate::ast::{AstArenas, DeclaratorId, ExpressionId, Name, StringId, Tag, Value};
 use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::{
@@ -19,16 +19,6 @@ pub struct External {
     pub tentative: Option<Span>,
 }
 
-#[derive(Debug, Default)]
-pub struct ExprFacts {
-    pub resolved: Option<ResolvedExpression>,
-    pub binding: Option<SymbolId>,
-    pub constant: Option<Value>,
-    pub resolved_seen: bool,
-    pub binding_seen: bool,
-    pub constant_seen: bool,
-}
-
 #[derive(Debug)]
 pub struct Sema {
     pub scopes: Scopes,
@@ -41,7 +31,9 @@ pub struct Sema {
     pub functions: FunctionDefArena,
     pub inits: InitializerArena,
 
-    exprs: Vec<ExprFacts>,
+    pub expr_types: Facts<ExpressionId, ResolvedExpression>,
+    pub expr_bindings: Facts<ExpressionId, SymbolId>,
+    pub expr_consts: Facts<ExpressionId, Value>,
     pub declarations: HashMap<DeclaratorId, SymbolId>,
     pub externals: HashMap<StringId, External>,
 
@@ -64,13 +56,21 @@ impl Default for Sema {
             functions: FunctionDefArena::default(),
             inits: InitializerArena::default(),
 
-            exprs: Vec::new(),
+            expr_types: Facts::default(),
+            expr_bindings: Facts::default(),
+            expr_consts: Facts::default(),
             declarations: HashMap::default(),
             externals: HashMap::default(),
 
             layouts: HashMap::default(),
             target,
         }
+    }
+}
+
+impl HasFacts<ExpressionId, ResolvedExpression> for Sema {
+    fn facts(&mut self) -> &mut Facts<ExpressionId, ResolvedExpression> {
+        &mut self.expr_types
     }
 }
 
@@ -90,69 +90,11 @@ impl Sema {
 
     // ----- Expression table ---------
 
-    pub fn size_expr_facts(&mut self, len: usize) {
-        if self.exprs.len() < len {
-            self.exprs.resize_with(len, ExprFacts::default);
-        }
-    }
-
-    pub fn expr_facts(&self) -> &[ExprFacts] {
-        &self.exprs
-    }
-
-    fn facts(&self, id: ExpressionId) -> Option<&ExprFacts> {
-        self.exprs.get(usize::from(id))
-    }
-
-    fn facts_mut(&mut self, id: ExpressionId) -> &mut ExprFacts {
-        &mut self.exprs[usize::from(id)]
-    }
-
-    pub fn expr_seen(&self, id: ExpressionId) -> bool {
-        self.facts(id).is_some_and(|f| f.resolved_seen)
-    }
-
-    pub fn expr_poisoned(&self, id: ExpressionId) -> bool {
-        self.facts(id).is_some_and(|f| f.resolved_seen && f.resolved.is_none())
-    }
-
-    pub fn expr_resolved(&self, id: ExpressionId) -> Option<&ResolvedExpression> {
-        self.facts(id)?.resolved.as_ref()
-    }
-
-    pub fn set_expr_resolved(&mut self, id: ExpressionId, resolved: Option<ResolvedExpression>) {
-        let f = self.facts_mut(id);
-        f.resolved = resolved;
-        f.resolved_seen = true;
-    }
-
-    pub fn take_expr_resolved(&mut self, id: ExpressionId) -> Option<ResolvedExpression> {
-        take(&mut self.facts_mut(id).resolved)
-    }
-
-    pub fn binding(&self, id: ExpressionId) -> Option<SymbolId> {
-        self.facts(id)?.binding
-    }
-
-    pub fn binding_seen(&self, id: ExpressionId) -> bool {
-        self.facts(id).is_some_and(|f| f.binding_seen)
-    }
-
-    pub fn set_binding(&mut self, id: ExpressionId, binding: Option<SymbolId>) {
-        let f = self.facts_mut(id);
-        f.binding = binding;
-        f.binding_seen = true;
-    }
-
-    pub fn constant_cached(&self, id: ExpressionId) -> Option<Option<Value>> {
-        let f = self.facts(id)?;
-        f.constant_seen.then_some(f.constant)
-    }
-
-    pub fn set_constant(&mut self, id: ExpressionId, constant: Option<Value>) {
-        let f = self.facts_mut(id);
-        f.constant = constant;
-        f.constant_seen = true;
+    pub fn size_facts(&mut self, arenas: &AstArenas) {
+        let len = arenas.expressions.len();
+        self.expr_types.resize(len);
+        self.expr_bindings.resize(len);
+        self.expr_consts.resize(len);
     }
 
     // ----- Resolution --------------------

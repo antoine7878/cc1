@@ -17,8 +17,8 @@ impl DiagCollector for DiagSink<'_> {
 }
 
 pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<Value> {
-    if let Some(cached) = sema.constant_cached(expr.id) {
-        return cached;
+    if sema.expr_consts.seen(expr.id) {
+        return sema.expr_consts.get(expr.id).copied();
     }
     SymbolResolver::new(sema).visit_expression(ctx, expr);
     let mut collected = Vec::new();
@@ -28,13 +28,13 @@ pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> O
         Ok(value) => Some(value),
         Err(diagnosis) => sema.add_diag(Diag::err(None, diagnosis), &expr.span),
     };
-    sema.set_constant(expr.id, value);
+    sema.expr_consts.set(expr.id, value);
     value
 }
 
 pub fn try_fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<Value> {
-    if let Some(cached) = sema.constant_cached(expr.id) {
-        return cached;
+    if sema.expr_consts.seen(expr.id) {
+        return sema.expr_consts.get(expr.id).copied();
     }
     fold(sema, ctx, expr, &mut DiagSink(&mut Vec::new())).ok()
 }
@@ -50,13 +50,14 @@ fn scalar_ty(sema: &Sema, qty: QualifiedType) -> ResolvedType {
 }
 
 fn node_ty(sema: &Sema, expr: &ExpressionNode) -> Result<QualifiedType, Diagnosis> {
-    sema.expr_resolved(expr.id).map(|re| re.ty).ok_or(Diagnosis::Poisoned)
+    sema.expr_types.get(expr.id).map(|re| re.ty).ok_or(Diagnosis::Poisoned)
 }
 
 fn operand(sema: &mut Sema, ctx: &Context, e: &ExpressionNode, sink: &mut DiagSink) -> Result<Value, Diagnosis> {
     let value = fold(sema, ctx, e, sink)?;
     let casted = sema
-        .expr_resolved(e.id)
+        .expr_types
+        .get(e.id)
         .map(|re| re.casted_ty())
         .ok_or(Diagnosis::Poisoned)?;
     let ty = scalar_ty(sema, casted);
@@ -80,8 +81,8 @@ fn divisor(sema: &Sema, ty: &ResolvedType, lhs: Value, rhs: Value, op: BinaryOp)
 }
 
 fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSink) -> Result<Value, Diagnosis> {
-    if let Some(Some(value)) = sema.constant_cached(expr.id) {
-        return Ok(value);
+    if let Some(value) = sema.expr_consts.get(expr.id) {
+        return Ok(*value);
     }
     match expr.id.resolve(ctx) {
         Expression::ConstantExpression(inner) => fold(sema, ctx, inner, sink),
@@ -102,7 +103,7 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSi
 }
 
 fn identifier(sema: &Sema, expr: &ExpressionNode) -> Result<Value, Diagnosis> {
-    let id = sema.binding(expr.id).ok_or(Diagnosis::NonConstantExpression)?;
+    let id = sema.expr_bindings.get(expr.id).copied().ok_or(Diagnosis::NonConstantExpression)?;
     let symbol = id.resolve(sema);
     if symbol.kind != SymbolKind::Variant {
         return Err(Diagnosis::NonConstantExpression);

@@ -1,7 +1,9 @@
+mod facts;
 mod id;
 mod interner;
 mod store;
 
+pub use facts::{Fact, Facts, HasFacts, Loan};
 pub use store::Arena;
 pub use id::{ArenaId, ArenaKey};
 pub use interner::Interner;

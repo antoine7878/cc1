@@ -1,9 +1,10 @@
 use std::iter::zip;
 
-use crate::arena::ResolveWith;
+use crate::arena::{Loan, ResolveWith};
 use crate::ast::{
-    BinaryOp, Expression, ExpressionNode, ExpressionStatementNode, IterationStatement, IterationStatementNode,
-    MemberOp, Name, SelectionStatement, SelectionStatementNode, StatementNode, Storage, Tag, Type, UnaryOp, Value,
+    BinaryOp, Expression, ExpressionId, ExpressionNode, ExpressionStatementNode, IterationStatement,
+    IterationStatementNode, MemberOp, Name, SelectionStatement, SelectionStatementNode, StatementNode, Storage, Tag,
+    Type, UnaryOp, Value,
 };
 use crate::context::Context;
 use crate::parser::Span;
@@ -16,7 +17,7 @@ use crate::semantic::{
 type R = Result<(QualifiedType, ExpressionKind), Diagnosis>;
 
 pub fn resolve_expression(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
-    if sema.expr_seen(node.id) {
+    if sema.expr_types.seen(node.id) {
         return;
     }
     let resolved = match type_of(sema, ctx, node) {
@@ -26,7 +27,7 @@ pub fn resolve_expression(sema: &mut Sema, ctx: &Context, node: &ExpressionNode)
             None
         }
     };
-    sema.set_expr_resolved(node.id, resolved);
+    sema.expr_types.set(node.id, resolved);
 }
 
 pub fn check_selection_statement(sema: &mut Sema, node: &SelectionStatementNode) {
@@ -40,7 +41,7 @@ pub fn check_selection_statement(sema: &mut Sema, node: &SelectionStatementNode)
 }
 
 fn expr_to_void(sema: &mut Sema, e: &ExpressionNode) -> Option<()> {
-    let mut ops = Operands::take(sema, [e]).ok()?;
+    let mut ops = operands(sema, [e]).ok()?;
     let (sema, [re]) = ops.parts();
     cast::convert(sema, re, sema.builtins.void, false);
     Some(())
@@ -58,7 +59,7 @@ pub fn check_iteration_statement(sema: &mut Sema, node: &IterationStatementNode)
 }
 
 fn check_scalar(sema: &mut Sema, node: &ExpressionNode) -> Result<(), Diagnosis> {
-    let mut ops = Operands::take(sema, [node])?;
+    let mut ops = operands(sema, [node])?;
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &node.span);
     if !re.ty.is_scalar(sema) {
@@ -68,7 +69,7 @@ fn check_scalar(sema: &mut Sema, node: &ExpressionNode) -> Result<(), Diagnosis>
 }
 
 fn check_integral(sema: &mut Sema, node: &ExpressionNode) -> Result<(), Diagnosis> {
-    let mut ops = Operands::take(sema, [node])?;
+    let mut ops = operands(sema, [node])?;
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &node.span);
     if !re.ty.is_integral(sema) {
@@ -100,7 +101,7 @@ pub fn init(
     assign_ctx: AssignmentContext,
 ) -> R {
     let is_null = is_null_pointer_constant(sema, ctx, init_node);
-    let mut ops = Operands::take(sema, [init_node])?;
+    let mut ops = operands(sema, [init_node])?;
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &init_node.span);
     let mut l_re = ResolvedExpression::new(l_ty, ExpressionKind::LValue);
@@ -134,7 +135,7 @@ fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNod
             node = op;
         }
     }
-    let Some(re) = sema.expr_resolved(node.id) else { return false };
+    let Some(re) = sema.expr_types.get(node.id) else { return false };
     re.ty.is_integer(sema) && ice::try_fold(sema, ctx, node).is_some_and(|v| v.is_zero())
 }
 
@@ -144,13 +145,14 @@ fn is_void_pointer(sema: &Sema, qualif: QualifiedType) -> bool {
 }
 
 fn identifier(sema: &mut Sema, node: &ExpressionNode) -> R {
-    let id = sema.binding(node.id).ok_poisoned()?;
+    let id = sema.expr_bindings.get(node.id).copied().ok_poisoned()?;
     let sym = id.resolve(sema);
     Ok((sym.ty.ok_poisoned()?, sym.expression_kind()))
 }
 
 fn constant(sema: &mut Sema, e: &ExpressionNode) -> R {
-    sema.expr_resolved(e.id)
+    sema.expr_types
+        .get(e.id)
         .map(|re| (re.casted_ty(), re.kind))
         .ok_poisoned()
 }
@@ -163,7 +165,7 @@ fn array_subscript(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &Exp
     Ok((*inner, LValue))
 }
 fn fn_call(sema: &mut Sema, ctx: &Context, fn_node: &ExpressionNode, args: &[ExpressionNode]) -> R {
-    let mut ops = Operands::take(sema, [fn_node])?;
+    let mut ops = operands(sema, [fn_node])?;
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &fn_node.span);
     let ty = re.casted_ty();
@@ -196,7 +198,7 @@ fn fn_call(sema: &mut Sema, ctx: &Context, fn_node: &ExpressionNode, args: &[Exp
         }
     }
     for arg_node in args.iter().skip(param_len) {
-        let promoted = Operands::take(&mut *sema, [arg_node]).map(|mut a| {
+        let promoted = operands(&mut *sema, [arg_node]).map(|mut a| {
             let (sema, [re]) = a.parts();
             cast::lvalue_conversion(sema, re, &arg_node.span);
             cast::default_argument_promotions(sema, re);
@@ -213,7 +215,7 @@ fn fn_call(sema: &mut Sema, ctx: &Context, fn_node: &ExpressionNode, args: &[Exp
 }
 
 fn member(sema: &mut Sema, node: &ExpressionNode, op: MemberOp, e: &ExpressionNode, name: &Name) -> R {
-    let mut ops = Operands::take(sema, [e])?;
+    let mut ops = operands(sema, [e])?;
     let (sema, [re]) = ops.parts();
     let (&tag_qty, kind) = match op {
         MemberOp::Dot => (&re.casted_ty(), re.kind),
@@ -238,7 +240,7 @@ fn member(sema: &mut Sema, node: &ExpressionNode, op: MemberOp, e: &ExpressionNo
     let Some(sym_id) = tag.get_member(sema, name) else {
         return Err(Diagnosis::AccessNotMember(tag_qty, name.id));
     };
-    sema.set_binding(node.id, Some(sym_id));
+    sema.expr_bindings.set(node.id, Some(sym_id));
     let sym = sym_id.resolve(sema);
     let ty = sym.ty.ok_or(Diagnosis::Poisoned)?;
     let qty = QualifiedType::new(
@@ -250,7 +252,7 @@ fn member(sema: &mut Sema, node: &ExpressionNode, op: MemberOp, e: &ExpressionNo
 }
 
 fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
-    let mut ops = Operands::take(sema, [e])?;
+    let mut ops = operands(sema, [e])?;
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &e.span);
     check_assignable(re)?;
@@ -269,7 +271,7 @@ fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
 }
 
 fn sign(sema: &mut Sema, e: &ExpressionNode) -> R {
-    let mut ops = Operands::take(sema, [e])?;
+    let mut ops = operands(sema, [e])?;
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &e.span);
     if !re.casted_ty().is_arithmetic(sema) {
@@ -280,8 +282,8 @@ fn sign(sema: &mut Sema, e: &ExpressionNode) -> R {
 }
 
 fn address(sema: &mut Sema, e: &ExpressionNode) -> R {
-    let id = sema.binding(e.id);
-    let mut ops = Operands::take(sema, [e])?;
+    let id = sema.expr_bindings.get(e.id).copied();
+    let mut ops = operands(sema, [e])?;
     let (sema, [re]) = ops.parts();
     address_type(sema, re, id)
 }
@@ -311,7 +313,7 @@ fn is_bit_field(sema: &Sema, sym: Option<SymbolId>) -> bool {
 }
 
 fn indirection(sema: &mut Sema, e: &ExpressionNode) -> R {
-    let mut ops = Operands::take(sema, [e])?;
+    let mut ops = operands(sema, [e])?;
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &e.span);
     let ResolvedType::Pointer(inner) = re.casted_ty().id.resolve(sema) else {
@@ -325,7 +327,7 @@ fn indirection(sema: &mut Sema, e: &ExpressionNode) -> R {
 }
 
 fn bit_not(sema: &mut Sema, e: &ExpressionNode) -> R {
-    let mut ops = Operands::take(sema, [e])?;
+    let mut ops = operands(sema, [e])?;
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &e.span);
     if !re.casted_ty().is_integral(sema) {
@@ -336,7 +338,7 @@ fn bit_not(sema: &mut Sema, e: &ExpressionNode) -> R {
 }
 
 fn logic_not(sema: &mut Sema, e: &ExpressionNode) -> R {
-    let mut ops = Operands::take(sema, [e])?;
+    let mut ops = operands(sema, [e])?;
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &e.span);
     if !re.casted_ty().is_scalar(sema) {
@@ -348,9 +350,9 @@ fn logic_not(sema: &mut Sema, e: &ExpressionNode) -> R {
 
 fn size_of_e(sema: &mut Sema, node: &ExpressionNode, e: &ExpressionNode) -> R {
     let ty = {
-        let mut ops = Operands::take(&mut *sema, [e])?;
+        let mut ops = operands(&mut *sema, [e])?;
         let (sema, [re]) = ops.parts();
-        if is_bit_field(sema, sema.binding(e.id)) {
+        if is_bit_field(sema, sema.expr_bindings.get(e.id).copied()) {
             return Err(Diagnosis::SizeofBitfield);
         }
         re.ty
@@ -391,7 +393,7 @@ fn set_sizeof_constant(sema: &mut Sema, node: &ExpressionNode, ty: QualifiedType
             .target
             .cast(&sema.target.size_t, Value::UnsignedLong(layout.size.into()))
     {
-        sema.set_constant(node.id, Some(value));
+        sema.expr_consts.set(node.id, Some(value));
     }
 }
 
@@ -437,7 +439,7 @@ fn assignment(sema: &mut Sema, ctx: &Context, op: &Option<BinaryOp>, e1: &Expres
 }
 
 fn multiplicative(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let mut ops = Operands::take(sema, [e1, e2])?;
+    let mut ops = operands(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, lhs, &e1.span);
     cast::lvalue_conversion(sema, rhs, &e2.span);
@@ -463,7 +465,7 @@ fn multiplicative_types(
 }
 
 fn additive(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let mut ops = Operands::take(sema, [e1, e2])?;
+    let mut ops = operands(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, lhs, &e1.span);
     cast::lvalue_conversion(sema, rhs, &e2.span);
@@ -486,7 +488,7 @@ fn additive_types(sema: &mut Sema, op: &BinaryOp, lhs: &mut ResolvedExpression, 
 
 fn shift(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let count = ice::try_fold(sema, ctx, e2);
-    let mut ops = Operands::take(sema, [e1, e2])?;
+    let mut ops = operands(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, lhs, &e1.span);
     cast::lvalue_conversion(sema, rhs, &e2.span);
@@ -514,7 +516,7 @@ fn shift_types(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut Resolved
 }
 
 fn relational(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let mut ops = Operands::take(sema, [e1, e2])?;
+    let mut ops = operands(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, lhs, &e1.span);
     cast::lvalue_conversion(sema, rhs, &e2.span);
@@ -551,7 +553,7 @@ fn relational_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut Reso
 fn equality(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let null1 = is_null_pointer_constant(sema, ctx, e1);
     let null2 = is_null_pointer_constant(sema, ctx, e2);
-    let mut ops = Operands::take(sema, [e1, e2])?;
+    let mut ops = operands(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, lhs, &e1.span);
     cast::lvalue_conversion(sema, rhs, &e2.span);
@@ -595,7 +597,7 @@ fn equality_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut Resolv
 }
 
 fn bitwise(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let mut ops = Operands::take(sema, [e1, e2])?;
+    let mut ops = operands(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, lhs, &e1.span);
     cast::lvalue_conversion(sema, rhs, &e2.span);
@@ -610,7 +612,7 @@ fn bitwise_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut Resolve
 }
 
 fn logic(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let mut ops = Operands::take(sema, [e1, e2])?;
+    let mut ops = operands(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, lhs, &e1.span);
     cast::lvalue_conversion(sema, rhs, &e2.span);
@@ -628,7 +630,7 @@ fn logic_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedE
 fn conditional(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode, e3: &ExpressionNode) -> R {
     let null2 = is_null_pointer_constant(sema, ctx, e2);
     let null3 = is_null_pointer_constant(sema, ctx, e3);
-    let mut ops = Operands::take(sema, [e1, e2, e3])?;
+    let mut ops = operands(sema, [e1, e2, e3])?;
     let (sema, [condition, lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, condition, &e1.span);
     cast::lvalue_conversion(sema, lhs, &e2.span);
@@ -697,7 +699,7 @@ fn cast(sema: &mut Sema, ctx: &Context, node: &ExpressionNode, ty_node: &Type, o
     let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
     let (qualif, _) = declaration::declared_type(sema, ctx, base, &ty_node.declarator).ok_poisoned()?;
     let is_null = is_null_pointer_constant(sema, ctx, operand);
-    let mut ops = Operands::take(sema, [operand])?;
+    let mut ops = operands(sema, [operand])?;
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &operand.span);
     cast_type(sema, qualif, re, is_null)
@@ -720,7 +722,7 @@ fn cast_type(sema: &mut Sema, qualif: QualifiedType, re: &mut ResolvedExpression
 
 fn simple_assignment(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let is_null = is_null_pointer_constant(sema, ctx, e2);
-    let mut ops = Operands::take(sema, [e1, e2])?;
+    let mut ops = operands(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, rhs, &e2.span);
     simple_assignation_type(sema, lhs, rhs, is_null)
@@ -738,7 +740,7 @@ fn simple_assignation_type(
 }
 
 fn additive_assignment(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let mut ops = Operands::take(sema, [e1, e2])?;
+    let mut ops = operands(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, rhs, &e2.span);
     additive_assignation_type(sema, lhs, rhs, &e1.span)
@@ -770,7 +772,7 @@ fn additive_assignation_type(
 
 fn coumpound_assignment(sema: &mut Sema, ctx: &Context, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let count = ice::try_fold(sema, ctx, e2);
-    let mut ops = Operands::take(sema, [e1, e2])?;
+    let mut ops = operands(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, rhs, &e2.span);
     coumpound_assignation_type(sema, op, lhs, rhs, &e1.span, count)
@@ -799,13 +801,13 @@ fn coumpound_assignation_type(
 
 fn list(sema: &mut Sema, es: &[ExpressionNode]) -> R {
     for node in es[0..(es.len() - 1)].iter() {
-        let Ok(mut ops) = Operands::take(&mut *sema, [node]) else { continue };
+        let Ok(mut ops) = operands(&mut *sema, [node]) else { continue };
         let (sema, [re]) = ops.parts();
         cast::lvalue_conversion(sema, re, &node.span);
         cast::to_void(sema, re);
     }
     let last = es.last().unwrap();
-    let mut ops = Operands::take(sema, [last])?;
+    let mut ops = operands(sema, [last])?;
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &last.span);
     Ok((re.casted_ty(), RValue))
@@ -842,39 +844,8 @@ impl<T> OptionPoisoned<T> for Option<T> {
     }
 }
 
-struct Operands<'s, 'n, const N: usize> {
-    sema: &'s mut Sema,
-    nodes: [&'n ExpressionNode; N],
-    res: Option<[ResolvedExpression; N]>,
-}
+type Operands<'s, const N: usize> = Loan<'s, Sema, ExpressionId, ResolvedExpression, N>;
 
-impl<'s, 'n, const N: usize> Operands<'s, 'n, N> {
-    fn take(sema: &'s mut Sema, nodes: [&'n ExpressionNode; N]) -> Result<Self, Diagnosis> {
-        let mut taken = std::array::from_fn(|i| sema.take_expr_resolved(nodes[i].id));
-        if taken.iter().any(Option::is_none) {
-            for (node, re) in zip(nodes, &mut taken) {
-                if let Some(re) = re.take() {
-                    sema.set_expr_resolved(node.id, Some(re));
-                }
-            }
-            return Err(Diagnosis::Poisoned);
-        }
-        Ok(Self {
-            sema,
-            nodes,
-            res: Some(taken.map(Option::unwrap)),
-        })
-    }
-
-    fn parts(&mut self) -> (&mut Sema, &mut [ResolvedExpression; N]) {
-        (self.sema, self.res.as_mut().unwrap())
-    }
-}
-
-impl<const N: usize> Drop for Operands<'_, '_, N> {
-    fn drop(&mut self) {
-        for (node, re) in zip(self.nodes, self.res.take().unwrap()) {
-            self.sema.set_expr_resolved(node.id, Some(re));
-        }
-    }
+fn operands<'s, const N: usize>(sema: &'s mut Sema, nodes: [&ExpressionNode; N]) -> Result<Operands<'s, N>, Diagnosis> {
+    Loan::take(sema, nodes.map(|n| n.id)).ok_poisoned()
 }

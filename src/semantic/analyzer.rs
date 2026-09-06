@@ -15,7 +15,7 @@ impl Analyzer {
 
     pub fn init(mut ctx: Context) -> Context {
         let mut sema = Sema::new(ctx.target.clone());
-        sema.size_expr_facts(ctx.arenas.expressions.len());
+        sema.size_facts(&ctx.arenas);
         ctx.sema = sema;
         ctx
     }

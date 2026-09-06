@@ -200,11 +200,11 @@ fn address_constant(sema: &Sema, ctx: &Context, e: &ExpressionNode) -> Option<In
     match e.id.resolve(ctx) {
         Expression::StringLiteral(literal) => Some(Initializer::String(literal.name().id)),
         Expression::Unary(UnaryOp::Addr, inner) => Some(Initializer::Address {
-            sym: sema.binding(inner.id)?,
+            sym: sema.expr_bindings.get(inner.id).copied()?,
             offset: 0,
         }),
         Expression::Identifier(_) => {
-            let sym = sema.binding(e.id)?;
+            let sym = sema.expr_bindings.get(e.id).copied()?;
             let ty = sym.resolve(sema).ty?;
             match ty.id.resolve(sema) {
                 ResolvedType::Array { .. } | ResolvedType::Function { .. } => {
