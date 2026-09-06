@@ -8,10 +8,9 @@ use crate::ast::{
 use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::ExpressionKind::{LValue, RValue};
-use crate::semantic::ice::try_fold;
 use crate::semantic::{
     AssignmentContext, Diag, DiagCollector, Diagnosis, ExpressionKind, ParamTypes, QualifiedType, ResolvedExpression,
-    ResolvedType, Sema, SymbolId, SymbolKind, cast, declaration, layout,
+    ResolvedType, Sema, SymbolId, SymbolKind, cast, declaration, ice, layout,
 };
 
 type R = Result<(QualifiedType, ExpressionKind), Diagnosis>;
@@ -61,6 +60,7 @@ pub fn check_iteration_statement(sema: &mut Sema, node: &IterationStatementNode)
 fn check_scalar(sema: &mut Sema, node: &ExpressionNode) -> Result<(), Diagnosis> {
     let mut ops = Operands::take(sema, [node])?;
     let (sema, [re]) = ops.parts();
+    cast::lvalue_conversion(sema, re, &node.span);
     if !re.ty.is_scalar(sema) {
         return Err(Diagnosis::NonScalarStatement(re.ty));
     }
@@ -70,6 +70,7 @@ fn check_scalar(sema: &mut Sema, node: &ExpressionNode) -> Result<(), Diagnosis>
 fn check_integral(sema: &mut Sema, node: &ExpressionNode) -> Result<(), Diagnosis> {
     let mut ops = Operands::take(sema, [node])?;
     let (sema, [re]) = ops.parts();
+    cast::lvalue_conversion(sema, re, &node.span);
     if !re.ty.is_integral(sema) {
         return Err(Diagnosis::NonIntegralStatement(re.ty));
     }
@@ -134,7 +135,7 @@ fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNod
         }
     }
     let Some(re) = sema.expr_resolved(node.id) else { return false };
-    re.ty.is_integer(sema) && try_fold(sema, ctx, node).is_some_and(|v| v.is_zero())
+    re.ty.is_integer(sema) && ice::try_fold(sema, ctx, node).is_some_and(|v| v.is_zero())
 }
 
 fn is_void_pointer(sema: &Sema, qualif: QualifiedType) -> bool {
@@ -484,7 +485,7 @@ fn additive_types(sema: &mut Sema, op: &BinaryOp, lhs: &mut ResolvedExpression, 
 }
 
 fn shift(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let count = try_fold(sema, ctx, e2);
+    let count = ice::try_fold(sema, ctx, e2);
     let mut ops = Operands::take(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, lhs, &e1.span);
@@ -768,7 +769,7 @@ fn additive_assignation_type(
 }
 
 fn coumpound_assignment(sema: &mut Sema, ctx: &Context, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let count = try_fold(sema, ctx, e2);
+    let count = ice::try_fold(sema, ctx, e2);
     let mut ops = Operands::take(sema, [e1, e2])?;
     let (sema, [lhs, rhs]) = ops.parts();
     cast::lvalue_conversion(sema, rhs, &e2.span);
