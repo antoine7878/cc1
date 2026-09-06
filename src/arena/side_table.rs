@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use crate::arena::ArenaKey;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Fact<T> {
+pub enum Slot<T> {
     Unknown,
     Poisoned,
     Known(T),
@@ -12,12 +12,12 @@ pub enum Fact<T> {
 }
 
 #[derive(Debug)]
-pub struct Facts<Id: ArenaKey, Val> {
-    slots: Vec<Fact<Val>>,
+pub struct SideTable<Id: ArenaKey, Val> {
+    slots: Vec<Slot<Val>>,
     marker: PhantomData<fn() -> Id>,
 }
 
-impl<Id: ArenaKey, Val> Default for Facts<Id, Val> {
+impl<Id: ArenaKey, Val> Default for SideTable<Id, Val> {
     fn default() -> Self {
         Self {
             slots: Vec::new(),
@@ -26,10 +26,10 @@ impl<Id: ArenaKey, Val> Default for Facts<Id, Val> {
     }
 }
 
-impl<Id: ArenaKey, Val> Facts<Id, Val> {
+impl<Id: ArenaKey, Val> SideTable<Id, Val> {
     pub fn resize(&mut self, len: usize) {
         if len > self.slots.len() {
-            self.slots.resize_with(len, || Fact::Unknown);
+            self.slots.resize_with(len, || Slot::Unknown);
         }
     }
 
@@ -42,38 +42,38 @@ impl<Id: ArenaKey, Val> Facts<Id, Val> {
     }
 
     pub fn seen(&self, id: Id) -> bool {
-        !matches!(self.slots.get(id.into()), None | Some(Fact::Unknown))
+        !matches!(self.slots.get(id.into()), None | Some(Slot::Unknown))
     }
 
     pub fn poisoned(&self, id: Id) -> bool {
-        matches!(self.slots.get(id.into()), Some(Fact::Poisoned))
+        matches!(self.slots.get(id.into()), Some(Slot::Poisoned))
     }
 
     pub fn get(&self, id: Id) -> Option<&Val> {
         match self.slots.get(id.into()) {
-            Some(Fact::Known(v)) => Some(v),
+            Some(Slot::Known(v)) => Some(v),
             _ => None,
         }
     }
 
     pub fn get_mut(&mut self, id: Id) -> Option<&mut Val> {
         match self.slots.get_mut(id.into()) {
-            Some(Fact::Known(v)) => Some(v),
+            Some(Slot::Known(v)) => Some(v),
             _ => None,
         }
     }
 
     pub fn set(&mut self, id: Id, value: Option<Val>) {
         self.slots[id.into()] = match value {
-            Some(v) => Fact::Known(v),
-            None => Fact::Poisoned,
+            Some(v) => Slot::Known(v),
+            None => Slot::Poisoned,
         };
     }
 
     pub fn take(&mut self, id: Id) -> Option<Val> {
         match self.slots.get_mut(id.into()) {
-            Some(slot @ Fact::Known(_)) => match std::mem::replace(slot, Fact::Borrowed) {
-                Fact::Known(v) => Some(v),
+            Some(slot @ Slot::Known(_)) => match std::mem::replace(slot, Slot::Borrowed) {
+                Slot::Known(v) => Some(v),
                 _ => unreachable!(),
             },
             _ => None,
@@ -81,27 +81,27 @@ impl<Id: ArenaKey, Val> Facts<Id, Val> {
     }
 
     pub fn give(&mut self, id: Id, value: Val) {
-        self.slots[id.into()] = Fact::Known(value);
+        self.slots[id.into()] = Slot::Known(value);
     }
 }
 
-pub trait HasFacts<Id: ArenaKey, Val> {
-    fn facts(&mut self) -> &mut Facts<Id, Val>;
+pub trait HasTable<Id: ArenaKey, Val> {
+    fn table(&mut self) -> &mut SideTable<Id, Val>;
 }
 
-pub struct Loan<'h, H: HasFacts<Id, Val>, Id: ArenaKey, Val, const N: usize> {
+pub struct Loan<'h, H: HasTable<Id, Val>, Id: ArenaKey, Val, const N: usize> {
     holder: &'h mut H,
     ids: [Id; N],
     values: Option<[Val; N]>,
 }
 
-impl<'h, H: HasFacts<Id, Val>, Id: ArenaKey, Val, const N: usize> Loan<'h, H, Id, Val, N> {
+impl<'h, H: HasTable<Id, Val>, Id: ArenaKey, Val, const N: usize> Loan<'h, H, Id, Val, N> {
     pub fn take(holder: &'h mut H, ids: [Id; N]) -> Option<Self> {
-        let mut taken = std::array::from_fn(|i| holder.facts().take(ids[i]));
+        let mut taken = std::array::from_fn(|i| holder.table().take(ids[i]));
         if taken.iter().any(Option::is_none) {
             for (id, val) in zip(ids, &mut taken) {
                 if let Some(val) = val.take() {
-                    holder.facts().give(id, val);
+                    holder.table().give(id, val);
                 }
             }
             return None;
@@ -118,10 +118,10 @@ impl<'h, H: HasFacts<Id, Val>, Id: ArenaKey, Val, const N: usize> Loan<'h, H, Id
     }
 }
 
-impl<H: HasFacts<Id, Val>, Id: ArenaKey, Val, const N: usize> Drop for Loan<'_, H, Id, Val, N> {
+impl<H: HasTable<Id, Val>, Id: ArenaKey, Val, const N: usize> Drop for Loan<'_, H, Id, Val, N> {
     fn drop(&mut self) {
         for (id, val) in zip(self.ids, self.values.take().unwrap()) {
-            self.holder.facts().give(id, val);
+            self.holder.table().give(id, val);
         }
     }
 }

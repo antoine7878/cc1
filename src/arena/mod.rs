@@ -1,9 +1,9 @@
-mod facts;
 mod id;
 mod interner;
+mod side_table;
 mod store;
 
-pub use facts::{Fact, Facts, HasFacts, Loan};
+pub use side_table::{HasTable, Loan, SideTable, Slot};
 pub use store::Arena;
 pub use id::{ArenaId, ArenaKey};
 pub use interner::Interner;

@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 use std::mem::take;
 
-use crate::arena::{Facts, HasFacts, ResolveMutWith, ResolveWith};
+use crate::arena::{HasTable, ResolveMutWith, ResolveWith, SideTable};
+use crate::ast::statement::StatementId;
 use crate::ast::{AstArenas, DeclaratorId, ExpressionId, Name, StringId, Tag, Value};
 use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::{
     Builtins, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, InitializerArena, Linkage,
-    QualifiedType, ResolvedExpression, ResolvedTypeArena, ResolvedTypeId, ScopeKind, Scopes, Symbol, SymbolArena,
-    SymbolId, SymbolKind, TagDefArena, TagDefId,
+    QualifiedType, ResolvedExpression, ResolvedStatement, ResolvedTypeArena, ResolvedTypeId, ScopeKind, Scopes, Symbol,
+    SymbolArena, SymbolId, SymbolKind, TagDefArena, TagDefId,
 };
 use crate::target::{Layout, Target};
 
@@ -31,11 +32,12 @@ pub struct Sema {
     pub functions: FunctionDefArena,
     pub inits: InitializerArena,
 
-    pub expr_types: Facts<ExpressionId, ResolvedExpression>,
-    pub expr_bindings: Facts<ExpressionId, SymbolId>,
-    pub expr_consts: Facts<ExpressionId, Value>,
+    pub expr_types: SideTable<ExpressionId, ResolvedExpression>,
+    pub expr_bindings: SideTable<ExpressionId, SymbolId>,
+    pub expr_consts: SideTable<ExpressionId, Value>,
     pub declarations: HashMap<DeclaratorId, SymbolId>,
     pub externals: HashMap<StringId, External>,
+    pub stmts: SideTable<StatementId, ResolvedStatement>,
 
     pub layouts: HashMap<ResolvedTypeId, Layout>,
     pub target: Target,
@@ -56,9 +58,11 @@ impl Default for Sema {
             functions: FunctionDefArena::default(),
             inits: InitializerArena::default(),
 
-            expr_types: Facts::default(),
-            expr_bindings: Facts::default(),
-            expr_consts: Facts::default(),
+            expr_types: SideTable::default(),
+            expr_bindings: SideTable::default(),
+            expr_consts: SideTable::default(),
+            stmts: SideTable::default(),
+
             declarations: HashMap::default(),
             externals: HashMap::default(),
 
@@ -68,8 +72,8 @@ impl Default for Sema {
     }
 }
 
-impl HasFacts<ExpressionId, ResolvedExpression> for Sema {
-    fn facts(&mut self) -> &mut Facts<ExpressionId, ResolvedExpression> {
+impl HasTable<ExpressionId, ResolvedExpression> for Sema {
+    fn table(&mut self) -> &mut SideTable<ExpressionId, ResolvedExpression> {
         &mut self.expr_types
     }
 }
@@ -90,7 +94,7 @@ impl Sema {
 
     // ----- Expression table ---------
 
-    pub fn size_facts(&mut self, arenas: &AstArenas) {
+    pub fn size_tables(&mut self, arenas: &AstArenas) {
         let len = arenas.expressions.len();
         self.expr_types.resize(len);
         self.expr_bindings.resize(len);

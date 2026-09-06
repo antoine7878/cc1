@@ -17,7 +17,7 @@ impl Visitor for ConstChecker<'_> {
 }
 
 pub fn check_constants(sema: &mut Sema, ctx: &Context) {
-    sema.size_facts(&ctx.arenas);
+    sema.size_tables(&ctx.arenas);
     let mut checker = ConstChecker { sema };
     walk_translation_unit(&mut checker, ctx, &ctx.ast);
 }

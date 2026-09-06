@@ -1,23 +1,23 @@
-use cc1::arena::{ArenaId, Facts, HasFacts, Loan};
+use cc1::arena::{ArenaId, HasTable, Loan, SideTable};
 
 type Id = ArenaId<String>;
 
-fn facts() -> Facts<Id, String> {
-    Facts::default()
+fn table() -> SideTable<Id, String> {
+    SideTable::default()
 }
 
 struct Holder {
-    table: Facts<Id, String>,
+    table: SideTable<Id, String>,
 }
 
-impl HasFacts<Id, String> for Holder {
-    fn facts(&mut self) -> &mut Facts<Id, String> {
+impl HasTable<Id, String> for Holder {
+    fn table(&mut self) -> &mut SideTable<Id, String> {
         &mut self.table
     }
 }
 
 fn holder() -> Holder {
-    let mut table = facts();
+    let mut table = table();
     table.resize(3);
     Holder { table }
 }
@@ -26,152 +26,152 @@ type Ops<'h, const N: usize> = Loan<'h, Holder, Id, String, N>;
 
 #[test]
 fn default_table_is_empty_and_reads_unknown() {
-    let facts = facts();
-    assert!(facts.is_empty());
-    assert_eq!(facts.len(), 0);
+    let table = table();
+    assert!(table.is_empty());
+    assert_eq!(table.len(), 0);
     let id = Id::from(0usize);
-    assert!(!facts.seen(id));
-    assert!(!facts.poisoned(id));
-    assert_eq!(facts.get(id), None);
+    assert!(!table.seen(id));
+    assert!(!table.poisoned(id));
+    assert_eq!(table.get(id), None);
 }
 
 #[test]
 fn resize_grows_and_fills_with_unknown() {
-    let mut facts = facts();
-    facts.resize(3);
-    assert_eq!(facts.len(), 3);
+    let mut table = table();
+    table.resize(3);
+    assert_eq!(table.len(), 3);
     for i in 0..3 {
         let id = Id::from(i);
-        assert!(!facts.seen(id));
-        assert!(!facts.poisoned(id));
+        assert!(!table.seen(id));
+        assert!(!table.poisoned(id));
     }
 }
 
 #[test]
-fn resize_does_not_shrink_and_keeps_stored_facts() {
-    let mut facts = facts();
-    facts.resize(3);
+fn resize_does_not_shrink_and_keeps_stored_values() {
+    let mut table = table();
+    table.resize(3);
     let id = Id::from(1usize);
-    facts.set(id, Some("a".to_string()));
-    facts.resize(1);
-    assert_eq!(facts.len(), 3);
-    assert_eq!(facts.get(id), Some(&"a".to_string()));
+    table.set(id, Some("a".to_string()));
+    table.resize(1);
+    assert_eq!(table.len(), 3);
+    assert_eq!(table.get(id), Some(&"a".to_string()));
 }
 
 #[test]
 fn set_some_makes_it_known() {
-    let mut facts = facts();
-    facts.resize(1);
+    let mut table = table();
+    table.resize(1);
     let id = Id::from(0usize);
-    facts.set(id, Some("a".to_string()));
-    assert!(facts.seen(id));
-    assert!(!facts.poisoned(id));
-    assert_eq!(facts.get(id), Some(&"a".to_string()));
+    table.set(id, Some("a".to_string()));
+    assert!(table.seen(id));
+    assert!(!table.poisoned(id));
+    assert_eq!(table.get(id), Some(&"a".to_string()));
 }
 
 #[test]
 fn set_none_makes_it_poisoned() {
-    let mut facts = facts();
-    facts.resize(1);
+    let mut table = table();
+    table.resize(1);
     let id = Id::from(0usize);
-    facts.set(id, None);
-    assert!(facts.seen(id));
-    assert!(facts.poisoned(id));
-    assert_eq!(facts.get(id), None);
+    table.set(id, None);
+    assert!(table.seen(id));
+    assert!(table.poisoned(id));
+    assert_eq!(table.get(id), None);
 }
 
 #[test]
 fn set_overwrites_known_with_poisoned() {
-    let mut facts = facts();
-    facts.resize(1);
+    let mut table = table();
+    table.resize(1);
     let id = Id::from(0usize);
-    facts.set(id, Some("a".to_string()));
-    facts.set(id, None);
-    assert!(facts.poisoned(id));
-    assert_eq!(facts.get(id), None);
+    table.set(id, Some("a".to_string()));
+    table.set(id, None);
+    assert!(table.poisoned(id));
+    assert_eq!(table.get(id), None);
 }
 
 #[test]
 fn set_overwrites_poisoned_with_known() {
-    let mut facts = facts();
-    facts.resize(1);
+    let mut table = table();
+    table.resize(1);
     let id = Id::from(0usize);
-    facts.set(id, None);
-    facts.set(id, Some("a".to_string()));
-    assert!(!facts.poisoned(id));
-    assert_eq!(facts.get(id), Some(&"a".to_string()));
+    table.set(id, None);
+    table.set(id, Some("a".to_string()));
+    assert!(!table.poisoned(id));
+    assert_eq!(table.get(id), Some(&"a".to_string()));
 }
 
 #[test]
 fn get_mut_mutates_in_place() {
-    let mut facts = facts();
-    facts.resize(1);
+    let mut table = table();
+    table.resize(1);
     let id = Id::from(0usize);
-    facts.set(id, Some("a".to_string()));
-    facts.get_mut(id).unwrap().push('b');
-    assert_eq!(facts.get(id), Some(&"ab".to_string()));
+    table.set(id, Some("a".to_string()));
+    table.get_mut(id).unwrap().push('b');
+    assert_eq!(table.get(id), Some(&"ab".to_string()));
 }
 
 #[test]
 fn take_known_yields_value_and_leaves_borrowed_state() {
-    let mut facts = facts();
-    facts.resize(1);
+    let mut table = table();
+    table.resize(1);
     let id = Id::from(0usize);
-    facts.set(id, Some("a".to_string()));
-    assert_eq!(facts.take(id), Some("a".to_string()));
-    assert!(facts.seen(id));
-    assert!(!facts.poisoned(id));
-    assert_eq!(facts.get(id), None);
+    table.set(id, Some("a".to_string()));
+    assert_eq!(table.take(id), Some("a".to_string()));
+    assert!(table.seen(id));
+    assert!(!table.poisoned(id));
+    assert_eq!(table.get(id), None);
 }
 
 #[test]
 fn take_twice_returns_none_the_second_time() {
-    let mut facts = facts();
-    facts.resize(1);
+    let mut table = table();
+    table.resize(1);
     let id = Id::from(0usize);
-    facts.set(id, Some("a".to_string()));
-    facts.take(id);
-    assert_eq!(facts.take(id), None);
+    table.set(id, Some("a".to_string()));
+    table.take(id);
+    assert_eq!(table.take(id), None);
 }
 
 #[test]
 fn take_on_unknown_returns_none_and_leaves_state() {
-    let mut facts = facts();
-    facts.resize(1);
+    let mut table = table();
+    table.resize(1);
     let id = Id::from(0usize);
-    assert_eq!(facts.take(id), None);
-    assert!(!facts.seen(id));
+    assert_eq!(table.take(id), None);
+    assert!(!table.seen(id));
 }
 
 #[test]
 fn take_on_poisoned_returns_none_and_leaves_state() {
-    let mut facts = facts();
-    facts.resize(1);
+    let mut table = table();
+    table.resize(1);
     let id = Id::from(0usize);
-    facts.set(id, None);
-    assert_eq!(facts.take(id), None);
-    assert!(facts.poisoned(id));
+    table.set(id, None);
+    assert_eq!(table.take(id), None);
+    assert!(table.poisoned(id));
 }
 
 #[test]
 fn give_after_take_restores_known() {
-    let mut facts = facts();
-    facts.resize(1);
+    let mut table = table();
+    table.resize(1);
     let id = Id::from(0usize);
-    facts.set(id, Some("a".to_string()));
-    let value = facts.take(id).unwrap();
-    facts.give(id, value);
-    assert!(!facts.poisoned(id));
-    assert_eq!(facts.get(id), Some(&"a".to_string()));
+    table.set(id, Some("a".to_string()));
+    let value = table.take(id).unwrap();
+    table.give(id, value);
+    assert!(!table.poisoned(id));
+    assert_eq!(table.get(id), Some(&"a".to_string()));
 }
 
 #[test]
 fn reads_past_the_end_do_not_panic() {
-    let facts = facts();
+    let table = table();
     let id = Id::from(42usize);
-    assert!(!facts.seen(id));
-    assert!(!facts.poisoned(id));
-    assert_eq!(facts.get(id), None);
+    assert!(!table.seen(id));
+    assert!(!table.poisoned(id));
+    assert_eq!(table.get(id), None);
 }
 
 #[test]
