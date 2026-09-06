@@ -1,8 +1,9 @@
 use std::collections::HashMap;
-use std::mem;
+use std::mem::take;
 
 use crate::arena::{ResolveMutWith, ResolveWith};
 use crate::ast::{DeclaratorId, ExpressionId, Name, StringId, Tag, Value};
+use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::{
     Builtins, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, InitializerArena, Linkage,
@@ -126,7 +127,7 @@ impl Sema {
     }
 
     pub fn take_expr_resolved(&mut self, id: ExpressionId) -> Option<ResolvedExpression> {
-        mem::take(&mut self.facts_mut(id).resolved)
+        take(&mut self.facts_mut(id).resolved)
     }
 
     pub fn binding(&self, id: ExpressionId) -> Option<SymbolId> {
@@ -295,6 +296,14 @@ impl Sema {
         };
         let sym_id = self.symbols.alloc(Symbol::label(name, is_init));
         self.scopes.insert(SymbolKind::Label, name.id, sym_id);
+    }
+
+    pub fn with_sema(mut ctx: Context, pass: impl FnOnce(&mut Sema, &Context)) -> Context {
+        let mut sema = take(&mut ctx.sema);
+        pass(&mut sema, &ctx);
+        ctx.diagnosis.append(&mut sema.diagnosis);
+        ctx.sema = sema;
+        ctx
     }
 }
 

@@ -9,6 +9,8 @@ use crate::utils::{RED, RESET, YELLOW};
 
 #[derive(Clone, Debug)]
 pub enum Diagnosis {
+    NonScalarStatement(QualifiedType),
+    NonIntegralStatement(QualifiedType),
     InternalNeverDefined(Name),
     TentativeNeverCompleted(QualifiedType),
     Temprorary,
@@ -171,6 +173,9 @@ impl DiagnosisNode {
     fn message(&self, ctx: &Context) -> String {
         let sema = &ctx.sema;
         match &self.inner {
+            Diagnosis::NonScalarStatement(ty) => format!("statement requires expression of scalar type ('{}' invalid)", ty.describe(sema, ctx)),
+            Diagnosis::NonIntegralStatement(ty) => format!("statement requires expression of integer type ('{}' invalid)", ty.describe(sema, ctx)),
+            
             Diagnosis::InternalNeverDefined(name) => format!("'{}' used but never defined", name.id.resolve(ctx)),
             Diagnosis::TentativeNeverCompleted(ty) => format!("tentative definition has type '{}' that is never completed", ty.describe(sema, ctx)),
             Diagnosis::SubscriptNotArray => "subscripted value is not an array, pointer, or vector".to_string(),

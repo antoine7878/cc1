@@ -7,3 +7,5 @@ pub mod report;
 pub mod semantic;
 pub mod target;
 pub mod utils;
+
+// pub mod checker;

@@ -26,6 +26,13 @@ impl Pipeline {
         self
     }
 
+    pub fn pass_group<const N: usize>(mut self, fns: [fn(Context) -> Context; N]) -> Self {
+        for f in fns {
+            self = self.pass(f);
+        }
+        self.checkpoint()
+    }
+
     pub fn checkpoint(mut self) -> Self {
         self.stopped |= self.failed();
         self

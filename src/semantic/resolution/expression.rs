@@ -1,7 +1,10 @@
 use std::iter::zip;
 
 use crate::arena::ResolveWith;
-use crate::ast::{BinaryOp, Expression, ExpressionNode, MemberOp, Name, Storage, Tag, Type, UnaryOp, Value};
+use crate::ast::{
+    BinaryOp, Expression, ExpressionNode, ExpressionStatementNode, IterationStatement, IterationStatementNode,
+    MemberOp, Name, SelectionStatement, SelectionStatementNode, StatementNode, Storage, Tag, Type, UnaryOp, Value,
+};
 use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::ExpressionKind::{LValue, RValue};
@@ -19,12 +22,73 @@ pub fn resolve_expression(sema: &mut Sema, ctx: &Context, node: &ExpressionNode)
     }
     let resolved = match type_of(sema, ctx, node) {
         Ok((ty, kind)) => Some(ResolvedExpression::new(ty, kind)),
-        Err(inner) => {
-            sema.add_diag(Diag::err((), inner), &node.span);
+        Err(diag) => {
+            sema.add_diag(Diag::err((), diag), &node.span);
             None
         }
     };
     sema.set_expr_resolved(node.id, resolved);
+}
+
+pub fn check_selection_statement(sema: &mut Sema, node: &SelectionStatementNode) {
+    let res = match &node.stmt {
+        SelectionStatement::If(e1, _, _) => check_scalar(sema, e1),
+        SelectionStatement::Switch(e, _) => check_integral(sema, e),
+    };
+    if let Err(diag) = res {
+        sema.add_diag(Diag::err((), diag), &node.span);
+    }
+}
+
+fn expr_to_void(sema: &mut Sema, e: &ExpressionNode) -> Option<()> {
+    let mut ops = Operands::take(sema, [e]).ok()?;
+    let (sema, [re]) = ops.parts();
+    cast::convert(sema, re, sema.builtins.void, false);
+    Some(())
+}
+
+pub fn check_iteration_statement(sema: &mut Sema, node: &IterationStatementNode) {
+    let res = match &node.stmt {
+        IterationStatement::While(e, _) => check_scalar(sema, e),
+        IterationStatement::Do(_, e) => check_scalar(sema, e),
+        IterationStatement::For(b) => check_for(sema, b),
+    };
+    if let Err(diag) = res {
+        sema.add_diag(Diag::err((), diag), &node.span);
+    }
+}
+
+fn check_scalar(sema: &mut Sema, node: &ExpressionNode) -> Result<(), Diagnosis> {
+    let mut ops = Operands::take(sema, [node])?;
+    let (sema, [re]) = ops.parts();
+    if !re.ty.is_scalar(sema) {
+        return Err(Diagnosis::NonScalarStatement(re.ty));
+    }
+    Ok(())
+}
+
+fn check_integral(sema: &mut Sema, node: &ExpressionNode) -> Result<(), Diagnosis> {
+    let mut ops = Operands::take(sema, [node])?;
+    let (sema, [re]) = ops.parts();
+    if !re.ty.is_integral(sema) {
+        return Err(Diagnosis::NonIntegralStatement(re.ty));
+    }
+    Ok(())
+}
+
+fn check_for(
+    sema: &mut Sema,
+    b: &(
+        ExpressionStatementNode,
+        ExpressionStatementNode,
+        Option<ExpressionNode>,
+        StatementNode,
+    ),
+) -> Result<(), Diagnosis> {
+    let (e1, e2, e3, _) = b;
+    e1.expr.as_ref().and_then(|e| expr_to_void(sema, e));
+    e3.as_ref().and_then(|e| expr_to_void(sema, e));
+    if let Some(e) = e2.expr.as_ref() { check_scalar(sema, e) } else { Ok(()) }
 }
 
 pub fn init(

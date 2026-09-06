@@ -184,12 +184,12 @@ impl Display for JumpStatement {
 
 impl SelectionStatementNode {
     pub fn new_if(
-        expr: ExpressionNode,
-        sif: StatementNode,
-        selse: Option<StatementNode>,
+        e_condition: ExpressionNode,
+        s_if: StatementNode,
+        s_else: Option<StatementNode>,
         span: Span,
     ) -> SelectionStatementNode {
-        SelectionStatementNode::new(SelectionStatement::If(expr, sif, selse), span)
+        SelectionStatementNode::new(SelectionStatement::If(e_condition, s_if, s_else), span)
     }
 
     pub fn switch(expr: ExpressionNode, stmt: StatementNode, span: Span) -> SelectionStatementNode {

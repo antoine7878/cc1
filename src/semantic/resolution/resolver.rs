@@ -1,16 +1,17 @@
 use crate::arena::{ResolveMutWith, ResolveWith};
 use crate::ast::visit::{
-    Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_jump_statement, walk_labeled_statement,
+    Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_iteration_statement, walk_jump_statement,
+    walk_labeled_statement, walk_selection_statement,
 };
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Expression, ExpressionNode,
-    FunctionDefinitionNode, InitDeclaratorNode, InitializerNode, JumpStatement, JumpStatementNode, Labeled,
-    LabeledStatementNode, Name, Storage, TypeSpecifier,
+    FunctionDefinitionNode, InitDeclaratorNode, InitializerNode, IterationStatementNode, JumpStatement,
+    JumpStatementNode, Labeled, LabeledStatementNode, Name, SelectionStatementNode, Storage, TypeSpecifier,
 };
 use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::model::initializer;
-use crate::semantic::resolution::expression;
+use crate::semantic::resolution::expression::{self};
 use crate::semantic::{
     AssignmentContext, DeclaredParams, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId,
     ParamInfo, ParamTypes, QualifiedType, ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain,
@@ -370,6 +371,16 @@ impl Visitor for SymbolResolver<'_> {
         walk_declaration(self, ctx, node);
     }
 
+    fn visit_init_declarator(&mut self, ctx: &Context, node: &InitDeclaratorNode) {
+        let decl = &node.declarator;
+        let Some(&sym) = self.sema.declarations.get(&decl.id) else { return };
+        let Some(ty) = sym.resolve(self.sema).ty else { return };
+        self.visit_declarator(ctx, &node.declarator);
+        if let Some(init) = &node.initializer {
+            self.resolve_initializer(ctx, sym, ty, init);
+        }
+    }
+
     fn visit_labeled_statement(&mut self, ctx: &Context, node: &LabeledStatementNode) {
         match &node.inner {
             Labeled::Identifier(name, _) => self.sema.add_label_symbol(*name, &node.span, true),
@@ -379,6 +390,25 @@ impl Visitor for SymbolResolver<'_> {
             Labeled::Default(_) => (),
         }
         walk_labeled_statement(self, ctx, node);
+    }
+
+    fn visit_compound_statement(&mut self, ctx: &Context, node: &CompoundStatementNode) {
+        match self.sema.scopes.kind() {
+            ScopeKind::Prototype => self.sema.scopes.set_kind(ScopeKind::Function),
+            _ => self.sema.scopes.push(ScopeKind::Block),
+        }
+        walk_compound_statement(self, ctx, node);
+        self.sema.scopes.pop();
+    }
+
+    fn visit_selection_statement(&mut self, ctx: &Context, node: &SelectionStatementNode) {
+        walk_selection_statement(self, ctx, node);
+        expression::check_selection_statement(self.sema, node);
+    }
+
+    fn visit_iteration_statement(&mut self, ctx: &Context, node: &IterationStatementNode) {
+        walk_iteration_statement(self, ctx, node);
+        expression::check_iteration_statement(self.sema, node);
     }
 
     fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode) {
@@ -396,15 +426,6 @@ impl Visitor for SymbolResolver<'_> {
         }
     }
 
-    fn visit_compound_statement(&mut self, ctx: &Context, node: &CompoundStatementNode) {
-        match self.sema.scopes.kind() {
-            ScopeKind::Prototype => self.sema.scopes.set_kind(ScopeKind::Function),
-            _ => self.sema.scopes.push(ScopeKind::Block),
-        }
-        walk_compound_statement(self, ctx, node);
-        self.sema.scopes.pop();
-    }
-
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
         if let Expression::FunctionCall(f, _) = node.id.resolve(ctx)
             && let Expression::Identifier(fn_name) = f.id.resolve(ctx)
@@ -414,15 +435,5 @@ impl Visitor for SymbolResolver<'_> {
         }
         walk_expression(self, ctx, node);
         self.resolve_expression(ctx, node);
-    }
-
-    fn visit_init_declarator(&mut self, ctx: &Context, node: &InitDeclaratorNode) {
-        let decl = &node.declarator;
-        let Some(&sym) = self.sema.declarations.get(&decl.id) else { return };
-        let Some(ty) = sym.resolve(self.sema).ty else { return };
-        self.visit_declarator(ctx, &node.declarator);
-        if let Some(init) = &node.initializer {
-            self.resolve_initializer(ctx, sym, ty, init);
-        }
     }
 }

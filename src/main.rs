@@ -6,16 +6,15 @@ use cc1::semantic::Analyzer;
 
 fn main() {
     Pipeline::default()
-        .pass(parse_args)
-        .checkpoint()
-        .pass(parser::parse_source)
-        .checkpoint()
-        .pass(Analyzer::init)
-        .pass(Analyzer::resolve_names)
-        .pass(Analyzer::check_constants)
-        .pass(Analyzer::mark_uses)
-        .pass(Analyzer::finish)
-        .checkpoint()
+        .pass_group([parse_args])
+        .pass_group([parser::parse_source])
+        .pass_group([
+            Analyzer::init,
+            Analyzer::resolve_names,
+            Analyzer::check_constants,
+            Analyzer::mark_uses,
+            Analyzer::finish,
+        ])
         .report(AstPrinter::print)
         .report(Context::dump_symbols)
         .finally(Context::dump_diagnostics);
