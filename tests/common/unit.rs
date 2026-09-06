@@ -251,6 +251,21 @@ impl Unit {
             .collect()
     }
 
+    pub fn member_refs(&self) -> Vec<(String, String, usize)> {
+        (0..self.ctx.sema.member_refs.len())
+            .map(ExpressionId::from)
+            .filter(|&id| self.ctx.sema.member_refs.seen(id))
+            .filter_map(|id| {
+                let reference = self.ctx.sema.member_refs.get(id).copied()?;
+                let sym = reference.member(&self.ctx.sema).sym?;
+                let member = self.ctx.sema.symbols.get(sym).name.id.resolve(&self.ctx).clone();
+                let tag = self.ctx.sema.tags.get(reference.tag).name;
+                let tag = tag.map_or_else(|| "<anonymous>".to_string(), |n| n.id.resolve(&self.ctx).clone());
+                Some((member, tag, reference.index))
+            })
+            .collect()
+    }
+
     pub fn symbols(&self) -> Vec<(String, String, String)> {
         self.ctx
             .sema
@@ -481,6 +496,24 @@ pub fn run_uses(name: &str, src: &str, expected: &[(&str, bool)]) {
     let got = unit.uses();
     let expected: Vec<(String, bool)> = expected.iter().map(|(n, u)| (n.to_string(), *u)).collect();
     assert_eq!(got, expected, "`{name}` symbol uses:\n{src}");
+}
+
+pub fn run_member_refs(name: &str, src: &str, expected: &[(&str, &str, usize)]) {
+    let unit = Unit::compile(src);
+
+    assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
+    assert!(
+        unit.diagnosis().is_empty(),
+        "`{name}` unexpected diagnosis:\n{src}\n{}",
+        unit.render()
+    );
+
+    let got = unit.member_refs();
+    let expected: Vec<(String, String, usize)> = expected
+        .iter()
+        .map(|(m, t, i)| (m.to_string(), t.to_string(), *i))
+        .collect();
+    assert_eq!(got, expected, "`{name}` member refs:\n{src}");
 }
 
 pub fn run_placements(name: &str, src: &str, expected: &[(&str, &str, &str, &str)]) {

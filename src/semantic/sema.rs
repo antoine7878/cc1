@@ -8,8 +8,8 @@ use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::{
     Builtins, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, InitializerArena, Linkage,
-    QualifiedType, ResolvedExpression, ResolvedStatement, ResolvedTypeArena, ResolvedTypeId, ScopeKind, Scopes, Symbol,
-    SymbolArena, SymbolId, SymbolKind, TagDefArena, TagDefId,
+    MemberRef, QualifiedType, ResolvedExpression, ResolvedStatement, ResolvedTypeArena, ResolvedTypeId, ScopeKind,
+    Scopes, Symbol, SymbolArena, SymbolId, SymbolKind, TagDefArena, TagDefId,
 };
 use crate::target::{Layout, Target};
 
@@ -35,6 +35,7 @@ pub struct Sema {
     pub expr_types: SideTable<ExpressionId, ResolvedExpression>,
     pub expr_bindings: SideTable<ExpressionId, SymbolId>,
     pub expr_consts: SideTable<ExpressionId, Value>,
+    pub member_refs: SideTable<ExpressionId, MemberRef>,
     pub declarations: HashMap<DeclaratorId, SymbolId>,
     pub externals: HashMap<StringId, External>,
     pub stmts: SideTable<StatementId, ResolvedStatement>,
@@ -61,6 +62,7 @@ impl Default for Sema {
             expr_types: SideTable::default(),
             expr_bindings: SideTable::default(),
             expr_consts: SideTable::default(),
+            member_refs: SideTable::default(),
             stmts: SideTable::default(),
 
             declarations: HashMap::default(),
@@ -99,6 +101,7 @@ impl Sema {
         self.expr_types.resize(len);
         self.expr_bindings.resize(len);
         self.expr_consts.resize(len);
+        self.member_refs.resize(len);
     }
 
     // ----- Resolution --------------------

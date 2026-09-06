@@ -687,3 +687,39 @@ recover!(
     [Diagnosis::CastToNonScalar],
     &[]
 );
+
+member_refs!(
+    member_ref_of_a_dot_access,
+    "struct S { int a; int b; }; int f(struct S s) { return s.b; }",
+    &[("b", "S", 1)]
+);
+
+member_refs!(
+    member_ref_of_an_arrow_access,
+    "struct S { int a; int b; }; int f(struct S *p) { return p->a; }",
+    &[("a", "S", 0)]
+);
+
+member_refs!(
+    member_ref_of_a_union_access,
+    "union U { int a; long b; }; long f(union U u) { return u.b; }",
+    &[("b", "U", 1)]
+);
+
+member_refs!(
+    member_ref_of_an_anonymous_tag,
+    "struct { int a; int b; } s; int f(void) { return s.b; }",
+    &[("b", "<anonymous>", 1)]
+);
+
+member_refs!(
+    member_ref_of_a_nested_access,
+    "struct I { int x; }; struct O { int a; struct I i; }; int f(struct O o) { return o.i.x; }",
+    &[("i", "O", 1), ("x", "I", 0)]
+);
+
+member_refs!(
+    member_ref_indexes_past_an_unnamed_bit_field,
+    "struct S { int a : 3; int : 5; int b : 4; }; int f(struct S s) { return s.b; }",
+    &[("b", "S", 2)]
+);

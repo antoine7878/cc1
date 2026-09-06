@@ -10,8 +10,8 @@ use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::ExpressionKind::{LValue, RValue};
 use crate::semantic::{
-    AssignmentContext, Diag, DiagCollector, Diagnosis, ExpressionKind, ParamTypes, QualifiedType, ResolvedExpression,
-    ResolvedType, Sema, SymbolId, SymbolKind, cast, declaration, ice, layout,
+    AssignmentContext, Diag, DiagCollector, Diagnosis, ExpressionKind, MemberRef, ParamTypes, QualifiedType,
+    ResolvedExpression, ResolvedType, Sema, SymbolId, SymbolKind, cast, declaration, ice, layout,
 };
 
 type R = Result<(QualifiedType, ExpressionKind), Diagnosis>;
@@ -237,10 +237,11 @@ fn member(sema: &mut Sema, node: &ExpressionNode, op: MemberOp, e: &ExpressionNo
     if tag.kind != Tag::Struct && tag.kind != Tag::Union {
         return Err(Diagnosis::AccessNotStuctOrUnion(tag_qty));
     }
-    let Some(sym_id) = tag.get_member(sema, name) else {
+    let Some((index, sym_id)) = tag.find_member(sema, name) else {
         return Err(Diagnosis::AccessNotMember(tag_qty, name.id));
     };
     sema.expr_bindings.set(node.id, Some(sym_id));
+    sema.member_refs.set(node.id, Some(MemberRef { tag: tag_id, index }));
     let sym = sym_id.resolve(sema);
     let ty = sym.ty.ok_or(Diagnosis::Poisoned)?;
     let qty = QualifiedType::new(

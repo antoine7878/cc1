@@ -40,6 +40,18 @@ impl Member {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MemberRef {
+    pub tag: TagDefId,
+    pub index: usize,
+}
+
+impl MemberRef {
+    pub fn member(self, sema: &Sema) -> Member {
+        sema.tags.get(self.tag).members[self.index]
+    }
+}
+
 impl Tag {
     pub fn symbol_kind(self) -> SymbolKind {
         match self {
@@ -59,10 +71,10 @@ impl TagDef {
         matches!(self.kind, Tag::Enum)
     }
 
-    pub fn get_member(&self, sema: &Sema, name: &Name) -> Option<SymbolId> {
-        self.members.iter().find_map(|&member| {
+    pub fn find_member(&self, sema: &Sema, name: &Name) -> Option<(usize, SymbolId)> {
+        self.members.iter().enumerate().find_map(|(index, member)| {
             let sym_id = member.sym?;
-            (sema.symbols.get(sym_id).name.id == name.id).then_some(sym_id)
+            (sema.symbols.get(sym_id).name.id == name.id).then_some((index, sym_id))
         })
     }
 }

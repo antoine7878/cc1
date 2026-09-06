@@ -124,6 +124,15 @@ macro_rules! uses {
 }
 
 #[macro_export]
+macro_rules! member_refs {
+    ($name:ident, $src:expr, $expected:expr) => {
+        test_case!($name, {
+            $crate::common::run_member_refs(stringify!($name), $src, $expected);
+        });
+    };
+}
+
+#[macro_export]
 macro_rules! placements {
     ($name:ident, $src:expr, $expected:expr) => {
         test_case!($name, {
