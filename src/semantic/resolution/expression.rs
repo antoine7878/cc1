@@ -1,6 +1,6 @@
 use std::iter::zip;
 
-use crate::arena::{Loan, ResolveWith};
+use crate::arena::{Loan, OptionPoisoned, ResolveWith};
 use crate::ast::{
     BinaryOp, Expression, ExpressionId, ExpressionNode, ExpressionStatementNode, IterationStatement,
     IterationStatementNode, MemberOp, Name, SelectionStatement, SelectionStatementNode, StatementNode, Storage, Tag,
@@ -15,6 +15,12 @@ use crate::semantic::{
 };
 
 type R = Result<(QualifiedType, ExpressionKind), Diagnosis>;
+
+type Operands<'s, const N: usize> = Loan<'s, Sema, ExpressionId, ResolvedExpression, N>;
+
+fn operands<'s, const N: usize>(sema: &'s mut Sema, nodes: [&ExpressionNode; N]) -> Result<Operands<'s, N>, Diagnosis> {
+    Loan::take(sema, nodes.map(|n| n.id)).ok_poisoned()
+}
 
 pub fn resolve_expression(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
     if sema.expr_types.seen(node.id) {
@@ -833,20 +839,4 @@ fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> R {
         Expression::Cast(ty_node, operand) => cast(sema, ctx, node, ty_node, operand),
         Expression::List(es) => list(sema, es),
     }
-}
-
-trait OptionPoisoned<T> {
-    fn ok_poisoned(self) -> Result<T, Diagnosis>;
-}
-
-impl<T> OptionPoisoned<T> for Option<T> {
-    fn ok_poisoned(self) -> Result<T, Diagnosis> {
-        self.ok_or(Diagnosis::Poisoned)
-    }
-}
-
-type Operands<'s, const N: usize> = Loan<'s, Sema, ExpressionId, ResolvedExpression, N>;
-
-fn operands<'s, const N: usize>(sema: &'s mut Sema, nodes: [&ExpressionNode; N]) -> Result<Operands<'s, N>, Diagnosis> {
-    Loan::take(sema, nodes.map(|n| n.id)).ok_poisoned()
 }

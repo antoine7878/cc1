@@ -453,6 +453,7 @@ impl Visitor for SymbolResolver<'_> {
     }
 
     fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode) {
+        walk_jump_statement(self, ctx, node);
         match &node.stmt {
             JumpStatement::Goto(name) => self.sema.add_label_symbol(*name, &node.span, false),
             JumpStatement::Return(e) => {
@@ -463,7 +464,9 @@ impl Visitor for SymbolResolver<'_> {
                     self.resolve_return(ctx, node, return_ty);
                 }
             }
-            _ => walk_jump_statement(self, ctx, node),
+            // JumpStatement::Continue => (),
+            // JumpStatement::Break => (),
+            _ => (),
         }
     }
 

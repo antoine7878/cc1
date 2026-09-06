@@ -10,15 +10,19 @@ pub enum ResolvedStatement {
         continue_target: StatementId,
         reachable: bool,
     },
+    Continue(SymbolId),
+
     Switch {
         control_ty: QualifiedType,
         cases: Vec<(Value, StatementId)>,
         default: Option<StatementId>,
     },
+
     Case(Value, StatementId),
     Default(SymbolId),
+
     Break(SymbolId),
-    Continue(SymbolId),
+
     Goto(SymbolId),
     Label(SymbolId),
 }

@@ -3,6 +3,7 @@ pub mod expression;
 pub mod externals;
 pub mod resolver;
 pub mod scope;
+pub mod statement;
 pub mod uses;
 
 pub use expression::resolve_expression;

@@ -74,6 +74,12 @@ impl Default for Sema {
     }
 }
 
+impl HasTable<StatementId, ResolvedStatement> for Sema {
+    fn table(&mut self) -> &mut SideTable<StatementId, ResolvedStatement> {
+        &mut self.stmts
+    }
+}
+
 impl HasTable<ExpressionId, ResolvedExpression> for Sema {
     fn table(&mut self) -> &mut SideTable<ExpressionId, ResolvedExpression> {
         &mut self.expr_types

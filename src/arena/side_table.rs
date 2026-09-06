@@ -2,6 +2,7 @@ use std::iter::zip;
 use std::marker::PhantomData;
 
 use crate::arena::ArenaKey;
+use crate::semantic::Diagnosis;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Slot<T> {
@@ -123,5 +124,15 @@ impl<H: HasTable<Id, Val>, Id: ArenaKey, Val, const N: usize> Drop for Loan<'_, 
         for (id, val) in zip(self.ids, self.values.take().unwrap()) {
             self.holder.table().give(id, val);
         }
+    }
+}
+
+pub trait OptionPoisoned<T> {
+    fn ok_poisoned(self) -> Result<T, Diagnosis>;
+}
+
+impl<T> OptionPoisoned<T> for Option<T> {
+    fn ok_poisoned(self) -> Result<T, Diagnosis> {
+        self.ok_or(Diagnosis::Poisoned)
     }
 }
