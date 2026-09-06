@@ -3,7 +3,7 @@ struct S {
 };
 
 void fn(void) {
-	struct S a;
-	for (;;) {
+	int a = 1;
+	if (a) {
 	}
 }
