@@ -1,8 +1,10 @@
 use crate::arena::{Loan, OptionPoisoned};
+use crate::ast::Statement;
 use crate::ast::{
     ExpressionNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, SelectionStatement,
     SelectionStatementNode, StatementNode, statement::StatementId,
 };
+use crate::context::Context;
 use crate::semantic::resolution::expression::operands;
 use crate::semantic::{Diag, DiagCollector, Diagnosis, ResolvedStatement, Sema, cast};
 
@@ -15,7 +17,11 @@ fn substatements<'s, const N: usize>(
     Loan::take(sema, nodes.map(|n| n.id)).ok_poisoned()
 }
 
-pub fn st(sema: &mut Sema, stmt: StatementNode) {}
+// pub fn st(sema: &mut Sema, ctx: &Context, stmt: StatementNode) {
+//     match stmt.id.resolve(ctx) {
+//         Statement::Labeled(l) => (),
+//     }
+// }
 
 pub fn check_selection_statement(sema: &mut Sema, node: &SelectionStatementNode) {
     let res = match &node.stmt {
