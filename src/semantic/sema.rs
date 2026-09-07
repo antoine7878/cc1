@@ -106,8 +106,8 @@ impl Sema {
         self.expr_bindings.resize(len);
         self.expr_consts.resize(len);
         self.member_refs.resize(len);
+        self.stmts.resize(arenas.statements.len());
     }
-
     // ----- Externals ---------------------
 
     pub fn linkage_of_name(&self, name: StringId) -> Option<Linkage> {

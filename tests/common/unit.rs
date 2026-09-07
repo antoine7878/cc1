@@ -286,6 +286,19 @@ impl Unit {
             .collect()
     }
 
+    pub fn labels(&self) -> Vec<(String, Vec<String>)> {
+        self.ctx
+            .sema
+            .functions
+            .iter()
+            .map(|def| {
+                let name = self.ctx.sema.symbols.get(def.sym).name.id.resolve(&self.ctx).clone();
+                let labels = def.labels.iter().map(|l| l.id.resolve(&self.ctx).clone()).collect();
+                (name, labels)
+            })
+            .collect()
+    }
+
     fn render_initializer(&self, init: &Initializer) -> String {
         match init {
             Initializer::Zero => "0".to_string(),
@@ -568,6 +581,23 @@ pub fn run_initializers(name: &str, src: &str, expected: &[(&str, &str)]) {
     let got = unit.initializers();
     let expected: Vec<(String, String)> = expected.iter().map(|(s, i)| (s.to_string(), i.to_string())).collect();
     assert_eq!(got, expected, "`{name}` initializers:\n{src}");
+}
+
+pub fn run_labels(name: &str, src: &str, expected: &[(&str, &[&str])]) {
+    let unit = Unit::compile(src);
+
+    assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
+    assert!(
+        unit.diagnosis().is_empty(),
+        "`{name}` unexpected diagnosis:\n{src}\n{}",
+        unit.render()
+    );
+
+    let expected: Vec<(String, Vec<String>)> = expected
+        .iter()
+        .map(|(f, labels)| (f.to_string(), labels.iter().map(|l| l.to_string()).collect()))
+        .collect();
+    assert_eq!(unit.labels(), expected, "wrong labels for `{name}`:\n{src}");
 }
 
 pub fn run_member_refs(name: &str, src: &str, expected: &[(&str, &str, usize)]) {

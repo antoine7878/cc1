@@ -15,13 +15,7 @@ pub fn size_of_e(sema: &mut Sema, node: &ExpressionNode, e: &ExpressionNode) -> 
     Ok(result)
 }
 
-pub fn size_of_ty(
-    resolver: &mut SymbolResolver,
-    ctx: &Context,
-    node: &ExpressionNode,
-    ty: &Type,
-    span: &Span,
-) -> R {
+pub fn size_of_ty(resolver: &mut SymbolResolver, ctx: &Context, node: &ExpressionNode, ty: &Type, span: &Span) -> R {
     let base = declaration::base_type(resolver, ctx, &ty.specifiers, span);
     let (ty, _) = declaration::declared_type(resolver, ctx, base, &ty.declarator).ok_poisoned()?;
     let result = size_t(resolver.sema, ty, false)?;

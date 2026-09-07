@@ -13,6 +13,7 @@ pub struct FunctionDef {
     pub sym: SymbolId,
     pub parameters: Vec<SymbolId>,
     pub is_complete: bool,
+    pub labels: Vec<Name>,
 }
 
 impl FunctionDefArena {
@@ -21,6 +22,7 @@ impl FunctionDefArena {
             sym,
             parameters: Vec::new(),
             is_complete: false,
+            labels: Vec::new(),
         })
     }
 

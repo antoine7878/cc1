@@ -8,12 +8,7 @@ use crate::semantic::{
     SymbolResolver, constrain,
 };
 
-pub fn requires_complete_object(
-    resolver: &SymbolResolver,
-    ty: QualifiedType,
-    storage: Storage,
-    is_init: bool,
-) -> bool {
+pub fn requires_complete_object(resolver: &SymbolResolver, ty: QualifiedType, storage: Storage, is_init: bool) -> bool {
     if ty.is_void(resolver.sema) {
         return true;
     }

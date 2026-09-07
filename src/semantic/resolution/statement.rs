@@ -1,33 +1,70 @@
-use crate::arena::{Loan, OptionPoisoned};
+use crate::ast::statement::StatementId;
 use crate::ast::{
-    ExpressionNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, JumpStatement,
+    ExpressionNode, ExpressionStatementNode, Fold, IterationStatement, IterationStatementNode, JumpStatement,
     JumpStatementNode, Labeled, LabeledStatementNode, SelectionStatement, SelectionStatementNode, StatementNode,
-    statement::StatementId,
 };
 use crate::context::Context;
 use crate::semantic::resolution::expression::{self, operands};
+use crate::semantic::resolved_statement::StatementScope;
 use crate::semantic::{
     AssignmentContext, Diag, DiagCollector, Diagnosis, QualifiedType, ResolvedStatement, ScopeKind, Sema,
     SymbolResolver, cast,
 };
 
-type Substatements<'s, const N: usize> = Loan<'s, Sema, StatementId, ResolvedStatement, N>;
+pub type R = Result<(), Diagnosis>;
 
-fn substatements<'s, const N: usize>(
-    sema: &'s mut Sema,
-    nodes: [&StatementNode; N],
-) -> Result<Substatements<'s, N>, Diagnosis> {
-    Loan::take(sema, nodes.map(|n| n.id)).ok_poisoned()
+pub fn check_labeled_statement(
+    resolver: &mut SymbolResolver,
+    ctx: &Context,
+    id: StatementId,
+    node: &LabeledStatementNode,
+) {
+    let res = match &node.inner {
+        Labeled::Identifier(name, _) => {
+            resolver.define_label(*name, &node.span);
+            resolver.sema.stmts.set(id, Some(ResolvedStatement::Label(name.id)));
+            Ok(())
+        }
+        Labeled::Case(expr, _) => check_case(resolver, ctx, id, expr),
+        Labeled::Default(_) => check_default(resolver, id),
+    };
+    if let Err(diag) = res {
+        resolver.sema.add_diag(Diag::err((), diag), &node.span);
+    }
 }
 
-pub fn check_labeled_statement(resolver: &mut SymbolResolver, ctx: &Context, node: &LabeledStatementNode) {
-    match &node.inner {
-        Labeled::Identifier(name, _) => resolver.add_label_symbol(*name, &node.span, true),
-        Labeled::Case(expr, _) => {
-            resolver.eval_constant(ctx, expr);
-        }
-        Labeled::Default(_) => (),
+fn check_case(resolver: &mut SymbolResolver, ctx: &Context, id: StatementId, expr: &ExpressionNode) -> R {
+    let value = resolver.eval_constant(ctx, expr);
+    let sema = &mut resolver.sema;
+    let Some(StatementScope::Switch {
+        stmt, cases, control, ..
+    }) = resolver.stmt_scopes.last_mut()
+    else {
+        return Err(Diagnosis::OutsideSwitch("case"));
+    };
+    let stmt = *stmt;
+    let Some(value) = value else { return Err(Diagnosis::Poisoned) };
+    let ty = sema.types.get(control.id);
+    Fold::new(&sema.target).convert(ty, value);
+    if cases.iter().any(|(v, _)| value == *v) {
+        return Err(Diagnosis::DuplicateCase(value));
     }
+    cases.push((value, id));
+    sema.stmts.set(id, Some(ResolvedStatement::Case(value, stmt)));
+    Ok(())
+}
+
+fn check_default(resolver: &mut SymbolResolver, id: StatementId) -> R {
+    let Some(StatementScope::Switch { stmt, default, .. }) = resolver.stmt_scopes.last_mut() else {
+        return Err(Diagnosis::OutsideSwitch("default"));
+    };
+    let stmt = *stmt;
+    if default.is_some() {
+        return Err(Diagnosis::DuplicateDefault);
+    }
+    *default = Some(id);
+    resolver.sema.stmts.set(id, Some(ResolvedStatement::Default(stmt)));
+    Ok(())
 }
 
 pub fn enter_compound_statement(resolver: &mut SymbolResolver) {
@@ -41,13 +78,17 @@ pub fn leave_compound_statement(resolver: &mut SymbolResolver) {
     resolver.leave_scope();
 }
 
-pub fn check_selection_statement(sema: &mut Sema, node: &SelectionStatementNode) {
+pub fn check_selection_statement(sema: &mut Sema, node: &SelectionStatementNode) -> QualifiedType {
     let res = match &node.stmt {
         SelectionStatement::If(e1, _, _) => check_scalar(sema, e1),
         SelectionStatement::Switch(e, _) => check_integral(sema, e),
     };
-    if let Err(diag) = res {
-        sema.add_diag(Diag::err((), diag), &node.span);
+    match res {
+        Err(diag) => {
+            sema.add_diag(Diag::err((), diag), &node.span);
+            QualifiedType::plain(sema.builtins.int)
+        }
+        Ok(r) => r,
     }
 }
 
@@ -69,24 +110,25 @@ pub fn check_iteration_statement(sema: &mut Sema, node: &IterationStatementNode)
     }
 }
 
-fn check_scalar(sema: &mut Sema, node: &ExpressionNode) -> Result<(), Diagnosis> {
+fn check_scalar(sema: &mut Sema, node: &ExpressionNode) -> Result<QualifiedType, Diagnosis> {
     let mut ops = operands(sema, [node])?;
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &node.span);
     if !re.ty.is_scalar(sema) {
         return Err(Diagnosis::NonScalarStatement(re.ty));
     }
-    Ok(())
+    Ok(re.ty)
 }
 
-fn check_integral(sema: &mut Sema, node: &ExpressionNode) -> Result<(), Diagnosis> {
+fn check_integral(sema: &mut Sema, node: &ExpressionNode) -> Result<QualifiedType, Diagnosis> {
     let mut ops = operands(sema, [node])?;
     let (sema, [re]) = ops.parts();
     cast::lvalue_conversion(sema, re, &node.span);
     if !re.ty.is_integral(sema) {
         return Err(Diagnosis::NonIntegralStatement(re.ty));
     }
-    Ok(())
+    cast::promote(sema, re);
+    Ok(re.ty)
 }
 
 fn check_for(
@@ -97,42 +139,65 @@ fn check_for(
         Option<ExpressionNode>,
         StatementNode,
     ),
-) -> Result<(), Diagnosis> {
+) -> Result<QualifiedType, Diagnosis> {
     let (e1, e2, e3, _) = b;
     e1.expr.as_ref().and_then(|e| expr_to_void(sema, e));
     e3.as_ref().and_then(|e| expr_to_void(sema, e));
-    if let Some(e) = e2.expr.as_ref() { check_scalar(sema, e) } else { Ok(()) }
+    if let Some(e) = e2.expr.as_ref() {
+        check_scalar(sema, e)
+    } else {
+        Ok(QualifiedType::plain(sema.builtins.int))
+    }
 }
 
 pub fn check_jump_statement(
     resolver: &mut SymbolResolver,
     ctx: &Context,
+    id: StatementId,
     node: &JumpStatementNode,
     return_ty: Option<QualifiedType>,
 ) {
-    match &node.stmt {
-        JumpStatement::Goto(name) => resolver.add_label_symbol(*name, &node.span, false),
-        JumpStatement::Return(_) => {
-            if let Some(return_ty) = return_ty {
-                check_return(resolver.sema, ctx, node, return_ty);
-            }
+    let res = match &node.stmt {
+        JumpStatement::Goto(name) => {
+            resolver.reference_label(*name);
+            resolver.sema.stmts.set(id, Some(ResolvedStatement::Goto(name.id)));
+            Ok(())
         }
-        // JumpStatement::Continue => (),
-        // JumpStatement::Break => (),
-        _ => (),
+        JumpStatement::Return(_) => {
+            check_return(resolver.sema, ctx, node, return_ty.expect("a return inside a function"))
+        }
+        JumpStatement::Break => check_break(resolver, id),
+        JumpStatement::Continue => check_continue(resolver, id),
+    };
+    if let Err(diag) = res {
+        resolver.sema.add_diag(Diag::err((), diag), &node.span);
     }
 }
 
-fn check_return(sema: &mut Sema, ctx: &Context, node: &JumpStatementNode, return_ty: QualifiedType) {
+fn check_break(resolver: &mut SymbolResolver, id: StatementId) -> R {
+    let &stmt = match resolver.stmt_scopes.last() {
+        Some(StatementScope::Loop(stmt)) => stmt,
+        Some(StatementScope::Switch { stmt, .. }) => stmt,
+        None => return Err(Diagnosis::BreakNotInLoop),
+    };
+    resolver.sema.stmts.set(id, Some(ResolvedStatement::Break(stmt)));
+    Ok(())
+}
+
+fn check_continue(resolver: &mut SymbolResolver, id: StatementId) -> R {
+    let Some(&StatementScope::Loop(stmt)) = resolver.stmt_scopes.last() else {
+        return Err(Diagnosis::ContinueNotInLoop);
+    };
+    resolver.sema.stmts.set(id, Some(ResolvedStatement::Continue(stmt)));
+    Ok(())
+}
+
+fn check_return(sema: &mut Sema, ctx: &Context, node: &JumpStatementNode, return_ty: QualifiedType) -> R {
     match &node.stmt {
         JumpStatement::Return(Some(e)) => {
-            if let Err(inner) = expression::init(sema, ctx, return_ty, e, AssignmentContext::Return) {
-                sema.add_diag(Diag::err((), inner), &e.span);
-            }
+            expression::init(sema, ctx, return_ty, e, AssignmentContext::Return).map(|_| ())
         }
-        JumpStatement::Return(None) if return_ty.id != sema.builtins.void => {
-            sema.add_diag(Diag::err((), Diagnosis::InvalidReturnType), &node.span);
-        }
-        _ => (),
+        JumpStatement::Return(None) if return_ty.id != sema.builtins.void => Err(Diagnosis::InvalidReturnType),
+        _ => unreachable!(),
     }
 }

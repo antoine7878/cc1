@@ -147,10 +147,6 @@ impl Symbol {
         }
     }
 
-    pub fn label(name: Name, is_init: bool) -> Self {
-        Self::new(name, None, None, SymbolKind::Label, is_init)
-    }
-
     pub fn is_compatible(&self, sema: &Sema, other: &Self) -> bool {
         self.name.id == other.name.id
             && self.kind == other.kind
@@ -174,7 +170,6 @@ pub enum SymbolKind {
     Enum,
     Union,
     Member,
-    Label,
     Typedef,
     Variant,
 }
@@ -219,7 +214,6 @@ impl fmt::Display for SymbolKind {
             SymbolKind::Enum => write!(f, "enum"),
             SymbolKind::Union => write!(f, "union"),
             SymbolKind::Member => write!(f, "member"),
-            SymbolKind::Label => write!(f, "label"),
             SymbolKind::Typedef => write!(f, "typedef"),
             SymbolKind::Variant => write!(f, "variant"),
         }

@@ -8,6 +8,7 @@ use crate::semantic::{
     ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, SymbolResolver, constrain,
 };
 
+#[derive(Debug, Clone)]
 pub struct FunctionHeader {
     pub id: FunctionDefId,
     pub params: DeclaredParams,
@@ -57,7 +58,7 @@ pub fn define_function(
     constrain::specifier::check_external_specifiers(&node.specifiers).collect(resolver, span);
 
     let name = decl.ident(ctx)?;
-    let previous = resolver.current(SymbolKind::Function, name.id);
+    let previous = resolver.current(name.id);
     let declared = previous.and_then(|id| param_types(resolver.sema, id));
     let ty = match &declared {
         Some(declared) if !matches!(params, DeclaredParams::Prototype { .. }) => {
@@ -65,7 +66,9 @@ pub fn define_function(
         }
         _ => rty,
     };
-    let &ResolvedType::Function { ret: return_ty, .. } = ty.id.resolve(resolver.sema) else { unreachable!() };
+    let &ResolvedType::Function { ret: return_ty, .. } = ty.id.resolve(resolver.sema) else {
+        unreachable!()
+    };
     let is_defined_return = return_ty.is_void(resolver.sema) || return_ty.is_complete(resolver.sema);
     constrain::ty::check_definition_return(is_defined_return, return_ty).collect(resolver, decl_span);
     let prior = resolver.sema.linkage_of_name(name.id);
@@ -149,7 +152,10 @@ fn param_prototype(
         constrain::parameter::check_complete_parameter(param.ty.is_complete(resolver.sema), param.ty)
             .collect(resolver, &param.span);
     }
-    params.iter().filter_map(|param| add_parameter(resolver, param)).collect()
+    params
+        .iter()
+        .filter_map(|param| add_parameter(resolver, param))
+        .collect()
 }
 
 fn add_parameter(resolver: &mut SymbolResolver, param: &ParamInfo) -> Option<SymbolId> {

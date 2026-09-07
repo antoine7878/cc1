@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 use std::io::{self, Write, stderr};
 
-use crate::ast::{Name, StringId, UnaryOp};
+use crate::ast::{Name, StringId, UnaryOp, Value};
 use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::{QualifiedType, SymbolKind};
@@ -9,6 +9,14 @@ use crate::utils::{RED, RESET, YELLOW};
 
 #[derive(Clone, Debug)]
 pub enum Diagnosis {
+    OutsideSwitch(&'static str),
+    DuplicateCase(Value),
+    DuplicateDefault,
+    BreakNotInLoop,
+    ContinueNotInLoop,
+    DuplicateLabel(Name),
+    UndefinedLabel(Name),
+
     Poisoned,
     InvalidOperand,
     SyntaxError {
@@ -220,6 +228,14 @@ impl DiagnosisNode {
     fn message(&self, ctx: &Context) -> String {
         let sema = &ctx.sema;
         match &self.inner {
+            Diagnosis::OutsideSwitch(s) =>format!("'{}' statement not in switch statement", s),
+            Diagnosis::DuplicateCase(value) => format!("duplicate case value '{}'", value.to_u64()),
+            Diagnosis::DuplicateDefault => "multiple default labels in one switch".to_string(),
+            Diagnosis::BreakNotInLoop => "'break' statement not in loop or switch statement".to_string(),
+            Diagnosis::ContinueNotInLoop => "'continue' statement not in loop statement".to_string(),
+            Diagnosis::DuplicateLabel(name) => format!("redefinition of label '{}'", name.id.resolve(ctx)),
+            Diagnosis::UndefinedLabel(name) => format!("use of undeclared label '{}'", name.id.resolve(ctx)),
+
             Diagnosis::Poisoned => "Internal error".to_string(),
             Diagnosis::InvalidOperand => "invalid operand".to_string(),
             Diagnosis::SyntaxError { found, expected } if expected.is_empty() => format!("syntax error, unexpected {}", token_label(found)),

@@ -1,6 +1,7 @@
-struct S {
-	int x;
-	int y;
-} s;
 
-int *p = &s.y;
+int main(void) {
+	int a;
+a:
+a:
+	return 0;
+}

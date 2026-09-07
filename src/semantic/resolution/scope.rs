@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ast::StringId;
-use crate::semantic::{SymbolId, SymbolKind, TagDefId};
+use crate::semantic::{SymbolId, TagDefId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScopeKind {
@@ -12,18 +12,16 @@ pub enum ScopeKind {
 }
 
 #[derive(Debug)]
-pub struct Scope {
+pub struct SymbolScope {
     tags: HashMap<StringId, TagDefId>,
-    labels: HashMap<StringId, SymbolId>,
     ordinaries: HashMap<StringId, SymbolId>,
     pub kind: ScopeKind,
 }
 
-impl Scope {
+impl SymbolScope {
     fn new(kind: ScopeKind) -> Self {
         Self {
             tags: HashMap::new(),
-            labels: HashMap::new(),
             ordinaries: HashMap::new(),
             kind,
         }
@@ -31,11 +29,11 @@ impl Scope {
 }
 
 #[derive(Default, Debug)]
-pub struct Scopes(Vec<Scope>);
+pub struct SymbolScopes(Vec<SymbolScope>);
 
-impl Scopes {
+impl SymbolScopes {
     pub fn push(&mut self, kind: ScopeKind) {
-        self.0.push(Scope::new(kind));
+        self.0.push(SymbolScope::new(kind));
     }
 
     pub fn pop(&mut self) {
@@ -46,20 +44,12 @@ impl Scopes {
         self.0.is_empty()
     }
 
-    fn last(&self) -> &Scope {
+    fn last(&self) -> &SymbolScope {
         self.0.last().unwrap()
     }
 
-    fn last_mut(&mut self) -> &mut Scope {
+    fn last_mut(&mut self) -> &mut SymbolScope {
         self.0.last_mut().unwrap()
-    }
-
-    fn function(&self) -> &Scope {
-        self.0.iter().find(|s| s.kind == ScopeKind::Function).unwrap()
-    }
-
-    fn function_mut(&mut self) -> &mut Scope {
-        self.0.iter_mut().find(|s| s.kind == ScopeKind::Function).unwrap()
     }
 
     pub fn kind(&self) -> ScopeKind {
@@ -74,10 +64,6 @@ impl Scopes {
         self.0.iter().rev().find_map(|s| s.ordinaries.get(&name)).copied()
     }
 
-    pub fn lookup_label(&self, name: StringId) -> Option<SymbolId> {
-        self.0.iter().rev().find_map(|s| s.labels.get(&name)).copied()
-    }
-
     pub fn lookup_tag(&self, name: StringId, current_only: bool) -> Option<TagDefId> {
         if current_only {
             return self.last().tags.get(&name).copied();
@@ -85,18 +71,12 @@ impl Scopes {
         self.0.iter().rev().find_map(|s| s.tags.get(&name)).copied()
     }
 
-    pub fn current(&self, kind: SymbolKind, name: StringId) -> Option<SymbolId> {
-        match kind {
-            SymbolKind::Label => self.function().labels.get(&name).copied(),
-            _ => self.last().ordinaries.get(&name).copied(),
-        }
+    pub fn current(&self, name: StringId) -> Option<SymbolId> {
+        self.last().ordinaries.get(&name).copied()
     }
 
-    pub fn insert(&mut self, kind: SymbolKind, name: StringId, id: SymbolId) {
-        match kind {
-            SymbolKind::Label => self.function_mut().labels.insert(name, id),
-            _ => self.last_mut().ordinaries.insert(name, id),
-        };
+    pub fn insert(&mut self, name: StringId, id: SymbolId) {
+        self.last_mut().ordinaries.insert(name, id);
     }
 
     pub fn insert_tag(&mut self, name: StringId, id: TagDefId) {
