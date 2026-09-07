@@ -100,20 +100,18 @@ pub(super) fn cast(
     let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
     let (qualif, _) = declaration::declared_type(sema, ctx, base, &ty_node.declarator).ok_poisoned()?;
     let is_null = is_null_pointer_constant(sema, ctx, operand);
-    with_converted(sema, [operand], |sema, [re]| cast_type(sema, qualif, re, is_null))
-}
-
-fn cast_type(sema: &mut Sema, qualif: QualifiedType, re: &mut ResolvedExpression, is_null: bool) -> R {
-    let ty = qualif.id.resolve(sema);
-    if !ty.is_void() {
-        let from = re.casted_ty().id.resolve(sema);
-        if !ty.is_scalar(sema) || !from.is_scalar(sema) {
-            return Err(Diagnosis::CastToNonScalar);
+    with_converted(sema, [operand], |sema, [re]| {
+        let ty = qualif.id.resolve(sema);
+        if !ty.is_void() {
+            let from = re.casted_ty().id.resolve(sema);
+            if !ty.is_scalar(sema) || !from.is_scalar(sema) {
+                return Err(Diagnosis::CastToNonScalar);
+            }
+            if ty.is_pointer() != from.is_pointer() && (ty.is_floating() || from.is_floating()) {
+                return Err(Diagnosis::InvalidOperand);
+            }
+            cast::convert(sema, re, qualif.id, is_null);
         }
-        if ty.is_pointer() != from.is_pointer() && (ty.is_floating() || from.is_floating()) {
-            return Err(Diagnosis::InvalidOperand);
-        }
-        cast::convert(sema, re, qualif.id, is_null);
-    }
-    Ok((qualif, RValue))
+        Ok((qualif, RValue))
+    })
 }

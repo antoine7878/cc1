@@ -4,6 +4,7 @@ mod compare;
 mod conditional;
 mod dispatch;
 mod operand;
+mod pointer;
 mod primary;
 mod sizeof;
 mod unary;
