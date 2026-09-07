@@ -1,12 +1,12 @@
 use crate::arena::ResolveWith;
 use crate::semantic::{QualifiedType, ResolvedExpression, ResolvedType, Sema, cast};
 
-pub(super) enum PointerMatch {
+pub enum PointerMatch {
     Converted,
     Compatible(QualifiedType, QualifiedType),
 }
 
-pub(super) fn reconcile(
+pub fn reconcile(
     sema: &mut Sema,
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,
@@ -43,6 +43,6 @@ pub(super) fn reconcile(
     None
 }
 
-pub(super) fn both_pointers(sema: &Sema, lhs: &ResolvedExpression, rhs: &ResolvedExpression) -> bool {
+pub fn both_pointers(sema: &Sema, lhs: &ResolvedExpression, rhs: &ResolvedExpression) -> bool {
     lhs.casted_ty().is_pointer(sema) && rhs.casted_ty().is_pointer(sema)
 }

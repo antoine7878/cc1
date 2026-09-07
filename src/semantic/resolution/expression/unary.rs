@@ -8,7 +8,7 @@ use super::operand::{
     R, check_assignable, int_rvalue, is_bit_field, is_null_pointer_constant, with_converted, with_ops,
 };
 
-pub(super) fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
+pub fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
     with_converted(sema, [e], |sema, [re]| {
         check_assignable(re)?;
         if let ResolvedType::Pointer(inner) = re.ty.id.resolve(sema)
@@ -26,7 +26,7 @@ pub(super) fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
     })
 }
 
-pub(super) fn sign(sema: &mut Sema, e: &ExpressionNode) -> R {
+pub fn sign(sema: &mut Sema, e: &ExpressionNode) -> R {
     with_converted(sema, [e], |sema, [re]| {
         if !re.casted_ty().is_arithmetic(sema) {
             return Err(Diagnosis::InvalidUnary(re.ty));
@@ -36,7 +36,7 @@ pub(super) fn sign(sema: &mut Sema, e: &ExpressionNode) -> R {
     })
 }
 
-pub(super) fn address(sema: &mut Sema, e: &ExpressionNode) -> R {
+pub fn address(sema: &mut Sema, e: &ExpressionNode) -> R {
     let id = sema.expr_bindings.get(e.id).copied();
     with_ops(sema, [e], |sema, [re]| address_type(sema, re, id))
 }
@@ -59,7 +59,7 @@ fn address_type(sema: &mut Sema, re: &mut ResolvedExpression, sym: Option<Symbol
     Ok((qty, RValue))
 }
 
-pub(super) fn indirection(sema: &mut Sema, e: &ExpressionNode) -> R {
+pub fn indirection(sema: &mut Sema, e: &ExpressionNode) -> R {
     with_converted(sema, [e], |sema, [re]| {
         let ResolvedType::Pointer(inner) = re.casted_ty().id.resolve(sema) else {
             return Err(Diagnosis::IndirectionNotPointer(re.ty));
@@ -72,7 +72,7 @@ pub(super) fn indirection(sema: &mut Sema, e: &ExpressionNode) -> R {
     })
 }
 
-pub(super) fn bit_not(sema: &mut Sema, e: &ExpressionNode) -> R {
+pub fn bit_not(sema: &mut Sema, e: &ExpressionNode) -> R {
     with_converted(sema, [e], |sema, [re]| {
         if !re.casted_ty().is_integral(sema) {
             return Err(Diagnosis::InvalidUnary(re.ty));
@@ -82,7 +82,7 @@ pub(super) fn bit_not(sema: &mut Sema, e: &ExpressionNode) -> R {
     })
 }
 
-pub(super) fn logic_not(sema: &mut Sema, e: &ExpressionNode) -> R {
+pub fn logic_not(sema: &mut Sema, e: &ExpressionNode) -> R {
     with_converted(sema, [e], |sema, [re]| {
         if !re.casted_ty().is_scalar(sema) {
             return Err(Diagnosis::InvalidUnary(re.ty));
@@ -91,7 +91,7 @@ pub(super) fn logic_not(sema: &mut Sema, e: &ExpressionNode) -> R {
     })
 }
 
-pub(super) fn cast(
+pub fn cast(
     sema: &mut Sema,
     ctx: &Context,
     node: &ExpressionNode,

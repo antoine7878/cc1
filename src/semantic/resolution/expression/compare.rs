@@ -6,7 +6,7 @@ use crate::semantic::{Diagnosis, ResolvedExpression, ResolvedType, Sema, cast};
 use super::operand::{R, int_rvalue, is_null_pointer_constant, with_converted};
 use super::pointer::{both_pointers, reconcile};
 
-pub(super) fn relational(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+pub fn relational(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
         let l = lhs.casted_ty().id.resolve(sema);
         let r = rhs.casted_ty().id.resolve(sema);
@@ -34,7 +34,7 @@ pub(super) fn relational(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNo
     })
 }
 
-pub(super) fn equality(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+pub fn equality(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let null1 = is_null_pointer_constant(sema, ctx, e1);
     let null2 = is_null_pointer_constant(sema, ctx, e2);
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
@@ -52,18 +52,18 @@ pub(super) fn equality(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: 
     })
 }
 
-pub(super) fn bitwise(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+pub fn bitwise(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| bitwise_type(sema, lhs, rhs))
 }
 
-pub(super) fn bitwise_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) -> R {
+pub fn bitwise_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) -> R {
     if !lhs.casted_ty().is_integral(sema) || !rhs.casted_ty().is_integral(sema) {
         return Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty));
     }
     cast::usual_arithmetic(sema, lhs, rhs)
 }
 
-pub(super) fn logic(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+pub fn logic(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
         if !lhs.casted_ty().is_scalar(sema) || !rhs.casted_ty().is_scalar(sema) {
             return Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty));

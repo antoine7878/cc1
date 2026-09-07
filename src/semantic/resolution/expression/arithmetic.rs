@@ -6,13 +6,13 @@ use crate::semantic::{Diagnosis, ResolvedExpression, ResolvedType, Sema, cast, i
 
 use super::operand::{R, with_converted};
 
-pub(super) fn multiplicative(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+pub fn multiplicative(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
         multiplicative_types(sema, op, lhs, rhs)
     })
 }
 
-pub(super) fn multiplicative_types(
+pub fn multiplicative_types(
     sema: &mut Sema,
     op: &BinaryOp,
     lhs: &mut ResolvedExpression,
@@ -30,7 +30,7 @@ pub(super) fn multiplicative_types(
     cast::usual_arithmetic(sema, lhs, rhs)
 }
 
-pub(super) fn additive(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+pub fn additive(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
         match (op, lhs.casted_ty().id.resolve(sema), rhs.casted_ty().id.resolve(sema)) {
             (_, l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => cast::usual_arithmetic(sema, lhs, rhs),
@@ -46,12 +46,12 @@ pub(super) fn additive(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: 
     })
 }
 
-pub(super) fn shift(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+pub fn shift(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let count = ice::try_fold(sema, ctx, e2);
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| shift_types(sema, lhs, rhs, count))
 }
 
-pub(super) fn shift_types(
+pub fn shift_types(
     sema: &mut Sema,
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,

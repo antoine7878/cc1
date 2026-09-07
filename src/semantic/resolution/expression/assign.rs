@@ -41,7 +41,7 @@ pub fn init(
     })
 }
 
-pub(super) fn simple_assignment(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+pub fn simple_assignment(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let is_null = is_null_pointer_constant(sema, ctx, e2);
     with_assign_ops(sema, e1, e2, |sema, lhs, rhs| {
         check_assignable(lhs)?;
@@ -50,7 +50,7 @@ pub(super) fn simple_assignment(sema: &mut Sema, ctx: &Context, e1: &ExpressionN
     })
 }
 
-pub(super) fn additive_assignment(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+pub fn additive_assignment(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     with_assign_ops(sema, e1, e2, |sema, lhs, rhs| {
         check_assignable(lhs)?;
         let target = lhs.ty.unqualified();
@@ -71,7 +71,7 @@ pub(super) fn additive_assignment(sema: &mut Sema, e1: &ExpressionNode, e2: &Exp
     })
 }
 
-pub(super) fn compound_assignment(
+pub fn compound_assignment(
     sema: &mut Sema,
     ctx: &Context,
     op: &BinaryOp,

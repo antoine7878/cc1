@@ -7,7 +7,7 @@ use crate::semantic::{Diagnosis, QualifiedType, Sema, cast};
 use super::operand::{R, is_null_pointer_constant, with_converted};
 use super::pointer::{PointerMatch, both_pointers, reconcile};
 
-pub(super) fn conditional(
+pub fn conditional(
     sema: &mut Sema,
     ctx: &Context,
     e1: &ExpressionNode,

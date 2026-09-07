@@ -12,20 +12,20 @@ use super::assign::init;
 use super::dispatch::binary_op;
 use super::operand::{R, with_converted, with_ops};
 
-pub(super) fn identifier(sema: &mut Sema, node: &ExpressionNode) -> R {
+pub fn identifier(sema: &mut Sema, node: &ExpressionNode) -> R {
     let id = sema.expr_bindings.get(node.id).copied().ok_poisoned()?;
     let sym = id.resolve(sema);
     Ok((sym.ty.ok_poisoned()?, sym.expression_kind()))
 }
 
-pub(super) fn constant(sema: &mut Sema, e: &ExpressionNode) -> R {
+pub fn constant(sema: &mut Sema, e: &ExpressionNode) -> R {
     sema.expr_types
         .get(e.id)
         .map(|re| (re.casted_ty(), re.kind))
         .ok_poisoned()
 }
 
-pub(super) fn array_subscript(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+pub fn array_subscript(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let (qty, _) = binary_op(sema, ctx, &BinaryOp::Add, e1, e2)?;
     let ResolvedType::Pointer(inner) = qty.id.resolve(sema) else {
         return Err(Diagnosis::SubscriptNotArray);
@@ -33,7 +33,7 @@ pub(super) fn array_subscript(sema: &mut Sema, ctx: &Context, e1: &ExpressionNod
     Ok((*inner, LValue))
 }
 
-pub(super) fn fn_call(sema: &mut Sema, ctx: &Context, fn_node: &ExpressionNode, args: &[ExpressionNode]) -> R {
+pub fn fn_call(sema: &mut Sema, ctx: &Context, fn_node: &ExpressionNode, args: &[ExpressionNode]) -> R {
     with_converted(sema, [fn_node], |sema, [re]| {
         let ty = re.casted_ty();
         let ResolvedType::Pointer(inner) = ty.id.resolve(sema) else {
@@ -81,7 +81,7 @@ pub(super) fn fn_call(sema: &mut Sema, ctx: &Context, fn_node: &ExpressionNode, 
     })
 }
 
-pub(super) fn member(sema: &mut Sema, node: &ExpressionNode, op: MemberOp, e: &ExpressionNode, name: &Name) -> R {
+pub fn member(sema: &mut Sema, node: &ExpressionNode, op: MemberOp, e: &ExpressionNode, name: &Name) -> R {
     with_ops(sema, [e], |sema, [re]| {
         let (&tag_qty, kind) = match op {
             MemberOp::Dot => (&re.casted_ty(), re.kind),

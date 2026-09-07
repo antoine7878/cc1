@@ -11,4 +11,4 @@ mod unary;
 
 pub use assign::init;
 pub use dispatch::resolve_expression;
-pub(crate) use operand::operands;
+pub use operand::operands;

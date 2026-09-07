@@ -7,7 +7,7 @@ use crate::semantic::{Diagnosis, QualifiedType, Sema, declaration, layout};
 
 use super::operand::{R, is_bit_field, with_ops};
 
-pub(super) fn size_of_e(sema: &mut Sema, node: &ExpressionNode, e: &ExpressionNode) -> R {
+pub fn size_of_e(sema: &mut Sema, node: &ExpressionNode, e: &ExpressionNode) -> R {
     let ty = with_ops(&mut *sema, [e], |sema, [re]| {
         if is_bit_field(sema, sema.expr_bindings.get(e.id).copied()) {
             return Err(Diagnosis::SizeofBitfield);
@@ -19,7 +19,7 @@ pub(super) fn size_of_e(sema: &mut Sema, node: &ExpressionNode, e: &ExpressionNo
     Ok(result)
 }
 
-pub(super) fn size_of_ty(sema: &mut Sema, ctx: &Context, node: &ExpressionNode, ty: &Type, span: &Span) -> R {
+pub fn size_of_ty(sema: &mut Sema, ctx: &Context, node: &ExpressionNode, ty: &Type, span: &Span) -> R {
     let base = declaration::base_type(sema, ctx, &ty.specifiers, span);
     let (ty, _) = declaration::declared_type(sema, ctx, base, &ty.declarator).ok_poisoned()?;
     let result = size_t(sema, ty)?;

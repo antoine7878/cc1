@@ -47,7 +47,7 @@ fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> R {
     }
 }
 
-pub(super) fn binary_op(sema: &mut Sema, ctx: &Context, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+pub fn binary_op(sema: &mut Sema, ctx: &Context, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     match op {
         BinaryOp::Add | BinaryOp::Sub => additive(sema, op, e1, e2),
         BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => multiplicative(sema, op, e1, e2),
