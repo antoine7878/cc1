@@ -26,7 +26,7 @@ pub fn check_declaration(sema: &mut Sema, ctx: &Context, node: &DeclarationNode)
     let specifiers = &node.specifiers;
     let span = &node.span;
     if sema.scopes.kind() == ScopeKind::File {
-        constrain::external::check_external_specifiers(specifiers).collect(sema, span);
+        constrain::specifier::check_external_specifiers(specifiers).collect(sema, span);
     }
     if node.init_declarators.is_empty() && !declares_tag(ctx, specifiers) {
         sema.add_diag(Diag::err((), Diagnosis::EmptyDeclaration), span);
@@ -55,7 +55,7 @@ pub fn classify(
         && declared_storage != Storage::Typedef
         && is_function
     {
-        constrain::declaration::extern_function_only(sema.scopes.kind(), declared_storage).collect(sema, span);
+        constrain::specifier::extern_function_only(sema.scopes.kind(), declared_storage).collect(sema, span);
     }
     let default_storage = if is_function { Storage::Extern } else { Storage::Auto };
     let storage = declared_storage.unwrap_or(default_storage);
@@ -88,7 +88,7 @@ pub fn declare_init_declarator(
     let is_init = init_declarator.initializer.is_some();
     let (storage, kind) = classify(sema, ty, declared_storage, &core.span);
     if kind == SymbolKind::Variable && !already_diagnosed && requires_complete_object(sema, ty, storage, is_init) {
-        constrain::declaration::check_complete_object(ty.is_complete(sema), ty).collect(sema, &core.span);
+        constrain::ty::check_complete_object(ty.is_complete(sema), ty).collect(sema, &core.span);
     }
     let sym = Symbol::new(name, Some(ty), Some(storage), kind, is_init);
     let sym_id = declare_symbol(sema, sym, declared_storage, &core.span);

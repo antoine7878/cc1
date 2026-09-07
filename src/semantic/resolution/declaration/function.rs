@@ -44,13 +44,13 @@ pub fn define_function(sema: &mut Sema, ctx: &Context, node: &FunctionDefinition
 
     let qualif = base_type(sema, ctx, &node.specifiers, span);
     let (rty, decl, params) = declared_function(sema, ctx, qualif, &node.declarator)?;
-    let params = constrain::external::extract_function_declarator(params).collect(sema, decl_span)?;
+    let params = constrain::ty::extract_function_declarator(params).collect(sema, decl_span)?;
 
-    let declared_storage = constrain::declaration::get_storage(&node.specifiers).collect(sema, span);
+    let declared_storage = constrain::specifier::get_storage(&node.specifiers).collect(sema, span);
     let storage = declared_storage.unwrap_or(Storage::Extern);
 
-    constrain::external::check_function_storage(storage).collect(sema, span);
-    constrain::external::check_external_specifiers(&node.specifiers).collect(sema, span);
+    constrain::specifier::check_function_storage(storage).collect(sema, span);
+    constrain::specifier::check_external_specifiers(&node.specifiers).collect(sema, span);
 
     let name = decl.ident(ctx)?;
     let previous = sema.scopes.current(SymbolKind::Function, name.id);
@@ -62,7 +62,7 @@ pub fn define_function(sema: &mut Sema, ctx: &Context, node: &FunctionDefinition
         _ => rty,
     };
     let &ResolvedType::Function { ret: return_ty, .. } = ty.id.resolve(sema) else { unreachable!() };
-    constrain::external::check_definition_return(return_ty.is_void(sema) || return_ty.is_complete(sema), return_ty)
+    constrain::ty::check_definition_return(return_ty.is_void(sema) || return_ty.is_complete(sema), return_ty)
         .collect(sema, decl_span);
     let prior = sema.linkage_of_name(name.id);
     let linkage = Symbol::linkage_of(sema.scopes.kind(), declared_storage, SymbolKind::Function, prior);
@@ -126,18 +126,18 @@ fn param_empty(sema: &mut Sema, lst: &[DeclarationNode], span: &Span) -> Vec<Sym
 }
 
 fn param_prototype(sema: &mut Sema, params: &[ParamInfo], lst: &[DeclarationNode], span: &Span) -> Vec<SymbolId> {
-    if !constrain::external::is_valid_parameter_style(params, lst).collect(sema, span) {
+    if !constrain::parameter::is_valid_parameter_style(params, lst).collect(sema, span) {
         return Vec::new();
     }
     if let [only] = params {
         let is_void = matches!(only.ty.id.resolve(sema), ResolvedType::Void);
-        constrain::external::check_void_parameter(is_void).collect(sema, &only.span);
+        constrain::parameter::check_void_parameter(is_void).collect(sema, &only.span);
     }
     for param in params {
         if param.ty.is_void(sema) {
             continue;
         }
-        constrain::external::check_complete_parameter(param.ty.is_complete(sema), param.ty).collect(sema, &param.span);
+        constrain::parameter::check_complete_parameter(param.ty.is_complete(sema), param.ty).collect(sema, &param.span);
     }
     params.iter().filter_map(|param| add_parameter(sema, param)).collect()
 }
@@ -177,7 +177,7 @@ fn param_old_style(
 
     let names_id: Vec<_> = names.iter().map(|n| n.id).collect();
 
-    let Some(missing_id) = constrain::external::is_valid_old_style(&names_id, declarations).collect(sema, span) else {
+    let Some(missing_id) = constrain::parameter::is_valid_old_style(&names_id, declarations).collect(sema, span) else {
         return Vec::new();
     };
     let ty = QualifiedType::plain(sema.builtins.int);
@@ -204,13 +204,13 @@ fn add_parameter_declarator(
     let qualif = base_type(sema, ctx, specifiers, span);
     let (ty, decl) = declared_type(sema, ctx, qualif, decl)?;
     let ty = sema.types.adjust_parameter(ty);
-    let declared_storage = constrain::declaration::get_storage(specifiers).collect(sema, span);
+    let declared_storage = constrain::specifier::get_storage(specifiers).collect(sema, span);
     if let Some(storage) = declared_storage {
-        constrain::external::param_storage_only_register(storage).collect(sema, span)?;
+        constrain::parameter::param_storage_only_register(storage).collect(sema, span)?;
     }
     let name = decl.ident(ctx)?;
     if !ty.is_void(sema) {
-        constrain::external::check_complete_parameter(ty.is_complete(sema), ty).collect(sema, &decl.span);
+        constrain::parameter::check_complete_parameter(ty.is_complete(sema), ty).collect(sema, &decl.span);
     }
     let storage = declared_storage.unwrap_or(Storage::Auto);
     let sym = Symbol::parameter(name, ty, storage);

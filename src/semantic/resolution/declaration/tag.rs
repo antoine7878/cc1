@@ -36,12 +36,12 @@ pub fn struct_or_union_tag(
             let name = node.ident(ctx);
             let bit_width = declarator.bit_width.as_ref().and_then(|e| {
                 let value = ice::eval_constant(sema, ctx, e);
-                let checked = constrain::declaration::check_bit_width(&sema.target, ty.id.resolve(sema), value, name);
+                let checked = constrain::ty::check_bit_width(&sema.target, ty.id.resolve(sema), value, name);
                 checked.collect(sema, &e.span)
             });
             let is_member_object = ty.is_object(sema);
             if !already_diagnosed {
-                constrain::declaration::check_member_type(is_member_object, ty).collect(sema, &decl.span);
+                constrain::ty::check_member_type(is_member_object, ty).collect(sema, &decl.span);
             }
             if already_diagnosed || !is_member_object {
                 has_rejected_member = true;

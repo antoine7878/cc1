@@ -1,0 +1,75 @@
+use crate::ast::{Name, Value};
+use crate::semantic::diagnosis::{Diag, Diagnosis};
+use crate::semantic::{DeclaredParams, QualifiedType, ResolvedType};
+use crate::target::Target;
+
+pub fn check_return_type(ret: &ResolvedType, ty: QualifiedType) -> Diag<()> {
+    match ret {
+        ResolvedType::Array { .. } => Diag::err((), Diagnosis::FunctionReturningArray(ty)),
+        ResolvedType::Function { .. } => Diag::err((), Diagnosis::FunctionReturningFunction(ty)),
+        _ => Diag::ok(()),
+    }
+}
+
+pub fn check_definition_return(is_valid: bool, ty: QualifiedType) -> Diag<()> {
+    match is_valid {
+        true => Diag::ok(()),
+        false => Diag::err((), Diagnosis::IncompleteReturn(ty)),
+    }
+}
+
+pub fn check_complete_object(is_complete: bool, ty: QualifiedType) -> Diag<()> {
+    match is_complete {
+        true => Diag::ok(()),
+        false => Diag::err((), Diagnosis::IncompleteVariable(ty)),
+    }
+}
+
+pub fn check_member_type(is_object: bool, ty: QualifiedType) -> Diag<()> {
+    match is_object {
+        true => Diag::ok(()),
+        false => Diag::err((), Diagnosis::InvalidMemberType(ty)),
+    }
+}
+
+pub fn check_element_type(is_object: bool, ty: QualifiedType) -> Diag<()> {
+    match is_object {
+        true => Diag::ok(()),
+        false => Diag::err((), Diagnosis::InvalidElementType(ty)),
+    }
+}
+
+pub fn check_bit_width(
+    target: &Target,
+    ty: &ResolvedType,
+    value: Option<Value>,
+    name: Option<Name>,
+) -> Diag<Option<i32>> {
+    if !matches!(ty, ResolvedType::Int | ResolvedType::UnsignedInt) {
+        return Diag::err(None, Diagnosis::NonIntBitFieldType);
+    };
+    let Some(value) = value else { return Diag::ok(None) };
+    let Some(width) = value.get_integer_value() else {
+        return Diag::err(None, Diagnosis::NonIntegerConstantExpression);
+    };
+    if value.is_negative() {
+        return Diag::err(None, Diagnosis::NegativeBitFieldWidth(name, value.to_i64()));
+    }
+    let Some(bits) = target.bits(ty) else {
+        return Diag::err(None, Diagnosis::NonIntBitFieldType);
+    };
+    if width > u64::from(bits) {
+        return Diag::err(None, Diagnosis::BitFieldWidthTooLarge(name, width, bits));
+    }
+    match (width, name) {
+        (0, Some(name)) => Diag::err(None, Diagnosis::ZeroWidthNamedBitField(name)),
+        _ => Diag::ok(Some(width as i32)),
+    }
+}
+
+pub fn extract_function_declarator(params: Option<DeclaredParams>) -> Diag<Option<DeclaredParams>> {
+    params.map_or_else(
+        || Diag::err(None, Diagnosis::NotFunctionTypeDeclarator),
+        |params| Diag::ok(Some(params)),
+    )
+}

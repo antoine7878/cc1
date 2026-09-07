@@ -74,7 +74,7 @@ impl Visitor for SymbolResolver<'_> {
         let specifiers = &node.specifiers;
         let span = &node.span;
         declaration::check_declaration(self.sema, ctx, node);
-        let declared_storage = constrain::declaration::get_storage(specifiers).collect(self, span);
+        let declared_storage = constrain::specifier::get_storage(specifiers).collect(self, span);
         let qualif = declaration::base_type(self.sema, ctx, specifiers, span);
         for init_declarator in &node.init_declarators {
             declaration::declare_init_declarator(self.sema, ctx, init_declarator, qualif, declared_storage);

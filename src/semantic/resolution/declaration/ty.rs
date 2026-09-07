@@ -16,7 +16,7 @@ pub fn base_type(
     specifiers: &[DeclarationSpecifier],
     span: &Span,
 ) -> Option<QualifiedType> {
-    let (is_const, is_volatile) = constrain::declaration::get_qualifier(specifiers).collect(sema, span);
+    let (is_const, is_volatile) = constrain::specifier::get_qualifier(specifiers).collect(sema, span);
 
     let types: Vec<_> = specifiers
         .iter()
@@ -43,7 +43,7 @@ pub fn base_type(
         }
         [TypeSpecifier::TypedefName(t)] => return sema.resolve_typedef(*t, is_const, is_volatile, span),
         s => {
-            let ty = constrain::declaration::basic_type(s).collect(sema, span)?;
+            let ty = constrain::specifier::basic_type(s).collect(sema, span)?;
             sema.types.alloc(ty)
         }
     };
@@ -79,7 +79,7 @@ fn extract_declarator(
     match declarator.id.resolve(ctx) {
         Declarator::Pointer { qualifiers, inner } => {
             let (is_const, is_volatile) =
-                constrain::declaration::check_qualifier(qualifiers.iter().copied()).collect(sema, &declarator.span);
+                constrain::specifier::check_qualifier(qualifiers.iter().copied()).collect(sema, &declarator.span);
             let id = sema.types.pointer(inner_most);
             extract_declarator(sema, ctx, inner, QualifiedType::new(id, is_const, is_volatile), false)
         }
@@ -88,7 +88,7 @@ fn extract_declarator(
             size,
         } => {
             if !inner_already_diagnosed {
-                constrain::declaration::check_element_type(inner_most.is_object(sema), inner_most)
+                constrain::ty::check_element_type(inner_most.is_object(sema), inner_most)
                     .collect(sema, &declarator.span);
             }
             let len = size.as_ref().and_then(|e| array_length(sema, ctx, e));
@@ -101,8 +101,7 @@ fn extract_declarator(
             params,
         } => {
             let list = resolve_params(sema, ctx, params);
-            constrain::declaration::check_return_type(inner_most.id.resolve(sema), inner_most)
-                .collect(sema, &declarator.span);
+            constrain::ty::check_return_type(inner_most.id.resolve(sema), inner_most).collect(sema, &declarator.span);
             let id = sema.types.function(inner_most, list.types());
             let (ty, leaf, inner_list) = extract_declarator(sema, ctx, inner, QualifiedType::plain(id), false);
             match inner.id.resolve(ctx) {
@@ -145,7 +144,7 @@ fn resolve_prototype(
     for param in &params {
         let is_void = matches!(param.ty.id.resolve(sema), ResolvedType::Void);
         let is_special_case = params.len() == 1 && param.name.is_some();
-        constrain::external::check_void_parameter(is_void && !is_special_case).collect(sema, &param.span);
+        constrain::parameter::check_void_parameter(is_void && !is_special_case).collect(sema, &param.span);
     }
     DeclaredParams::Prototype { params, is_variadic }
 }
@@ -155,9 +154,9 @@ fn resolve_parameter(sema: &mut Sema, ctx: &Context, param: &ParameterDeclaratio
     let qualif = base_type(sema, ctx, &param.specifiers, span);
     let (ty, decl) = declared_type(sema, ctx, qualif, &param.declarator)?;
     let ty = sema.types.adjust_parameter(ty);
-    let storage = constrain::declaration::get_storage(&param.specifiers).collect(sema, span);
+    let storage = constrain::specifier::get_storage(&param.specifiers).collect(sema, span);
     if let Some(storage) = storage {
-        constrain::external::param_storage_only_register(storage).collect(sema, span);
+        constrain::parameter::param_storage_only_register(storage).collect(sema, span);
     }
     Some(ParamInfo {
         name: decl.ident(ctx),

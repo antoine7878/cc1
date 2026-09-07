@@ -5,13 +5,13 @@ use cc1::ast::{
 };
 use cc1::ast::{DeclaratorNode, Node};
 use cc1::parser::Span;
-use cc1::semantic::constrain::declaration::{
-    basic_type, check_bit_width, check_complete_object, check_element_type, check_member_type, check_qualifier,
-    extern_function_only, get_qualifier, get_storage,
+use cc1::semantic::constrain::parameter::{check_complete_parameter, is_valid_old_style, param_storage_only_register};
+use cc1::semantic::constrain::specifier::{
+    basic_type, check_external_specifiers, check_function_storage, check_qualifier, extern_function_only,
+    get_qualifier, get_storage, is_tentative_definition,
 };
-use cc1::semantic::constrain::external::{
-    check_complete_parameter, check_definition_return, check_external_specifiers, check_function_storage,
-    is_tentative_definition, is_valid_old_style, param_storage_only_register,
+use cc1::semantic::constrain::ty::{
+    check_bit_width, check_complete_object, check_definition_return, check_element_type, check_member_type,
 };
 use cc1::semantic::{Diag, QualifiedType, ResolvedType, ScopeKind, Sema};
 use cc1::target::I386;
