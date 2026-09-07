@@ -39,8 +39,6 @@ ttest:
 	cargo build --release -p ft_lex -p ft_yacc
 	cargo nextest run -p ft_lex -p ft_yacc -p libft -p cc1
 
-coverage: $(NAME)
-	cargo llvm-cov nextest
 
 CFF = -m32 -std=iso9899:1990 -pedantic-errors -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
 CFF = -m32 -std=iso9899:1990
@@ -52,6 +50,26 @@ cc:
 	gcc $(CFF) rscs/hello.c
 	./a.out
 	rm ./a.out
+
+empty :=
+space := $(empty) $(empty)
+
+COV_SKIP = \
+	src/main.rs \
+	src/report.rs \
+	src/ast/mod.rs \
+	src/ast/name.rs \
+	src/ast/print.rs \
+	src/pipeline.rs  \
+	src/utils/table.rs \
+	src/parser/span.rs \
+	src/parser/driver.rs \
+	src/semantic/diagnosis.rs \
+	src/ast/type_specifier.rs \
+	src/semantic/resolution/statement.rs
+
+coverage: $(NAME)
+	cargo llvm-cov nextest --ignore-filename-regex '$(subst $(space),|,$(strip $(COV_SKIP)))'
 
 clean:
 	cargo clean -p cc1
