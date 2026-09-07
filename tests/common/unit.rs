@@ -445,6 +445,14 @@ impl Unit {
             .collect()
     }
 
+    /// Absolute bit position of each named member, the quantity the ABI actually fixes.
+    pub fn member_bits(&self, tag: &str) -> Vec<(String, u32)> {
+        self.tag_members(tag)
+            .into_iter()
+            .map(|(name, offset, bit)| (name, offset * 8 + bit))
+            .collect()
+    }
+
     pub fn messages(&self) -> Vec<String> {
         self.diagnosis()
             .iter()
@@ -573,6 +581,24 @@ pub fn run_size(name: &str, decl: &str, ty: &str, expected: u64) {
         got.map(|(_, value)| value.as_str()),
         Some(expected.to_string().as_str()),
         "`{name}` sizeof({ty}) should be {expected}:\n{decl}"
+    );
+}
+
+pub fn run_bits(name: &str, decl: &str, tag: &str, expected: &[(&str, u32)]) {
+    let unit = Unit::compile(decl);
+
+    assert!(unit.parsed(), "`{name}` failed to parse:\n{decl}");
+    assert!(
+        unit.diagnosis().is_empty(),
+        "`{name}` unexpected diagnosis:\n{decl}\n{}",
+        unit.render()
+    );
+
+    let expected: Vec<(String, u32)> = expected.iter().map(|(n, b)| (n.to_string(), *b)).collect();
+    assert_eq!(
+        unit.member_bits(tag),
+        expected,
+        "`{name}` member bit offsets in `{tag}`:\n{decl}"
     );
 }
 

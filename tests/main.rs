@@ -8,6 +8,7 @@ mod test_diagnostic;
 mod test_f80;
 mod test_initializer;
 mod test_layout;
+mod test_layout_abi;
 mod test_linkage;
 mod test_operator;
 mod test_parsing;

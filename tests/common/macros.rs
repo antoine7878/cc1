@@ -133,6 +133,15 @@ macro_rules! size {
 }
 
 #[macro_export]
+macro_rules! bits {
+    ($name:ident, $decl:expr, $tag:expr, $expected:expr) => {
+        test_case!($name, {
+            $crate::common::run_bits(stringify!($name), $decl, $tag, $expected);
+        });
+    };
+}
+
+#[macro_export]
 macro_rules! offsets {
     ($name:ident, $decl:expr, $tag:expr, $expected:expr) => {
         test_case!($name, {
