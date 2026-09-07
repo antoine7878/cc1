@@ -391,9 +391,6 @@ fn size_t(sema: &Sema, ty: QualifiedType) -> R {
     Ok((qty, RValue))
 }
 
-/// 6.3.3.4 The sizeof operator yields the size in bytes of its operand, as a constant of type
-/// size_t: recording it here lets 6.4 accept it as a constant expression without re-deriving the
-/// type, and without evaluating the operand.
 fn set_sizeof_constant(sema: &mut Sema, node: &ExpressionNode, ty: QualifiedType) {
     if let Some(layout) = layout::of(sema, ty.id)
         && let Some(value) = sema
