@@ -59,9 +59,12 @@ COV_SKIP = \
 	src/report.rs \
 	src/ast/mod.rs \
 	src/ast/name.rs \
+	src/pipeline.rs \
 	src/ast/print.rs \
-	src/pipeline.rs  \
+	src/parser/lex.rs \
 	src/utils/table.rs \
+	src/parser/yacc.rs \
+	src/ast/display.rs \
 	src/parser/span.rs \
 	src/parser/driver.rs \
 	src/semantic/diagnosis.rs \

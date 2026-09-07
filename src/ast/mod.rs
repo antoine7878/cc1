@@ -1,5 +1,6 @@
 pub mod arenas;
 pub mod declaration;
+pub mod display;
 pub mod expression;
 pub mod f80;
 pub mod function;

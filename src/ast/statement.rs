@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use crate::ast::{AstArenas, DeclarationNode, ExpressionNode, Name};
 use crate::parser::Span;
 use crate::{ast_node, define_arena};
@@ -137,51 +135,6 @@ impl LabeledStatementNode {
         Self::new(Labeled::Default(stmt), span)
     }
 }
-
-impl Display for Labeled {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Labeled::Identifier(..) => "Identifier",
-            Labeled::Case(..) => "Case",
-            Labeled::Default(_) => "Default",
-        };
-        write!(f, "{}", s)
-    }
-}
-
-impl Display for SelectionStatement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            SelectionStatement::If(..) => "If",
-            SelectionStatement::Switch(..) => "Switch",
-        };
-        write!(f, "{}", s)
-    }
-}
-
-impl Display for IterationStatement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            IterationStatement::While(..) => "While",
-            IterationStatement::Do(..) => "Do",
-            IterationStatement::For(..) => "For",
-        };
-        write!(f, "{}", s)
-    }
-}
-
-impl Display for JumpStatement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            JumpStatement::Goto(_) => "Goto",
-            JumpStatement::Continue => "Continue",
-            JumpStatement::Break => "Break",
-            JumpStatement::Return(_) => "Return",
-        };
-        write!(f, "{}", s)
-    }
-}
-
 impl SelectionStatementNode {
     pub fn new_if(
         e_condition: ExpressionNode,

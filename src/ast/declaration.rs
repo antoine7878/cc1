@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use crate::ast::{AstArenas, DeclarationSpecifier, ExpressionNode, FunctionParametersNode, Name, Qualifier};
 use crate::context::Context;
 use crate::parser::Span;
@@ -121,28 +119,5 @@ impl DeclaratorArena {
         span: Span,
     ) -> DeclaratorNode {
         self.add(Declarator::Function { declarator, params }, span)
-    }
-}
-
-impl Display for Declarator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Declarator::Ident(_) => "Ident",
-            Declarator::Abstract => "Abstract",
-            Declarator::Pointer { .. } => "Pointer",
-            Declarator::Array { .. } => "Array",
-            Declarator::Function { .. } => "Function",
-        };
-        write!(f, "{}", s)
-    }
-}
-
-impl Display for Initializer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Initializer::Single(_) => "Single",
-            Initializer::List(_) => "List",
-        };
-        write!(f, "{}", s)
     }
 }

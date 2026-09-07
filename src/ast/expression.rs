@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use crate::ast::{
     AstArenas, BinaryOp, DeclarationSpecifier, DeclaratorNode, MemberOp, Name, StringLiteralNode, UnaryOp, ValueNode,
 };
@@ -45,13 +43,6 @@ pub struct Type {
     pub specifiers: Vec<DeclarationSpecifier>,
     pub declarator: DeclaratorNode,
 }
-
-impl Display for Type {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Type")
-    }
-}
-
 impl ExpressionArena {
     pub fn identifier(&mut self, name: Name, span: Span) -> ExpressionNode {
         ExpressionNode::new(self.alloc(Expression::Identifier(name)), span)
@@ -147,27 +138,5 @@ impl ExpressionArena {
         span: Span,
     ) -> ExpressionNode {
         ExpressionNode::new(self.alloc(Expression::Ternary(cond, then, or)), span)
-    }
-}
-
-impl Display for Expression {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Expression::Constant(_) => write!(f, "NumberLiteral"),
-            Expression::Identifier(_) => write!(f, "Identifier"),
-            Expression::StringLiteral(_) => write!(f, "StringLiteral"),
-            Expression::ConstantExpression(_) => write!(f, "ConstantExpression"),
-            Expression::Unary(op, _) => write!(f, "{}", op),
-            Expression::Binary(op, _, _) => write!(f, "{}", op),
-            Expression::Assign(None, _, _) => write!(f, "Assign"),
-            Expression::Assign(Some(op), _, _) => write!(f, "{}Assign", op),
-            Expression::List(_) => write!(f, "List"),
-            Expression::Ternary(_, _, _) => write!(f, "Ternary"),
-            Expression::ArraySubscripting(_, _) => write!(f, "Array access"),
-            Expression::FunctionCall(_, _) => write!(f, "Fn call"),
-            Expression::Member(op, _, _) => write!(f, "{}", op),
-            Expression::SizeofExpr(_) | Expression::SizeofType(_) => write!(f, "Sizeof"),
-            Expression::Cast(_, _) => write!(f, "Cast"),
-        }
     }
 }

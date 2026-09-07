@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name, TypeSpecifier};
 use crate::ast_node;
 use crate::context::Context;
@@ -62,17 +60,5 @@ impl FunctionParametersNode {
             span,
             param: FunctionParameters::Variadic(params),
         }
-    }
-}
-
-impl Display for FunctionParameters {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            FunctionParameters::Empty => "Empty",
-            FunctionParameters::OldStyle(_) => "OldStyle",
-            FunctionParameters::ParameterTypeList(_) => "Parameters",
-            FunctionParameters::Variadic(_) => "Variadic",
-        };
-        write!(f, "{}", s)
     }
 }
