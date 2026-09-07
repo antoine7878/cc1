@@ -1,13 +1,13 @@
 use crate::arena::{Loan, OptionPoisoned};
-use crate::ast::Statement;
 use crate::ast::{
     ExpressionNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, JumpStatement,
-    JumpStatementNode, SelectionStatement, SelectionStatementNode, StatementNode, statement::StatementId,
+    JumpStatementNode, Labeled, LabeledStatementNode, SelectionStatement, SelectionStatementNode, StatementNode,
+    statement::StatementId,
 };
 use crate::context::Context;
 use crate::semantic::resolution::expression::{self, operands};
 use crate::semantic::{
-    AssignmentContext, Diag, DiagCollector, Diagnosis, QualifiedType, ResolvedStatement, Sema, cast,
+    AssignmentContext, Diag, DiagCollector, Diagnosis, QualifiedType, ResolvedStatement, ScopeKind, Sema, cast, ice,
 };
 
 type Substatements<'s, const N: usize> = Loan<'s, Sema, StatementId, ResolvedStatement, N>;
@@ -19,11 +19,26 @@ fn substatements<'s, const N: usize>(
     Loan::take(sema, nodes.map(|n| n.id)).ok_poisoned()
 }
 
-// pub fn st(sema: &mut Sema, ctx: &Context, stmt: StatementNode) {
-//     match stmt.id.resolve(ctx) {
-//         Statement::Labeled(l) => (),
-//     }
-// }
+pub fn check_labeled_statement(sema: &mut Sema, ctx: &Context, node: &LabeledStatementNode) {
+    match &node.inner {
+        Labeled::Identifier(name, _) => sema.add_label_symbol(*name, &node.span, true),
+        Labeled::Case(expr, _) => {
+            ice::eval_constant(sema, ctx, expr);
+        }
+        Labeled::Default(_) => (),
+    }
+}
+
+pub fn enter_compound_statement(sema: &mut Sema) {
+    match sema.scopes.kind() {
+        ScopeKind::Prototype => sema.scopes.set_kind(ScopeKind::Function),
+        _ => sema.scopes.push(ScopeKind::Block),
+    }
+}
+
+pub fn leave_compound_statement(sema: &mut Sema) {
+    sema.scopes.pop();
+}
 
 pub fn check_selection_statement(sema: &mut Sema, node: &SelectionStatementNode) {
     let res = match &node.stmt {
@@ -88,7 +103,26 @@ fn check_for(
     if let Some(e) = e2.expr.as_ref() { check_scalar(sema, e) } else { Ok(()) }
 }
 
-pub fn check_return(sema: &mut Sema, ctx: &Context, node: &JumpStatementNode, return_ty: QualifiedType) {
+pub fn check_jump_statement(
+    sema: &mut Sema,
+    ctx: &Context,
+    node: &JumpStatementNode,
+    return_ty: Option<QualifiedType>,
+) {
+    match &node.stmt {
+        JumpStatement::Goto(name) => sema.add_label_symbol(*name, &node.span, false),
+        JumpStatement::Return(_) => {
+            if let Some(return_ty) = return_ty {
+                check_return(sema, ctx, node, return_ty);
+            }
+        }
+        // JumpStatement::Continue => (),
+        // JumpStatement::Break => (),
+        _ => (),
+    }
+}
+
+fn check_return(sema: &mut Sema, ctx: &Context, node: &JumpStatementNode, return_ty: QualifiedType) {
     match &node.stmt {
         JumpStatement::Return(Some(e)) => {
             if let Err(inner) = expression::init(sema, ctx, return_ty, e, AssignmentContext::Return) {

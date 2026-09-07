@@ -5,17 +5,13 @@ use crate::ast::visit::{
 };
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, Expression, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode,
-    InitializerNode, IterationStatementNode, JumpStatement, JumpStatementNode, Labeled, LabeledStatementNode,
-    SelectionStatementNode,
+    InitializerNode, IterationStatementNode, JumpStatementNode, LabeledStatementNode, SelectionStatementNode,
 };
 use crate::context::Context;
 use crate::semantic::model::initializer;
-use crate::semantic::resolution::expression::{self};
-use crate::semantic::resolution::function;
-use crate::semantic::resolution::statement;
+use crate::semantic::resolution::{expression, function, statement};
 use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedType, ScopeKind, Sema, SymbolId, constrain,
-    declaration, ice,
+    Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedType, Sema, SymbolId, constrain, declaration,
 };
 
 #[derive(Debug)]
@@ -97,23 +93,14 @@ impl Visitor for SymbolResolver<'_> {
     }
 
     fn visit_labeled_statement(&mut self, ctx: &Context, node: &LabeledStatementNode) {
-        match &node.inner {
-            Labeled::Identifier(name, _) => self.sema.add_label_symbol(*name, &node.span, true),
-            Labeled::Case(expr, _) => {
-                ice::eval_constant(self.sema, ctx, expr);
-            }
-            Labeled::Default(_) => (),
-        }
+        statement::check_labeled_statement(self.sema, ctx, node);
         walk_labeled_statement(self, ctx, node);
     }
 
     fn visit_compound_statement(&mut self, ctx: &Context, node: &CompoundStatementNode) {
-        match self.sema.scopes.kind() {
-            ScopeKind::Prototype => self.sema.scopes.set_kind(ScopeKind::Function),
-            _ => self.sema.scopes.push(ScopeKind::Block),
-        }
+        statement::enter_compound_statement(self.sema);
         walk_compound_statement(self, ctx, node);
-        self.sema.scopes.pop();
+        statement::leave_compound_statement(self.sema);
     }
 
     fn visit_selection_statement(&mut self, ctx: &Context, node: &SelectionStatementNode) {
@@ -128,20 +115,7 @@ impl Visitor for SymbolResolver<'_> {
 
     fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode) {
         walk_jump_statement(self, ctx, node);
-        match &node.stmt {
-            JumpStatement::Goto(name) => self.sema.add_label_symbol(*name, &node.span, false),
-            JumpStatement::Return(e) => {
-                if let Some(e) = e {
-                    self.visit_expression(ctx, e);
-                }
-                if let Some(return_ty) = self.return_ty {
-                    statement::check_return(self.sema, ctx, node, return_ty);
-                }
-            }
-            // JumpStatement::Continue => (),
-            // JumpStatement::Break => (),
-            _ => (),
-        }
+        statement::check_jump_statement(self.sema, ctx, node, self.return_ty);
     }
 
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
