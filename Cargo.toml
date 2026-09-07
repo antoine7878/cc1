@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 autotests = false
 
+[dependencies]
+libft = { path = "libft" }
+
 [[test]]
 name = "suite"
 path = "tests/main.rs"

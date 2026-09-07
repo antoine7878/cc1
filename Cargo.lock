@@ -5,6 +5,9 @@ version = 4
 [[package]]
 name = "cc1"
 version = "0.1.0"
+dependencies = [
+ "libft",
+]
 
 [[package]]
 name = "ft_lex"

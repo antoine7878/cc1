@@ -1,5 +1,7 @@
 use std::fmt::{self, Debug};
 
+use libft::simple_escape;
+
 use crate::{error::LexError, utils::byte_label};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -136,16 +138,7 @@ impl From<Token> for String {
 
 impl Token {
     fn from_escaped_byte(b: u8) -> Self {
-        Self::Byte(match b {
-            b'a' => 7,
-            b'b' => 8,
-            b'f' => 12,
-            b'n' => b'\n',
-            b'r' => b'\r',
-            b't' => b'\t',
-            b'v' => 11,
-            b => b,
-        })
+        Self::Byte(simple_escape(b))
     }
 
     pub fn is_duplication(&self) -> bool {
