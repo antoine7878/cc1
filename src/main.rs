@@ -17,6 +17,7 @@ fn main() {
             Analyzer::finish_externals,
             Analyzer::finalize_layouts,
         ])
+        .checkpoint()
         .report(AstPrinter::print)
         .report(Context::dump_symbols)
         .finally(Context::dump_diagnostics);
