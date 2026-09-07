@@ -4,7 +4,9 @@ use crate::context::Context;
 use crate::semantic::ExpressionKind::{LValue, RValue};
 use crate::semantic::{Diagnosis, QualifiedType, ResolvedExpression, ResolvedType, Sema, SymbolId, cast, declaration};
 
-use super::operand::{R, check_assignable, is_bit_field, is_null_pointer_constant, with_converted, with_ops};
+use super::operand::{
+    R, check_assignable, int_rvalue, is_bit_field, is_null_pointer_constant, with_converted, with_ops,
+};
 
 pub(super) fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
     with_converted(sema, [e], |sema, [re]| {
@@ -53,7 +55,7 @@ fn address_type(sema: &mut Sema, re: &mut ResolvedExpression, sym: Option<Symbol
         return Err(Diagnosis::BitFieldAddress);
     }
     let ty = sema.types.pointer(re.ty);
-    let qty = QualifiedType::new(ty, false, false);
+    let qty = QualifiedType::plain(ty);
     Ok((qty, RValue))
 }
 
@@ -85,8 +87,7 @@ pub(super) fn logic_not(sema: &mut Sema, e: &ExpressionNode) -> R {
         if !re.casted_ty().is_scalar(sema) {
             return Err(Diagnosis::InvalidUnary(re.ty));
         }
-        let qty = QualifiedType::new(sema.builtins.int, false, false);
-        Ok((qty, RValue))
+        int_rvalue(sema)
     })
 }
 

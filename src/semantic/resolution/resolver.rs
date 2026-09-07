@@ -187,7 +187,7 @@ impl<'a> SymbolResolver<'a> {
         else {
             return Vec::new();
         };
-        let ty = QualifiedType::new(self.sema.builtins.int, false, false);
+        let ty = QualifiedType::plain(self.sema.builtins.int);
         missing_id
             .into_iter()
             .map(|string_id| Name::new(string_id, Span::default()))
@@ -370,9 +370,9 @@ impl SymbolResolver<'_> {
     }
 
     fn implicit_declare_function(&mut self, fn_name: &Name, span: &Span) {
-        let ret = QualifiedType::new(self.sema.builtins.int, false, false);
+        let ret = QualifiedType::plain(self.sema.builtins.int);
         let fn_ty = self.sema.types.function(ret, ParamTypes::Unspecified);
-        let ty = QualifiedType::new(fn_ty, false, false);
+        let ty = QualifiedType::plain(fn_ty);
         let sym = Symbol::function(*fn_name, ty, Storage::Extern);
         self.sema.declare(sym, span);
     }

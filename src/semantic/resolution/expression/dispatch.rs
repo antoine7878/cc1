@@ -1,11 +1,11 @@
 use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, Expression, ExpressionNode, UnaryOp};
 use crate::context::Context;
-use crate::semantic::ExpressionKind::RValue;
-use crate::semantic::{Diag, DiagCollector, ExpressionKind, ResolvedExpression, Sema, cast};
+use crate::semantic::ExpressionKind::{LValue, RValue};
+use crate::semantic::{Diag, DiagCollector, ResolvedExpression, Sema, cast};
 
 use super::arithmetic::{additive, multiplicative, shift};
-use super::assign::{additive_assignment, coumpound_assignment, simple_assignment};
+use super::assign::{additive_assignment, compound_assignment, simple_assignment};
 use super::compare::{bitwise, equality, logic, relational};
 use super::conditional::conditional;
 use super::operand::{R, with_converted};
@@ -28,7 +28,6 @@ pub fn resolve_expression(sema: &mut Sema, ctx: &Context, node: &ExpressionNode)
 }
 
 fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> R {
-    use ExpressionKind::{LValue, RValue};
     match node.id.resolve(ctx) {
         Expression::Identifier(_) => identifier(sema, node),
         Expression::Constant(value) => Ok((value.ty(sema), RValue)),
@@ -84,7 +83,7 @@ fn assignment(sema: &mut Sema, ctx: &Context, op: &Option<BinaryOp>, e1: &Expres
             | BinaryOp::BitAnd
             | BinaryOp::BitOr
             | BinaryOp::BitXor),
-        ) => coumpound_assignment(sema, ctx, op, e1, e2),
+        ) => compound_assignment(sema, ctx, op, e1, e2),
         _ => unreachable!(),
     }
 }

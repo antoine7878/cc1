@@ -52,8 +52,8 @@ impl StringLiteralNode {
             StringLiteral::WString(s) => (sema.builtins.int, s),
         };
         let len = s.id.resolve(ctx).len();
-        let base = QualifiedType::new(base_id, false, false);
-        QualifiedType::new(sema.types.array(base, Some(len + 1)), false, false)
+        let base = QualifiedType::plain(base_id);
+        QualifiedType::plain(sema.types.array(base, Some(len + 1)))
     }
 }
 

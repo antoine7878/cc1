@@ -47,13 +47,13 @@ pub fn lvalue_conversion(sema: &mut Sema, re: &mut ResolvedExpression, span: &Sp
 
 pub fn function_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
     let ResolvedType::Function { .. } = re.ty.id.resolve(sema) else { return };
-    let to = QualifiedType::new(sema.types.pointer(re.ty), false, false);
+    let to = QualifiedType::plain(sema.types.pointer(re.ty));
     re.casts.push(ImplicitCast::new(CastKind::FunctionToPointer, to));
 }
 
 pub fn array_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
     let ResolvedType::Array { elem, .. } = re.ty.id.resolve(sema) else { return };
-    let to = QualifiedType::new(sema.types.pointer(*elem), false, false);
+    let to = QualifiedType::plain(sema.types.pointer(*elem));
     re.casts.push(ImplicitCast::new(CastKind::ArrayToPointer, to))
 }
 
@@ -68,7 +68,7 @@ pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
     if !ty.is_complete(sema) {
         sema.add_diag(Diag::err((), Diagnosis::IncompleteType(re.ty)), span);
     }
-    let to = QualifiedType::new(re.ty.id, false, false);
+    let to = QualifiedType::plain(re.ty.id);
     re.casts.push(ImplicitCast::new(CastKind::LValueToRValue, to));
 }
 
@@ -83,12 +83,12 @@ pub fn promote(sema: &Sema, re: &mut ResolvedExpression) {
     }
 
     let kind = CastKind::IntegerPromotion;
-    let to = QualifiedType::new(sema.builtins.int, false, false);
+    let to = QualifiedType::plain(sema.builtins.int);
     re.casts.push(ImplicitCast::new(kind, to));
 }
 
 fn convert_type(ty: ResolvedTypeId) -> QualifiedType {
-    QualifiedType::new(ty, false, false)
+    QualifiedType::plain(ty)
 }
 
 pub fn convert(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId, is_null_ptr: bool) {
@@ -113,7 +113,7 @@ pub fn convert(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTyp
 }
 
 pub fn to_void(sema: &Sema, re: &mut ResolvedExpression) {
-    let cast = ImplicitCast::new(CastKind::ToVoid, QualifiedType::new(sema.builtins.void, false, false));
+    let cast = ImplicitCast::new(CastKind::ToVoid, QualifiedType::plain(sema.builtins.void));
     re.casts.push(cast);
 }
 
@@ -280,7 +280,7 @@ pub fn pointer_minus_pointer(
     if !lp.is_compatible_ignoring_qualifiers(sema, rp) {
         return Err(Diagnosis::InvalidOperand);
     }
-    Ok((QualifiedType::new(sema.builtins.ptrdiff_t, false, false), RValue))
+    Ok((QualifiedType::plain(sema.builtins.ptrdiff_t), RValue))
 }
 
 impl fmt::Display for CastKind {

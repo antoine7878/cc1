@@ -71,7 +71,7 @@ pub(super) fn additive_assignment(sema: &mut Sema, e1: &ExpressionNode, e2: &Exp
     })
 }
 
-pub(super) fn coumpound_assignment(
+pub(super) fn compound_assignment(
     sema: &mut Sema,
     ctx: &Context,
     op: &BinaryOp,

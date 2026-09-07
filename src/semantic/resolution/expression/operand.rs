@@ -3,6 +3,7 @@ use std::iter::zip;
 use crate::arena::{Loan, OptionPoisoned, ResolveWith};
 use crate::ast::{Expression, ExpressionId, ExpressionNode};
 use crate::context::Context;
+use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::{
     Diagnosis, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, Sema, SymbolId, SymbolKind, cast,
     declaration, ice,
@@ -17,6 +18,10 @@ pub(crate) fn operands<'s, const N: usize>(
     nodes: [&ExpressionNode; N],
 ) -> Result<Operands<'s, N>, Diagnosis> {
     Loan::take(sema, nodes.map(|n| n.id)).ok_poisoned()
+}
+
+pub(super) fn int_rvalue(sema: &Sema) -> R {
+    Ok((QualifiedType::plain(sema.builtins.int), RValue))
 }
 
 pub(super) fn with_ops<const N: usize, T, F>(sema: &mut Sema, nodes: [&ExpressionNode; N], f: F) -> Result<T, Diagnosis>

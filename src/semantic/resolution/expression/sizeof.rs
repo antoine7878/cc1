@@ -37,7 +37,7 @@ fn size_t(sema: &Sema, ty: QualifiedType) -> R {
     if !ty.is_complete(sema) {
         return Err(Diagnosis::SizeofIncomplete(ty));
     }
-    let qty = QualifiedType::new(sema.builtins.size_t, false, false);
+    let qty = QualifiedType::plain(sema.builtins.size_t);
     Ok((qty, RValue))
 }
 

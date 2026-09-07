@@ -34,7 +34,7 @@ impl ValueNode {
             Value::Double(_) => sema.builtins.double,
             Value::LongDouble(_) => sema.builtins.long_double,
         };
-        QualifiedType::new(ty, false, false)
+        QualifiedType::plain(ty)
     }
 }
 

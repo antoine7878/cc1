@@ -76,7 +76,7 @@ pub(super) fn fn_call(sema: &mut Sema, ctx: &Context, fn_node: &ExpressionNode, 
         }
         match rejected {
             true => Err(Diagnosis::Poisoned),
-            false => Ok((QualifiedType::new(ret.id, false, false), RValue)),
+            false => Ok((QualifiedType::plain(ret.id), RValue)),
         }
     })
 }

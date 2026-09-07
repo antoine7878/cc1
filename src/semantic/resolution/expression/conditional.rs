@@ -31,7 +31,7 @@ pub(super) fn conditional(
             return Ok((l_ty, RValue));
         }
         if l.is_void() && r.is_void() {
-            return Ok((QualifiedType::new(sema.builtins.void, false, false), RValue));
+            return Ok((QualifiedType::plain(sema.builtins.void), RValue));
         }
         let were_pointers = both_pointers(sema, lhs, rhs);
         match reconcile(sema, lhs, rhs, null2, null3) {
@@ -40,7 +40,7 @@ pub(super) fn conditional(
                 let inner = i1.unqualified().composite(sema, &i2.unqualified()).ok_poisoned()?;
                 let inner = QualifiedType::new(inner.id, i1.is_const || i2.is_const, i1.is_volatile || i2.is_volatile);
                 let ty = sema.types.pointer(inner);
-                Ok((QualifiedType::new(ty, false, false), RValue))
+                Ok((QualifiedType::plain(ty), RValue))
             }
             None if were_pointers => Err(Diagnosis::PointerMismatch(lhs.ty, rhs.ty)),
             None => Err(Diagnosis::IncompatibleOperands(lhs.ty, rhs.ty)),

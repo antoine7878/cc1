@@ -94,7 +94,7 @@ fn extract_declarator(
             let len = size.as_ref().and_then(|e| array_length(sema, ctx, e));
             let this_level_erred = size.is_some() && len.is_none();
             let id = sema.types.array(inner_most, len);
-            extract_declarator(sema, ctx, inner, QualifiedType::new(id, false, false), this_level_erred)
+            extract_declarator(sema, ctx, inner, QualifiedType::plain(id), this_level_erred)
         }
         Declarator::Function {
             declarator: inner,
@@ -104,8 +104,7 @@ fn extract_declarator(
             constrain::declaration::check_return_type(inner_most.id.resolve(sema), inner_most)
                 .collect(sema, &declarator.span);
             let id = sema.types.function(inner_most, list.types());
-            let (ty, leaf, inner_list) =
-                extract_declarator(sema, ctx, inner, QualifiedType::new(id, false, false), false);
+            let (ty, leaf, inner_list) = extract_declarator(sema, ctx, inner, QualifiedType::plain(id), false);
             match inner.id.resolve(ctx) {
                 Declarator::Ident(_) | Declarator::Abstract => (ty, leaf, Some(list)),
                 _ => (ty, leaf, inner_list),
@@ -273,7 +272,7 @@ pub fn enum_tag(sema: &mut Sema, ctx: &Context, id: EnumId) -> Option<TagDefId> 
             sema.add_diag(Diag::err((), Diagnosis::VariantBadValue), &variant.span);
             value = 0
         }
-        let ty = QualifiedType::new(sema.builtins.int, false, false);
+        let ty = QualifiedType::plain(sema.builtins.int);
         members.push(Member::symbol(
             sema.declare(Symbol::variant(variant.name, ty, value as i32), &variant.span),
             None,

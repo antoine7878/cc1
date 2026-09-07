@@ -181,7 +181,7 @@ impl ResolvedTypeArena {
     pub fn adjust_parameter(&mut self, param: QualifiedType) -> QualifiedType {
         let id = match self.get(param.id).clone() {
             ResolvedType::Array { elem, .. } => self.pointer(elem),
-            ResolvedType::Function { .. } => self.pointer(QualifiedType::new(param.id, false, false)),
+            ResolvedType::Function { .. } => self.pointer(QualifiedType::plain(param.id)),
             _ => return param,
         };
         QualifiedType::new(id, param.is_const, param.is_volatile)
@@ -189,7 +189,7 @@ impl ResolvedTypeArena {
 
     fn parameter(&mut self, param: QualifiedType) -> QualifiedType {
         let param = self.adjust_parameter(param);
-        QualifiedType::new(param.id, false, false)
+        QualifiedType::plain(param.id)
     }
 
     pub fn tag(&mut self, id: TagDefId) -> ResolvedTypeId {
@@ -204,6 +204,10 @@ impl QualifiedType {
             is_const,
             is_volatile,
         }
+    }
+
+    pub fn plain(id: ResolvedTypeId) -> Self {
+        QualifiedType::new(id, false, false)
     }
 
     pub fn is_char(&self, sema: &Sema) -> bool {
@@ -265,7 +269,7 @@ impl QualifiedType {
     }
 
     pub fn unqualified(&self) -> Self {
-        QualifiedType::new(self.id, false, false)
+        QualifiedType::plain(self.id)
     }
 
     pub fn is_compatible(&self, sema: &Sema, other: &Self) -> bool {

@@ -1,17 +1,16 @@
 use crate::arena::ResolveWith;
 use crate::ast::ExpressionNode;
 use crate::context::Context;
-use crate::semantic::ExpressionKind::RValue;
-use crate::semantic::{Diagnosis, QualifiedType, ResolvedExpression, ResolvedType, Sema, cast};
+use crate::semantic::{Diagnosis, ResolvedExpression, ResolvedType, Sema, cast};
 
-use super::operand::{R, is_null_pointer_constant, with_converted};
+use super::operand::{R, int_rvalue, is_null_pointer_constant, with_converted};
 use super::pointer::{both_pointers, reconcile};
 
 pub(super) fn relational(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
         let l = lhs.casted_ty().id.resolve(sema);
         let r = rhs.casted_ty().id.resolve(sema);
-        let ret = Ok((QualifiedType::new(sema.builtins.int, false, false), RValue));
+        let ret = int_rvalue(sema);
         if l.is_arithmetic(sema) && r.is_arithmetic(sema) {
             cast::usual_arithmetic(sema, lhs, rhs)?;
             return ret;
@@ -39,7 +38,7 @@ pub(super) fn equality(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: 
     let null1 = is_null_pointer_constant(sema, ctx, e1);
     let null2 = is_null_pointer_constant(sema, ctx, e2);
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
-        let ret = Ok((QualifiedType::new(sema.builtins.int, false, false), RValue));
+        let ret = int_rvalue(sema);
         if lhs.casted_ty().is_arithmetic(sema) && rhs.casted_ty().is_arithmetic(sema) {
             cast::usual_arithmetic(sema, lhs, rhs)?;
             return ret;
@@ -69,6 +68,6 @@ pub(super) fn logic(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -
         if !lhs.casted_ty().is_scalar(sema) || !rhs.casted_ty().is_scalar(sema) {
             return Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty));
         }
-        Ok((QualifiedType::new(sema.builtins.int, false, false), RValue))
+        int_rvalue(sema)
     })
 }
