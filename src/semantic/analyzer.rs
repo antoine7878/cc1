@@ -5,14 +5,6 @@ use crate::semantic::{ScopeKind, Sema, SymbolResolver, eval, finish_externals, m
 pub struct Analyzer;
 
 impl Analyzer {
-    pub fn analyze(ctx: Context) -> Context {
-        let ctx = Self::init(ctx);
-        let ctx = Self::resolve_names(ctx);
-        let ctx = Self::check_constants(ctx);
-        let ctx = Self::mark_uses(ctx);
-        Self::finish(ctx)
-    }
-
     pub fn init(mut ctx: Context) -> Context {
         let mut sema = Sema::new(ctx.target.clone());
         sema.size_tables(&ctx.arenas);
@@ -40,5 +32,13 @@ impl Analyzer {
 
     pub fn finish(ctx: Context) -> Context {
         Sema::with_sema(ctx, |sema, _| finish_externals(sema))
+    }
+
+    pub fn analyze(ctx: Context) -> Context {
+        let ctx = Self::init(ctx);
+        let ctx = Self::resolve_names(ctx);
+        let ctx = Self::check_constants(ctx);
+        let ctx = Self::mark_uses(ctx);
+        Self::finish(ctx)
     }
 }

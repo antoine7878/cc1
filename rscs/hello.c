@@ -1,9 +1,2 @@
-struct S {
-	long a : 1;
-};
-
-void fn(void) {
-	int a = 1;
-	if (a) {
-	}
-}
+int a[10];
+int *p = &a[3];

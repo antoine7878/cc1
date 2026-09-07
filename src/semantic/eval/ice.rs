@@ -103,7 +103,11 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSi
 }
 
 fn identifier(sema: &Sema, expr: &ExpressionNode) -> Result<Value, Diagnosis> {
-    let id = sema.expr_bindings.get(expr.id).copied().ok_or(Diagnosis::NonConstantExpression)?;
+    let id = sema
+        .expr_bindings
+        .get(expr.id)
+        .copied()
+        .ok_or(Diagnosis::NonConstantExpression)?;
     let symbol = id.resolve(sema);
     if symbol.kind != SymbolKind::Variant {
         return Err(Diagnosis::NonConstantExpression);
