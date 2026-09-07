@@ -2,19 +2,25 @@ use crate::arena::ResolveWith;
 use crate::ast::{DeclarationNode, DeclarationSpecifier, DeclaratorNode, FunctionDefinitionNode, Name, Storage};
 use crate::context::Context;
 use crate::parser::Span;
+use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     DeclaredParams, Definition, Diag, DiagCollector, Diagnosis, FunctionDefId, ParamInfo, ParamTypes, QualifiedType,
-    ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain, declaration,
+    ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain,
 };
 
-pub struct Header {
+pub struct FunctionHeader {
     pub id: FunctionDefId,
     pub params: DeclaredParams,
     pub declared: Option<ParamTypes>,
     pub return_ty: QualifiedType,
 }
 
-pub fn bind_parameters(sema: &mut Sema, ctx: &Context, node: &FunctionDefinitionNode, header: &Header) {
+pub fn bind_function_parameters(
+    sema: &mut Sema,
+    ctx: &Context,
+    node: &FunctionDefinitionNode,
+    header: &FunctionHeader,
+) {
     sema.scopes.push(ScopeKind::Prototype);
     let lst = &node.old_style_declarations;
     let span = &node.declarator.span;
@@ -32,12 +38,12 @@ pub fn bind_parameters(sema: &mut Sema, ctx: &Context, node: &FunctionDefinition
     sema.functions.complete(header.id, parameters);
 }
 
-pub fn define(sema: &mut Sema, ctx: &Context, node: &FunctionDefinitionNode) -> Option<Header> {
+pub fn define_function(sema: &mut Sema, ctx: &Context, node: &FunctionDefinitionNode) -> Option<FunctionHeader> {
     let span = &node.span;
     let decl_span = &node.declarator.span;
 
-    let qualif = declaration::base_type(sema, ctx, &node.specifiers, span);
-    let (rty, decl, params) = declaration::declared_function(sema, ctx, qualif, &node.declarator)?;
+    let qualif = base_type(sema, ctx, &node.specifiers, span);
+    let (rty, decl, params) = declared_function(sema, ctx, qualif, &node.declarator)?;
     let params = constrain::external::extract_function_declarator(params).collect(sema, decl_span)?;
 
     let declared_storage = constrain::declaration::get_storage(&node.specifiers).collect(sema, span);
@@ -65,7 +71,7 @@ pub fn define(sema: &mut Sema, ctx: &Context, node: &FunctionDefinitionNode) -> 
     sym.definition = Definition::Definition;
     let sym = sema.declare(sym, decl_span);
     let declared = (previous == Some(sym)).then_some(declared).flatten();
-    Some(Header {
+    Some(FunctionHeader {
         id: sema.functions.declare(sym),
         params,
         declared,
@@ -195,8 +201,8 @@ fn add_parameter_declarator(
     decl: &DeclaratorNode,
     span: &Span,
 ) -> Option<SymbolId> {
-    let qualif = declaration::base_type(sema, ctx, specifiers, span);
-    let (ty, decl) = declaration::declared_type(sema, ctx, qualif, decl)?;
+    let qualif = base_type(sema, ctx, specifiers, span);
+    let (ty, decl) = declared_type(sema, ctx, qualif, decl)?;
     let ty = sema.types.adjust_parameter(ty);
     let declared_storage = constrain::declaration::get_storage(specifiers).collect(sema, span);
     if let Some(storage) = declared_storage {
@@ -210,6 +216,7 @@ fn add_parameter_declarator(
     let sym = Symbol::parameter(name, ty, storage);
     Some(sema.declare(sym, &decl.span))
 }
+
 pub fn implicit_declare_function(sema: &mut Sema, fn_name: &Name, span: &Span) {
     let ret = QualifiedType::plain(sema.builtins.int);
     let fn_ty = sema.types.function(ret, ParamTypes::Unspecified);

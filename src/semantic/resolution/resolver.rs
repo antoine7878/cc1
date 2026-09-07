@@ -9,7 +9,7 @@ use crate::ast::{
 };
 use crate::context::Context;
 use crate::semantic::model::initializer;
-use crate::semantic::resolution::{expression, function, statement};
+use crate::semantic::resolution::{expression, statement};
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedType, Sema, SymbolId, constrain, declaration,
 };
@@ -63,9 +63,9 @@ impl SymbolResolver<'_> {
 
 impl Visitor for SymbolResolver<'_> {
     fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
-        let Some(header) = function::define(self.sema, ctx, node) else { return };
+        let Some(header) = declaration::define_function(self.sema, ctx, node) else { return };
         self.return_ty = Some(header.return_ty);
-        function::bind_parameters(self.sema, ctx, node, &header);
+        declaration::bind_function_parameters(self.sema, ctx, node, &header);
         self.visit_compound_statement(ctx, &node.body);
         self.return_ty = None;
     }
@@ -123,7 +123,7 @@ impl Visitor for SymbolResolver<'_> {
             && let Expression::Identifier(fn_name) = f.id.resolve(ctx)
             && self.sema.scopes.lookup_ordinary(fn_name.id).is_none()
         {
-            function::implicit_declare_function(self.sema, fn_name, &node.span);
+            declaration::implicit_declare_function(self.sema, fn_name, &node.span);
         }
         walk_expression(self, ctx, node);
         self.resolve_expression(ctx, node);
