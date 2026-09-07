@@ -3,22 +3,18 @@ use crate::ast::{ExpressionNode, Storage, Type, UnaryOp};
 use crate::context::Context;
 use crate::semantic::ExpressionKind::{LValue, RValue};
 use crate::semantic::resolution::expression::*;
-use crate::semantic::{Diagnosis, QualifiedType, ResolvedExpression, ResolvedType, Sema, SymbolId, cast, declaration};
+use crate::semantic::{
+    Diagnosis, QualifiedType, ResolvedExpression, ResolvedType, Sema, SymbolId, cast, constrain, declaration,
+};
 
 pub fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
     with_converted(sema, [e], |sema, [re]| {
-        check_assignable(re)?;
-        if let ResolvedType::Pointer(inner) = re.ty.id.resolve(sema)
-            && !inner.is_object(sema)
-        {
-            return Err(match inner.is_function(sema) {
-                true => Diagnosis::BadPostIncDec(op, re.ty),
-                false => Diagnosis::IncompleteType(*inner),
-            });
-        }
-        if !re.ty.is_scalar(sema) {
-            return Err(Diagnosis::BadPostIncDec(op, re.ty));
-        }
+        constrain::expression::check_assignable(re.kind, re.ty).into_result()?;
+        let non_object_pointee = match re.ty.id.resolve(sema) {
+            ResolvedType::Pointer(inner) if !inner.is_object(sema) => Some((*inner, inner.is_function(sema))),
+            _ => None,
+        };
+        constrain::expression::check_inc_dec(op, re.ty.is_scalar(sema), non_object_pointee, re.ty).into_result()?;
         Ok((re.casted_ty(), RValue))
     })
 }
@@ -39,18 +35,15 @@ pub fn address(sema: &mut Sema, e: &ExpressionNode) -> R {
 }
 
 fn address_type(sema: &mut Sema, re: &mut ResolvedExpression, sym: Option<SymbolId>) -> R {
-    if re.kind == RValue && !re.casted_ty().is_function(sema) {
-        return Err(Diagnosis::RValueAddress(re.ty));
-    }
-    if let Some(id) = sym {
-        let sym = id.resolve(sema);
-        if sym.storage == Some(Storage::Register) {
-            return Err(Diagnosis::RegisterAddress);
-        }
-    }
-    if is_bit_field(sema, sym) {
-        return Err(Diagnosis::BitFieldAddress);
-    }
+    let is_register = sym.is_some_and(|id| id.resolve(sema).storage == Some(Storage::Register));
+    constrain::expression::check_address_of(
+        re.kind,
+        re.casted_ty().is_function(sema),
+        is_register,
+        is_bit_field(sema, sym),
+        re.ty,
+    )
+    .into_result()?;
     let ty = sema.types.pointer(re.ty);
     let qty = QualifiedType::plain(ty);
     Ok((qty, RValue))

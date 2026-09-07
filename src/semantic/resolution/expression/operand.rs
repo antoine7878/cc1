@@ -69,13 +69,3 @@ pub fn is_bit_field(sema: &Sema, sym: Option<SymbolId>) -> bool {
     let sym = id.resolve(sema);
     sym.kind == SymbolKind::Member && sym.value.is_some()
 }
-
-pub fn check_assignable(lhs: &ResolvedExpression) -> Result<(), Diagnosis> {
-    if lhs.kind == ExpressionKind::RValue {
-        return Err(Diagnosis::AssignToRValue);
-    }
-    if lhs.ty.is_const {
-        return Err(Diagnosis::ConstAssignment(lhs.ty));
-    }
-    Ok(())
-}

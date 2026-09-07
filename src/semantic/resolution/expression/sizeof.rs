@@ -4,16 +4,13 @@ use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::resolution::expression::*;
-use crate::semantic::{Diagnosis, QualifiedType, Sema, declaration, layout};
+use crate::semantic::{QualifiedType, Sema, constrain, declaration, layout};
 
 pub fn size_of_e(sema: &mut Sema, node: &ExpressionNode, e: &ExpressionNode) -> R {
-    let ty = with_ops(&mut *sema, [e], |sema, [re]| {
-        if is_bit_field(sema, sema.expr_bindings.get(e.id).copied()) {
-            return Err(Diagnosis::SizeofBitfield);
-        }
-        Ok(re.ty)
+    let (ty, is_bit_field) = with_ops(&mut *sema, [e], |sema, [re]| {
+        Ok((re.ty, is_bit_field(sema, sema.expr_bindings.get(e.id).copied())))
     })?;
-    let result = size_t(sema, ty)?;
+    let result = size_t(sema, ty, is_bit_field)?;
     set_sizeof_constant(sema, node, ty);
     Ok(result)
 }
@@ -21,21 +18,20 @@ pub fn size_of_e(sema: &mut Sema, node: &ExpressionNode, e: &ExpressionNode) -> 
 pub fn size_of_ty(sema: &mut Sema, ctx: &Context, node: &ExpressionNode, ty: &Type, span: &Span) -> R {
     let base = declaration::base_type(sema, ctx, &ty.specifiers, span);
     let (ty, _) = declaration::declared_type(sema, ctx, base, &ty.declarator).ok_poisoned()?;
-    let result = size_t(sema, ty)?;
+    let result = size_t(sema, ty, false)?;
     set_sizeof_constant(sema, node, ty);
     Ok(result)
 }
 
-fn size_t(sema: &Sema, ty: QualifiedType) -> R {
-    if ty.is_void(sema) {
-        return Err(Diagnosis::SizeofVoid);
-    }
-    if ty.is_function(sema) {
-        return Err(Diagnosis::SizeofFunction);
-    }
-    if !ty.is_complete(sema) {
-        return Err(Diagnosis::SizeofIncomplete(ty));
-    }
+fn size_t(sema: &Sema, ty: QualifiedType, is_bit_field: bool) -> R {
+    constrain::expression::check_sizeof(
+        is_bit_field,
+        ty.is_void(sema),
+        ty.is_function(sema),
+        ty.is_complete(sema),
+        ty,
+    )
+    .into_result()?;
     let qty = QualifiedType::plain(sema.builtins.size_t);
     Ok((qty, RValue))
 }

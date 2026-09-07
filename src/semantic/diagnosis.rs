@@ -455,6 +455,13 @@ impl<T> Diag<T> {
     pub fn err(res: T, diagnosis: Diagnosis) -> Self {
         Self::new(res, Some(diagnosis))
     }
+
+    pub fn into_result(self) -> Result<T, Diagnosis> {
+        match self.diagnosis {
+            Some(diagnosis) => Err(diagnosis),
+            None => Ok(self.res),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
