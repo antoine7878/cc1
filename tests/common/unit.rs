@@ -506,14 +506,13 @@ pub fn run_size(name: &str, decl: &str, ty: &str, expected: u64) {
     );
 }
 
-pub fn run_offsets(name: &str, decl: &str, ty: &str, tag: &str, expected: &[(&str, u32, u32)]) {
-    let src = format!("{decl} enum layout_probe {{ PROBE = sizeof({ty}) }};");
-    let unit = Unit::compile(&src);
+pub fn run_offsets(name: &str, decl: &str, tag: &str, expected: &[(&str, u32, u32)]) {
+    let unit = Unit::compile(decl);
 
-    assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
+    assert!(unit.parsed(), "`{name}` failed to parse:\n{decl}");
     assert!(
         unit.diagnosis().is_empty(),
-        "`{name}` unexpected diagnosis:\n{src}\n{}",
+        "`{name}` unexpected diagnosis:\n{decl}\n{}",
         unit.render()
     );
 

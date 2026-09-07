@@ -14,6 +14,7 @@ fn main() {
             Analyzer::check_constants,
             Analyzer::mark_uses,
             Analyzer::finish,
+            Analyzer::finalize_layouts,
         ])
         .report(AstPrinter::print)
         .report(Context::dump_symbols)

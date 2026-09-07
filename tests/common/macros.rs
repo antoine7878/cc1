@@ -107,9 +107,9 @@ macro_rules! size {
 
 #[macro_export]
 macro_rules! offsets {
-    ($name:ident, $decl:expr, $ty:expr, $tag:expr, $expected:expr) => {
+    ($name:ident, $decl:expr, $tag:expr, $expected:expr) => {
         test_case!($name, {
-            $crate::common::run_offsets(stringify!($name), $decl, $ty, $tag, $expected);
+            $crate::common::run_offsets(stringify!($name), $decl, $tag, $expected);
         });
     };
 }

@@ -27,6 +27,12 @@ pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Option<Layout> {
     Some(layout)
 }
 
+pub fn finalize(sema: &mut Sema) {
+    for index in 0..sema.tags.len() {
+        let _ = of_tag(sema, TagDefId::from(index));
+    }
+}
+
 pub fn of_tag(sema: &mut Sema, id: TagDefId) -> Option<Layout> {
     let mut tag = id.resolve(sema).clone();
     if !tag.is_complete {

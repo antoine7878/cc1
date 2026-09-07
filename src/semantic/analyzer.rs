@@ -1,6 +1,6 @@
 use crate::ast::visit::walk_translation_unit;
 use crate::context::Context;
-use crate::semantic::{ScopeKind, Sema, SymbolResolver, eval, finish_externals, mark_uses};
+use crate::semantic::{ScopeKind, Sema, SymbolResolver, eval, finish_externals, layout, mark_uses};
 
 pub struct Analyzer;
 
@@ -34,11 +34,16 @@ impl Analyzer {
         Sema::with_sema(ctx, |sema, _| finish_externals(sema))
     }
 
+    pub fn finalize_layouts(ctx: Context) -> Context {
+        Sema::with_sema(ctx, |sema, _| layout::finalize(sema))
+    }
+
     pub fn analyze(ctx: Context) -> Context {
         let ctx = Self::init(ctx);
         let ctx = Self::resolve_names(ctx);
         let ctx = Self::check_constants(ctx);
         let ctx = Self::mark_uses(ctx);
-        Self::finish(ctx)
+        let ctx = Self::finish(ctx);
+        Self::finalize_layouts(ctx)
     }
 }
