@@ -6,7 +6,7 @@ use crate::ast::visit::{
 use crate::ast::{
     CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Expression, ExpressionNode,
     FunctionDefinitionNode, InitDeclaratorNode, InitializerNode, IterationStatementNode, JumpStatement,
-    JumpStatementNode, Labeled, LabeledStatementNode, Name, SelectionStatementNode, Storage, TypeSpecifier,
+    JumpStatementNode, Labeled, LabeledStatementNode, Name, SelectionStatementNode, Storage,
 };
 use crate::context::Context;
 use crate::parser::Span;
@@ -223,98 +223,6 @@ impl<'a> SymbolResolver<'a> {
         let sym = Symbol::parameter(name, ty, storage);
         Some(self.sema.declare(sym, &decl.span))
     }
-
-    fn requires_complete_object(&self, ty: QualifiedType, storage: Storage, is_init: bool) -> bool {
-        if ty.is_void(self.sema) {
-            return true;
-        }
-        let is_unsized_array = matches!(ty.id.resolve(self.sema), ResolvedType::Array { len: None, .. });
-        if is_init && is_unsized_array {
-            return false;
-        }
-        if is_init {
-            return true;
-        }
-        matches!(self.sema.scopes.kind(), ScopeKind::Block | ScopeKind::Function) && storage != Storage::Extern
-    }
-
-    fn check_declaration(&mut self, ctx: &Context, node: &DeclarationNode) {
-        let specifiers = &node.specifiers;
-        let span = &node.span;
-        if self.sema.scopes.kind() == ScopeKind::File {
-            constrain::external::check_external_specifiers(specifiers).collect(self, span);
-        }
-        if node.init_declarators.is_empty() && !declares_tag(ctx, specifiers) {
-            self.add_diag(Diag::err((), Diagnosis::EmptyDeclaration), span);
-        }
-    }
-
-    fn declared_type_watched(
-        &mut self,
-        ctx: &Context,
-        qualif: Option<QualifiedType>,
-        decl: &DeclaratorNode,
-    ) -> Option<(QualifiedType, DeclaratorNode, bool)> {
-        let before = self.sema.diagnosis.len();
-        let (ty, core) = declaration::declared_type(self.sema, ctx, qualif, decl)?;
-        Some((ty, core, self.sema.diagnosis.len() != before))
-    }
-
-    fn classify(&mut self, ty: QualifiedType, declared_storage: Option<Storage>, span: &Span) -> (Storage, SymbolKind) {
-        let is_function = matches!(ty.id.resolve(self.sema), ResolvedType::Function { .. });
-        if let Some(declared_storage) = declared_storage
-            && declared_storage != Storage::Typedef
-            && is_function
-        {
-            constrain::declaration::extern_function_only(self.sema.scopes.kind(), declared_storage).collect(self, span);
-        }
-        let default_storage = if is_function { Storage::Extern } else { Storage::Auto };
-        let storage = declared_storage.unwrap_or(default_storage);
-        let kind = match storage {
-            Storage::Typedef => SymbolKind::Typedef,
-            _ if is_function => SymbolKind::Function,
-            _ => SymbolKind::Variable,
-        };
-        (storage, kind)
-    }
-
-    fn declare_symbol(&mut self, mut sym: Symbol, declared_storage: Option<Storage>, span: &Span) -> SymbolId {
-        let scope_kind = self.sema.scopes.kind();
-        let prior = self.sema.linkage_of_name(sym.name.id);
-        sym.linkage = Symbol::linkage_of(scope_kind, declared_storage, sym.kind, prior);
-        sym.duration = Symbol::duration_of(scope_kind, declared_storage, sym.kind);
-        sym.definition = Symbol::definition_of(scope_kind, declared_storage, sym.is_init, sym.kind);
-        self.sema.declare(sym, span)
-    }
-
-    fn declare_init_declarator(
-        &mut self,
-        ctx: &Context,
-        init_declarator: &InitDeclaratorNode,
-        qualif: Option<QualifiedType>,
-        declared_storage: Option<Storage>,
-    ) -> Option<()> {
-        let (ty, core, already_diagnosed) = self.declared_type_watched(ctx, qualif, &init_declarator.declarator)?;
-        let name = core.ident(ctx)?;
-        let is_init = init_declarator.initializer.is_some();
-        let (storage, kind) = self.classify(ty, declared_storage, &core.span);
-        if kind == SymbolKind::Variable && !already_diagnosed && self.requires_complete_object(ty, storage, is_init) {
-            constrain::declaration::check_complete_object(ty.is_complete(self.sema), ty).collect(self, &core.span);
-        }
-        let sym = Symbol::new(name, Some(ty), Some(storage), kind, is_init);
-        let sym_id = self.declare_symbol(sym, declared_storage, &core.span);
-        self.sema.declarations.insert(init_declarator.declarator.id, sym_id);
-        Some(())
-    }
-}
-
-fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
-    specifiers.iter().any(|specifier| match specifier {
-        DeclarationSpecifier::Type(TypeSpecifier::Struct(id)) => id.resolve(ctx).name.is_some(),
-        DeclarationSpecifier::Type(TypeSpecifier::Union(id)) => id.resolve(ctx).name.is_some(),
-        DeclarationSpecifier::Type(TypeSpecifier::Enum(_)) => true,
-        _ => false,
-    })
 }
 
 impl SymbolResolver<'_> {
@@ -395,11 +303,11 @@ impl Visitor for SymbolResolver<'_> {
     fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode) {
         let specifiers = &node.specifiers;
         let span = &node.span;
-        self.check_declaration(ctx, node);
+        declaration::check_declaration(self.sema, ctx, node);
         let declared_storage = constrain::declaration::get_storage(specifiers).collect(self, span);
         let qualif = declaration::base_type(self.sema, ctx, specifiers, span);
         for init_declarator in &node.init_declarators {
-            self.declare_init_declarator(ctx, init_declarator, qualif, declared_storage);
+            declaration::declare_init_declarator(self.sema, ctx, init_declarator, qualif, declared_storage);
         }
         walk_declaration(self, ctx, node);
     }
