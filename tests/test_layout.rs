@@ -275,3 +275,17 @@ offsets!(
     "S",
     &[("a", 0, 0), ("b", 0, 8)]
 );
+
+offsets!(
+    offset_of_a_tag_reached_only_through_a_pointer,
+    "struct S { char a; int b; }; struct S *p;",
+    "S",
+    &[("a", 0, 0), ("b", 4, 0)]
+);
+
+offsets!(
+    offset_of_a_tag_declared_inside_a_function,
+    "void f(void) { struct S { char a; int b; } s; s.a = 0; }",
+    "S",
+    &[("a", 0, 0), ("b", 4, 0)]
+);
