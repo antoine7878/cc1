@@ -61,3 +61,37 @@ labels!(
     "void f(void){ goto l; l: ; }",
     &[("f", &["l"])]
 );
+
+// 6.6.4 Selection and iteration statements: the controlling expression is resolved too
+
+reject!(control_if_undeclared, "void f(void){ if (undeclared_cond) ; }");
+reject!(
+    control_if_else_undeclared,
+    "void f(void){ if (1) ; else undeclared_else; }"
+);
+reject!(
+    control_switch_undeclared,
+    "void f(void){ switch (undeclared_ctl) { case 1: ; } }"
+);
+reject!(control_while_undeclared, "void f(void){ while (undeclared_while) ; }");
+reject!(control_do_undeclared, "void f(void){ do ; while (undeclared_do); }");
+reject!(
+    control_for_init_undeclared,
+    "void f(void){ for (undeclared_init; 1; 1) ; }"
+);
+reject!(
+    control_for_condition_undeclared,
+    "void f(void){ for (1; undeclared_cond; 1) ; }"
+);
+reject!(
+    control_for_step_undeclared,
+    "void f(void){ for (1; 1; undeclared_step) ; }"
+);
+reject!(
+    control_if_requires_a_scalar,
+    "struct S { int x; }; void f(struct S s){ if (s) ; }"
+);
+reject!(
+    control_switch_requires_an_integer,
+    "void f(double d){ switch (d) { case 1: ; } }"
+);
