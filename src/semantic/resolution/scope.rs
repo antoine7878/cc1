@@ -88,24 +88,14 @@ impl Scopes {
     pub fn current(&self, kind: SymbolKind, name: StringId) -> Option<SymbolId> {
         match kind {
             SymbolKind::Label => self.function().labels.get(&name).copied(),
-            SymbolKind::Typedef
-            | SymbolKind::Variable
-            | SymbolKind::Parameter
-            | SymbolKind::Function
-            | SymbolKind::Variant => self.last().ordinaries.get(&name).copied(),
-            _ => unimplemented!(),
+            _ => self.last().ordinaries.get(&name).copied(),
         }
     }
 
     pub fn insert(&mut self, kind: SymbolKind, name: StringId, id: SymbolId) {
         match kind {
             SymbolKind::Label => self.function_mut().labels.insert(name, id),
-            SymbolKind::Typedef
-            | SymbolKind::Variable
-            | SymbolKind::Parameter
-            | SymbolKind::Function
-            | SymbolKind::Variant => self.last_mut().ordinaries.insert(name, id),
-            _ => unimplemented!(),
+            _ => self.last_mut().ordinaries.insert(name, id),
         };
     }
 

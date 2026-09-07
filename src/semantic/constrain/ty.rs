@@ -3,6 +3,15 @@ use crate::semantic::diagnosis::{Diag, Diagnosis};
 use crate::semantic::{DeclaredParams, QualifiedType, ResolvedType};
 use crate::target::Target;
 
+/// 6.5.2.3 A type specifier of the form `enum identifier` without an enumerator list shall only
+/// appear after the type it specifies is complete.
+pub fn check_enum_reference(is_complete: bool, name: Option<Name>) -> Diag<()> {
+    match is_complete {
+        true => Diag::ok(()),
+        false => Diag::err((), Diagnosis::ForwardEnumReference(name)),
+    }
+}
+
 pub fn check_return_type(ret: &ResolvedType, ty: QualifiedType) -> Diag<()> {
     match ret {
         ResolvedType::Array { .. } => Diag::err((), Diagnosis::FunctionReturningArray(ty)),

@@ -417,3 +417,21 @@ fn source_line_of_a_missing_file_is_none() {
     let ctx = Context::default();
     assert_eq!(ctx.source_line("/cc1/no/such/source/file.c", 1), None);
 }
+
+reports!(
+    report_forward_enum_reference,
+    "enum E *p;",
+    ["<test>:1:1: error: ISO C forbids forward references to enum 'E'"]
+);
+
+reports!(
+    report_indirection_on_a_pointer_to_void,
+    "void *v; void f(void) { *v; }",
+    ["<test>:1:25: error: ISO C does not allow indirection on operand of type 'void *'"]
+);
+
+reports!(
+    report_cast_of_a_non_scalar_operand,
+    "struct S { int a; } s; void f(void) { (int)s; }",
+    ["<test>:1:39: error: Conversion of non scalar type"]
+);

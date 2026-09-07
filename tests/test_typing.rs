@@ -971,7 +971,7 @@ shaped!(
 rejects_shaped!(
     cast_of_a_non_scalar_operand_is_rejected,
     "struct S { int a; } s; void f(void) { (int)s; }",
-    Diagnosis::CastToNonScalar,
+    Diagnosis::CastOfNonScalar,
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
 );
 

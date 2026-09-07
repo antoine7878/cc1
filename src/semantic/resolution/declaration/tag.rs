@@ -80,6 +80,8 @@ pub fn enum_tag(sema: &mut Sema, ctx: &Context, id: EnumId) -> Option<TagDefId> 
     let is_definition = !enum_node.variants.is_empty();
     let tag = sema.declare_tag(Tag::Enum, enum_node.name, is_definition, &enum_node.span);
     if !is_definition {
+        let is_complete = tag.resolve(sema).is_complete;
+        constrain::ty::check_enum_reference(is_complete, enum_node.name).collect(sema, &enum_node.span);
         return Some(tag);
     }
 

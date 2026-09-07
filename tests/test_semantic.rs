@@ -60,6 +60,16 @@ reject!(
     "union U { int a : 33; };"
 );
 
+// ---- 6.5.2.3 `enum identifier` shall follow the completion of the type -----
+
+accept!(enum_reference_after_definition, "enum E { A }; enum E x;");
+accept!(enum_pointer_after_definition, "enum E { A }; enum E *p;");
+
+reject!(enum_forward_declaration, "enum E;");
+reject!(enum_forward_reference_in_a_declaration, "enum E x;");
+reject!(enum_forward_reference_through_a_pointer, "enum E *p;");
+reject!(enum_forward_reference_in_a_prototype, "void f(enum E x);");
+
 // ---- 6.5.6 a typedef name is a synonym, not a type of its own -------------
 
 accept!(typedef_repeated_use, "typedef int T; T u; T v;");

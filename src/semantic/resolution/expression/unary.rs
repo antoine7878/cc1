@@ -55,7 +55,7 @@ pub fn indirection(sema: &mut Sema, e: &ExpressionNode) -> R {
             return Err(Diagnosis::IndirectionNotPointer(re.ty));
         };
         if inner.is_void(sema) {
-            return Err(Diagnosis::IncompleteType(*inner));
+            return Err(Diagnosis::IndirectionToVoid);
         }
         let kind = if inner.is_function(sema) { RValue } else { LValue };
         Ok((*inner, kind))
@@ -89,8 +89,11 @@ pub fn cast(sema: &mut Sema, ctx: &Context, node: &ExpressionNode, ty_node: &Typ
         let ty = qualif.id.resolve(sema);
         if !ty.is_void() {
             let from = re.casted_ty().id.resolve(sema);
-            if !ty.is_scalar(sema) || !from.is_scalar(sema) {
+            if !ty.is_scalar(sema) {
                 return Err(Diagnosis::CastToNonScalar);
+            }
+            if !from.is_scalar(sema) {
+                return Err(Diagnosis::CastOfNonScalar);
             }
             if ty.is_pointer() != from.is_pointer() && (ty.is_floating() || from.is_floating()) {
                 return Err(Diagnosis::InvalidOperand);

@@ -10,7 +10,6 @@ use crate::utils::{RED, RESET, YELLOW};
 #[derive(Clone, Debug)]
 pub enum Diagnosis {
     Poisoned,
-    Temprorary,
     InvalidOperand,
     SyntaxError {
         found: &'static str,
@@ -77,7 +76,6 @@ pub enum Diagnosis {
     // 6.3.4
     CastToNonScalar,
     CastOfNonScalar,
-    IncompatibleCast,
 
     // 6.3.5
     DivisionByZero,
@@ -131,6 +129,9 @@ pub enum Diagnosis {
     // 6.5.2.2
     VariantBadValue,
 
+    // 6.5.2.3
+    ForwardEnumReference(Option<Name>),
+
     // 6.5.3
     DuplicateTypeQualifiers,
 
@@ -154,7 +155,6 @@ pub enum Diagnosis {
     InitIncompatibleTypes(QualifiedType, QualifiedType),
 
     // 6.6.1
-    LabelOutsideFunction,
 
     // 6.6.4
     NonScalarStatement(QualifiedType),
@@ -177,10 +177,7 @@ pub enum Diagnosis {
     FunctionAutoExtern,
     UnnamedPrototypeParameter,
     ParameterTypeListWithList,
-    ParameterOldStyleListLenMismatch,
-    MissingDeclarationInOldStyle,
     MissingParameterInOldStyle,
-    TypedefInOldStyle,
     IncompleteParameter(QualifiedType),
     IncompleteReturn(QualifiedType),
 }
@@ -221,7 +218,6 @@ impl DiagnosisNode {
         let sema = &ctx.sema;
         match &self.inner {
             Diagnosis::Poisoned => "Internal error".to_string(),
-            Diagnosis::Temprorary =>  "TEMPRORARY DIAG".to_string(),
             Diagnosis::InvalidOperand => "invalid operand".to_string(),
             Diagnosis::SyntaxError { found, expected } if expected.is_empty() => format!("syntax error, unexpected {}", token_label(found)),
             Diagnosis::SyntaxError { found, expected } => format!("syntax error, unexpected {}, expecting {expected}", token_label(found)),
@@ -288,7 +284,6 @@ impl DiagnosisNode {
             // 6.3.4
             Diagnosis::CastToNonScalar => "Conversion to non scalar type".to_string(),
             Diagnosis::CastOfNonScalar => "Conversion of non scalar type".to_string(),
-            Diagnosis::IncompatibleCast => "Incompatible types".to_string(),
 
             // 6.3.5
             Diagnosis::DivisionByZero => "division by zero is undefined".to_string(),
@@ -342,6 +337,9 @@ impl DiagnosisNode {
             Diagnosis::ZeroWidthNamedBitField(name) => format!("named bit-field '{}' has zero width", name.id.resolve(ctx)),
 
             // 6.5.2.2
+            Diagnosis::ForwardEnumReference(Some(name)) => format!("ISO C forbids forward references to enum '{}'", name.id.resolve(ctx)),
+            Diagnosis::ForwardEnumReference(None) => "ISO C forbids forward references to 'enum' types".to_string(),
+
             Diagnosis::VariantBadValue => "Variant value should be in int range".to_string(),
 
             // 6.5.3
@@ -367,7 +365,6 @@ impl DiagnosisNode {
             Diagnosis::InitIncompatibleTypes(to, from) => format!("initialization of '{}' from incompatible pointer type '{}'", to.describe(sema, ctx), from.describe(sema, ctx)),
 
             // 6.6.1
-            Diagnosis::LabelOutsideFunction => "Label outside function".to_string(),
 
             // 6.6.4
             Diagnosis::NonScalarStatement(ty) => format!("statement requires expression of scalar type ('{}' invalid)", ty.describe(sema, ctx)),
@@ -390,10 +387,7 @@ impl DiagnosisNode {
             Diagnosis::FunctionAutoExtern => "Function storage shall be auto or extern".to_string(),
             Diagnosis::UnnamedPrototypeParameter => "Parameter shall include an identifier".to_string(),
             Diagnosis::ParameterTypeListWithList => "Parameter style function declration shall not be followed by a declaration list".to_string(),
-            Diagnosis::ParameterOldStyleListLenMismatch => "Old style parameter function declaration shall be followed by a declaration list".to_string(),
-            Diagnosis::MissingDeclarationInOldStyle => "Missing argument declaration in old style function".to_string(),
             Diagnosis::MissingParameterInOldStyle => "Missing parameter".to_string(),
-            Diagnosis::TypedefInOldStyle => "Typedef unsed in old style function".to_string(),
             Diagnosis::IncompleteParameter(ty) => format!("parameter has incomplete type '{}'", ty.describe(sema, ctx)),
             Diagnosis::IncompleteReturn(ty) => format!("function definition has incomplete return type '{}'", ty.describe(sema, ctx)),
         }

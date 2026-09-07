@@ -1,7 +1,8 @@
-struct S x;
+#include <stdio.h>
 
-struct S {
-	int a;
-};
+enum E { A = (int)3.3L };
 
-struct S y = x;
+int main(void) {
+	printf("coucou:%i\n", A);
+	return 0;
+}
