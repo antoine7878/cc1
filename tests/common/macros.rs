@@ -124,6 +124,15 @@ macro_rules! uses {
 }
 
 #[macro_export]
+macro_rules! inits {
+    ($name:ident, $src:expr, $expected:expr) => {
+        test_case!($name, {
+            $crate::common::run_initializers(stringify!($name), $src, $expected);
+        });
+    };
+}
+
+#[macro_export]
 macro_rules! member_refs {
     ($name:ident, $src:expr, $expected:expr) => {
         test_case!($name, {

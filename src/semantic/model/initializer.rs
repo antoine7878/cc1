@@ -4,13 +4,13 @@ use std::slice::Iter;
 use crate::arena::ResolveWith;
 use crate::ast;
 use crate::ast::visit::Visitor;
-use crate::ast::{Expression, ExpressionId, ExpressionNode, InitializerNode, StringId, Tag, UnaryOp, Value};
+use crate::ast::{Expression, ExpressionId, ExpressionNode, InitializerNode, StringId, Tag, Value};
 use crate::context::Context;
 use crate::define_arena;
 use crate::semantic::resolution::expression;
 use crate::semantic::{
-    AssignmentContext, Diag, DiagCollector, Diagnosis, Duration, QualifiedType, ResolvedType, Sema, SymbolId,
-    SymbolResolver, TagDefId, ice,
+    AssignmentContext, Diag, DiagCollector, Diagnosis, Duration, Place, QualifiedType, ResolvedType, Sema,
+    SymbolResolver, TagDefId, address, ice,
 };
 
 define_arena!(Initializer, InitializerArena, InitializerId, Sema, sema, inits);
@@ -19,7 +19,7 @@ define_arena!(Initializer, InitializerArena, InitializerId, Sema, sema, inits);
 pub enum Initializer {
     Zero,
     Value(Value),
-    Address { sym: SymbolId, offset: u32 },
+    Address(Place),
     String(StringId),
     List(Vec<Initializer>),
     Expr(ExpressionId),
@@ -71,14 +71,11 @@ fn single(
     if let Some(value) = ice::try_fold(resolver.sema, ctx, e) {
         return Initializer::Value(value);
     }
-    if let Some(init) = address_constant(resolver.sema, ctx, e) {
-        return init;
+    if let Some(at) = address::fold(resolver.sema, ctx, e) {
+        return Initializer::Address(at);
     }
-    if ty.id.resolve(resolver.sema).is_arithmetic(resolver.sema) {
-        resolver.add_diag(Diag::err((), Diagnosis::NonConstantExpression), &e.span);
-        return Initializer::Zero;
-    }
-    Initializer::Expr(e.id)
+    resolver.add_diag(Diag::err((), Diagnosis::NonConstantInitializer), &e.span);
+    Initializer::Zero
 }
 
 fn braced(
@@ -194,27 +191,6 @@ fn string(resolver: &mut SymbolResolver, ctx: &Context, ty: QualifiedType, e: &E
         resolver.add_diag(Diag::err((), Diagnosis::ArrayInitTooLong), &e.span);
     }
     Some(Initializer::String(id))
-}
-
-fn address_constant(sema: &Sema, ctx: &Context, e: &ExpressionNode) -> Option<Initializer> {
-    match e.id.resolve(ctx) {
-        Expression::StringLiteral(literal) => Some(Initializer::String(literal.name().id)),
-        Expression::Unary(UnaryOp::Addr, inner) => Some(Initializer::Address {
-            sym: sema.expr_bindings.get(inner.id).copied()?,
-            offset: 0,
-        }),
-        Expression::Identifier(_) => {
-            let sym = sema.expr_bindings.get(e.id).copied()?;
-            let ty = sym.resolve(sema).ty?;
-            match ty.id.resolve(sema) {
-                ResolvedType::Array { .. } | ResolvedType::Function { .. } => {
-                    Some(Initializer::Address { sym, offset: 0 })
-                }
-                _ => None,
-            }
-        }
-        _ => None,
-    }
 }
 
 fn excess(resolver: &mut SymbolResolver, cursor: &mut Cursor) {

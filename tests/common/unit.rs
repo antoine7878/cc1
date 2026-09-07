@@ -6,7 +6,8 @@ use cc1::ast::{Expression, ExpressionId, Name, Tag, Value};
 use cc1::context::Context;
 use cc1::parser::parse_reader;
 use cc1::semantic::{
-    Analyzer, Diagnosis, DiagnosisNode, ExpressionKind, ParamTypes, QualifiedType, ResolvedType, SymbolKind,
+    AddressBase, Analyzer, Diagnosis, DiagnosisNode, ExpressionKind, Initializer, ParamTypes, QualifiedType,
+    ResolvedType, SymbolKind,
 };
 
 use crate::common::ty::Ty;
@@ -266,6 +267,44 @@ impl Unit {
             .collect()
     }
 
+    fn render_initializer(&self, init: &Initializer) -> String {
+        match init {
+            Initializer::Zero => "0".to_string(),
+            Initializer::Value(value) => repr(Some(*value)),
+            Initializer::String(id) => format!("{:?}", id.resolve(&self.ctx)),
+            Initializer::Expr(_) => "expr".to_string(),
+            Initializer::List(items) => {
+                let rendered: Vec<String> = items.iter().map(|i| self.render_initializer(i)).collect();
+                format!("{{{}}}", rendered.join(", "))
+            }
+            Initializer::Address(at) => {
+                let base = match at.base {
+                    AddressBase::Symbol(sym) => self.ctx.sema.symbols.get(sym).name.id.resolve(&self.ctx).clone(),
+                    AddressBase::String(id) => format!("{:?}", id.resolve(&self.ctx)),
+                    AddressBase::Absolute => "abs".to_string(),
+                };
+                match at.offset {
+                    0 => format!("&{base}"),
+                    n if n > 0 => format!("&{base}+{n}"),
+                    n => format!("&{base}{n}"),
+                }
+            }
+        }
+    }
+
+    pub fn initializers(&self) -> Vec<(String, String)> {
+        self.ctx
+            .sema
+            .symbols
+            .iter()
+            .filter_map(|symbol| {
+                let id = symbol.initializer?;
+                let name = symbol.name.id.resolve(&self.ctx).clone();
+                Some((name, self.render_initializer(self.ctx.sema.inits.get(id))))
+            })
+            .collect()
+    }
+
     pub fn symbols(&self) -> Vec<(String, String, String)> {
         self.ctx
             .sema
@@ -496,6 +535,21 @@ pub fn run_uses(name: &str, src: &str, expected: &[(&str, bool)]) {
     let got = unit.uses();
     let expected: Vec<(String, bool)> = expected.iter().map(|(n, u)| (n.to_string(), *u)).collect();
     assert_eq!(got, expected, "`{name}` symbol uses:\n{src}");
+}
+
+pub fn run_initializers(name: &str, src: &str, expected: &[(&str, &str)]) {
+    let unit = Unit::compile(src);
+
+    assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
+    assert!(
+        unit.diagnosis().is_empty(),
+        "`{name}` unexpected diagnosis:\n{src}\n{}",
+        unit.render()
+    );
+
+    let got = unit.initializers();
+    let expected: Vec<(String, String)> = expected.iter().map(|(s, i)| (s.to_string(), i.to_string())).collect();
+    assert_eq!(got, expected, "`{name}` initializers:\n{src}");
 }
 
 pub fn run_member_refs(name: &str, src: &str, expected: &[(&str, &str, usize)]) {

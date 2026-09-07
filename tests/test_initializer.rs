@@ -77,3 +77,91 @@ reject!(
     init_automatic_array_from_variable,
     "void f(int n) { int a[2] = { n, 1 }; }"
 );
+
+// 6.4: an address constant may be built with &, *, [], . and pointer casts,
+// but the value of an object shall not be accessed by those operators.
+inits!(init_folds_address_of_object, "int g; int *p = &g;", &[("p", "&g")]);
+inits!(init_folds_array_decay, "int a[3]; int *p = a;", &[("p", "&a")]);
+inits!(
+    init_folds_function_designator,
+    "int f(void); int (*p)(void) = f;",
+    &[("p", "&f")]
+);
+inits!(
+    init_folds_address_of_element,
+    "int a[10]; int *p = &a[3];",
+    &[("p", "&a+12")]
+);
+inits!(
+    init_folds_address_of_member,
+    "struct S { int x; int y; } s; int *p = &s.y;",
+    &[("p", "&s+4")]
+);
+inits!(
+    init_folds_address_of_element_of_member,
+    "struct S { int x; int a[4]; } s; int *p = &s.a[2];",
+    &[("p", "&s+12")]
+);
+inits!(
+    init_folds_member_array_decay,
+    "struct S { int x; int a[4]; } s; int *p = s.a;",
+    &[("p", "&s+4")]
+);
+inits!(
+    init_folds_address_of_row_element,
+    "int a[3][4]; int *p = &a[1][2];",
+    &[("p", "&a+24")]
+);
+inits!(
+    init_folds_pointer_addition,
+    "int a[10]; int *p = a + 3;",
+    &[("p", "&a+12")]
+);
+inits!(
+    init_folds_pointer_subtraction,
+    "int a[10]; int *p = &a[5] - 2;",
+    &[("p", "&a+12")]
+);
+inits!(
+    init_folds_to_a_negative_offset,
+    "int a[10]; int *p = &a[0] - 2;",
+    &[("p", "&a-8")]
+);
+inits!(
+    init_folds_byte_offset_through_a_cast,
+    "int x; char *p = (char *)&x + 1;",
+    &[("p", "&x+1")]
+);
+inits!(
+    init_folds_offset_into_a_string_literal,
+    "char *p = \"abc\" + 1;",
+    &[("p", "&\"abc\"+1")]
+);
+inits!(
+    init_folds_indirection_of_address,
+    "int x; int *p = &*&x;",
+    &[("p", "&x")]
+);
+inits!(
+    init_folds_absolute_address,
+    "int *p = (int *)4 + 1;",
+    &[("p", "&abs+8")]
+);
+inits!(
+    init_folds_address_constant_into_an_integer,
+    "int a[10]; long n = (long)&a[3];",
+    &[("n", "&a+12")]
+);
+
+reject!(
+    init_address_read_through_a_pointer_variable,
+    "struct S { int x; } s; struct S *q = &s; int *p = &q->x;"
+);
+reject!(
+    init_address_of_an_automatic_object,
+    "void f(void) { int x; static int *p = &x; }"
+);
+reject!(
+    init_static_struct_from_a_variable,
+    "struct S { int a; } x; struct S y = x;"
+);

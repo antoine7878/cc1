@@ -149,6 +149,7 @@ pub enum Diagnosis {
 
     // 6.5.7
     ArrayInitTooLong,
+    NonConstantInitializer,
     InitDiscardedQualifiers(QualifiedType, QualifiedType),
     InitIncompatibleTypes(QualifiedType, QualifiedType),
 
@@ -361,6 +362,7 @@ impl DiagnosisNode {
 
             // 6.5.7
             Diagnosis::ArrayInitTooLong => "excess elements in array initializer".to_string(),
+            Diagnosis::NonConstantInitializer => "initializer element is not a compile-time constant".to_string(),
             Diagnosis::InitDiscardedQualifiers(to, from) => format!("initializing '{}' with an expression of type '{}' discards qualifiers", to.describe(sema, ctx), from.describe(sema, ctx)),
             Diagnosis::InitIncompatibleTypes(to, from) => format!("initialization of '{}' from incompatible pointer type '{}'", to.describe(sema, ctx), from.describe(sema, ctx)),
 

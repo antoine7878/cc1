@@ -1,2 +1,7 @@
-int a[10];
-int *p = &a[3];
+struct S x;
+
+struct S {
+	int a;
+};
+
+struct S y = x;
