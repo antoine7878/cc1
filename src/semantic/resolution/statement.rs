@@ -1,12 +1,14 @@
 use crate::arena::{Loan, OptionPoisoned};
 use crate::ast::Statement;
 use crate::ast::{
-    ExpressionNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, SelectionStatement,
-    SelectionStatementNode, StatementNode, statement::StatementId,
+    ExpressionNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, JumpStatement,
+    JumpStatementNode, SelectionStatement, SelectionStatementNode, StatementNode, statement::StatementId,
 };
 use crate::context::Context;
-use crate::semantic::resolution::expression::operands;
-use crate::semantic::{Diag, DiagCollector, Diagnosis, ResolvedStatement, Sema, cast};
+use crate::semantic::resolution::expression::{self, operands};
+use crate::semantic::{
+    AssignmentContext, Diag, DiagCollector, Diagnosis, QualifiedType, ResolvedStatement, Sema, cast,
+};
 
 type Substatements<'s, const N: usize> = Loan<'s, Sema, StatementId, ResolvedStatement, N>;
 
@@ -84,4 +86,18 @@ fn check_for(
     e1.expr.as_ref().and_then(|e| expr_to_void(sema, e));
     e3.as_ref().and_then(|e| expr_to_void(sema, e));
     if let Some(e) = e2.expr.as_ref() { check_scalar(sema, e) } else { Ok(()) }
+}
+
+pub fn check_return(sema: &mut Sema, ctx: &Context, node: &JumpStatementNode, return_ty: QualifiedType) {
+    match &node.stmt {
+        JumpStatement::Return(Some(e)) => {
+            if let Err(inner) = expression::init(sema, ctx, return_ty, e, AssignmentContext::Return) {
+                sema.add_diag(Diag::err((), inner), &e.span);
+            }
+        }
+        JumpStatement::Return(None) if return_ty.id != sema.builtins.void => {
+            sema.add_diag(Diag::err((), Diagnosis::InvalidReturnType), &node.span);
+        }
+        _ => (),
+    }
 }

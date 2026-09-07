@@ -14,8 +14,8 @@ use crate::semantic::resolution::expression::{self};
 use crate::semantic::resolution::function;
 use crate::semantic::resolution::statement;
 use crate::semantic::{
-    AssignmentContext, Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedType, ScopeKind, Sema,
-    SymbolId, constrain, declaration, ice,
+    Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedType, ScopeKind, Sema, SymbolId, constrain,
+    declaration, ice,
 };
 
 #[derive(Debug)]
@@ -62,21 +62,6 @@ impl SymbolResolver<'_> {
         }
         let id = self.sema.inits.alloc(init);
         sym_id.resolve_mut(self.sema).initializer = Some(id);
-    }
-
-    fn resolve_return(&mut self, ctx: &Context, node: &JumpStatementNode, return_ty: QualifiedType) {
-        match &node.stmt {
-            JumpStatement::Return(Some(e)) => {
-                self.visit_expression(ctx, e);
-                if let Err(inner) = expression::init(self.sema, ctx, return_ty, e, AssignmentContext::Return) {
-                    self.add_diag(Diag::err((), inner), &e.span);
-                }
-            }
-            JumpStatement::Return(None) if return_ty.id != self.sema.builtins.void => {
-                self.add_diag(Diag::err((), Diagnosis::InvalidReturnType), &node.span);
-            }
-            _ => (),
-        }
     }
 }
 
@@ -150,7 +135,7 @@ impl Visitor for SymbolResolver<'_> {
                     self.visit_expression(ctx, e);
                 }
                 if let Some(return_ty) = self.return_ty {
-                    self.resolve_return(ctx, node, return_ty);
+                    statement::check_return(self.sema, ctx, node, return_ty);
                 }
             }
             // JumpStatement::Continue => (),
