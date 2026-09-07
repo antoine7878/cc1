@@ -12,6 +12,7 @@ use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::model::initializer;
 use crate::semantic::resolution::expression::{self};
+use crate::semantic::resolution::statement;
 use crate::semantic::{
     AssignmentContext, DeclaredParams, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId,
     ParamInfo, ParamTypes, QualifiedType, ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain,
@@ -444,12 +445,12 @@ impl Visitor for SymbolResolver<'_> {
 
     fn visit_selection_statement(&mut self, ctx: &Context, node: &SelectionStatementNode) {
         walk_selection_statement(self, ctx, node);
-        expression::check_selection_statement(self.sema, node);
+        statement::check_selection_statement(self.sema, node);
     }
 
     fn visit_iteration_statement(&mut self, ctx: &Context, node: &IterationStatementNode) {
         walk_iteration_statement(self, ctx, node);
-        expression::check_iteration_statement(self.sema, node);
+        statement::check_iteration_statement(self.sema, node);
     }
 
     fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode) {
