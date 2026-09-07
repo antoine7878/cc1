@@ -40,8 +40,7 @@ ttest:
 	cargo nextest run -p ft_lex -p ft_yacc -p libft -p cc1
 
 
-CFF = -m32 -std=iso9899:1990 -pedantic-errors -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
-# CFF = -m32 -std=iso9899:1990
+CFF = -m32 -std=iso9899:1990
 
 c:
 	gcc -c $(CFF) rscs/hello.c -o /dev/null
