@@ -3,23 +3,24 @@ use crate::ast::{BinaryOp, Expression, ExpressionNode, UnaryOp};
 use crate::context::Context;
 use crate::semantic::ExpressionKind::{LValue, RValue};
 use crate::semantic::resolution::expression::*;
-use crate::semantic::{Diag, DiagCollector, ResolvedExpression, Sema, cast};
+use crate::semantic::{Diag, DiagCollector, ResolvedExpression, Sema, SymbolResolver, cast};
 
-pub fn resolve_expression(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
-    if sema.expr_types.seen(node.id) {
+pub fn resolve_expression(resolver: &mut SymbolResolver, ctx: &Context, node: &ExpressionNode) {
+    if resolver.sema.expr_types.seen(node.id) {
         return;
     }
-    let resolved = match type_of(sema, ctx, node) {
+    let resolved = match type_of(resolver, ctx, node) {
         Ok((ty, kind)) => Some(ResolvedExpression::new(ty, kind)),
         Err(diag) => {
-            sema.add_diag(Diag::err((), diag), &node.span);
+            resolver.add_diag(Diag::err((), diag), &node.span);
             None
         }
     };
-    sema.expr_types.set(node.id, resolved);
+    resolver.sema.expr_types.set(node.id, resolved);
 }
 
-fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> R {
+fn type_of(resolver: &mut SymbolResolver, ctx: &Context, node: &ExpressionNode) -> R {
+    let sema = &mut *resolver.sema;
     match node.id.resolve(ctx) {
         Expression::Identifier(_) => identifier(sema, node),
         Expression::Constant(value) => Ok((value.ty(sema), RValue)),
@@ -30,11 +31,11 @@ fn type_of(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> R {
         Expression::Member(op, e, name) => member(sema, node, *op, e, name),
         Expression::Unary(op, e) => unary_op(sema, *op, e),
         Expression::SizeofExpr(e) => size_of_e(sema, node, e),
-        Expression::SizeofType(ty) => size_of_ty(sema, ctx, node, ty, &node.span),
+        Expression::SizeofType(ty) => size_of_ty(resolver, ctx, node, ty, &node.span),
         Expression::Binary(op, e1, e2) => binary_op(sema, ctx, op, e1, e2),
         Expression::Ternary(e1, e2, e3) => conditional(sema, ctx, e1, e2, e3),
         Expression::Assign(op, e1, e2) => assignment(sema, ctx, op, e1, e2),
-        Expression::Cast(ty_node, operand) => cast(sema, ctx, node, ty_node, operand),
+        Expression::Cast(ty_node, operand) => cast(resolver, ctx, node, ty_node, operand),
         Expression::List(es) => list(sema, es),
     }
 }

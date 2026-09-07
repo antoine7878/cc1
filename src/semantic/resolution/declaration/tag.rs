@@ -4,11 +4,11 @@ use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, Member, QualifiedType, Sema, Symbol, SymbolKind, TagDefId, constrain, ice,
+    Diag, DiagCollector, Diagnosis, Member, QualifiedType, Symbol, SymbolKind, SymbolResolver, TagDefId, constrain,
 };
 
 pub fn struct_or_union_tag(
-    sema: &mut Sema,
+    resolver: &mut SymbolResolver,
     ctx: &Context,
     kind: Tag,
     name: Option<Name>,
@@ -16,7 +16,7 @@ pub fn struct_or_union_tag(
     span: &Span,
 ) -> TagDefId {
     let is_definition = !fields.is_empty();
-    let tag = sema.declare_tag(kind, name, is_definition, span);
+    let tag = resolver.declare_tag(kind, name, is_definition, span);
     if !is_definition {
         return tag;
     }
@@ -25,23 +25,24 @@ pub fn struct_or_union_tag(
     let mut has_rejected_member = false;
     for field in fields {
         if field.struct_declarators.is_empty() {
-            sema.add_diag(Diag::err((), Diagnosis::EmptyDeclaration), &field.span);
+            resolver.add_diag(Diag::err((), Diagnosis::EmptyDeclaration), &field.span);
         }
-        let qual = base_type(sema, ctx, &field.specifiers, &field.span);
+        let qual = base_type(resolver, ctx, &field.specifiers, &field.span);
         for declarator in &field.struct_declarators {
             let decl = &declarator.declarator;
-            let diag_count_before = sema.diagnosis.len();
-            let Some((ty, node)) = declared_type(sema, ctx, qual, decl) else { continue };
-            let already_diagnosed = sema.diagnosis.len() != diag_count_before;
+            let diag_count_before = resolver.sema.diagnosis.len();
+            let Some((ty, node)) = declared_type(resolver, ctx, qual, decl) else { continue };
+            let already_diagnosed = resolver.sema.diagnosis.len() != diag_count_before;
             let name = node.ident(ctx);
             let bit_width = declarator.bit_width.as_ref().and_then(|e| {
-                let value = ice::eval_constant(sema, ctx, e);
+                let value = resolver.eval_constant(ctx, e);
+                let sema = &*resolver.sema;
                 let checked = constrain::ty::check_bit_width(&sema.target, ty.id.resolve(sema), value, name);
-                checked.collect(sema, &e.span)
+                checked.collect(resolver, &e.span)
             });
-            let is_member_object = ty.is_object(sema);
+            let is_member_object = ty.is_object(resolver.sema);
             if !already_diagnosed {
-                constrain::ty::check_member_type(is_member_object, ty).collect(sema, &decl.span);
+                constrain::ty::check_member_type(is_member_object, ty).collect(resolver, &decl.span);
             }
             if already_diagnosed || !is_member_object {
                 has_rejected_member = true;
@@ -51,16 +52,16 @@ pub fn struct_or_union_tag(
                 (Some(name), _) => {
                     if members
                         .iter()
-                        .any(|m| m.sym.is_some_and(|id| id.resolve(sema).name.id == name.id))
+                        .any(|m| m.sym.is_some_and(|id| id.resolve(resolver.sema).name.id == name.id))
                     {
-                        sema.add_diag(
+                        resolver.add_diag(
                             Diag::err((), Diagnosis::DuplicateDeclaration(SymbolKind::Member, name)),
                             &decl.span,
                         );
                         continue;
                     }
                     let memb = Symbol::member(name, ty, bit_width);
-                    let id = sema.symbols.alloc(memb);
+                    let id = resolver.sema.symbols.alloc(memb);
                     members.push(Member::symbol(id, bit_width))
                 }
                 (None, Some(i)) => members.push(Member::bitfield(i)),
@@ -69,19 +70,19 @@ pub fn struct_or_union_tag(
         }
     }
     if !has_rejected_member && (members.is_empty() || members.iter().all(|m| m.sym.is_none())) {
-        sema.add_diag(Diag::err((), Diagnosis::TagWithoutMember(kind.symbol_kind())), span);
+        resolver.add_diag(Diag::err((), Diagnosis::TagWithoutMember(kind.symbol_kind())), span);
     }
-    sema.tags.complete(tag, members);
+    resolver.sema.tags.complete(tag, members);
     tag
 }
 
-pub fn enum_tag(sema: &mut Sema, ctx: &Context, id: EnumId) -> Option<TagDefId> {
+pub fn enum_tag(resolver: &mut SymbolResolver, ctx: &Context, id: EnumId) -> Option<TagDefId> {
     let enum_node = id.resolve(ctx);
     let is_definition = !enum_node.variants.is_empty();
-    let tag = sema.declare_tag(Tag::Enum, enum_node.name, is_definition, &enum_node.span);
+    let tag = resolver.declare_tag(Tag::Enum, enum_node.name, is_definition, &enum_node.span);
     if !is_definition {
-        let is_complete = tag.resolve(sema).is_complete;
-        constrain::ty::check_enum_reference(is_complete, enum_node.name).collect(sema, &enum_node.span);
+        let is_complete = tag.resolve(resolver.sema).is_complete;
+        constrain::ty::check_enum_reference(is_complete, enum_node.name).collect(resolver, &enum_node.span);
         return Some(tag);
     }
 
@@ -91,29 +92,29 @@ pub fn enum_tag(sema: &mut Sema, ctx: &Context, id: EnumId) -> Option<TagDefId> 
     for variant_id in &enum_node.variants {
         let variant = variant_id.resolve(ctx);
         if let Some(expr) = &variant.value
-            && let Some(v) = variant_value(sema, ctx, expr)
+            && let Some(v) = variant_value(resolver, ctx, expr)
         {
             value = v;
         }
         if value < i32::MIN as i64 || value > i32::MAX as i64 {
-            sema.add_diag(Diag::err((), Diagnosis::VariantBadValue), &variant.span);
+            resolver.add_diag(Diag::err((), Diagnosis::VariantBadValue), &variant.span);
             value = 0
         }
-        let ty = QualifiedType::plain(sema.builtins.int);
+        let ty = QualifiedType::plain(resolver.sema.builtins.int);
         members.push(Member::symbol(
-            sema.declare(Symbol::variant(variant.name, ty, value as i32), &variant.span),
+            resolver.declare(Symbol::variant(variant.name, ty, value as i32), &variant.span),
             None,
         ));
         value += 1;
     }
-    sema.tags.complete(tag, members);
+    resolver.sema.tags.complete(tag, members);
     Some(tag)
 }
 
-fn variant_value(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<i64> {
-    let value = ice::eval_constant(sema, ctx, expr)?;
+fn variant_value(resolver: &mut SymbolResolver, ctx: &Context, expr: &ExpressionNode) -> Option<i64> {
+    let value = resolver.eval_constant(ctx, expr)?;
     value.get_integer_value().map_or_else(
-        || sema.add_diag(Diag::err(None, Diagnosis::NonIntegerConstantExpression), &expr.span),
+        || resolver.add_diag(Diag::err(None, Diagnosis::NonIntegerConstantExpression), &expr.span),
         |v| Some(v as i64),
     )
 }

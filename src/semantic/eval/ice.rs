@@ -1,12 +1,9 @@
 use std::cmp::Ordering;
 
 use crate::arena::ResolveWith;
-use crate::ast::visit::Visitor;
 use crate::ast::{BinaryOp, Expression, ExpressionNode, Fold, Tag, UnaryOp, Value};
 use crate::context::Context;
-use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedType, Sema, SymbolKind, SymbolResolver,
-};
+use crate::semantic::{Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedType, Sema, SymbolKind};
 
 struct DiagSink<'a>(&'a mut Vec<DiagnosisNode>);
 
@@ -16,11 +13,12 @@ impl DiagCollector for DiagSink<'_> {
     }
 }
 
+/// Folds an already resolved expression. Binding happens in the resolution pass, so a caller that
+/// is still binding must go through `SymbolResolver::eval_constant`.
 pub fn eval_constant(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option<Value> {
     if sema.expr_consts.seen(expr.id) {
         return sema.expr_consts.get(expr.id).copied();
     }
-    SymbolResolver::new(sema).visit_expression(ctx, expr);
     let mut collected = Vec::new();
     let folded = fold(sema, ctx, expr, &mut DiagSink(&mut collected));
     sema.diagnosis.append(&mut collected);

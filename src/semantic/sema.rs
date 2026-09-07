@@ -3,13 +3,13 @@ use std::mem::take;
 
 use crate::arena::{HasTable, ResolveMutWith, ResolveWith, SideTable};
 use crate::ast::statement::StatementId;
-use crate::ast::{AstArenas, DeclaratorId, ExpressionId, Name, StringId, Tag, Value};
+use crate::ast::{AstArenas, DeclaratorId, ExpressionId, StringId, Value};
 use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::{
     Builtins, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, InitializerArena, Linkage,
-    MemberRef, QualifiedType, ResolvedExpression, ResolvedStatement, ResolvedTypeArena, ResolvedTypeId, ScopeKind,
-    Scopes, Symbol, SymbolArena, SymbolId, SymbolKind, TagDefArena, TagDefId,
+    MemberRef, ResolvedExpression, ResolvedStatement, ResolvedTypeArena, ResolvedTypeId, Symbol, SymbolArena, SymbolId,
+    TagDefArena,
 };
 use crate::target::{Layout, Target};
 
@@ -22,7 +22,6 @@ pub struct External {
 
 #[derive(Debug)]
 pub struct Sema {
-    pub scopes: Scopes,
     pub diagnosis: Vec<DiagnosisNode>,
 
     pub symbols: SymbolArena,
@@ -50,7 +49,6 @@ impl Default for Sema {
         let target = Target::default();
         let builtins = Builtins::new(&mut types, &target);
         Self {
-            scopes: Scopes::default(),
             diagnosis: Vec::new(),
             symbols: SymbolArena::default(),
             types,
@@ -110,65 +108,14 @@ impl Sema {
         self.member_refs.resize(len);
     }
 
-    // ----- Resolution --------------------
-
-    pub fn resolve_typedef(
-        &mut self,
-        name: Name,
-        is_const: bool,
-        is_volatile: bool,
-        span: &Span,
-    ) -> Option<QualifiedType> {
-        let sym_id = self.scopes.lookup_ordinary(name.id)?;
-        let sym = sym_id.resolve(self);
-        if sym.kind != SymbolKind::Typedef {
-            return self.add_diag(Diag::err(None, Diagnosis::UndeclaredIdentifier(name)), span);
-        }
-        let base = sym.ty?;
-        if (is_const && base.is_const) || (is_volatile && base.is_volatile) {
-            self.add_diag(Diag::err((), Diagnosis::DuplicateTypeQualifiers), span)
-        }
-        Some(QualifiedType::new(
-            base.id,
-            base.is_const || is_const,
-            base.is_volatile || is_volatile,
-        ))
-    }
-
-    pub fn declare_tag(&mut self, kind: Tag, name: Option<Name>, is_definition: bool, span: &Span) -> TagDefId {
-        let Some(name) = name else { return self.tags.declare(kind, None) };
-
-        if let Some(id) = self.scopes.lookup_tag(name.id, is_definition) {
-            let def = id.resolve(self);
-            if def.kind != kind || (is_definition && def.is_complete) {
-                self.add_diag(Diag::err((), Diagnosis::DuplicateDeclaration(def.kind(), name)), span)
-            }
-            return id;
-        }
-
-        let id = self.tags.declare(kind, Some(name));
-        self.scopes.insert_tag(name.id, id);
-        id
-    }
+    // ----- Externals ---------------------
 
     pub fn linkage_of_name(&self, name: StringId) -> Option<Linkage> {
         let id = self.externals.get(&name)?.symbol;
         Some(id.resolve(self).linkage)
     }
 
-    pub fn declare(&mut self, sym: Symbol, span: &Span) -> SymbolId {
-        let (name, kind) = (sym.name, sym.kind);
-        let lexical = self.dedup(&sym, span);
-        let sym_id = if sym.linkage != Linkage::None {
-            self.register_external(sym, span, lexical)
-        } else {
-            lexical.unwrap_or_else(|| self.symbols.alloc(sym))
-        };
-        self.scopes.insert(kind, name.id, sym_id);
-        sym_id
-    }
-
-    fn register_external(&mut self, sym: Symbol, span: &Span, lexical: Option<SymbolId>) -> SymbolId {
+    pub fn register_external(&mut self, sym: Symbol, span: &Span, lexical: Option<SymbolId>) -> SymbolId {
         let name = sym.name;
         let linkage = sym.linkage;
         let definition = sym.definition;
@@ -216,41 +163,6 @@ impl Sema {
         }
 
         entry_symbol
-    }
-
-    fn dedup(&mut self, sym: &Symbol, span: &Span) -> Option<SymbolId> {
-        let old_id = self.scopes.current(sym.kind, sym.name.id)?;
-        let old_symbol = old_id.resolve(self);
-        if (self.scopes.kind() == ScopeKind::File
-            || (sym.linkage != Linkage::None && old_symbol.linkage != Linkage::None))
-            && old_symbol.is_compatible(self, sym)
-            && !(sym.is_init && old_symbol.is_init)
-        {
-            return Some(old_id);
-        }
-        self.add_diag(
-            Diag::err(Some(old_id), Diagnosis::DuplicateDeclaration(sym.kind, sym.name)),
-            span,
-        )
-    }
-
-    pub fn add_label_symbol(&mut self, name: Name, span: &Span, is_init: bool) {
-        if let Some(old) = self.scopes.lookup_label(name.id) {
-            let old_init = old.resolve(self).is_init;
-            if !old_init && is_init {
-                old.resolve_mut(self).is_init = true;
-                return;
-            }
-            if !(is_init && old_init) {
-                return;
-            }
-            return self.add_diag(
-                Diag::err((), Diagnosis::DuplicateDeclaration(SymbolKind::Label, name)),
-                span,
-            );
-        };
-        let sym_id = self.symbols.alloc(Symbol::label(name, is_init));
-        self.scopes.insert(SymbolKind::Label, name.id, sym_id);
     }
 
     pub fn with_sema(mut ctx: Context, pass: impl FnOnce(&mut Sema, &Context)) -> Context {

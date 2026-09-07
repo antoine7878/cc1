@@ -5,7 +5,7 @@ use crate::parser::Span;
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     DeclaredParams, Definition, Diag, DiagCollector, Diagnosis, FunctionDefId, ParamInfo, ParamTypes, QualifiedType,
-    ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, constrain,
+    ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, SymbolResolver, constrain,
 };
 
 pub struct FunctionHeader {
@@ -16,63 +16,67 @@ pub struct FunctionHeader {
 }
 
 pub fn bind_function_parameters(
-    sema: &mut Sema,
+    resolver: &mut SymbolResolver,
     ctx: &Context,
     node: &FunctionDefinitionNode,
     header: &FunctionHeader,
 ) {
-    sema.scopes.push(ScopeKind::Prototype);
+    resolver.enter_scope(ScopeKind::Prototype);
     let lst = &node.old_style_declarations;
     let span = &node.declarator.span;
     let parameters = match &header.params {
-        DeclaredParams::Unspecified => param_empty(sema, lst, span),
-        DeclaredParams::Names(names) => param_old_style(sema, ctx, names, lst, span),
-        DeclaredParams::Prototype { params, .. } => param_prototype(sema, params, lst, span),
+        DeclaredParams::Unspecified => param_empty(resolver.sema, lst, span),
+        DeclaredParams::Names(names) => param_old_style(resolver, ctx, names, lst, span),
+        DeclaredParams::Prototype { params, .. } => param_prototype(resolver, params, lst, span),
     };
     if let Some(declared) = &header.declared
         && !matches!(header.params, DeclaredParams::Prototype { .. })
         && let Some(name) = node.declarator.ident(ctx)
     {
-        check_identifier_list(sema, declared, &header.params, &parameters, name, span);
+        check_identifier_list(resolver.sema, declared, &header.params, &parameters, name, span);
     }
-    sema.functions.complete(header.id, parameters);
+    resolver.sema.functions.complete(header.id, parameters);
 }
 
-pub fn define_function(sema: &mut Sema, ctx: &Context, node: &FunctionDefinitionNode) -> Option<FunctionHeader> {
+pub fn define_function(
+    resolver: &mut SymbolResolver,
+    ctx: &Context,
+    node: &FunctionDefinitionNode,
+) -> Option<FunctionHeader> {
     let span = &node.span;
     let decl_span = &node.declarator.span;
 
-    let qualif = base_type(sema, ctx, &node.specifiers, span);
-    let (rty, decl, params) = declared_function(sema, ctx, qualif, &node.declarator)?;
-    let params = constrain::ty::extract_function_declarator(params).collect(sema, decl_span)?;
+    let qualif = base_type(resolver, ctx, &node.specifiers, span);
+    let (rty, decl, params) = declared_function(resolver, ctx, qualif, &node.declarator)?;
+    let params = constrain::ty::extract_function_declarator(params).collect(resolver, decl_span)?;
 
-    let declared_storage = constrain::specifier::get_storage(&node.specifiers).collect(sema, span);
+    let declared_storage = constrain::specifier::get_storage(&node.specifiers).collect(resolver, span);
     let storage = declared_storage.unwrap_or(Storage::Extern);
 
-    constrain::specifier::check_function_storage(storage).collect(sema, span);
-    constrain::specifier::check_external_specifiers(&node.specifiers).collect(sema, span);
+    constrain::specifier::check_function_storage(storage).collect(resolver, span);
+    constrain::specifier::check_external_specifiers(&node.specifiers).collect(resolver, span);
 
     let name = decl.ident(ctx)?;
-    let previous = sema.scopes.current(SymbolKind::Function, name.id);
-    let declared = previous.and_then(|id| param_types(sema, id));
+    let previous = resolver.current(SymbolKind::Function, name.id);
+    let declared = previous.and_then(|id| param_types(resolver.sema, id));
     let ty = match &declared {
         Some(declared) if !matches!(params, DeclaredParams::Prototype { .. }) => {
-            with_param_types(sema, rty, declared.clone())
+            with_param_types(resolver.sema, rty, declared.clone())
         }
         _ => rty,
     };
-    let &ResolvedType::Function { ret: return_ty, .. } = ty.id.resolve(sema) else { unreachable!() };
-    constrain::ty::check_definition_return(return_ty.is_void(sema) || return_ty.is_complete(sema), return_ty)
-        .collect(sema, decl_span);
-    let prior = sema.linkage_of_name(name.id);
-    let linkage = Symbol::linkage_of(sema.scopes.kind(), declared_storage, SymbolKind::Function, prior);
+    let &ResolvedType::Function { ret: return_ty, .. } = ty.id.resolve(resolver.sema) else { unreachable!() };
+    let is_defined_return = return_ty.is_void(resolver.sema) || return_ty.is_complete(resolver.sema);
+    constrain::ty::check_definition_return(is_defined_return, return_ty).collect(resolver, decl_span);
+    let prior = resolver.sema.linkage_of_name(name.id);
+    let linkage = Symbol::linkage_of(resolver.scope_kind(), declared_storage, SymbolKind::Function, prior);
     let mut sym = Symbol::function(name, ty, storage);
     sym.linkage = linkage;
     sym.definition = Definition::Definition;
-    let sym = sema.declare(sym, decl_span);
+    let sym = resolver.declare(sym, decl_span);
     let declared = (previous == Some(sym)).then_some(declared).flatten();
     Some(FunctionHeader {
-        id: sema.functions.declare(sym),
+        id: resolver.sema.functions.declare(sym),
         params,
         declared,
         return_ty,
@@ -125,32 +129,38 @@ fn param_empty(sema: &mut Sema, lst: &[DeclarationNode], span: &Span) -> Vec<Sym
     Vec::new()
 }
 
-fn param_prototype(sema: &mut Sema, params: &[ParamInfo], lst: &[DeclarationNode], span: &Span) -> Vec<SymbolId> {
-    if !constrain::parameter::is_valid_parameter_style(params, lst).collect(sema, span) {
+fn param_prototype(
+    resolver: &mut SymbolResolver,
+    params: &[ParamInfo],
+    lst: &[DeclarationNode],
+    span: &Span,
+) -> Vec<SymbolId> {
+    if !constrain::parameter::is_valid_parameter_style(params, lst).collect(resolver, span) {
         return Vec::new();
     }
     if let [only] = params {
-        let is_void = matches!(only.ty.id.resolve(sema), ResolvedType::Void);
-        constrain::parameter::check_void_parameter(is_void).collect(sema, &only.span);
+        let is_void = matches!(only.ty.id.resolve(resolver.sema), ResolvedType::Void);
+        constrain::parameter::check_void_parameter(is_void).collect(resolver, &only.span);
     }
     for param in params {
-        if param.ty.is_void(sema) {
+        if param.ty.is_void(resolver.sema) {
             continue;
         }
-        constrain::parameter::check_complete_parameter(param.ty.is_complete(sema), param.ty).collect(sema, &param.span);
+        constrain::parameter::check_complete_parameter(param.ty.is_complete(resolver.sema), param.ty)
+            .collect(resolver, &param.span);
     }
-    params.iter().filter_map(|param| add_parameter(sema, param)).collect()
+    params.iter().filter_map(|param| add_parameter(resolver, param)).collect()
 }
 
-fn add_parameter(sema: &mut Sema, param: &ParamInfo) -> Option<SymbolId> {
+fn add_parameter(resolver: &mut SymbolResolver, param: &ParamInfo) -> Option<SymbolId> {
     let name = param.name?;
     let storage = param.storage.unwrap_or(Storage::Auto);
     let sym = Symbol::parameter(name, param.ty, storage);
-    Some(sema.declare(sym, &name.span))
+    Some(resolver.declare(sym, &name.span))
 }
 
 fn param_old_style(
-    sema: &mut Sema,
+    resolver: &mut SymbolResolver,
     ctx: &Context,
     names: &[Name],
     lst: &[DeclarationNode],
@@ -167,8 +177,8 @@ fn param_old_style(
                 init_declarators
                     .iter()
                     .map(|decl| {
-                        add_parameter_declarator(sema, ctx, specifiers, &decl.declarator, span)
-                            .map(|sym_id| sym_id.resolve(sema).name.id)
+                        add_parameter_declarator(resolver, ctx, specifiers, &decl.declarator, span)
+                            .map(|sym_id| sym_id.resolve(resolver.sema).name.id)
                     })
                     .collect::<Vec<_>>()
             },
@@ -177,50 +187,51 @@ fn param_old_style(
 
     let names_id: Vec<_> = names.iter().map(|n| n.id).collect();
 
-    let Some(missing_id) = constrain::parameter::is_valid_old_style(&names_id, declarations).collect(sema, span) else {
+    let Some(missing_id) = constrain::parameter::is_valid_old_style(&names_id, declarations).collect(resolver, span)
+    else {
         return Vec::new();
     };
-    let ty = QualifiedType::plain(sema.builtins.int);
+    let ty = QualifiedType::plain(resolver.sema.builtins.int);
     missing_id
         .into_iter()
         .map(|string_id| Name::new(string_id, Span::default()))
         .map(|name| Symbol::parameter(name, ty, Storage::Auto))
         .for_each(|sym| {
-            let _ = sema.declare(sym, &Span::default());
+            let _ = resolver.declare(sym, &Span::default());
         });
     names
         .iter()
-        .filter_map(|name| sema.scopes.lookup_ordinary(name.id))
+        .filter_map(|name| resolver.lookup_ordinary(name.id))
         .collect()
 }
 
 fn add_parameter_declarator(
-    sema: &mut Sema,
+    resolver: &mut SymbolResolver,
     ctx: &Context,
     specifiers: &[DeclarationSpecifier],
     decl: &DeclaratorNode,
     span: &Span,
 ) -> Option<SymbolId> {
-    let qualif = base_type(sema, ctx, specifiers, span);
-    let (ty, decl) = declared_type(sema, ctx, qualif, decl)?;
-    let ty = sema.types.adjust_parameter(ty);
-    let declared_storage = constrain::specifier::get_storage(specifiers).collect(sema, span);
+    let qualif = base_type(resolver, ctx, specifiers, span);
+    let (ty, decl) = declared_type(resolver, ctx, qualif, decl)?;
+    let ty = resolver.sema.types.adjust_parameter(ty);
+    let declared_storage = constrain::specifier::get_storage(specifiers).collect(resolver, span);
     if let Some(storage) = declared_storage {
-        constrain::parameter::param_storage_only_register(storage).collect(sema, span)?;
+        constrain::parameter::param_storage_only_register(storage).collect(resolver, span)?;
     }
     let name = decl.ident(ctx)?;
-    if !ty.is_void(sema) {
-        constrain::parameter::check_complete_parameter(ty.is_complete(sema), ty).collect(sema, &decl.span);
+    if !ty.is_void(resolver.sema) {
+        constrain::parameter::check_complete_parameter(ty.is_complete(resolver.sema), ty).collect(resolver, &decl.span);
     }
     let storage = declared_storage.unwrap_or(Storage::Auto);
     let sym = Symbol::parameter(name, ty, storage);
-    Some(sema.declare(sym, &decl.span))
+    Some(resolver.declare(sym, &decl.span))
 }
 
-pub fn implicit_declare_function(sema: &mut Sema, fn_name: &Name, span: &Span) {
-    let ret = QualifiedType::plain(sema.builtins.int);
-    let fn_ty = sema.types.function(ret, ParamTypes::Unspecified);
+pub fn implicit_declare_function(resolver: &mut SymbolResolver, fn_name: &Name, span: &Span) {
+    let ret = QualifiedType::plain(resolver.sema.builtins.int);
+    let fn_ty = resolver.sema.types.function(ret, ParamTypes::Unspecified);
     let ty = QualifiedType::plain(fn_ty);
     let sym = Symbol::function(*fn_name, ty, Storage::Extern);
-    sema.declare(sym, span);
+    resolver.declare(sym, span);
 }

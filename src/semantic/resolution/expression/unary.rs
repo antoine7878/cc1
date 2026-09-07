@@ -4,7 +4,8 @@ use crate::context::Context;
 use crate::semantic::ExpressionKind::{LValue, RValue};
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{
-    Diagnosis, QualifiedType, ResolvedExpression, ResolvedType, Sema, SymbolId, cast, constrain, declaration,
+    Diagnosis, QualifiedType, ResolvedExpression, ResolvedType, Sema, SymbolId, SymbolResolver, cast, constrain,
+    declaration,
 };
 
 pub fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
@@ -81,11 +82,17 @@ pub fn logic_not(sema: &mut Sema, e: &ExpressionNode) -> R {
     })
 }
 
-pub fn cast(sema: &mut Sema, ctx: &Context, node: &ExpressionNode, ty_node: &Type, operand: &ExpressionNode) -> R {
-    let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
-    let (qualif, _) = declaration::declared_type(sema, ctx, base, &ty_node.declarator).ok_poisoned()?;
-    let is_null = is_null_pointer_constant(sema, ctx, operand);
-    with_converted(sema, [operand], |sema, [re]| {
+pub fn cast(
+    resolver: &mut SymbolResolver,
+    ctx: &Context,
+    node: &ExpressionNode,
+    ty_node: &Type,
+    operand: &ExpressionNode,
+) -> R {
+    let base = declaration::base_type(resolver, ctx, &ty_node.specifiers, &node.span);
+    let (qualif, _) = declaration::declared_type(resolver, ctx, base, &ty_node.declarator).ok_poisoned()?;
+    let is_null = is_null_pointer_constant(resolver.sema, ctx, operand);
+    with_converted(resolver.sema, [operand], |sema, [re]| {
         let ty = qualif.id.resolve(sema);
         if !ty.is_void() {
             let from = re.casted_ty().id.resolve(sema);

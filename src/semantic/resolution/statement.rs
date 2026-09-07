@@ -7,7 +7,8 @@ use crate::ast::{
 use crate::context::Context;
 use crate::semantic::resolution::expression::{self, operands};
 use crate::semantic::{
-    AssignmentContext, Diag, DiagCollector, Diagnosis, QualifiedType, ResolvedStatement, ScopeKind, Sema, cast, ice,
+    AssignmentContext, Diag, DiagCollector, Diagnosis, QualifiedType, ResolvedStatement, ScopeKind, Sema,
+    SymbolResolver, cast,
 };
 
 type Substatements<'s, const N: usize> = Loan<'s, Sema, StatementId, ResolvedStatement, N>;
@@ -19,25 +20,25 @@ fn substatements<'s, const N: usize>(
     Loan::take(sema, nodes.map(|n| n.id)).ok_poisoned()
 }
 
-pub fn check_labeled_statement(sema: &mut Sema, ctx: &Context, node: &LabeledStatementNode) {
+pub fn check_labeled_statement(resolver: &mut SymbolResolver, ctx: &Context, node: &LabeledStatementNode) {
     match &node.inner {
-        Labeled::Identifier(name, _) => sema.add_label_symbol(*name, &node.span, true),
+        Labeled::Identifier(name, _) => resolver.add_label_symbol(*name, &node.span, true),
         Labeled::Case(expr, _) => {
-            ice::eval_constant(sema, ctx, expr);
+            resolver.eval_constant(ctx, expr);
         }
         Labeled::Default(_) => (),
     }
 }
 
-pub fn enter_compound_statement(sema: &mut Sema) {
-    match sema.scopes.kind() {
-        ScopeKind::Prototype => sema.scopes.set_kind(ScopeKind::Function),
-        _ => sema.scopes.push(ScopeKind::Block),
+pub fn enter_compound_statement(resolver: &mut SymbolResolver) {
+    match resolver.scope_kind() {
+        ScopeKind::Prototype => resolver.promote_scope(ScopeKind::Function),
+        _ => resolver.enter_scope(ScopeKind::Block),
     }
 }
 
-pub fn leave_compound_statement(sema: &mut Sema) {
-    sema.scopes.pop();
+pub fn leave_compound_statement(resolver: &mut SymbolResolver) {
+    resolver.leave_scope();
 }
 
 pub fn check_selection_statement(sema: &mut Sema, node: &SelectionStatementNode) {
@@ -104,16 +105,16 @@ fn check_for(
 }
 
 pub fn check_jump_statement(
-    sema: &mut Sema,
+    resolver: &mut SymbolResolver,
     ctx: &Context,
     node: &JumpStatementNode,
     return_ty: Option<QualifiedType>,
 ) {
     match &node.stmt {
-        JumpStatement::Goto(name) => sema.add_label_symbol(*name, &node.span, false),
+        JumpStatement::Goto(name) => resolver.add_label_symbol(*name, &node.span, false),
         JumpStatement::Return(_) => {
             if let Some(return_ty) = return_ty {
-                check_return(sema, ctx, node, return_ty);
+                check_return(resolver.sema, ctx, node, return_ty);
             }
         }
         // JumpStatement::Continue => (),

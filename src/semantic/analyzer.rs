@@ -1,6 +1,5 @@
-use crate::ast::visit::walk_translation_unit;
 use crate::context::Context;
-use crate::semantic::{ScopeKind, Sema, SymbolResolver, eval, finish_externals, layout, mark_uses};
+use crate::semantic::{Sema, SymbolResolver, eval, finish_externals, layout, mark_uses};
 
 pub struct Analyzer;
 
@@ -13,13 +12,7 @@ impl Analyzer {
     }
 
     pub fn resolve_names(ctx: Context) -> Context {
-        Sema::with_sema(ctx, |sema, ctx| {
-            let mut resolver = SymbolResolver::new(sema);
-            resolver.sema.scopes.push(ScopeKind::File);
-            walk_translation_unit(&mut resolver, ctx, &ctx.ast);
-            resolver.sema.scopes.pop();
-            assert!(resolver.sema.scopes.is_empty());
-        })
+        Sema::with_sema(ctx, SymbolResolver::resolve_unit)
     }
 
     pub fn check_constants(ctx: Context) -> Context {

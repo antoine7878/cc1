@@ -723,3 +723,25 @@ member_refs!(
     "struct S { int a : 3; int : 5; int b : 4; }; int f(struct S s) { return s.b; }",
     &[("b", "S", 2)]
 );
+
+// A cast type name is resolved once, when the cast expression itself is typed. Reading it back
+// from the expression table keeps a tag defined there from being declared a second time.
+accept!(
+    tag_defined_in_a_compared_cast_is_declared_once,
+    "int f(void *q) { return q == (struct S { int a; } *) 0; }"
+);
+
+accept!(
+    enum_defined_in_a_compared_cast_is_declared_once,
+    "int f(void *q) { return q == (enum E { A } *) 0; }"
+);
+
+accept!(
+    a_void_pointer_cast_of_zero_stays_a_null_pointer_constant,
+    "int f(int *p) { return p == (void *) 0; }"
+);
+
+reject!(
+    a_non_void_pointer_cast_of_zero_is_not_a_null_pointer_constant,
+    "int f(int *p) { return p == (char *) 0; }"
+);

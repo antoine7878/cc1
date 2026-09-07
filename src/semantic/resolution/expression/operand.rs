@@ -5,8 +5,7 @@ use crate::ast::{Expression, ExpressionId, ExpressionNode};
 use crate::context::Context;
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::{
-    Diagnosis, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, Sema, SymbolId, SymbolKind, cast,
-    declaration, ice,
+    Diagnosis, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, Sema, SymbolId, SymbolKind, cast, ice,
 };
 
 pub type R = Result<(QualifiedType, ExpressionKind), Diagnosis>;
@@ -45,15 +44,15 @@ where
     })
 }
 
+/// Operands are resolved before the parent that inspects them, so the cast type is read back from
+/// the expression table instead of resolving the type name a second time.
 pub fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> bool {
     let mut node = node;
-    if let Expression::Cast(ty_node, op) = node.id.resolve(ctx) {
-        let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
-        if let Some((qualif, _)) = declaration::declared_type(sema, ctx, base, &ty_node.declarator)
-            && is_void_pointer(sema, qualif)
-        {
-            node = op;
-        }
+    if let Expression::Cast(_, op) = node.id.resolve(ctx)
+        && let Some(re) = sema.expr_types.get(node.id)
+        && is_void_pointer(sema, re.ty)
+    {
+        node = op;
     }
     let Some(re) = sema.expr_types.get(node.id) else { return false };
     re.ty.is_integer(sema) && ice::try_fold(sema, ctx, node).is_some_and(|v| v.is_zero())
