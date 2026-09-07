@@ -72,9 +72,6 @@ impl F80 {
 
     fn normalized(self) -> (u64, i32) {
         let (mantissa, exp) = self.parts();
-        if mantissa == 0 {
-            return (0, exp);
-        }
         let shift = mantissa.leading_zeros();
         (mantissa << shift, exp - shift as i32)
     }
@@ -104,12 +101,8 @@ impl F80 {
 fn scale(mut value: f64, mut exp: i32) -> f64 {
     const STEP: i32 = 1000;
     let up = 2f64.powi(STEP);
-    while exp > STEP {
-        value *= up;
-        exp -= STEP;
-        if value.is_infinite() {
-            return value;
-        }
+    if exp > STEP {
+        return f64::INFINITY;
     }
     while exp < -STEP {
         value /= up;
@@ -521,10 +514,8 @@ impl Big {
     }
 
     fn bit_len(&self) -> u32 {
-        match self.0.last() {
-            None => 0,
-            Some(top) => self.0.len() as u32 * 32 - top.leading_zeros(),
-        }
+        let top = self.0.last().expect("a non-zero magnitude");
+        self.0.len() as u32 * 32 - top.leading_zeros()
     }
 
     fn bit(&self, index: u32) -> bool {
@@ -572,10 +563,9 @@ impl Big {
 
 impl From<u32> for Big {
     fn from(value: u32) -> Self {
-        match value {
-            0 => Self::default(),
-            _ => Big(vec![value]),
-        }
+        let mut big = Big(vec![value]);
+        big.trim();
+        big
     }
 }
 
