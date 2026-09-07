@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use cc1::ast::{BinaryOp, Fold, UnaryOp, Value};
+use cc1::ast::{BinaryOp, F80, Fold, UnaryOp, Value};
 use cc1::semantic::{Diag, Diagnosis, ResolvedType};
 use cc1::target::{I386, X86_64};
 
@@ -338,7 +338,7 @@ fn is_true_follows_zero_test() {
 fn is_floating_covers_real_types() {
     assert!(Value::Float(0.0).is_floating());
     assert!(Value::Double(0.0).is_floating());
-    assert!(Value::LongDouble(0.0).is_floating());
+    assert!(Value::LongDouble(F80::from(0.0)).is_floating());
     assert!(!Value::Int(0).is_floating());
     assert!(!Value::UnsignedLong(0).is_floating());
 }
@@ -350,7 +350,7 @@ fn get_integer_value_rejects_real_types() {
     assert_eq!(Value::UnsignedLong(u64::MAX).get_integer_value(), Some(u64::MAX));
     assert_eq!(Value::Double(1.0).get_integer_value(), None);
     assert_eq!(Value::Float(1.0).get_integer_value(), None);
-    assert_eq!(Value::LongDouble(1.0).get_integer_value(), None);
+    assert_eq!(Value::LongDouble(F80::from(1.0)).get_integer_value(), None);
 }
 
 #[test]
@@ -532,8 +532,8 @@ fold!(
     binary(
         &ResolvedType::LongDouble,
         BinaryOp::Add,
-        Value::LongDouble(1.5),
-        Value::LongDouble(1.5)
+        Value::LongDouble(F80::from(1.5)),
+        Value::LongDouble(F80::from(1.5))
     ),
     "LongDouble(3.0)"
 );
@@ -744,7 +744,7 @@ fn compare_orders_every_representation() {
     );
     assert_eq!(fold.compare(Value::Float(1.0), Value::Float(2.0)), Some(Ordering::Less));
     assert_eq!(
-        fold.compare(Value::LongDouble(2.0), Value::LongDouble(2.0)),
+        fold.compare(Value::LongDouble(F80::from(2.0)), Value::LongDouble(F80::from(2.0))),
         Some(Ordering::Equal)
     );
     assert_eq!(fold.compare(Value::Double(f64::NAN), Value::Double(1.0)), None);
@@ -758,7 +758,7 @@ fn is_negative_covers_every_representation() {
     assert!(Value::Long(-1).is_negative());
     assert!(Value::Float(-1.0).is_negative());
     assert!(Value::Double(-1.0).is_negative());
-    assert!(Value::LongDouble(-1.0).is_negative());
+    assert!(Value::LongDouble(F80::from(-1.0)).is_negative());
     assert!(!Value::Int(1).is_negative());
     assert!(!Value::UnsignedInt(1).is_negative());
     assert!(!Value::UnsignedLong(1).is_negative());
@@ -770,7 +770,7 @@ fn is_greater_or_eq_covers_every_representation() {
     assert!(Value::UnsignedInt(5).is_greater_or_eq(4));
     assert!(Value::UnsignedLong(4).is_greater_or_eq(4));
     assert!(Value::Float(4.5).is_greater_or_eq(4));
-    assert!(Value::LongDouble(4.0).is_greater_or_eq(4));
+    assert!(Value::LongDouble(F80::from(4.0)).is_greater_or_eq(4));
     assert!(!Value::Long(3).is_greater_or_eq(4));
     assert!(!Value::Double(3.5).is_greater_or_eq(4));
 }
@@ -779,9 +779,9 @@ fn is_greater_or_eq_covers_every_representation() {
 fn is_zero_covers_every_representation() {
     assert!(Value::Float(0.0).is_zero());
     assert!(Value::Double(0.0).is_zero());
-    assert!(Value::LongDouble(0.0).is_zero());
+    assert!(Value::LongDouble(F80::from(0.0)).is_zero());
     assert!(!Value::Float(1.0).is_zero());
-    assert!(!Value::LongDouble(1.0).is_zero());
+    assert!(!Value::LongDouble(F80::from(1.0)).is_zero());
 }
 
 #[test]
@@ -789,7 +789,7 @@ fn a_floating_value_reinterprets_as_an_integer_by_truncation() {
     assert_eq!(Value::Float(3.9).to_i64(), 3);
     assert_eq!(Value::Float(3.9).to_u64(), 3);
     assert_eq!(Value::Double(3.9).to_u64(), 3);
-    assert_eq!(Value::LongDouble(3.9).to_u64(), 3);
+    assert_eq!(Value::LongDouble(F80::from(3.9)).to_u64(), 3);
 }
 
 #[test]
@@ -800,4 +800,146 @@ fn the_minimum_of_a_signed_type_is_recognised() {
     assert!(!fold.is_min(&ResolvedType::Int, Value::Int(0)));
     assert!(!fold.is_min(&ResolvedType::UnsignedInt, Value::UnsignedInt(0)));
     assert!(!fold.is_min(&ResolvedType::UnsignedLong, Value::UnsignedLong(0)));
+}
+
+// ---- 6.1.3.1 a long double constant carries the x87 80-bit format ---------
+// Expected encodings come from exact rational arithmetic, not from the local gcc: `-m32` on
+// this host targets 32-bit ARM, whose long double is not the x87 extended format.
+
+#[test]
+fn f80_parses_decimal_constants() {
+    let cases = [
+        ("1.0", "0xK3FFF8000000000000000"),
+        ("2.0", "0xK40008000000000000000"),
+        ("0.5", "0xK3FFE8000000000000000"),
+        ("2.5", "0xK4000A000000000000000"),
+        ("3.3", "0xK4000D333333333333333"),
+        ("0.1", "0xK3FFBCCCCCCCCCCCCCCCD"),
+        ("1e10", "0xK40209502F90000000000"),
+        ("1e-10", "0xK3FDDDBE6FECEBDEDD5BF"),
+        ("123456789.123456789", "0xK4019EB79A2A3F35BA6E7"),
+        ("3.14159265358979323846", "0xK4000C90FDAA22168C235"),
+        ("1e100", "0xK414B924D692CA61BE758"),
+        ("1e-100", "0xK3EB2DFF9772470297EBD"),
+        ("1e300", "0xK43E3BF21E44003ACDD2D"),
+        ("1e1000", "0xK4CF8F38DB1F9DD3DAC05"),
+        ("1.7976931348623157e308", "0xK43FEFFFFFFFFFFFFF7AC"),
+    ];
+    for (src, bits) in cases {
+        assert_eq!(format!("{:X}", F80::from(src)), bits, "F80::from({src:?})");
+    }
+}
+
+#[test]
+fn f80_keeps_the_bits_a_double_would_lose() {
+    assert_eq!(
+        format!("{:X}", F80::from("9007199254740993")),
+        "0xK40348000000000000400"
+    );
+    assert_eq!(
+        format!("{:X}", F80::from("18446744073709551615")),
+        "0xK403EFFFFFFFFFFFFFFFF"
+    );
+    assert_eq!(i64::from(F80::from("9007199254740993")), 9007199254740993);
+    assert_ne!(F80::from("1.0") + F80::from("1e-19"), F80::from("1.0"));
+    assert_eq!(
+        format!("{:X}", F80::from("1.0") + F80::from("1e-19")),
+        "0xK3FFF8000000000000001"
+    );
+}
+
+#[test]
+fn f80_saturates_and_denormalises_at_the_extremes() {
+    let cases = [
+        ("1e4932", "0xK7FFED72CB2A95C7EF6CD"),
+        ("1e4933", "0xK7FFF8000000000000000"),
+        ("1e-4932", "0xK0000261247C8F29357F0"),
+        ("1e-4950", "0xK00000000000000000003"),
+        ("3.6e-4951", "0xK00000000000000000001"),
+        ("1e-4951", "0xK00000000000000000000"),
+        ("1e-5000", "0xK00000000000000000000"),
+    ];
+    for (src, bits) in cases {
+        assert_eq!(format!("{:X}", F80::from(src)), bits, "F80::from({src:?})");
+    }
+    assert!(F80::from("1e4933").is_infinite());
+    assert!(F80::from("1e-5000").is_zero());
+}
+
+#[test]
+fn f80_arithmetic_rounds_once_to_nearest_even() {
+    let cases = [
+        ("1.5", '+', "1.5", "0xK4000C000000000000000"),
+        ("1.0", '/', "3.0", "0xK3FFDAAAAAAAAAAAAAAAB"),
+        ("0.1", '+', "0.2", "0xK3FFD999999999999999A"),
+        ("1e100", '*', "1e-100", "0xK3FFEFFFFFFFFFFFFFFFF"),
+        ("2.0", '*', "3.0", "0xK4001C000000000000000"),
+        ("1.0", '*', "3.0", "0xK4000C000000000000000"),
+        ("1.0", '-', "3.0", "0xKC0008000000000000000"),
+        ("1e300", '*', "1e300", "0xK47C88EB39714297EFB28"),
+        ("3.3", '*', "3.3", "0xK4002AE3D70A3D70A3D70"),
+        ("1e-4930", '/', "1e10", "0xK00000000000663278E62"),
+    ];
+    for (lhs, op, rhs, bits) in cases {
+        let (a, b) = (F80::from(lhs), F80::from(rhs));
+        let got = match op {
+            '+' => a + b,
+            '-' => a - b,
+            '*' => a * b,
+            _ => a / b,
+        };
+        assert_eq!(format!("{got:X}"), bits, "{lhs} {op} {rhs}");
+    }
+}
+
+#[test]
+fn f80_handles_infinities_and_nans() {
+    let one = F80::from("1.0");
+    let zero = F80::from("0.0");
+    assert!((one / zero).is_infinite());
+    assert!(!(one / zero).is_negative());
+    assert!((-one / zero).is_negative());
+    assert!((zero / zero).is_nan());
+    assert!((one / zero - one / zero).is_nan());
+    assert!(((one / zero) * zero).is_nan());
+    assert_eq!(format!("{:X}", F80::from("1e4933") + one), "0xK7FFF8000000000000000");
+    assert!(zero / zero != zero / zero);
+    assert_eq!(one.partial_cmp(&(zero / zero)), None);
+}
+
+#[test]
+fn f80_converts_across_the_other_representations() {
+    assert_eq!(format!("{:X}", F80::from(1.0)), "0xK3FFF8000000000000000");
+    assert_eq!(format!("{:X}", F80::from(3.3)), format!("{:X}", F80::from(3.3)));
+    assert_eq!(format!("{:X}", F80::from(1u64)), "0xK3FFF8000000000000000");
+    assert_eq!(format!("{:X}", F80::from(-1i64)), "0xKBFFF8000000000000000");
+    assert_eq!(format!("{:X}", F80::from(u64::MAX)), "0xK403EFFFFFFFFFFFFFFFF");
+    assert_eq!(f64::from(F80::from("1.0")), 1.0);
+    assert_eq!(f64::from(F80::from("3.3")), 3.3);
+    assert_eq!(f64::from(F80::from("1e300")), 1e300);
+    assert_eq!(f64::from(F80::from("1e1000")), f64::INFINITY);
+    assert_eq!(i64::from(F80::from("3.9")), 3);
+    assert_eq!(i64::from(-F80::from("3.9")), -3);
+    assert_eq!(u64::from(F80::from("3.9")), 3);
+    assert_eq!(f64::from(F80::from("0.0")), 0.0);
+}
+
+#[test]
+fn f80_orders_and_compares() {
+    let (one, two) = (F80::from("1.0"), F80::from("2.0"));
+    assert!(one < two);
+    assert!(-one < one);
+    assert!(-one < F80::from("0.0"));
+    assert_eq!(F80::from("0.0"), -F80::from("0.0"));
+    assert_eq!(one, F80::from("1.0"));
+    assert!(F80::from("1e-4950") > F80::from("0.0"));
+}
+
+#[test]
+fn a_long_double_literal_reaches_value_as_f80() {
+    let Value::LongDouble(v) = Value::parse("3.3l", &I386).res else {
+        panic!("expected a long double");
+    };
+    assert_eq!(format!("{v:X}"), "0xK4000D333333333333333");
+    assert_eq!(Value::parse("1.0", &I386).res, Value::Double(1.0));
 }

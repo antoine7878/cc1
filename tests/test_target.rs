@@ -1,5 +1,5 @@
 use crate::common::repr;
-use cc1::ast::Value;
+use cc1::ast::{F80, Value};
 use cc1::semantic::{QualifiedType, ResolvedType, ResolvedTypeId, TagDefId};
 use cc1::target::{I386, Target, X86_64};
 
@@ -200,9 +200,9 @@ fn value_size_follows_the_value_type() {
     assert_eq!(I386.value_size(Value::Long(0)), 4);
     assert_eq!(I386.value_size(Value::Float(0.0)), 4);
     assert_eq!(I386.value_size(Value::Double(0.0)), 8);
-    assert_eq!(I386.value_size(Value::LongDouble(0.0)), 12);
+    assert_eq!(I386.value_size(Value::LongDouble(F80::from(0.0))), 12);
     assert_eq!(X86_64.value_size(Value::Long(0)), 8);
-    assert_eq!(X86_64.value_size(Value::LongDouble(0.0)), 16);
+    assert_eq!(X86_64.value_size(Value::LongDouble(F80::from(0.0))), 16);
 }
 
 #[test]

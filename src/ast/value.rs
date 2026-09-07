@@ -3,9 +3,8 @@ use crate::semantic::{Diag, Diagnosis, QualifiedType, ResolvedType, Sema};
 use crate::target::Target;
 use std::cmp::Ordering;
 
-use super::{BinaryOp, UnaryOp};
+use super::{BinaryOp, F80, UnaryOp};
 
-// TODO: add custom f80
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Value {
     Int(i32),
@@ -14,7 +13,7 @@ pub enum Value {
     UnsignedInt(u32),
     Float(f32),
     Double(f64),
-    LongDouble(f64),
+    LongDouble(F80),
 }
 
 ast_node! {
@@ -98,7 +97,7 @@ impl Value {
         let s = &s[0..(s.len() - suffix.len())];
         match suffix {
             "f" => Value::Float(s.parse::<f32>().unwrap()),
-            "l" => Value::LongDouble(s.parse::<f64>().unwrap()),
+            "l" => Value::LongDouble(F80::from(s)),
             _ => Value::Double(s.parse::<f64>().unwrap()),
         }
     }
@@ -223,7 +222,7 @@ impl Value {
             Value::UnsignedLong(_) => false,
             Value::Float(i) => i < 0.,
             Value::Double(i) => i < 0.,
-            Value::LongDouble(i) => i < 0.,
+            Value::LongDouble(i) => i.is_negative(),
         }
     }
 
@@ -235,7 +234,7 @@ impl Value {
             Value::UnsignedLong(i) => i >= v as u64,
             Value::Float(i) => i >= v as f32,
             Value::Double(i) => i >= v as f64,
-            Value::LongDouble(i) => i >= v as f64,
+            Value::LongDouble(i) => i >= F80::from(u64::from(v)),
         }
     }
 
@@ -247,7 +246,7 @@ impl Value {
             Value::UnsignedLong(i) => i == 0,
             Value::Float(i) => i == 0.,
             Value::Double(i) => i == 0.,
-            Value::LongDouble(i) => i == 0.,
+            Value::LongDouble(i) => i.is_zero(),
         }
     }
 
@@ -258,7 +257,8 @@ impl Value {
             Value::Long(v) => v,
             Value::UnsignedLong(v) => v as i64,
             Value::Float(v) => v as i64,
-            Value::Double(v) | Value::LongDouble(v) => v as i64,
+            Value::Double(v) => v as i64,
+            Value::LongDouble(v) => i64::from(v),
         }
     }
 
@@ -269,7 +269,8 @@ impl Value {
             Value::Long(v) => v as u64,
             Value::UnsignedLong(v) => v,
             Value::Float(v) => v as u64,
-            Value::Double(v) | Value::LongDouble(v) => v as u64,
+            Value::Double(v) => v as u64,
+            Value::LongDouble(v) => u64::from(v),
         }
     }
 
@@ -280,7 +281,20 @@ impl Value {
             Value::Long(v) => v as f64,
             Value::UnsignedLong(v) => v as f64,
             Value::Float(v) => v as f64,
-            Value::Double(v) | Value::LongDouble(v) => v,
+            Value::Double(v) => v,
+            Value::LongDouble(v) => f64::from(v),
+        }
+    }
+
+    fn to_f80(self) -> F80 {
+        match self {
+            Value::Int(v) => F80::from(i64::from(v)),
+            Value::UnsignedInt(v) => F80::from(u64::from(v)),
+            Value::Long(v) => F80::from(v),
+            Value::UnsignedLong(v) => F80::from(v),
+            Value::Float(v) => F80::from(f64::from(v)),
+            Value::Double(v) => F80::from(v),
+            Value::LongDouble(v) => v,
         }
     }
 
@@ -323,7 +337,7 @@ impl<'a> Fold<'a> {
         match ty {
             ResolvedType::Float => Some(Value::Float(value.to_f64() as f32)),
             ResolvedType::Double => Some(Value::Double(value.to_f64())),
-            ResolvedType::LongDouble => Some(Value::LongDouble(value.to_f64())),
+            ResolvedType::LongDouble => Some(Value::LongDouble(value.to_f80())),
             _ => self.target.cast(ty, value),
         }
     }
@@ -360,6 +374,16 @@ impl<'a> Fold<'a> {
     fn floating(&self, ty: &ResolvedType, op: BinaryOp, lhs: Value, rhs: Value) -> Value {
         use BinaryOp::{Add, Div, Mul, Sub};
 
+        if matches!(ty, ResolvedType::LongDouble) {
+            let (a, b) = (lhs.to_f80(), rhs.to_f80());
+            return Value::LongDouble(match op {
+                Add => a + b,
+                Sub => a - b,
+                Mul => a * b,
+                Div => a / b,
+                _ => unreachable!(),
+            });
+        }
         let (a, b) = (lhs.to_f64(), rhs.to_f64());
         let r = match op {
             Add => a + b,
@@ -425,6 +449,9 @@ impl<'a> Fold<'a> {
     }
 
     fn neg(&self, ty: &ResolvedType, value: Value) -> Diag<Value> {
+        if matches!(ty, ResolvedType::LongDouble) {
+            return Diag::ok(Value::LongDouble(-value.to_f80()));
+        }
         if ty.is_floating() {
             let negated = self.convert(ty, Value::Double(-value.to_f64()));
             return Diag::ok(negated.expect("a floating type"));

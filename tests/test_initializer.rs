@@ -165,3 +165,8 @@ reject!(
     init_static_struct_from_a_variable,
     "struct S { int a; } x; struct S y = x;"
 );
+inits!(
+    init_long_double_constant,
+    "long double x = 3.3L;",
+    &[("x", "LongDouble(3.3)")]
+);
