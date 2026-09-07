@@ -22,7 +22,11 @@ impl Span {
 impl fmt::Display for Span {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.start.line == self.end.line && self.start.col == self.end.col {
-            false => write!(f, "<{}:{}, {}:{}>", self.start.line, self.start.col, self.end.line, self.end.col),
+            false => write!(
+                f,
+                "<{}:{}, {}:{}>",
+                self.start.line, self.start.col, self.end.line, self.end.col
+            ),
             true => write!(f, "<{}:{}>", self.start.line, self.start.col),
         }
     }

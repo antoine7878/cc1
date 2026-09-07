@@ -17,6 +17,7 @@ mod test_resolution;
 mod test_scope;
 mod test_semantic;
 mod test_side_table;
+mod test_string;
 mod test_target;
 mod test_typing;
 mod test_uses;

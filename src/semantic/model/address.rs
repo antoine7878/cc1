@@ -1,12 +1,12 @@
 use crate::arena::ResolveWith;
-use crate::ast::{BinaryOp, Expression, ExpressionNode, MemberOp, StringId, UnaryOp};
+use crate::ast::{BinaryOp, Expression, ExpressionNode, MemberOp, StringConstId, UnaryOp};
 use crate::context::Context;
 use crate::semantic::{Duration, ResolvedType, Sema, SymbolId, SymbolKind, ice, layout};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AddressBase {
     Symbol(SymbolId),
-    String(StringId),
+    String(StringConstId),
     Absolute,
 }
 
@@ -32,7 +32,7 @@ pub fn fold(sema: &mut Sema, ctx: &Context, e: &ExpressionNode) -> Option<Place>
     }
     match e.id.resolve(ctx) {
         Expression::ConstantExpression(inner) => fold(sema, ctx, inner),
-        Expression::StringLiteral(literal) => Some(Place::at(AddressBase::String(literal.name().id), 0)),
+        Expression::StringLiteral(literal) => Some(Place::at(AddressBase::String(literal.id), 0)),
         Expression::Unary(UnaryOp::Addr, inner) => place(sema, ctx, inner),
         Expression::Cast(_, inner) => cast(sema, ctx, e, inner),
         Expression::Binary(BinaryOp::Add, e1, e2) => match additive(sema, ctx, e1, e2, 1) {
@@ -48,7 +48,7 @@ fn place(sema: &mut Sema, ctx: &Context, e: &ExpressionNode) -> Option<Place> {
     match e.id.resolve(ctx) {
         Expression::ConstantExpression(inner) => place(sema, ctx, inner),
         Expression::Identifier(_) => object(sema, e),
-        Expression::StringLiteral(literal) => Some(Place::at(AddressBase::String(literal.name().id), 0)),
+        Expression::StringLiteral(literal) => Some(Place::at(AddressBase::String(literal.id), 0)),
         Expression::Unary(UnaryOp::Deref, inner) => fold(sema, ctx, inner),
         Expression::ArraySubscripting(base, index) => match additive(sema, ctx, base, index, 1) {
             Some(at) => Some(at),

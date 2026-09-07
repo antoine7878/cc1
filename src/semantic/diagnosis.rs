@@ -25,6 +25,9 @@ pub enum Diagnosis {
     // 6.1.3.2
     IntegerConstantTooLarge,
 
+    // 6.1.3.4
+    EscapeOutOfRange,
+
     // 6.1.4
     MixedWideStringConcat,
 
@@ -230,6 +233,9 @@ impl DiagnosisNode {
 
             // 6.1.3.2
             Diagnosis::IntegerConstantTooLarge => "integer constant is too large for any integer type".to_string(),
+
+            // 6.1.3.4
+            Diagnosis::EscapeOutOfRange => "escape sequence is out of range for the character type".to_string(),
 
             // 6.1.4
             Diagnosis::MixedWideStringConcat => "concatenation of a wide and a narrow string literal is undefined".to_string(),

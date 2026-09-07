@@ -2,7 +2,7 @@ use std::io::Cursor;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-use cc1::ast::{Expression, ExpressionId, Name, Tag, Value};
+use cc1::ast::{Expression, ExpressionId, Name, StringConstant, Tag, Value};
 use cc1::context::Context;
 use cc1::parser::parse_reader;
 use cc1::semantic::{
@@ -11,6 +11,27 @@ use cc1::semantic::{
 };
 
 use crate::common::ty::Ty;
+
+fn string_body(constant: &StringConstant) -> String {
+    let mut out = String::new();
+    for &unit in &constant.units {
+        match char::from_u32(unit) {
+            Some(c) if (' '..='~').contains(&c) && c != '\\' && c != '"' => out.push(c),
+            _ => out.push_str(&format!("\\x{unit:02x}")),
+        }
+    }
+    out
+}
+
+fn string_display(constant: &StringConstant) -> String {
+    let prefix = if constant.is_wide { "L" } else { "" };
+    format!("{prefix}{}", string_body(constant))
+}
+
+fn string_quoted(constant: &StringConstant) -> String {
+    let prefix = if constant.is_wide { "L" } else { "" };
+    format!("{prefix}\"{}\"", string_body(constant))
+}
 
 fn needs_preprocessing(src: &str) -> bool {
     src.contains("\\\n") || src.contains("/*") || src.contains("//") || src.contains('#')
@@ -103,16 +124,14 @@ impl Unit {
             .expressions
             .iter()
             .filter_map(|expression| match expression {
-                Expression::StringLiteral(literal) => {
-                    let text = literal.name().id.resolve(&self.ctx);
-                    Some(match literal.is_wide() {
-                        true => format!("L{text}"),
-                        false => text.clone(),
-                    })
-                }
+                Expression::StringLiteral(literal) => Some(string_display(literal.constant(&self.ctx))),
                 _ => None,
             })
             .collect()
+    }
+
+    pub fn string_pool(&self) -> Vec<String> {
+        self.ctx.arenas.strings.iter().map(string_quoted).collect()
     }
 
     pub fn expressions(&self) -> Vec<String> {
@@ -271,7 +290,7 @@ impl Unit {
         match init {
             Initializer::Zero => "0".to_string(),
             Initializer::Value(value) => repr(Some(*value)),
-            Initializer::String(id) => format!("{:?}", id.resolve(&self.ctx)),
+            Initializer::String(id) => string_quoted(id.resolve(&self.ctx)),
             Initializer::Expr(_) => "expr".to_string(),
             Initializer::List(items) => {
                 let rendered: Vec<String> = items.iter().map(|i| self.render_initializer(i)).collect();
@@ -280,7 +299,7 @@ impl Unit {
             Initializer::Address(at) => {
                 let base = match at.base {
                     AddressBase::Symbol(sym) => self.ctx.sema.symbols.get(sym).name.id.resolve(&self.ctx).clone(),
-                    AddressBase::String(id) => format!("{:?}", id.resolve(&self.ctx)),
+                    AddressBase::String(id) => string_quoted(id.resolve(&self.ctx)),
                     AddressBase::Absolute => "abs".to_string(),
                 };
                 match at.offset {
@@ -585,6 +604,17 @@ pub fn run_placements(name: &str, src: &str, expected: &[(&str, &str, &str, &str
         .map(|(n, l, d, f)| (n.to_string(), l.to_string(), d.to_string(), f.to_string()))
         .collect();
     assert_eq!(got, expected, "`{name}` symbol placements:\n{src}");
+}
+
+pub fn run_pool(name: &str, src: &str, expected: &[&str]) {
+    let unit = Unit::parse(src);
+
+    assert!(unit.parsed(), "cc1 failed to parse `{name}`:\n{src}");
+    assert_eq!(
+        unit.string_pool(),
+        expected.iter().map(|s| s.to_string()).collect::<Vec<String>>(),
+        "wrong string pool for `{name}`:\n{src}"
+    );
 }
 
 pub fn run_literal(name: &str, src: &str, expected: &str) {

@@ -4,7 +4,7 @@ use std::slice::Iter;
 use crate::arena::ResolveWith;
 use crate::ast;
 use crate::ast::visit::Visitor;
-use crate::ast::{Expression, ExpressionId, ExpressionNode, InitializerNode, StringId, Tag, Value};
+use crate::ast::{Expression, ExpressionId, ExpressionNode, InitializerNode, StringConstId, Tag, Value};
 use crate::context::Context;
 use crate::define_arena;
 use crate::semantic::resolution::expression;
@@ -20,7 +20,7 @@ pub enum Initializer {
     Zero,
     Value(Value),
     Address(Place),
-    String(StringId),
+    String(StringConstId),
     List(Vec<Initializer>),
     Expr(ExpressionId),
 }
@@ -29,7 +29,7 @@ impl Initializer {
     pub fn len(&self, ctx: &Context) -> Option<usize> {
         match self {
             Initializer::List(values) => Some(values.len()),
-            Initializer::String(id) => Some(id.resolve(ctx).len() + 1),
+            Initializer::String(id) => Some(id.resolve(ctx).units.len() + 1),
             _ => None,
         }
     }
@@ -182,12 +182,12 @@ fn string(resolver: &mut SymbolResolver, ctx: &Context, ty: QualifiedType, e: &E
     let Expression::StringLiteral(literal) = e.id.resolve(ctx) else {
         return None;
     };
-    if literal.is_wide() {
+    if literal.is_wide(ctx) {
         return None;
     }
-    let id = literal.name().id;
+    let id = literal.id;
     resolver.visit_expression(ctx, e);
-    if len.is_some_and(|len| len < id.resolve(ctx).len()) {
+    if len.is_some_and(|len| len < literal.len(ctx)) {
         resolver.add_diag(Diag::err((), Diagnosis::ArrayInitTooLong), &e.span);
     }
     Some(Initializer::String(id))

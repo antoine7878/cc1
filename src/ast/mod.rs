@@ -1,6 +1,7 @@
 pub mod arenas;
 pub mod declaration;
 pub mod display;
+pub mod escape;
 pub mod expression;
 pub mod f80;
 pub mod function;
@@ -23,7 +24,7 @@ pub use declaration::{
 pub use expression::{Expression, ExpressionArena, ExpressionId, ExpressionNode, Type};
 pub use f80::F80;
 pub use function::{FunctionParameters, FunctionParametersNode, ParameterDeclaration};
-pub use literal::{StringLiteral, StringLiteralNode};
+pub use literal::{StringConstId, StringConstant, StringLiteralNode, StringPool};
 pub use name::{Name, StringArena, StringId};
 pub use operator::{BinaryOp, MemberOp, UnaryOp};
 pub use statement::{

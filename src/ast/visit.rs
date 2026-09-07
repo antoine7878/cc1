@@ -119,9 +119,7 @@ pub trait Visitor {
     }
 }
 
-pub fn walk_string_literal<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &StringLiteralNode) {
-    v.visit_name(ctx, &node.name());
-}
+pub fn walk_string_literal<V: Visitor + ?Sized>(_v: &mut V, _ctx: &Context, _node: &StringLiteralNode) {}
 
 pub fn walk_translation_unit<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &TranslationUnitNode) {
     for decl in &node.declarations {

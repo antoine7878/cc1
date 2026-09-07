@@ -3,7 +3,6 @@ use std::slice;
 
 use crate::arena::ArenaKey;
 
-
 #[derive(Debug)]
 pub struct Arena<Id: ArenaKey, Val> {
     data: Vec<Val>,

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::slice;
 
 use crate::arena::{Arena, ArenaKey};
 
@@ -39,5 +40,9 @@ impl<Id: ArenaKey, Val: Clone + Hash + Eq> Interner<Id, Val> {
 
     pub fn is_empty(&self) -> bool {
         self.arena.is_empty()
+    }
+
+    pub fn iter(&self) -> slice::Iter<'_, Val> {
+        self.arena.iter()
     }
 }

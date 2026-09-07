@@ -156,5 +156,9 @@ fn alloc_constant<R: Read>(lex: &mut YYLex<R>) -> ValueNode {
 fn alloc_string<R: Read>(lex: &mut YYLex<R>) -> StringLiteralNode {
     let span = lex.span;
     let text = lex.yytext.clone();
-    lex.ctx.arenas.names.literal(&text, span)
+    let Diag { res: node, diagnosis } = lex.ctx.arenas.strings.literal(&text, span);
+    if let Some(diagnosis) = diagnosis {
+        lex.ctx.diagnosis.push(DiagnosisNode::new(diagnosis, span));
+    }
+    node
 }

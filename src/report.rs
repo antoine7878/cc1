@@ -20,14 +20,26 @@ impl Context {
                     symbol.duration.to_string(),
                     symbol.definition.to_string(),
                     symbol.value.map_or("-".to_string(), |v| v.to_string()),
-                    symbol.ty.map_or(String::default(), |ty| ty.describe(&self.sema, self).to_string()),
+                    symbol
+                        .ty
+                        .map_or(String::default(), |ty| ty.describe(&self.sema, self).to_string()),
                     symbol.used.to_string(),
                 ]
             })
             .collect();
 
         print_table(
-            &["KIND", "NAME", "STORAGE", "LINKAGE", "DURATION", "DEFINITION", "VALUE", "TYPE", "USED"],
+            &[
+                "KIND",
+                "NAME",
+                "STORAGE",
+                "LINKAGE",
+                "DURATION",
+                "DEFINITION",
+                "VALUE",
+                "TYPE",
+                "USED",
+            ],
             &rows,
         );
     }

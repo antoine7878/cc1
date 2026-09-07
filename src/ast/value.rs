@@ -3,7 +3,7 @@ use crate::semantic::{Diag, Diagnosis, QualifiedType, ResolvedType, Sema};
 use crate::target::Target;
 use std::cmp::Ordering;
 
-use super::{BinaryOp, F80, UnaryOp};
+use super::{BinaryOp, F80, UnaryOp, escape};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Value {
@@ -102,43 +102,6 @@ impl Value {
         }
     }
 
-    fn parse_escape(bytes: &[u8], i: &mut usize) -> u32 {
-        let c = bytes[*i];
-        *i += 1;
-        match c {
-            b'a' => 7,
-            b'b' => 8,
-            b'f' => 12,
-            b'n' => 10,
-            b'r' => 13,
-            b't' => 9,
-            b'v' => 11,
-            b'x' => Self::parse_hex_escape(bytes, i),
-            b'0'..=b'7' => Self::parse_octal_escape(bytes, i, c),
-            _ => c as u32,
-        }
-    }
-
-    fn parse_hex_escape(bytes: &[u8], i: &mut usize) -> u32 {
-        let mut value: u32 = 0;
-        while *i < bytes.len() && (bytes[*i] as char).is_ascii_hexdigit() {
-            value = value.wrapping_mul(16) + (bytes[*i] as char).to_digit(16).unwrap();
-            *i += 1;
-        }
-        value
-    }
-
-    fn parse_octal_escape(bytes: &[u8], i: &mut usize, first: u8) -> u32 {
-        let mut value = (first - b'0') as u32;
-        let mut len = 1;
-        while *i < bytes.len() && len < 3 && (b'0'..=b'7').contains(&bytes[*i]) {
-            value = value * 8 + (bytes[*i] - b'0') as u32;
-            *i += 1;
-            len += 1;
-        }
-        value
-    }
-
     fn parse_char(s: &str, target: &Target) -> Self {
         let prefix = if s.starts_with("L") { "L" } else { "" };
         let s = &s[(prefix.len() + 1)..(s.len() - 1)];
@@ -156,13 +119,7 @@ impl Value {
         let mut value: u32 = 0;
         let mut count = 0;
         while i < bytes.len() {
-            let c = if bytes[i] == b'\\' {
-                i += 1;
-                Self::parse_escape(bytes, &mut i)
-            } else {
-                i += 1;
-                bytes[i - 1] as u32
-            };
+            let c = escape::next(bytes, &mut i);
             value = if narrow { (value << 8) | (c & 0xff) } else { c };
             count += 1;
         }
