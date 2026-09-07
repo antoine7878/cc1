@@ -1,0 +1,89 @@
+use crate::arena::ResolveWith;
+use crate::ast::{BinaryOp, ExpressionNode, Value};
+use crate::context::Context;
+use crate::semantic::ExpressionKind::RValue;
+use crate::semantic::{Diagnosis, ResolvedExpression, ResolvedType, Sema, cast, ice};
+
+use super::operand::{R, operands};
+
+pub(super) fn multiplicative(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+    let mut ops = operands(sema, [e1, e2])?;
+    let (sema, [lhs, rhs]) = ops.parts();
+    cast::lvalue_conversion(sema, lhs, &e1.span);
+    cast::lvalue_conversion(sema, rhs, &e2.span);
+    multiplicative_types(sema, op, lhs, rhs)
+}
+
+pub(super) fn multiplicative_types(
+    sema: &mut Sema,
+    op: &BinaryOp,
+    lhs: &mut ResolvedExpression,
+    rhs: &mut ResolvedExpression,
+) -> R {
+    let l = lhs.casted_ty().id.resolve(sema);
+    let r = rhs.casted_ty().id.resolve(sema);
+    if !match op {
+        BinaryOp::Mul | BinaryOp::Div => l.is_arithmetic(sema) && r.is_arithmetic(sema),
+        BinaryOp::Mod => l.is_integral(sema) && r.is_integral(sema),
+        _ => unreachable!(),
+    } {
+        return Err(Diagnosis::InvalidBinaryOperand(lhs.casted_ty(), rhs.casted_ty()));
+    }
+    cast::usual_arithmetic(sema, lhs, rhs)
+}
+
+pub(super) fn additive(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+    let mut ops = operands(sema, [e1, e2])?;
+    let (sema, [lhs, rhs]) = ops.parts();
+    cast::lvalue_conversion(sema, lhs, &e1.span);
+    cast::lvalue_conversion(sema, rhs, &e2.span);
+    additive_types(sema, op, lhs, rhs)
+}
+
+fn additive_types(sema: &mut Sema, op: &BinaryOp, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) -> R {
+    match (op, lhs.casted_ty().id.resolve(sema), rhs.casted_ty().id.resolve(sema)) {
+        (_, l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => cast::usual_arithmetic(sema, lhs, rhs),
+        (_, ResolvedType::Pointer(_), o) if o.is_integral(sema) => cast::pointer_integer_arithmetic(sema, lhs, rhs),
+        (BinaryOp::Add, o, ResolvedType::Pointer(_)) if o.is_integral(sema) => {
+            cast::pointer_integer_arithmetic(sema, rhs, lhs)
+        }
+        (BinaryOp::Sub, ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => {
+            cast::pointer_minus_pointer(sema, lhs, rhs)
+        }
+        _ => Err(Diagnosis::InvalidOperand),
+    }
+}
+
+pub(super) fn shift(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+    let count = ice::try_fold(sema, ctx, e2);
+    let mut ops = operands(sema, [e1, e2])?;
+    let (sema, [lhs, rhs]) = ops.parts();
+    cast::lvalue_conversion(sema, lhs, &e1.span);
+    cast::lvalue_conversion(sema, rhs, &e2.span);
+    shift_types(sema, lhs, rhs, count)
+}
+
+pub(super) fn shift_types(
+    sema: &mut Sema,
+    lhs: &mut ResolvedExpression,
+    rhs: &mut ResolvedExpression,
+    count: Option<Value>,
+) -> R {
+    let l = lhs.casted_ty().id.resolve(sema);
+    let r = rhs.casted_ty().id.resolve(sema);
+    if !l.is_integral(sema) || !r.is_integral(sema) {
+        return Err(Diagnosis::InvalidBinaryOperand(lhs.casted_ty(), rhs.casted_ty()));
+    }
+    cast::promote(sema, lhs);
+    cast::promote(sema, rhs);
+    let l = lhs.casted_ty().id.resolve(sema);
+    let l_layout = sema.target.layout(l).unwrap();
+    let Some(count) = count else { return Ok((lhs.casted_ty(), RValue)) };
+    if count.is_negative() {
+        return Err(Diagnosis::ShiftCountNegative);
+    }
+    if count.is_greater_or_eq(l_layout.size * sema.target.byte_size) {
+        return Err(Diagnosis::ShiftCountOutOfRange);
+    }
+    Ok((lhs.casted_ty(), RValue))
+}
