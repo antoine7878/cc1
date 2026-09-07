@@ -2,7 +2,6 @@ use crate::ast::UnaryOp;
 use crate::semantic::diagnosis::{Diag, Diagnosis};
 use crate::semantic::{ExpressionKind, QualifiedType};
 
-/// 6.3.16 An assignment operator shall have a modifiable lvalue as its left operand.
 pub fn check_assignable(kind: ExpressionKind, ty: QualifiedType) -> Diag<()> {
     if kind == ExpressionKind::RValue {
         return Diag::err((), Diagnosis::AssignToRValue);
@@ -13,9 +12,6 @@ pub fn check_assignable(kind: ExpressionKind, ty: QualifiedType) -> Diag<()> {
     Diag::ok(())
 }
 
-/// 6.3.3.2 The operand of the unary & operator shall be either a function designator or an lvalue
-/// that designates an object that is not a bit-field and is not declared with the register
-/// storage-class specifier.
 pub fn check_address_of(
     kind: ExpressionKind,
     is_function: bool,
@@ -35,9 +31,6 @@ pub fn check_address_of(
     Diag::ok(())
 }
 
-/// 6.3.3.4 The sizeof operator shall not be applied to an expression that has function type or an
-/// incomplete type, to the parenthesized name of such a type, or to an lvalue that designates a
-/// bit-field object.
 pub fn check_sizeof(
     is_bit_field: bool,
     is_void: bool,
@@ -60,8 +53,6 @@ pub fn check_sizeof(
     Diag::ok(())
 }
 
-/// 6.3.2.4 and 6.3.3.1 The operand of the increment or decrement operators shall be a modifiable
-/// lvalue with qualified or unqualified scalar type. A pointer operand shall point to an object.
 pub fn check_inc_dec(
     op: UnaryOp,
     is_scalar: bool,
