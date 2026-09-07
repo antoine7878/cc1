@@ -49,8 +49,18 @@ impl StatementScopes {
         self.0.last()
     }
 
-    pub fn last_mut(&mut self) -> Option<&mut StatementScope> {
-        self.0.last_mut()
+    pub fn nearest_loop(&self) -> Option<StatementId> {
+        self.0.iter().rev().find_map(|scope| match scope {
+            StatementScope::Loop(stmt) => Some(*stmt),
+            StatementScope::Switch { .. } => None,
+        })
+    }
+
+    pub fn nearest_switch(&mut self) -> Option<&mut StatementScope> {
+        self.0
+            .iter_mut()
+            .rev()
+            .find(|scope| matches!(scope, StatementScope::Switch { .. }))
     }
 }
 

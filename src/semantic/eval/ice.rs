@@ -83,7 +83,10 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSi
         return Ok(*value);
     }
     match expr.id.resolve(ctx) {
-        Expression::ConstantExpression(inner) => fold(sema, ctx, inner, sink),
+        Expression::ConstantExpression(inner) => {
+            integral_operands(sema, ctx, inner)?;
+            fold(sema, ctx, inner, sink)
+        }
         Expression::Constant(value_node) => Ok(value_node.value),
         Expression::Identifier(_) => identifier(sema, expr),
         Expression::Unary(op, e) => unary_op(sema, ctx, expr, *op, e, sink),
@@ -98,6 +101,23 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSi
         | Expression::FunctionCall(_, _)
         | Expression::Member(_, _, _) => Err(Diagnosis::NonConstantExpression),
     }
+}
+
+fn integral_operands(sema: &Sema, ctx: &Context, expr: &ExpressionNode) -> Result<(), Diagnosis> {
+    let operands: Vec<&ExpressionNode> = match expr.id.resolve(ctx) {
+        Expression::Cast(_, _) | Expression::SizeofExpr(_) | Expression::SizeofType(_) => return Ok(()),
+        Expression::ConstantExpression(e) | Expression::Unary(_, e) => vec![e],
+        Expression::Binary(_, e1, e2) => vec![e1, e2],
+        Expression::Ternary(condition, e1, e2) => vec![condition, e1, e2],
+        _ => Vec::new(),
+    };
+    for operand in operands {
+        if node_ty(sema, operand)?.is_floating(sema) {
+            return Err(Diagnosis::NonIntegerConstantExpression);
+        }
+        integral_operands(sema, ctx, operand)?;
+    }
+    Ok(())
 }
 
 fn identifier(sema: &Sema, expr: &ExpressionNode) -> Result<Value, Diagnosis> {

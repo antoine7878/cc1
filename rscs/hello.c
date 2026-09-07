@@ -1,7 +1,4 @@
 
-int main(void) {
-	int a;
-a:
-a:
-	return 0;
+void f(void) {
+	return 1;
 }

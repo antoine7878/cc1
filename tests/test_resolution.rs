@@ -546,6 +546,48 @@ recover!(
     &[]
 );
 
+// 6.4 An integral constant expression shall only have operands that are integer, enumeration
+// or character constants, sizeof expressions, and floating constants that are the immediate
+// operands of casts.
+reject!(ice_floating_operand_of_a_comparison, "char t[3.5 == 7.0/2 ? 1 : -1];");
+reject!(ice_floating_operand_of_a_negation, "char t[-(1.5) == 0 ? 1 : -1];");
+reject!(
+    ice_floating_arm_of_a_conditional,
+    "char t[(1 ? 2.0 : 3) == 2 ? 1 : -1];"
+);
+reject!(ice_floating_operand_of_an_addition, "char t[1.5 + 1 == 2 ? 1 : -1];");
+accept!(ice_floating_constant_under_a_cast, "char t[(int)3.5 == 3 ? 1 : -1];");
+accept!(ice_floating_operand_of_sizeof, "char t[sizeof(1.5) == 8 ? 1 : -1];");
+accept!(ice_all_integer_operands, "char t[1 + 2 == 3 ? 1 : -1];");
+
+// 6.5.6 A typedef name may not be redeclared in the same scope, even identically.
+reject!(typedef_redefined_at_file_scope, "typedef int T; typedef int T;");
+reject!(
+    typedef_redefined_in_a_block,
+    "void f(void){ typedef int T; typedef int T; }"
+);
+reject!(typedef_redefined_as_an_object, "typedef int T; int T;");
+reject!(object_redeclared_as_a_typedef, "int T; typedef int T;");
+accept!(
+    typedef_shadowed_in_an_inner_scope,
+    "typedef int T; void f(void){ typedef char T; }"
+);
+
+// 6.5.7 A block scope declaration of an identifier with linkage shall have no initializer.
+reject!(
+    block_scope_extern_with_an_initializer,
+    "void f(void){ extern int x = 1; }"
+);
+accept!(file_scope_extern_with_an_initializer, "extern int x = 1;");
+accept!(
+    block_scope_static_with_an_initializer,
+    "void f(void){ static int x = 1; }"
+);
+accept!(
+    block_scope_extern_without_an_initializer,
+    "void f(void){ extern int x; }"
+);
+
 // 6.4 A constant expression shall not contain assignment, increment, decrement,
 // function-call, or comma operators, except when they are contained within the operand of a
 // sizeof operator: the size of an object is a constant known at translation time.

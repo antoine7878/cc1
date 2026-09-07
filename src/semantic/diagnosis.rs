@@ -160,6 +160,7 @@ pub enum Diagnosis {
     DuplicateParameterName,
 
     // 6.5.7
+    BlockScopeLinkageInitializer,
     ArrayInitTooLong,
     NonConstantInitializer,
     InitDiscardedQualifiers(QualifiedType, QualifiedType),
@@ -174,7 +175,7 @@ pub enum Diagnosis {
     NonIntegralStatement(QualifiedType),
 
     // 6.6.6.4
-    InvalidReturnType,
+    ReturnWithoutValue,
     ReturnDiscardedQualifiers(QualifiedType, QualifiedType),
     ReturnIncompatibleTypes(QualifiedType, QualifiedType),
 
@@ -197,7 +198,9 @@ impl Diagnosis {
     #[rustfmt::skip]
     pub fn severity(&self) -> Severity {
         match self {
-            Diagnosis::InternalNeverDefined(_) | Diagnosis::MixedWideStringConcat => Severity::Warning,
+            Diagnosis::InternalNeverDefined(_) | Diagnosis::MixedWideStringConcat | Diagnosis::ReturnWithoutValue => {
+                Severity::Warning
+            }
             _ => Severity::Error
         }
     }
@@ -382,6 +385,7 @@ impl DiagnosisNode {
 
             // 6.5.7
             Diagnosis::ArrayInitTooLong => "excess elements in array initializer".to_string(),
+            Diagnosis::BlockScopeLinkageInitializer => "declaration of block scope identifier with linkage cannot have an initializer".to_string(),
             Diagnosis::NonConstantInitializer => "initializer element is not a compile-time constant".to_string(),
             Diagnosis::InitDiscardedQualifiers(to, from) => format!("initializing '{}' with an expression of type '{}' discards qualifiers", to.describe(sema, ctx), from.describe(sema, ctx)),
             Diagnosis::InitIncompatibleTypes(to, from) => format!("initialization of '{}' from incompatible pointer type '{}'", to.describe(sema, ctx), from.describe(sema, ctx)),
@@ -395,7 +399,7 @@ impl DiagnosisNode {
             Diagnosis::NonIntegralStatement(ty) => format!("statement requires expression of integer type ('{}' invalid)", ty.describe(sema, ctx)),
 
             // 6.6.6.4
-            Diagnosis::InvalidReturnType => "Invalid return type".to_string(),
+            Diagnosis::ReturnWithoutValue => "'return' with no value, in function returning non-void".to_string(),
             Diagnosis::ReturnDiscardedQualifiers(to, from) => format!("returning '{}' from a function with result type '{}' discards qualifiers", from.describe(sema, ctx), to.describe(sema, ctx)),
             Diagnosis::ReturnIncompatibleTypes(to, from) => format!("returning '{}' from a function with incompatible result type '{}'", from.describe(sema, ctx), to.describe(sema, ctx)),
 

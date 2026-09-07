@@ -147,8 +147,9 @@ impl SymbolResolver<'_> {
     fn dedup(&mut self, sym: &Symbol, span: &Span) -> Option<SymbolId> {
         let old_id = self.sym_scopes.current(sym.name.id)?;
         let old_symbol = old_id.resolve(self.sema);
-        if (self.sym_scopes.kind() == ScopeKind::File
-            || (sym.linkage != Linkage::None && old_symbol.linkage != Linkage::None))
+        if sym.kind != SymbolKind::Typedef
+            && (self.sym_scopes.kind() == ScopeKind::File
+                || (sym.linkage != Linkage::None && old_symbol.linkage != Linkage::None))
             && old_symbol.is_compatible(self.sema, sym)
             && !(sym.is_init && old_symbol.is_init)
         {

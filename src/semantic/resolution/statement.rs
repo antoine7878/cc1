@@ -38,14 +38,19 @@ fn check_case(resolver: &mut SymbolResolver, ctx: &Context, id: StatementId, exp
     let sema = &mut resolver.sema;
     let Some(StatementScope::Switch {
         stmt, cases, control, ..
-    }) = resolver.stmt_scopes.last_mut()
+    }) = resolver.stmt_scopes.nearest_switch()
     else {
         return Err(Diagnosis::OutsideSwitch("case"));
     };
     let stmt = *stmt;
     let Some(value) = value else { return Err(Diagnosis::Poisoned) };
+    if value.get_integer_value().is_none() {
+        return Err(Diagnosis::NonIntegerConstantExpression);
+    }
     let ty = sema.types.get(control.id);
-    Fold::new(&sema.target).convert(ty, value);
+    let Some(value) = Fold::new(&sema.target).convert(ty, value) else {
+        return Err(Diagnosis::Poisoned);
+    };
     if cases.iter().any(|(v, _)| value == *v) {
         return Err(Diagnosis::DuplicateCase(value));
     }
@@ -55,7 +60,7 @@ fn check_case(resolver: &mut SymbolResolver, ctx: &Context, id: StatementId, exp
 }
 
 fn check_default(resolver: &mut SymbolResolver, id: StatementId) -> R {
-    let Some(StatementScope::Switch { stmt, default, .. }) = resolver.stmt_scopes.last_mut() else {
+    let Some(StatementScope::Switch { stmt, default, .. }) = resolver.stmt_scopes.nearest_switch() else {
         return Err(Diagnosis::OutsideSwitch("default"));
     };
     let stmt = *stmt;
@@ -128,7 +133,7 @@ fn check_integral(sema: &mut Sema, node: &ExpressionNode) -> Result<QualifiedTyp
         return Err(Diagnosis::NonIntegralStatement(re.ty));
     }
     cast::promote(sema, re);
-    Ok(re.ty)
+    Ok(re.casted_ty())
 }
 
 fn check_for(
@@ -185,7 +190,7 @@ fn check_break(resolver: &mut SymbolResolver, id: StatementId) -> R {
 }
 
 fn check_continue(resolver: &mut SymbolResolver, id: StatementId) -> R {
-    let Some(&StatementScope::Loop(stmt)) = resolver.stmt_scopes.last() else {
+    let Some(stmt) = resolver.stmt_scopes.nearest_loop() else {
         return Err(Diagnosis::ContinueNotInLoop);
     };
     resolver.sema.stmts.set(id, Some(ResolvedStatement::Continue(stmt)));
@@ -197,7 +202,7 @@ fn check_return(sema: &mut Sema, ctx: &Context, node: &JumpStatementNode, return
         JumpStatement::Return(Some(e)) => {
             expression::init(sema, ctx, return_ty, e, AssignmentContext::Return).map(|_| ())
         }
-        JumpStatement::Return(None) if return_ty.id != sema.builtins.void => Err(Diagnosis::InvalidReturnType),
-        _ => unreachable!(),
+        JumpStatement::Return(None) if return_ty.id != sema.builtins.void => Err(Diagnosis::ReturnWithoutValue),
+        _ => Ok(()),
     }
 }

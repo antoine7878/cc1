@@ -1,6 +1,6 @@
 use crate::ast::{DeclarationSpecifier, InitDeclaratorNode, Qualifier, Storage, TypeSpecifier};
 use crate::semantic::diagnosis::{Diag, Diagnosis};
-use crate::semantic::{ResolvedType, ScopeKind};
+use crate::semantic::{Linkage, ResolvedType, ScopeKind};
 
 pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>> {
     let mut storages = specifiers.iter().filter_map(|s| match s {
@@ -100,6 +100,14 @@ pub fn extern_function_only(scope_type: ScopeKind, storage: Storage) -> Diag<()>
         Diag::err((), Diagnosis::BlockScopeNotExtern)
     } else {
         Diag::ok(())
+    }
+}
+
+pub fn check_block_scope_initializer(scope: ScopeKind, linkage: Linkage, is_init: bool) -> Diag<()> {
+    let block = matches!(scope, ScopeKind::Block | ScopeKind::Function);
+    match block && linkage != Linkage::None && is_init {
+        true => Diag::err((), Diagnosis::BlockScopeLinkageInitializer),
+        false => Diag::ok(()),
     }
 }
 

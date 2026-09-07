@@ -52,6 +52,15 @@ macro_rules! value {
 }
 
 #[macro_export]
+macro_rules! stmts {
+    ($name:ident, $src:expr, $expected:expr) => {
+        test_case!($name, {
+            $crate::common::run_statements(stringify!($name), $src, $expected);
+        });
+    };
+}
+
+#[macro_export]
 macro_rules! labels {
     ($name:ident, $src:expr, $expected:expr) => {
         test_case!($name, {

@@ -2,12 +2,13 @@ use std::io::Cursor;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
+use cc1::ast::statement::StatementId;
 use cc1::ast::{Expression, ExpressionId, Name, StringConstant, Tag, Value};
 use cc1::context::Context;
 use cc1::parser::parse_reader;
 use cc1::semantic::{
     AddressBase, Analyzer, Diagnosis, DiagnosisNode, ExpressionKind, Initializer, ParamTypes, QualifiedType,
-    ResolvedType, SymbolKind,
+    ResolvedStatement, ResolvedType, SymbolKind,
 };
 
 use crate::common::ty::Ty;
@@ -284,6 +285,43 @@ impl Unit {
                 Some((member, tag, reference.index))
             })
             .collect()
+    }
+
+    pub fn statements(&self) -> Vec<String> {
+        (0..self.ctx.sema.stmts.len())
+            .map(StatementId::from)
+            .filter_map(|id| {
+                let fact = self.render_statement(self.ctx.sema.stmts.get(id)?);
+                Some(format!("#{} {fact}", usize::from(id)))
+            })
+            .collect()
+    }
+
+    fn render_statement(&self, stmt: &ResolvedStatement) -> String {
+        match stmt {
+            ResolvedStatement::Loop(_) => "loop".to_string(),
+            ResolvedStatement::Switch {
+                control,
+                cases,
+                default,
+            } => {
+                let control = control.describe(&self.ctx.sema, &self.ctx);
+                let cases: Vec<String> = cases
+                    .iter()
+                    .map(|(value, id)| format!("{}->#{}", repr(Some(*value)), usize::from(*id)))
+                    .collect();
+                let default = default.map_or_else(|| "none".to_string(), |id| format!("#{}", usize::from(id)));
+                format!("switch {control} [{}] default={default}", cases.join(", "))
+            }
+            ResolvedStatement::Case(value, target) => {
+                format!("case {}->#{}", repr(Some(*value)), usize::from(*target))
+            }
+            ResolvedStatement::Default(target) => format!("default->#{}", usize::from(*target)),
+            ResolvedStatement::Break(target) => format!("break->#{}", usize::from(*target)),
+            ResolvedStatement::Continue(target) => format!("continue->#{}", usize::from(*target)),
+            ResolvedStatement::Goto(name) => format!("goto {}", name.resolve(&self.ctx)),
+            ResolvedStatement::Label(name) => format!("label {}", name.resolve(&self.ctx)),
+        }
     }
 
     pub fn labels(&self) -> Vec<(String, Vec<String>)> {
@@ -581,6 +619,20 @@ pub fn run_initializers(name: &str, src: &str, expected: &[(&str, &str)]) {
     let got = unit.initializers();
     let expected: Vec<(String, String)> = expected.iter().map(|(s, i)| (s.to_string(), i.to_string())).collect();
     assert_eq!(got, expected, "`{name}` initializers:\n{src}");
+}
+
+pub fn run_statements(name: &str, src: &str, expected: &[&str]) {
+    let unit = Unit::compile(src);
+
+    assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
+    assert!(
+        unit.diagnosis().is_empty(),
+        "`{name}` unexpected diagnosis:\n{src}\n{}",
+        unit.render()
+    );
+
+    let expected: Vec<String> = expected.iter().map(|s| s.to_string()).collect();
+    assert_eq!(unit.statements(), expected, "wrong statements for `{name}`:\n{src}");
 }
 
 pub fn run_labels(name: &str, src: &str, expected: &[(&str, &[&str])]) {

@@ -78,6 +78,7 @@ pub fn declare_symbol(
     sym.linkage = Symbol::linkage_of(scope_kind, declared_storage, sym.kind, prior);
     sym.duration = Symbol::duration_of(scope_kind, declared_storage, sym.kind);
     sym.definition = Symbol::definition_of(scope_kind, declared_storage, sym.is_init, sym.kind);
+    constrain::specifier::check_block_scope_initializer(scope_kind, sym.linkage, sym.is_init).collect(resolver, span);
     resolver.declare(sym, span)
 }
 
