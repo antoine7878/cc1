@@ -1,8 +1,10 @@
+use std::iter::zip;
+
 use crate::arena::{Loan, OptionPoisoned, ResolveWith};
 use crate::ast::{Expression, ExpressionId, ExpressionNode};
 use crate::context::Context;
 use crate::semantic::{
-    Diagnosis, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, Sema, SymbolId, SymbolKind,
+    Diagnosis, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, Sema, SymbolId, SymbolKind, cast,
     declaration, ice,
 };
 
@@ -15,6 +17,31 @@ pub(crate) fn operands<'s, const N: usize>(
     nodes: [&ExpressionNode; N],
 ) -> Result<Operands<'s, N>, Diagnosis> {
     Loan::take(sema, nodes.map(|n| n.id)).ok_poisoned()
+}
+
+pub(super) fn with_ops<const N: usize, T, F>(sema: &mut Sema, nodes: [&ExpressionNode; N], f: F) -> Result<T, Diagnosis>
+where
+    F: FnOnce(&mut Sema, &mut [ResolvedExpression; N]) -> Result<T, Diagnosis>,
+{
+    let mut ops = operands(sema, nodes)?;
+    let (sema, res) = ops.parts();
+    f(sema, res)
+}
+
+pub(super) fn with_converted<const N: usize, T, F>(
+    sema: &mut Sema,
+    nodes: [&ExpressionNode; N],
+    f: F,
+) -> Result<T, Diagnosis>
+where
+    F: FnOnce(&mut Sema, &mut [ResolvedExpression; N]) -> Result<T, Diagnosis>,
+{
+    with_ops(sema, nodes, |sema, res| {
+        for (re, node) in zip(res.iter_mut(), nodes) {
+            cast::lvalue_conversion(sema, re, &node.span);
+        }
+        f(sema, res)
+    })
 }
 
 pub(super) fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> bool {

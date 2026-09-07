@@ -8,7 +8,7 @@ use super::arithmetic::{additive, multiplicative, shift};
 use super::assign::{additive_assignment, coumpound_assignment, simple_assignment};
 use super::compare::{bitwise, equality, logic, relational};
 use super::conditional::conditional;
-use super::operand::{R, operands};
+use super::operand::{R, with_converted};
 use super::primary::{array_subscript, constant, fn_call, identifier, member};
 use super::sizeof::{size_of_e, size_of_ty};
 use super::unary::{address, bit_not, cast, inc_dec, indirection, logic_not, sign};
@@ -91,14 +91,11 @@ fn assignment(sema: &mut Sema, ctx: &Context, op: &Option<BinaryOp>, e1: &Expres
 
 fn list(sema: &mut Sema, es: &[ExpressionNode]) -> R {
     for node in es[0..(es.len() - 1)].iter() {
-        let Ok(mut ops) = operands(&mut *sema, [node]) else { continue };
-        let (sema, [re]) = ops.parts();
-        cast::lvalue_conversion(sema, re, &node.span);
-        cast::to_void(sema, re);
+        let _ = with_converted(&mut *sema, [node], |sema, [re]| {
+            cast::to_void(sema, re);
+            Ok(())
+        });
     }
     let last = es.last().unwrap();
-    let mut ops = operands(sema, [last])?;
-    let (sema, [re]) = ops.parts();
-    cast::lvalue_conversion(sema, re, &last.span);
-    Ok((re.casted_ty(), RValue))
+    with_converted(sema, [last], |_, [re]| Ok((re.casted_ty(), RValue)))
 }

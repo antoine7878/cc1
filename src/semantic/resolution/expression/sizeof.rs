@@ -5,17 +5,15 @@ use crate::parser::Span;
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::{Diagnosis, QualifiedType, Sema, declaration, layout};
 
-use super::operand::{R, is_bit_field, operands};
+use super::operand::{R, is_bit_field, with_ops};
 
 pub(super) fn size_of_e(sema: &mut Sema, node: &ExpressionNode, e: &ExpressionNode) -> R {
-    let ty = {
-        let mut ops = operands(&mut *sema, [e])?;
-        let (sema, [re]) = ops.parts();
+    let ty = with_ops(&mut *sema, [e], |sema, [re]| {
         if is_bit_field(sema, sema.expr_bindings.get(e.id).copied()) {
             return Err(Diagnosis::SizeofBitfield);
         }
-        re.ty
-    };
+        Ok(re.ty)
+    })?;
     let result = size_t(sema, ty)?;
     set_sizeof_constant(sema, node, ty);
     Ok(result)

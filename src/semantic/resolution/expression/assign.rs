@@ -9,7 +9,17 @@ use crate::semantic::{
 
 use super::arithmetic::{multiplicative_types, shift_types};
 use super::compare::bitwise_type;
-use super::operand::{R, check_assignable, is_null_pointer_constant, operands};
+use super::operand::{R, check_assignable, is_null_pointer_constant, with_converted, with_ops};
+
+fn with_assign_ops<F>(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode, f: F) -> R
+where
+    F: FnOnce(&mut Sema, &mut ResolvedExpression, &mut ResolvedExpression) -> R,
+{
+    with_ops(sema, [e1, e2], |sema, [lhs, rhs]| {
+        cast::lvalue_conversion(sema, rhs, &e2.span);
+        f(sema, lhs, rhs)
+    })
+}
 
 pub fn init(
     sema: &mut Sema,
@@ -19,26 +29,24 @@ pub fn init(
     assign_ctx: AssignmentContext,
 ) -> R {
     let is_null = is_null_pointer_constant(sema, ctx, init_node);
-    let mut ops = operands(sema, [init_node])?;
-    let (sema, [re]) = ops.parts();
-    cast::lvalue_conversion(sema, re, &init_node.span);
-    let mut l_re = ResolvedExpression::new(l_ty, ExpressionKind::LValue);
-    let out = cast::assignment_conversion(sema, &mut l_re, re, is_null, assign_ctx);
-    if matches!(assign_ctx, AssignmentContext::Return)
-        && let Some(cast) = re.casts.last_mut()
-    {
-        cast.to.is_volatile = false;
-        cast.to.is_const = false;
-    }
-    out.map(|q| (q, RValue))
+    with_converted(sema, [init_node], |sema, [re]| {
+        let mut l_re = ResolvedExpression::new(l_ty, ExpressionKind::LValue);
+        let out = cast::assignment_conversion(sema, &mut l_re, re, is_null, assign_ctx);
+        if matches!(assign_ctx, AssignmentContext::Return)
+            && let Some(cast) = re.casts.last_mut()
+        {
+            cast.to.is_volatile = false;
+            cast.to.is_const = false;
+        }
+        out.map(|q| (q, RValue))
+    })
 }
 
 pub(super) fn simple_assignment(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let is_null = is_null_pointer_constant(sema, ctx, e2);
-    let mut ops = operands(sema, [e1, e2])?;
-    let (sema, [lhs, rhs]) = ops.parts();
-    cast::lvalue_conversion(sema, rhs, &e2.span);
-    simple_assignation_type(sema, lhs, rhs, is_null)
+    with_assign_ops(sema, e1, e2, |sema, lhs, rhs| {
+        simple_assignation_type(sema, lhs, rhs, is_null)
+    })
 }
 
 fn simple_assignation_type(
@@ -53,10 +61,9 @@ fn simple_assignation_type(
 }
 
 pub(super) fn additive_assignment(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let mut ops = operands(sema, [e1, e2])?;
-    let (sema, [lhs, rhs]) = ops.parts();
-    cast::lvalue_conversion(sema, rhs, &e2.span);
-    additive_assignation_type(sema, lhs, rhs, &e1.span)
+    with_assign_ops(sema, e1, e2, |sema, lhs, rhs| {
+        additive_assignation_type(sema, lhs, rhs, &e1.span)
+    })
 }
 
 fn additive_assignation_type(
@@ -91,10 +98,9 @@ pub(super) fn coumpound_assignment(
     e2: &ExpressionNode,
 ) -> R {
     let count = ice::try_fold(sema, ctx, e2);
-    let mut ops = operands(sema, [e1, e2])?;
-    let (sema, [lhs, rhs]) = ops.parts();
-    cast::lvalue_conversion(sema, rhs, &e2.span);
-    coumpound_assignation_type(sema, op, lhs, rhs, &e1.span, count)
+    with_assign_ops(sema, e1, e2, |sema, lhs, rhs| {
+        coumpound_assignation_type(sema, op, lhs, rhs, &e1.span, count)
+    })
 }
 
 fn coumpound_assignation_type(

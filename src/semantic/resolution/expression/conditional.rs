@@ -4,7 +4,7 @@ use crate::context::Context;
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::{Diagnosis, QualifiedType, ResolvedExpression, ResolvedType, Sema, cast};
 
-use super::operand::{R, is_null_pointer_constant, operands};
+use super::operand::{R, is_null_pointer_constant, with_converted};
 
 pub(super) fn conditional(
     sema: &mut Sema,
@@ -15,12 +15,9 @@ pub(super) fn conditional(
 ) -> R {
     let null2 = is_null_pointer_constant(sema, ctx, e2);
     let null3 = is_null_pointer_constant(sema, ctx, e3);
-    let mut ops = operands(sema, [e1, e2, e3])?;
-    let (sema, [condition, lhs, rhs]) = ops.parts();
-    cast::lvalue_conversion(sema, condition, &e1.span);
-    cast::lvalue_conversion(sema, lhs, &e2.span);
-    cast::lvalue_conversion(sema, rhs, &e3.span);
-    conditional_type(sema, condition, lhs, rhs, null2, null3)
+    with_converted(sema, [e1, e2, e3], |sema, [condition, lhs, rhs]| {
+        conditional_type(sema, condition, lhs, rhs, null2, null3)
+    })
 }
 
 fn conditional_type(

@@ -4,14 +4,10 @@ use crate::context::Context;
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::{Diagnosis, QualifiedType, ResolvedExpression, ResolvedType, Sema, cast};
 
-use super::operand::{R, is_null_pointer_constant, operands};
+use super::operand::{R, is_null_pointer_constant, with_converted};
 
 pub(super) fn relational(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let mut ops = operands(sema, [e1, e2])?;
-    let (sema, [lhs, rhs]) = ops.parts();
-    cast::lvalue_conversion(sema, lhs, &e1.span);
-    cast::lvalue_conversion(sema, rhs, &e2.span);
-    relational_type(sema, lhs, rhs)
+    with_converted(sema, [e1, e2], |sema, [lhs, rhs]| relational_type(sema, lhs, rhs))
 }
 
 fn relational_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) -> R {
@@ -44,11 +40,9 @@ fn relational_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut Reso
 pub(super) fn equality(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let null1 = is_null_pointer_constant(sema, ctx, e1);
     let null2 = is_null_pointer_constant(sema, ctx, e2);
-    let mut ops = operands(sema, [e1, e2])?;
-    let (sema, [lhs, rhs]) = ops.parts();
-    cast::lvalue_conversion(sema, lhs, &e1.span);
-    cast::lvalue_conversion(sema, rhs, &e2.span);
-    equality_type(sema, lhs, rhs, null1, null2)
+    with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
+        equality_type(sema, lhs, rhs, null1, null2)
+    })
 }
 
 fn equality_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression, n1: bool, n2: bool) -> R {
@@ -88,11 +82,7 @@ fn equality_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut Resolv
 }
 
 pub(super) fn bitwise(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let mut ops = operands(sema, [e1, e2])?;
-    let (sema, [lhs, rhs]) = ops.parts();
-    cast::lvalue_conversion(sema, lhs, &e1.span);
-    cast::lvalue_conversion(sema, rhs, &e2.span);
-    bitwise_type(sema, lhs, rhs)
+    with_converted(sema, [e1, e2], |sema, [lhs, rhs]| bitwise_type(sema, lhs, rhs))
 }
 
 pub(super) fn bitwise_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) -> R {
@@ -103,11 +93,7 @@ pub(super) fn bitwise_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &
 }
 
 pub(super) fn logic(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let mut ops = operands(sema, [e1, e2])?;
-    let (sema, [lhs, rhs]) = ops.parts();
-    cast::lvalue_conversion(sema, lhs, &e1.span);
-    cast::lvalue_conversion(sema, rhs, &e2.span);
-    logic_type(sema, lhs, rhs)
+    with_converted(sema, [e1, e2], |sema, [lhs, rhs]| logic_type(sema, lhs, rhs))
 }
 
 fn logic_type(sema: &mut Sema, lhs: &mut ResolvedExpression, rhs: &mut ResolvedExpression) -> R {
