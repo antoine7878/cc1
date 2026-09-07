@@ -1,8 +1,6 @@
-#include <stdio.h>
+struct S {
+	int x;
+	int y;
+} s;
 
-enum E { A = (int)3.3L };
-
-int main(void) {
-	printf("coucou:%i\n", A);
-	return 0;
-}
+int *p = &s.y;
