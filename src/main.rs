@@ -13,7 +13,7 @@ fn main() {
             Analyzer::resolve_names,
             Analyzer::check_constants,
             Analyzer::mark_uses,
-            Analyzer::finish,
+            Analyzer::finish_externals,
             Analyzer::finalize_layouts,
         ])
         .report(AstPrinter::print)

@@ -30,7 +30,7 @@ impl Analyzer {
         Sema::with_sema(ctx, mark_uses)
     }
 
-    pub fn finish(ctx: Context) -> Context {
+    pub fn finish_externals(ctx: Context) -> Context {
         Sema::with_sema(ctx, |sema, _| finish_externals(sema))
     }
 
@@ -43,7 +43,7 @@ impl Analyzer {
         let ctx = Self::resolve_names(ctx);
         let ctx = Self::check_constants(ctx);
         let ctx = Self::mark_uses(ctx);
-        let ctx = Self::finish(ctx);
+        let ctx = Self::finish_externals(ctx);
         Self::finalize_layouts(ctx)
     }
 }
