@@ -42,7 +42,7 @@ pub fn init(
 pub fn simple_assignment(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let is_null = is_null_pointer_constant(sema, ctx, e2);
     with_assign_ops(sema, e1, e2, |sema, lhs, rhs| {
-        constrain::expression::check_assignable(lhs.kind, lhs.ty).into_result()?;
+        constrain::expression::check_assignable(sema, lhs.kind, lhs.ty).into_result()?;
         let q = cast::assignment_conversion(sema, lhs, rhs, is_null, AssignmentContext::Assignment)?;
         Ok((q, RValue))
     })
@@ -50,7 +50,7 @@ pub fn simple_assignment(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2
 
 pub fn additive_assignment(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     with_assign_ops(sema, e1, e2, |sema, lhs, rhs| {
-        constrain::expression::check_assignable(lhs.kind, lhs.ty).into_result()?;
+        constrain::expression::check_assignable(sema, lhs.kind, lhs.ty).into_result()?;
         let target = lhs.ty.unqualified();
         let l = lhs.ty.id.resolve(sema);
         let r = rhs.casted_ty().id.resolve(sema);
@@ -78,12 +78,12 @@ pub fn compound_assignment(
 ) -> R {
     let count = ice::try_fold(sema, ctx, e2);
     with_assign_ops(sema, e1, e2, |sema, lhs, rhs| {
-        constrain::expression::check_assignable(lhs.kind, lhs.ty).into_result()?;
+        constrain::expression::check_assignable(sema, lhs.kind, lhs.ty).into_result()?;
         let target = lhs.ty.unqualified();
         cast::lvalue_conversion(sema, lhs, &e1.span);
         match op {
             BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => multiplicative_types(sema, op, lhs, rhs),
-            BinaryOp::Left | BinaryOp::Right => shift_types(sema, lhs, rhs, count),
+            BinaryOp::Left | BinaryOp::Right => shift_types(sema, lhs, rhs, count, &e2.span),
             BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor => bitwise_type(sema, lhs, rhs),
             _ => unreachable!(),
         }?;

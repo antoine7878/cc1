@@ -133,6 +133,15 @@ macro_rules! size {
 }
 
 #[macro_export]
+macro_rules! facts {
+    ($name:ident, $src:expr) => {
+        test_case!($name, {
+            $crate::common::run_facts(stringify!($name), $src);
+        });
+    };
+}
+
+#[macro_export]
 macro_rules! bits {
     ($name:ident, $decl:expr, $tag:expr, $expected:expr) => {
         test_case!($name, {

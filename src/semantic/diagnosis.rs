@@ -112,6 +112,7 @@ pub enum Diagnosis {
     // 6.3.16
     AssignToRValue,
     ConstAssignment(QualifiedType),
+    ConstMemberAssignment(QualifiedType),
     AssignmentDiscardedQualifiers(QualifiedType, QualifiedType),
     AssignmentIncompatibleTypes(QualifiedType, QualifiedType),
 
@@ -198,9 +199,10 @@ impl Diagnosis {
     #[rustfmt::skip]
     pub fn severity(&self) -> Severity {
         match self {
-            Diagnosis::InternalNeverDefined(_) | Diagnosis::MixedWideStringConcat | Diagnosis::ReturnWithoutValue => {
-                Severity::Warning
-            }
+            Diagnosis::MixedWideStringConcat
+            | Diagnosis::ReturnWithoutValue
+            | Diagnosis::ShiftCountNegative
+            | Diagnosis::ShiftCountOutOfRange => Severity::Warning,
             _ => Severity::Error
         }
     }
@@ -334,6 +336,7 @@ impl DiagnosisNode {
             // 6.3.16
             Diagnosis::AssignToRValue => "expression is not assignable".to_string(),
             Diagnosis::ConstAssignment(ty) => format!("cannot assign to variable with const-qualified type '{}'", ty.describe(sema, ctx)),
+            Diagnosis::ConstMemberAssignment(ty) => format!("cannot assign to '{}' because it has a const-qualified member", ty.describe(sema, ctx)),
             Diagnosis::AssignmentDiscardedQualifiers(to, from) => format!("assigning to '{}' from '{}' discards qualifiers", to.describe(&ctx.sema, ctx), from.describe(sema, ctx)),
             Diagnosis::AssignmentIncompatibleTypes(to, from) => format!("assignment to '{}' from incompatible pointer type '{}'", to.describe(sema, ctx), from.describe(sema, ctx)),
 

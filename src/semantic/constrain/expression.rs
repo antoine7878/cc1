@@ -1,13 +1,16 @@
 use crate::ast::UnaryOp;
 use crate::semantic::diagnosis::{Diag, Diagnosis};
-use crate::semantic::{ExpressionKind, QualifiedType};
+use crate::semantic::{ExpressionKind, QualifiedType, Sema};
 
-pub fn check_assignable(kind: ExpressionKind, ty: QualifiedType) -> Diag<()> {
+pub fn check_assignable(sema: &Sema, kind: ExpressionKind, ty: QualifiedType) -> Diag<()> {
     if kind == ExpressionKind::RValue {
         return Diag::err((), Diagnosis::AssignToRValue);
     }
     if ty.is_const {
         return Diag::err((), Diagnosis::ConstAssignment(ty));
+    }
+    if ty.has_const_member(sema) {
+        return Diag::err((), Diagnosis::ConstMemberAssignment(ty));
     }
     Diag::ok(())
 }

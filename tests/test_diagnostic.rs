@@ -259,10 +259,12 @@ reports!(
     ["<test>:1:14: error: integer overflow in constant expression"]
 );
 
+// 6.3.7 An out-of-range shift count is undefined behaviour, not a constraint violation,
+// so it is a warning and the shift still yields the promoted type of its left operand.
 reports!(
     report_shift_count_out_of_range,
     "enum E { A = 1 << 32 };",
-    ["<test>:1:14: error: shift count >= width of type"]
+    ["<test>:1:19: warning: shift count >= width of type"]
 );
 
 reports!(
@@ -286,7 +288,7 @@ reports!(
 reports!(
     report_shift_count_negative,
     "enum E { A = 1 << -1 };",
-    ["<test>:1:14: error: shift count is negative"]
+    ["<test>:1:19: warning: shift count is negative"]
 );
 
 reports!(

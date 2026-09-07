@@ -535,6 +535,11 @@ pub fn run_accept(name: &str, src: &str) {
         "`{name}` should be accepted:\n{src}\n{}",
         unit.render()
     );
+    assert_eq!(
+        unit.missing_facts(),
+        Vec::<String>::new(),
+        "`{name}` is missing facts a code generator needs:\n{src}"
+    );
 }
 
 pub fn run_reject(name: &str, src: &str) {
@@ -551,6 +556,11 @@ pub fn run_value(name: &str, src: &str, expected: &[(&str, &str)]) {
         unit.diagnosis().is_empty(),
         "`{name}` unexpected diagnosis:\n{src}\n{}",
         unit.render()
+    );
+    assert_eq!(
+        unit.missing_facts(),
+        Vec::<String>::new(),
+        "`{name}` is missing facts a code generator needs:\n{src}"
     );
 
     let variants = unit.variants();
@@ -574,6 +584,11 @@ pub fn run_size(name: &str, decl: &str, ty: &str, expected: u64) {
         "`{name}` unexpected diagnosis:\n{src}\n{}",
         unit.render()
     );
+    assert_eq!(
+        unit.missing_facts(),
+        Vec::<String>::new(),
+        "`{name}` is missing facts a code generator needs:\n{decl}"
+    );
 
     let variants = unit.variants();
     let got = variants.iter().find(|(name, _)| name == "PROBE");
@@ -593,6 +608,11 @@ pub fn run_bits(name: &str, decl: &str, tag: &str, expected: &[(&str, u32)]) {
         "`{name}` unexpected diagnosis:\n{decl}\n{}",
         unit.render()
     );
+    assert_eq!(
+        unit.missing_facts(),
+        Vec::<String>::new(),
+        "`{name}` is missing facts a code generator needs:\n{decl}"
+    );
 
     let expected: Vec<(String, u32)> = expected.iter().map(|(n, b)| (n.to_string(), *b)).collect();
     assert_eq!(
@@ -611,6 +631,11 @@ pub fn run_offsets(name: &str, decl: &str, tag: &str, expected: &[(&str, u32, u3
         "`{name}` unexpected diagnosis:\n{decl}\n{}",
         unit.render()
     );
+    assert_eq!(
+        unit.missing_facts(),
+        Vec::<String>::new(),
+        "`{name}` is missing facts a code generator needs:\n{decl}"
+    );
 
     let got = unit.tag_members(tag);
     let expected: Vec<(String, u32, u32)> = expected.iter().map(|(n, o, b)| (n.to_string(), *o, *b)).collect();
@@ -625,6 +650,11 @@ pub fn run_uses(name: &str, src: &str, expected: &[(&str, bool)]) {
         unit.diagnosis().is_empty(),
         "`{name}` unexpected diagnosis:\n{src}\n{}",
         unit.render()
+    );
+    assert_eq!(
+        unit.missing_facts(),
+        Vec::<String>::new(),
+        "`{name}` is missing facts a code generator needs:\n{src}"
     );
 
     let got = unit.uses();
@@ -641,6 +671,11 @@ pub fn run_initializers(name: &str, src: &str, expected: &[(&str, &str)]) {
         "`{name}` unexpected diagnosis:\n{src}\n{}",
         unit.render()
     );
+    assert_eq!(
+        unit.missing_facts(),
+        Vec::<String>::new(),
+        "`{name}` is missing facts a code generator needs:\n{src}"
+    );
 
     let got = unit.initializers();
     let expected: Vec<(String, String)> = expected.iter().map(|(s, i)| (s.to_string(), i.to_string())).collect();
@@ -656,6 +691,11 @@ pub fn run_statements(name: &str, src: &str, expected: &[&str]) {
         "`{name}` unexpected diagnosis:\n{src}\n{}",
         unit.render()
     );
+    assert_eq!(
+        unit.missing_facts(),
+        Vec::<String>::new(),
+        "`{name}` is missing facts a code generator needs:\n{src}"
+    );
 
     let expected: Vec<String> = expected.iter().map(|s| s.to_string()).collect();
     assert_eq!(unit.statements(), expected, "wrong statements for `{name}`:\n{src}");
@@ -669,6 +709,11 @@ pub fn run_labels(name: &str, src: &str, expected: &[(&str, &[&str])]) {
         unit.diagnosis().is_empty(),
         "`{name}` unexpected diagnosis:\n{src}\n{}",
         unit.render()
+    );
+    assert_eq!(
+        unit.missing_facts(),
+        Vec::<String>::new(),
+        "`{name}` is missing facts a code generator needs:\n{src}"
     );
 
     let expected: Vec<(String, Vec<String>)> = expected
@@ -687,6 +732,11 @@ pub fn run_member_refs(name: &str, src: &str, expected: &[(&str, &str, usize)]) 
         "`{name}` unexpected diagnosis:\n{src}\n{}",
         unit.render()
     );
+    assert_eq!(
+        unit.missing_facts(),
+        Vec::<String>::new(),
+        "`{name}` is missing facts a code generator needs:\n{src}"
+    );
 
     let got = unit.member_refs();
     let expected: Vec<(String, String, usize)> = expected
@@ -704,6 +754,11 @@ pub fn run_placements(name: &str, src: &str, expected: &[(&str, &str, &str, &str
         unit.diagnosis().is_empty(),
         "`{name}` unexpected diagnosis:\n{src}\n{}",
         unit.render()
+    );
+    assert_eq!(
+        unit.missing_facts(),
+        Vec::<String>::new(),
+        "`{name}` is missing facts a code generator needs:\n{src}"
     );
 
     let got = unit.placements();

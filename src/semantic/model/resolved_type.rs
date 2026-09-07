@@ -341,6 +341,19 @@ impl QualifiedType {
         self.id.resolve(sema).is_integral(sema)
     }
 
+    pub fn has_const_member(&self, sema: &Sema) -> bool {
+        match self.id.resolve(sema) {
+            ResolvedType::Array { elem, .. } => elem.is_const || elem.has_const_member(sema),
+            ResolvedType::Tag(id) => sema.tags.get(*id).members.iter().any(|member| {
+                member
+                    .sym
+                    .and_then(|sym| sema.symbols.get(sym).ty)
+                    .is_some_and(|ty| ty.is_const || ty.has_const_member(sema))
+            }),
+            _ => false,
+        }
+    }
+
     pub fn is_floating(&self, sema: &Sema) -> bool {
         self.id.resolve(sema).is_floating()
     }

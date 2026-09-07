@@ -787,3 +787,76 @@ reject!(
     a_non_void_pointer_cast_of_zero_is_not_a_null_pointer_constant,
     "int f(int *p) { return p == (char *) 0; }"
 );
+
+// 6.2.2.1 A struct or union with a const-qualified member, at any depth, is not a modifiable
+// lvalue, so it may not be assigned to even when the object itself is unqualified.
+reject!(
+    const_member_blocks_struct_assignment,
+    "struct S { const int x; }; void f(struct S a, struct S b){ a = b; }"
+);
+reject!(
+    const_member_blocks_assignment_through_a_nested_struct,
+    "struct I { const int x; }; struct S { struct I i; }; void f(struct S a, struct S b){ a = b; }"
+);
+reject!(
+    const_member_blocks_union_assignment,
+    "union U { const int x; }; void f(union U a, union U b){ a = b; }"
+);
+reject!(
+    const_member_blocks_assignment_of_a_local,
+    "struct S { const int x; }; void f(void){ struct S a, b; a = b; }"
+);
+reject!(
+    const_array_member_blocks_struct_assignment,
+    "struct S { const int a[2]; }; void f(struct S x, struct S y){ x = y; }"
+);
+accept!(
+    unqualified_member_is_assignable,
+    "struct S { const int x; int y; }; void f(struct S a){ a.y = 1; }"
+);
+accept!(
+    struct_without_const_members_is_assignable,
+    "struct S { int x; }; void f(struct S a, struct S b){ a = b; }"
+);
+
+// 6.7 Constraints: if an identifier with internal linkage is used in an expression, other than
+// as part of the operand of sizeof, there shall be exactly one external definition for it.
+reject!(
+    internal_linkage_used_but_never_defined,
+    "static void g(void); void f(void){ g(); }"
+);
+accept!(
+    internal_linkage_used_only_inside_sizeof,
+    "static int g(void); void f(void){ sizeof(g()); }"
+);
+accept!(
+    internal_linkage_used_only_inside_unparenthesised_sizeof,
+    "static int g(void); void f(void){ int x = sizeof g(); }"
+);
+accept!(internal_linkage_declared_but_unused, "static void g(void);");
+accept!(
+    internal_linkage_tentative_definition,
+    "static int x; void f(void){ x = 1; }"
+);
+
+// 6.3.7 An out-of-range shift count is undefined behaviour, not a constraint violation, so the
+// shift is diagnosed but still resolves to the promoted type of its left operand.
+recover!(
+    shift_count_out_of_range_is_a_warning,
+    "void f(void){ int i = 1; i = i << 32; }",
+    [Diagnosis::ShiftCountOutOfRange],
+    &[]
+);
+recover!(
+    shift_count_negative_is_a_warning,
+    "void f(void){ int i = 1; i = i << -1; }",
+    [Diagnosis::ShiftCountNegative],
+    &[]
+);
+recover!(
+    compound_shift_count_out_of_range_is_a_warning,
+    "void f(void){ int i = 1; i <<= 33; }",
+    [Diagnosis::ShiftCountOutOfRange],
+    &[]
+);
+accept!(shift_count_in_range, "void f(void){ int i = 1; i <<= 31; }");

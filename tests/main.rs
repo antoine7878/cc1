@@ -6,6 +6,7 @@ mod test_cast;
 mod test_constrain;
 mod test_diagnostic;
 mod test_f80;
+mod test_facts;
 mod test_initializer;
 mod test_layout;
 mod test_layout_abi;

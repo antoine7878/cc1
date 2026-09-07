@@ -67,9 +67,8 @@ COV_SKIP = \
 	src/ast/display.rs \
 	src/parser/span.rs \
 	src/parser/driver.rs \
-	src/semantic/diagnosis.rs \
 	src/ast/type_specifier.rs \
-	src/semantic/resolution/statement.rs
+	src/semantic/diagnosis.rs
 
 coverage: $(NAME)
 	cargo llvm-cov nextest --ignore-filename-regex '$(subst $(space),|,$(strip $(COV_SKIP)))'

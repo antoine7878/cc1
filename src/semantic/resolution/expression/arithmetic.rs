@@ -1,9 +1,10 @@
 use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, ExpressionNode, Value};
 use crate::context::Context;
+use crate::parser::Span;
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::resolution::expression::*;
-use crate::semantic::{Diagnosis, ResolvedExpression, ResolvedType, Sema, cast, ice};
+use crate::semantic::{Diag, DiagCollector, Diagnosis, ResolvedExpression, ResolvedType, Sema, cast, ice};
 
 pub fn multiplicative(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
@@ -47,7 +48,9 @@ pub fn additive(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &Expres
 
 pub fn shift(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let count = ice::try_fold(sema, ctx, e2);
-    with_converted(sema, [e1, e2], |sema, [lhs, rhs]| shift_types(sema, lhs, rhs, count))
+    with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
+        shift_types(sema, lhs, rhs, count, &e2.span)
+    })
 }
 
 pub fn shift_types(
@@ -55,6 +58,7 @@ pub fn shift_types(
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,
     count: Option<Value>,
+    span: &Span,
 ) -> R {
     let l = lhs.casted_ty().id.resolve(sema);
     let r = rhs.casted_ty().id.resolve(sema);
@@ -67,10 +71,9 @@ pub fn shift_types(
     let l_layout = sema.target.layout(l).unwrap();
     let Some(count) = count else { return Ok((lhs.casted_ty(), RValue)) };
     if count.is_negative() {
-        return Err(Diagnosis::ShiftCountNegative);
-    }
-    if count.is_greater_or_eq(l_layout.size * sema.target.byte_size) {
-        return Err(Diagnosis::ShiftCountOutOfRange);
+        sema.add_diag(Diag::err((), Diagnosis::ShiftCountNegative), span);
+    } else if count.is_greater_or_eq(l_layout.size * sema.target.byte_size) {
+        sema.add_diag(Diag::err((), Diagnosis::ShiftCountOutOfRange), span);
     }
     Ok((lhs.casted_ty(), RValue))
 }

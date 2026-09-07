@@ -10,7 +10,7 @@ use crate::semantic::{
 
 pub fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
     with_converted(sema, [e], |sema, [re]| {
-        constrain::expression::check_assignable(re.kind, re.ty).into_result()?;
+        constrain::expression::check_assignable(sema, re.kind, re.ty).into_result()?;
         let non_object_pointee = match re.ty.id.resolve(sema) {
             ResolvedType::Pointer(inner) if !inner.is_object(sema) => Some((*inner, inner.is_function(sema))),
             _ => None,
