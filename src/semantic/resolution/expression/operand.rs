@@ -33,11 +33,7 @@ where
     f(sema, res)
 }
 
-pub fn with_converted<const N: usize, T, F>(
-    sema: &mut Sema,
-    nodes: [&ExpressionNode; N],
-    f: F,
-) -> Result<T, Diagnosis>
+pub fn with_converted<const N: usize, T, F>(sema: &mut Sema, nodes: [&ExpressionNode; N], f: F) -> Result<T, Diagnosis>
 where
     F: FnOnce(&mut Sema, &mut [ResolvedExpression; N]) -> Result<T, Diagnosis>,
 {

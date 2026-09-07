@@ -9,6 +9,13 @@ mod primary;
 mod sizeof;
 mod unary;
 
-pub use assign::init;
-pub use dispatch::resolve_expression;
-pub use operand::operands;
+pub use arithmetic::*;
+pub use assign::*;
+pub use compare::*;
+pub use conditional::*;
+pub use dispatch::*;
+pub use operand::*;
+pub use pointer::*;
+pub use primary::*;
+pub use sizeof::*;
+pub use unary::*;

@@ -3,9 +3,8 @@ use crate::ast::{ExpressionNode, Type, Value};
 use crate::context::Context;
 use crate::parser::Span;
 use crate::semantic::ExpressionKind::RValue;
+use crate::semantic::resolution::expression::*;
 use crate::semantic::{Diagnosis, QualifiedType, Sema, declaration, layout};
-
-use super::operand::{R, is_bit_field, with_ops};
 
 pub fn size_of_e(sema: &mut Sema, node: &ExpressionNode, e: &ExpressionNode) -> R {
     let ty = with_ops(&mut *sema, [e], |sema, [re]| {

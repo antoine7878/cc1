@@ -4,13 +4,10 @@ use crate::arena::{OptionPoisoned, ResolveWith};
 use crate::ast::{BinaryOp, ExpressionNode, MemberOp, Name, Tag};
 use crate::context::Context;
 use crate::semantic::ExpressionKind::{LValue, RValue};
+use crate::semantic::resolution::expression::*;
 use crate::semantic::{
     AssignmentContext, Diag, DiagCollector, Diagnosis, MemberRef, ParamTypes, QualifiedType, ResolvedType, Sema, cast,
 };
-
-use super::assign::init;
-use super::dispatch::binary_op;
-use super::operand::{R, with_converted, with_ops};
 
 pub fn identifier(sema: &mut Sema, node: &ExpressionNode) -> R {
     let id = sema.expr_bindings.get(node.id).copied().ok_poisoned()?;

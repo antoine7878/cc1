@@ -2,11 +2,8 @@ use crate::arena::{OptionPoisoned, ResolveWith};
 use crate::ast::{ExpressionNode, Storage, Type, UnaryOp};
 use crate::context::Context;
 use crate::semantic::ExpressionKind::{LValue, RValue};
+use crate::semantic::resolution::expression::*;
 use crate::semantic::{Diagnosis, QualifiedType, ResolvedExpression, ResolvedType, Sema, SymbolId, cast, declaration};
-
-use super::operand::{
-    R, check_assignable, int_rvalue, is_bit_field, is_null_pointer_constant, with_converted, with_ops,
-};
 
 pub fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
     with_converted(sema, [e], |sema, [re]| {
@@ -91,13 +88,7 @@ pub fn logic_not(sema: &mut Sema, e: &ExpressionNode) -> R {
     })
 }
 
-pub fn cast(
-    sema: &mut Sema,
-    ctx: &Context,
-    node: &ExpressionNode,
-    ty_node: &Type,
-    operand: &ExpressionNode,
-) -> R {
+pub fn cast(sema: &mut Sema, ctx: &Context, node: &ExpressionNode, ty_node: &Type, operand: &ExpressionNode) -> R {
     let base = declaration::base_type(sema, ctx, &ty_node.specifiers, &node.span);
     let (qualif, _) = declaration::declared_type(sema, ctx, base, &ty_node.declarator).ok_poisoned()?;
     let is_null = is_null_pointer_constant(sema, ctx, operand);

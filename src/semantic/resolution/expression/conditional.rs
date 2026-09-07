@@ -2,18 +2,10 @@ use crate::arena::{OptionPoisoned, ResolveWith};
 use crate::ast::ExpressionNode;
 use crate::context::Context;
 use crate::semantic::ExpressionKind::RValue;
+use crate::semantic::resolution::expression::*;
 use crate::semantic::{Diagnosis, QualifiedType, Sema, cast};
 
-use super::operand::{R, is_null_pointer_constant, with_converted};
-use super::pointer::{PointerMatch, both_pointers, reconcile};
-
-pub fn conditional(
-    sema: &mut Sema,
-    ctx: &Context,
-    e1: &ExpressionNode,
-    e2: &ExpressionNode,
-    e3: &ExpressionNode,
-) -> R {
+pub fn conditional(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode, e3: &ExpressionNode) -> R {
     let null2 = is_null_pointer_constant(sema, ctx, e2);
     let null3 = is_null_pointer_constant(sema, ctx, e3);
     with_converted(sema, [e1, e2, e3], |sema, [condition, lhs, rhs]| {

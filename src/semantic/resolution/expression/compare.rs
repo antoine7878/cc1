@@ -1,10 +1,8 @@
 use crate::arena::ResolveWith;
 use crate::ast::ExpressionNode;
 use crate::context::Context;
+use crate::semantic::resolution::expression::*;
 use crate::semantic::{Diagnosis, ResolvedExpression, ResolvedType, Sema, cast};
-
-use super::operand::{R, int_rvalue, is_null_pointer_constant, with_converted};
-use super::pointer::{both_pointers, reconcile};
 
 pub fn relational(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {

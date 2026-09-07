@@ -2,13 +2,10 @@ use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, ExpressionNode};
 use crate::context::Context;
 use crate::semantic::ExpressionKind::RValue;
+use crate::semantic::resolution::expression::*;
 use crate::semantic::{
     AssignmentContext, Diagnosis, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, Sema, cast, ice,
 };
-
-use super::arithmetic::{multiplicative_types, shift_types};
-use super::compare::bitwise_type;
-use super::operand::{R, check_assignable, is_null_pointer_constant, with_converted, with_ops};
 
 fn with_assign_ops<F>(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode, f: F) -> R
 where

@@ -2,16 +2,8 @@ use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, Expression, ExpressionNode, UnaryOp};
 use crate::context::Context;
 use crate::semantic::ExpressionKind::{LValue, RValue};
+use crate::semantic::resolution::expression::*;
 use crate::semantic::{Diag, DiagCollector, ResolvedExpression, Sema, cast};
-
-use super::arithmetic::{additive, multiplicative, shift};
-use super::assign::{additive_assignment, compound_assignment, simple_assignment};
-use super::compare::{bitwise, equality, logic, relational};
-use super::conditional::conditional;
-use super::operand::{R, with_converted};
-use super::primary::{array_subscript, constant, fn_call, identifier, member};
-use super::sizeof::{size_of_e, size_of_ty};
-use super::unary::{address, bit_not, cast, inc_dec, indirection, logic_not, sign};
 
 pub fn resolve_expression(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) {
     if sema.expr_types.seen(node.id) {
