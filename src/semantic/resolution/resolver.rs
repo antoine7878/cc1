@@ -278,22 +278,12 @@ impl<'a> SymbolResolver<'a> {
         (storage, kind)
     }
 
-    fn declare_symbol(
-        &mut self,
-        name: Name,
-        ty: QualifiedType,
-        storage: Storage,
-        kind: SymbolKind,
-        declared_storage: Option<Storage>,
-        is_init: bool,
-        span: &Span,
-    ) -> SymbolId {
+    fn declare_symbol(&mut self, mut sym: Symbol, declared_storage: Option<Storage>, span: &Span) -> SymbolId {
         let scope_kind = self.sema.scopes.kind();
-        let prior = self.sema.linkage_of_name(name.id);
-        let mut sym = Symbol::new(name, Some(ty), Some(storage), kind, is_init);
-        sym.linkage = Symbol::linkage_of(scope_kind, declared_storage, kind, prior);
-        sym.duration = Symbol::duration_of(scope_kind, declared_storage, kind);
-        sym.definition = Symbol::definition_of(scope_kind, declared_storage, is_init, kind);
+        let prior = self.sema.linkage_of_name(sym.name.id);
+        sym.linkage = Symbol::linkage_of(scope_kind, declared_storage, sym.kind, prior);
+        sym.duration = Symbol::duration_of(scope_kind, declared_storage, sym.kind);
+        sym.definition = Symbol::definition_of(scope_kind, declared_storage, sym.is_init, sym.kind);
         self.sema.declare(sym, span)
     }
 
@@ -311,7 +301,8 @@ impl<'a> SymbolResolver<'a> {
         if kind == SymbolKind::Variable && !already_diagnosed && self.requires_complete_object(ty, storage, is_init) {
             constrain::declaration::check_complete_object(ty.is_complete(self.sema), ty).collect(self, &core.span);
         }
-        let sym_id = self.declare_symbol(name, ty, storage, kind, declared_storage, is_init, &core.span);
+        let sym = Symbol::new(name, Some(ty), Some(storage), kind, is_init);
+        let sym_id = self.declare_symbol(sym, declared_storage, &core.span);
         self.sema.declarations.insert(init_declarator.declarator.id, sym_id);
         Some(())
     }

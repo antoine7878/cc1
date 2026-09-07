@@ -6,16 +6,16 @@ use crate::ast::{
 use crate::semantic::resolution::expression::operands;
 use crate::semantic::{Diag, DiagCollector, Diagnosis, ResolvedStatement, Sema, cast};
 
-type Operands<'s, const N: usize> = Loan<'s, Sema, StatementId, ResolvedStatement, N>;
+type Substatements<'s, const N: usize> = Loan<'s, Sema, StatementId, ResolvedStatement, N>;
 
-fn statement_operands<'s, const N: usize>(
+fn substatements<'s, const N: usize>(
     sema: &'s mut Sema,
     nodes: [&StatementNode; N],
-) -> Result<Operands<'s, N>, Diagnosis> {
+) -> Result<Substatements<'s, N>, Diagnosis> {
     Loan::take(sema, nodes.map(|n| n.id)).ok_poisoned()
 }
 
-pub fn st() {}
+pub fn st(sema: &mut Sema, stmt: StatementNode) {}
 
 pub fn check_selection_statement(sema: &mut Sema, node: &SelectionStatementNode) {
     let res = match &node.stmt {

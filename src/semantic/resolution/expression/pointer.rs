@@ -6,7 +6,7 @@ pub enum PointerMatch {
     Compatible(QualifiedType, QualifiedType),
 }
 
-pub fn reconcile(
+pub fn reconcile_pointers(
     sema: &mut Sema,
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,
@@ -28,9 +28,8 @@ pub fn reconcile(
     let (ResolvedType::Pointer(i1), ResolvedType::Pointer(i2)) = (l, r) else {
         return None;
     };
-    let (i1, i2) = (*i1, *i2);
-    if i1.is_compatible_ignoring_qualifiers(sema, &i2) {
-        return Some(PointerMatch::Compatible(i1, i2));
+    if i1.is_compatible_ignoring_qualifiers(sema, i2) {
+        return Some(PointerMatch::Compatible(*i1, *i2));
     }
     if i1.is_void(sema) && !i2.is_function(sema) {
         cast::convert(sema, rhs, l_ty.id, false);

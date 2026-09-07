@@ -42,7 +42,7 @@ pub fn equality(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &Expres
             return ret;
         }
         let were_pointers = both_pointers(sema, lhs, rhs);
-        match reconcile(sema, lhs, rhs, null1, null2) {
+        match reconcile_pointers(sema, lhs, rhs, null1, null2) {
             Some(_) => ret,
             None if were_pointers => Err(Diagnosis::InvalidComparison(lhs.ty, rhs.ty)),
             None => Err(Diagnosis::InvalidBinaryOperand(lhs.ty, rhs.ty)),

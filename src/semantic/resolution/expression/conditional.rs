@@ -26,7 +26,7 @@ pub fn conditional(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &Exp
             return Ok((QualifiedType::plain(sema.builtins.void), RValue));
         }
         let were_pointers = both_pointers(sema, lhs, rhs);
-        match reconcile(sema, lhs, rhs, null2, null3) {
+        match reconcile_pointers(sema, lhs, rhs, null2, null3) {
             Some(PointerMatch::Converted) => Ok((lhs.casted_ty(), RValue)),
             Some(PointerMatch::Compatible(i1, i2)) => {
                 let inner = i1.unqualified().composite(sema, &i2.unqualified()).ok_poisoned()?;
