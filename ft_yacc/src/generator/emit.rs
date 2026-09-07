@@ -31,7 +31,12 @@ impl Emitter {
         self.array(w, "YY_ACTION_TABLE", "isize", parser.actions())?;
         self.array(w, "YY_DEFAULT_ACT", "isize", parser.default_actions())?;
         self.array(w, "YY_DEFAULT_REDUCE_ACT", "isize", parser.default_reduces())?;
-        self.array(w, "YY_TOKEN_NAMES", "&str", parser.token_names().map(|n| format!("\"{}\"", n)))?;
+        self.array(
+            w,
+            "YY_TOKEN_NAMES",
+            "&str",
+            parser.token_names().map(|n| format!("\"{}\"", n)),
+        )?;
         Ok(())
     }
 

@@ -1,5 +1,5 @@
-use libft::BitSet;
 use crate::regex::Dfa;
+use libft::BitSet;
 
 #[derive(Debug, Default, Clone)]
 pub struct TableDfa {

@@ -82,10 +82,6 @@ impl Args {
 
 impl fmt::Display for Args {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.c {
-            write!(f, "-c")
-        } else {
-            write!(f, "{{}}")
-        }
+        if self.c { write!(f, "-c") } else { write!(f, "{{}}") }
     }
 }

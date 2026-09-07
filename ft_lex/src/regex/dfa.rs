@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
 
-use libft::BitSet;
 use crate::regex::{Automaton, ConditionId, Nfa, State, StateId, Transition};
+use libft::BitSet;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Dfa {

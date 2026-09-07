@@ -351,7 +351,12 @@ mod test {
 
     #[test]
     fn comments_rs() {
-        test_yacc("./test/tester/op_r.l", "./test/tester/comments_r.y", "x", b"comments ok\n");
+        test_yacc(
+            "./test/tester/op_r.l",
+            "./test/tester/comments_r.y",
+            "x",
+            b"comments ok\n",
+        );
     }
 
     #[test]
@@ -450,7 +455,12 @@ mod test {
 
     #[test]
     fn else_rs() {
-        test_yacc("./test/tester/op_r.l", "./test/tester/else_r.y", "iisls", b"ifelse\nif\n");
+        test_yacc(
+            "./test/tester/op_r.l",
+            "./test/tester/else_r.y",
+            "iisls",
+            b"ifelse\nif\n",
+        );
     }
 
     #[test]
