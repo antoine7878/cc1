@@ -24,6 +24,12 @@ pub struct Context {
 }
 impl Default for Context {
     fn default() -> Self {
+        Self::with_target(Target::default())
+    }
+}
+
+impl Context {
+    pub fn with_target(target: Target) -> Self {
         let mut arenas = AstArenas::default();
         let value_node = ValueNode {
             span: Span::default(),
@@ -33,20 +39,23 @@ impl Default for Context {
         Self {
             one,
             file_name: String::default(),
-            target: Target::default(),
+            sema: Sema::new(target.clone()),
+            target,
             diagnosis: Vec::default(),
             parse: ParseState::default(),
             arenas,
             ast: TranslationUnitNode::default(),
-            sema: Sema::default(),
             source_cache: RefCell::default(),
         }
     }
-}
 
-impl Context {
     pub fn one(&self) -> ExpressionNode {
         self.one.clone()
+    }
+
+    pub fn set_target(&mut self, target: Target) {
+        self.sema = Sema::new(target.clone());
+        self.target = target;
     }
 
     pub fn set_file_name(&mut self, file_name: String) {
@@ -54,8 +63,8 @@ impl Context {
         self.file_name = file_name;
     }
 
-    pub fn file_of(&self, span: Span) -> &String {
-        StringId::from(span.start.file).resolve(self)
+    pub fn file_of(&self, span: Span) -> Option<&String> {
+        self.arenas.names.try_get(StringId::from(span.start.file))
     }
 
     pub fn source_line(&self, path: &str, line_no: usize) -> Option<String> {

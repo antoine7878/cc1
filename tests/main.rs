@@ -2,6 +2,7 @@
 mod common;
 
 mod test_arena;
+mod test_args;
 mod test_cast;
 mod test_constrain;
 mod test_diagnostic;

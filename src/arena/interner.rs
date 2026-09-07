@@ -34,6 +34,10 @@ impl<Id: ArenaKey, Val: Clone + Hash + Eq> Interner<Id, Val> {
         self.arena.get(id)
     }
 
+    pub fn try_get(&self, id: Id) -> Option<&Val> {
+        self.arena.try_get(id)
+    }
+
     pub fn len(&self) -> usize {
         self.arena.len()
     }

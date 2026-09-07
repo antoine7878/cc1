@@ -29,6 +29,10 @@ impl<Id: ArenaKey, Val> Arena<Id, Val> {
         &self.data[id.into()]
     }
 
+    pub fn try_get(&self, id: Id) -> Option<&Val> {
+        self.data.get(id.into())
+    }
+
     pub fn get_mut(&mut self, id: Id) -> &mut Val {
         &mut self.data[id.into()]
     }

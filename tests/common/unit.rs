@@ -10,6 +10,7 @@ use cc1::semantic::{
     AddressBase, Analyzer, Diagnosis, DiagnosisNode, ExpressionKind, Initializer, ParamTypes, QualifiedType,
     ResolvedStatement, ResolvedType, SymbolKind,
 };
+use cc1::target::{I386, Target};
 
 use crate::common::ty::Ty;
 
@@ -68,10 +69,14 @@ pub struct Unit {
     pub status: i32,
 }
 
-fn new_ctx() -> Context {
-    let mut ctx = Context::default();
+fn ctx_for(target: Target) -> Context {
+    let mut ctx = Context::with_target(target);
     ctx.set_file_name("<test>".to_string());
     ctx
+}
+
+fn new_ctx() -> Context {
+    ctx_for(I386)
 }
 
 impl Unit {
@@ -82,8 +87,12 @@ impl Unit {
     }
 
     pub fn compile(src: &str) -> Self {
+        Self::compile_for(I386, src)
+    }
+
+    pub fn compile_for(target: Target, src: &str) -> Self {
         let src = preprocess(src);
-        let (ctx, status) = parse_reader(new_ctx(), Cursor::new(src));
+        let (ctx, status) = parse_reader(ctx_for(target), Cursor::new(src));
         let ctx = Analyzer::analyze(ctx);
         Self { ctx, status }
     }

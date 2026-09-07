@@ -66,7 +66,7 @@ pub const X86_64: Target = Target {
 
 impl Default for Target {
     fn default() -> Self {
-        I386
+        X86_64
     }
 }
 

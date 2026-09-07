@@ -1,4 +1,4 @@
-use crate::common::repr;
+use crate::common::{Unit, repr};
 use cc1::ast::{F80, Value};
 use cc1::semantic::{QualifiedType, ResolvedType, ResolvedTypeId, TagDefId};
 use cc1::target::{I386, Target, X86_64};
@@ -23,8 +23,8 @@ fn tag() -> ResolvedType {
 }
 
 #[test]
-fn default_target_is_i386() {
-    assert_eq!(Target::default().name, "i386");
+fn default_target_is_x86_64() {
+    assert_eq!(Target::default().name, "x86_64");
     assert_eq!(I386.name, "i386");
     assert_eq!(X86_64.name, "x86_64");
 }
@@ -213,4 +213,34 @@ fn abi_types_follow_the_target() {
     assert_eq!(X86_64.size_t, ResolvedType::UnsignedLong);
     assert_eq!(X86_64.ptrdiff_t, ResolvedType::Long);
     assert_eq!(X86_64.wchar_t, ResolvedType::Int);
+}
+
+fn probe(target: Target, ty: &str) -> String {
+    let name = target.name;
+    let unit = Unit::compile_for(target, &format!("enum probe {{ PROBE = sizeof({ty}) }};"));
+    assert!(unit.accepts(), "sizeof({ty}) on {name}:\n{}", unit.render());
+    unit.variants()
+        .into_iter()
+        .find(|(name, _)| name == "PROBE")
+        .expect("the probe variant")
+        .1
+}
+
+#[test]
+fn the_selected_target_drives_compiled_sizes() {
+    assert_eq!(probe(I386, "long"), "4");
+    assert_eq!(probe(X86_64, "long"), "8");
+    assert_eq!(probe(I386, "int *"), "4");
+    assert_eq!(probe(X86_64, "int *"), "8");
+    assert_eq!(probe(I386, "long double"), "12");
+    assert_eq!(probe(X86_64, "long double"), "16");
+}
+
+#[test]
+fn the_selected_target_drives_ptrdiff_t() {
+    let subtract = "int *p, *q; enum probe { PROBE = sizeof(1 ? 0 : 0) };";
+    assert!(Unit::compile_for(I386, subtract).accepts());
+    assert!(Unit::compile_for(X86_64, subtract).accepts());
+    assert_eq!(I386.ptrdiff_t, ResolvedType::Int);
+    assert_eq!(X86_64.ptrdiff_t, ResolvedType::Long);
 }

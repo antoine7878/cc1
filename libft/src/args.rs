@@ -27,9 +27,11 @@ impl fmt::Display for ArgError {
 }
 
 pub trait ArgParser: Sized {
+    type Argv: Iterator<Item = String>;
+
     fn positional(&mut self, arg: String);
     fn flag(&mut self, c: char, it: &mut Chars) -> Result<(), ArgError>;
-    fn argv(&mut self) -> &mut std::env::Args;
+    fn argv(&mut self) -> &mut Self::Argv;
 
     fn walk(&mut self) -> Result<(), ArgError> {
         let mut only_unamed = false;

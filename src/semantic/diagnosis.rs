@@ -17,6 +17,7 @@ pub enum Diagnosis {
     DuplicateLabel(Name),
     UndefinedLabel(Name),
 
+    BadArguments(String),
     Poisoned,
     InvalidOperand,
     SyntaxError {
@@ -56,7 +57,6 @@ pub enum Diagnosis {
     CallingIncompleteReturn(QualifiedType),
     TooManyArguments(usize, usize),
     TooFewArguments(usize, usize),
-    BadArgumentsCount,
     ArgumentDiscardedQualifiers(usize, QualifiedType, QualifiedType),
     ArgumentIncompatibleTypes(usize, QualifiedType, QualifiedType),
 
@@ -278,7 +278,7 @@ impl DiagnosisNode {
             Diagnosis::CallingIncompleteReturn(ty) => format!("calling a function with incomplete return type '{}'", ty.describe(sema, ctx)),
             Diagnosis::TooManyArguments(expected, have) => format!("too many arguments to function call, expected {expected}, have {have}"),
             Diagnosis::TooFewArguments(expected, have) => format!("too few arguments to function call, expected {expected}, have {have}"),
-            Diagnosis::BadArgumentsCount => "wrong argument count".to_string(),
+            Diagnosis::BadArguments(error) => error.clone(),
             Diagnosis::ArgumentDiscardedQualifiers(n, to, from) => format!("passing '{}' to parameter {n} of type '{}' discards qualifiers", from.describe(sema, ctx), to.describe(sema, ctx)),
             Diagnosis::ArgumentIncompatibleTypes(n, to, from) => format!("passing '{}' to parameter {n} of incompatible type '{}'", from.describe(sema, ctx), to.describe(sema, ctx)),
 
@@ -506,8 +506,11 @@ pub fn report<W: Write, D: Display>(
     let padding = line_no.to_string().len();
     let mid_pad = 9usize.saturating_sub(padding);
 
-    let path = ctx.file_of(span);
     let color = severity.color();
+
+    let Some(path) = ctx.file_of(span) else {
+        return writeln!(w, "cc1: {color}{severity}:{RESET} {msg}");
+    };
 
     writeln!(
         w,

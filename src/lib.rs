@@ -1,4 +1,5 @@
 pub mod arena;
+pub mod args;
 pub mod ast;
 pub mod context;
 pub mod parser;

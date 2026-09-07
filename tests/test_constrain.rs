@@ -435,7 +435,7 @@ fn a_tentative_definition_is_not_typedef_auto_or_register() {
 }
 
 fn int_type() -> QualifiedType {
-    let sema = Sema::default();
+    let sema = Sema::new(I386);
     QualifiedType::new(sema.builtins.int, false, false)
 }
 

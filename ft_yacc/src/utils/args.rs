@@ -42,11 +42,13 @@ impl Default for Args {
 }
 
 impl ArgParser for Args {
+    type Argv = std::env::Args;
+
     fn positional(&mut self, arg: String) {
         self.mandatory.push(arg);
     }
 
-    fn argv(&mut self) -> &mut std::env::Args {
+    fn argv(&mut self) -> &mut Self::Argv {
         &mut self.argv
     }
 

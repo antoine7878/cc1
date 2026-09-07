@@ -45,8 +45,13 @@ pub struct Sema {
 
 impl Default for Sema {
     fn default() -> Self {
+        Self::new(Target::default())
+    }
+}
+
+impl Sema {
+    pub fn new(target: Target) -> Self {
         let mut types = ResolvedTypeArena::default();
-        let target = Target::default();
         let builtins = Builtins::new(&mut types, &target);
         Self {
             diagnosis: Vec::new(),
@@ -91,13 +96,6 @@ impl DiagCollector for Sema {
 }
 
 impl Sema {
-    pub fn new(target: Target) -> Self {
-        Self {
-            target,
-            ..Self::default()
-        }
-    }
-
     // ----- Expression table ---------
 
     pub fn size_tables(&mut self, arenas: &AstArenas) {

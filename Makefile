@@ -30,7 +30,7 @@ $(PARSER): $(YACC_FILE) | $(FT_YACC)
 
 test: $(NAME)
 	clang -E -std=c89 rscs/hello.c > rscs/hello.i
-	./$(NAME) rscs/hello.i
+	./$(NAME) -m32 rscs/hello.i
 
 ctest: $(NAME)
 	cargo nextest run -p cc1
@@ -41,7 +41,7 @@ ttest:
 
 
 CFF = -m32 -std=iso9899:1990 -pedantic-errors -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin
-CFF = -m32 -std=iso9899:1990
+# CFF = -m32 -std=iso9899:1990
 
 c:
 	gcc -c $(CFF) rscs/hello.c -o /dev/null
