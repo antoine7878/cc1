@@ -1,5 +1,5 @@
 struct S {
-	int a;
+	long a : 1;
 };
 
 void fn(void) {

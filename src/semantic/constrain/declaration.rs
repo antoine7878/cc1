@@ -1,6 +1,7 @@
-use crate::ast::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier, Value};
+use crate::ast::{DeclarationSpecifier, Name, Qualifier, Storage, TypeSpecifier, Value};
 use crate::semantic::diagnosis::{Diag, Diagnosis};
 use crate::semantic::{QualifiedType, ResolvedType, ScopeKind};
+use crate::target::Target;
 
 pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>> {
     let mut storages = specifiers.iter().filter_map(|s| match s {
@@ -67,16 +68,32 @@ pub fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
     }
 }
 
-pub fn check_bit_width(ty: &ResolvedType, value: Option<Value>) -> Diag<Option<i32>> {
+pub fn check_bit_width(
+    target: &Target,
+    ty: &ResolvedType,
+    value: Option<Value>,
+    name: Option<Name>,
+) -> Diag<Option<i32>> {
     if !matches!(ty, ResolvedType::Int | ResolvedType::UnsignedInt) {
         return Diag::err(None, Diagnosis::NonIntBitFieldType);
     };
     let Some(value) = value else { return Diag::ok(None) };
-    let Some(int_value) = value.get_integer_value() else {
+    let Some(width) = value.get_integer_value() else {
         return Diag::err(None, Diagnosis::NonIntegerConstantExpression);
     };
-
-    Diag::ok(Some(int_value as i32))
+    if value.is_negative() {
+        return Diag::err(None, Diagnosis::NegativeBitFieldWidth(name, value.to_i64()));
+    }
+    let Some(bits) = target.bits(ty) else {
+        return Diag::err(None, Diagnosis::NonIntBitFieldType);
+    };
+    if width > u64::from(bits) {
+        return Diag::err(None, Diagnosis::BitFieldWidthTooLarge(name, width, bits));
+    }
+    match (width, name) {
+        (0, Some(name)) => Diag::err(None, Diagnosis::ZeroWidthNamedBitField(name)),
+        _ => Diag::ok(Some(width as i32)),
+    }
 }
 
 pub fn check_qualifier<I>(qualifiers: I) -> Diag<(bool, bool)>

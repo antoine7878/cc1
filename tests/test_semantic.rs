@@ -31,6 +31,35 @@ accept!(
 
 reject!(tag_duplicate_member, "struct S { int a; int a; };");
 
+accept!(bit_field_width_below_the_type_width, "struct S { int a : 3; };");
+accept!(bit_field_width_at_the_type_width, "struct S { int a : 32; };");
+accept!(
+    unsigned_bit_field_width_at_the_type_width,
+    "struct S { unsigned a : 32; };"
+);
+accept!(
+    bit_field_width_from_a_constant_expression,
+    "struct S { int a : 2 + 1; };"
+);
+accept!(anonymous_bit_field_of_zero_width, "struct S { int a : 1; int : 0; };");
+
+reject!(bit_field_width_exceeding_the_type_width, "struct S { int a : 33; };");
+reject!(
+    unsigned_bit_field_width_exceeding_the_type_width,
+    "struct S { unsigned a : 33; };"
+);
+reject!(
+    anonymous_bit_field_width_exceeding_the_type_width,
+    "struct S { int a; int : 33; };"
+);
+reject!(negative_bit_field_width, "struct S { int a : -1; };");
+reject!(negative_anonymous_bit_field_width, "struct S { int a; int : -1; };");
+reject!(zero_width_named_bit_field, "struct S { int a : 0; };");
+reject!(
+    bit_field_width_in_a_union_exceeding_the_type_width,
+    "union U { int a : 33; };"
+);
+
 // ---- 6.5.6 a typedef name is a synonym, not a type of its own -------------
 
 accept!(typedef_repeated_use, "typedef int T; T u; T v;");

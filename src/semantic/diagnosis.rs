@@ -124,6 +124,9 @@ pub enum Diagnosis {
     TagWithoutMember(SymbolKind),
     InvalidMemberType(QualifiedType),
     NonIntBitFieldType,
+    NegativeBitFieldWidth(Option<Name>, i64),
+    BitFieldWidthTooLarge(Option<Name>, u64, u32),
+    ZeroWidthNamedBitField(Name),
 
     // 6.5.2.2
     VariantBadValue,
@@ -331,6 +334,11 @@ impl DiagnosisNode {
             Diagnosis::TagWithoutMember(kind) => format!("{kind} has no named member"),
             Diagnosis::InvalidMemberType(ty) => format!("field has incomplete or function type '{}'", ty.describe(sema, ctx)),
             Diagnosis::NonIntBitFieldType => "Bit-field has non-integral type".to_string(),
+            Diagnosis::NegativeBitFieldWidth(Some(name), width) => format!("bit-field '{}' has negative width ({width})", name.id.resolve(ctx)),
+            Diagnosis::NegativeBitFieldWidth(None, width) => format!("anonymous bit-field has negative width ({width})"),
+            Diagnosis::BitFieldWidthTooLarge(Some(name), width, bits) => format!("width of bit-field '{}' ({width} bits) exceeds the width of its type ({bits} bits)", name.id.resolve(ctx)),
+            Diagnosis::BitFieldWidthTooLarge(None, width, bits) => format!("width of anonymous bit-field ({width} bits) exceeds the width of its type ({bits} bits)"),
+            Diagnosis::ZeroWidthNamedBitField(name) => format!("named bit-field '{}' has zero width", name.id.resolve(ctx)),
 
             // 6.5.2.2
             Diagnosis::VariantBadValue => "Variant value should be in int range".to_string(),

@@ -33,9 +33,11 @@ pub fn struct_or_union_tag(
             let diag_count_before = sema.diagnosis.len();
             let Some((ty, node)) = declared_type(sema, ctx, qual, decl) else { continue };
             let already_diagnosed = sema.diagnosis.len() != diag_count_before;
+            let name = node.ident(ctx);
             let bit_width = declarator.bit_width.as_ref().and_then(|e| {
                 let value = ice::eval_constant(sema, ctx, e);
-                constrain::declaration::check_bit_width(ty.id.resolve(sema), value).collect(sema, span)
+                let checked = constrain::declaration::check_bit_width(&sema.target, ty.id.resolve(sema), value, name);
+                checked.collect(sema, &e.span)
             });
             let is_member_object = ty.is_object(sema);
             if !already_diagnosed {
@@ -45,7 +47,7 @@ pub fn struct_or_union_tag(
                 has_rejected_member = true;
                 continue;
             }
-            match (node.ident(ctx), bit_width) {
+            match (name, bit_width) {
                 (Some(name), _) => {
                     if members
                         .iter()

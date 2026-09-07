@@ -39,7 +39,37 @@ reports!(
 reports!(
     report_non_integral_bit_field,
     "struct S { double a : 3; };",
-    ["<test>:1:1: error: Bit-field has non-integral type"]
+    ["<test>:1:23: error: Bit-field has non-integral type"]
+);
+
+reports!(
+    report_bit_field_width_exceeding_its_type,
+    "struct S { int a : 33; };",
+    ["<test>:1:20: error: width of bit-field 'a' (33 bits) exceeds the width of its type (32 bits)"]
+);
+
+reports!(
+    report_anonymous_bit_field_width_exceeding_its_type,
+    "struct S { int a; int : 33; };",
+    ["<test>:1:25: error: width of anonymous bit-field (33 bits) exceeds the width of its type (32 bits)"]
+);
+
+reports!(
+    report_negative_bit_field_width,
+    "struct S { int a : -1; };",
+    ["<test>:1:20: error: bit-field 'a' has negative width (-1)"]
+);
+
+reports!(
+    report_negative_anonymous_bit_field_width,
+    "struct S { int a; int : -1; };",
+    ["<test>:1:25: error: anonymous bit-field has negative width (-1)"]
+);
+
+reports!(
+    report_zero_width_named_bit_field,
+    "struct S { int a : 0; };",
+    ["<test>:1:20: error: named bit-field 'a' has zero width"]
 );
 
 reports!(
