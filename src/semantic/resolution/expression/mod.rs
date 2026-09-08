@@ -1,5 +1,6 @@
 mod arithmetic;
 mod assign;
+mod binding;
 mod compare;
 mod conditional;
 mod dispatch;
@@ -11,6 +12,7 @@ mod unary;
 
 pub use arithmetic::*;
 pub use assign::*;
+pub use binding::*;
 pub use compare::*;
 pub use conditional::*;
 pub use dispatch::*;

@@ -1,4 +1,5 @@
 use crate::ast::statement::StatementId;
+use crate::ast::visit::{Visitor, walk_jump_statement, walk_labeled_statement};
 use crate::ast::{
     ExpressionNode, ExpressionStatementNode, Fold, IterationStatement, IterationStatementNode, JumpStatement,
     JumpStatementNode, Labeled, LabeledStatementNode, SelectionStatement, SelectionStatementNode, StatementNode,
@@ -13,12 +14,17 @@ use crate::semantic::{
 
 pub type R = Result<(), Diagnosis>;
 
-pub fn check_labeled_statement(
+pub fn resolve_labeled_statement(
     resolver: &mut SymbolResolver,
     ctx: &Context,
     id: StatementId,
     node: &LabeledStatementNode,
 ) {
+    check_labeled_statement(resolver, ctx, id, node);
+    walk_labeled_statement(resolver, ctx, node);
+}
+
+fn check_labeled_statement(resolver: &mut SymbolResolver, ctx: &Context, id: StatementId, node: &LabeledStatementNode) {
     let res = match &node.inner {
         Labeled::Identifier(name, _) => {
             resolver.define_label(*name, &node.span);
@@ -83,7 +89,38 @@ pub fn leave_compound_statement(resolver: &mut SymbolResolver) {
     resolver.leave_scope();
 }
 
-pub fn check_selection_statement(sema: &mut Sema, node: &SelectionStatementNode) -> QualifiedType {
+fn leave_stmt_scope(resolver: &mut SymbolResolver) {
+    let scope = resolver.stmt_scopes.pop().expect("a statement scope to leave");
+    let (id, rs): (StatementId, ResolvedStatement) = scope.into();
+    resolver.sema.stmts.set(id, Some(rs));
+}
+
+pub fn resolve_selection_statement(
+    resolver: &mut SymbolResolver,
+    ctx: &Context,
+    id: StatementId,
+    node: &SelectionStatementNode,
+) {
+    match &node.stmt {
+        SelectionStatement::If(condition, then, otherwise) => {
+            resolver.visit_expression(ctx, condition);
+            check_selection_statement(resolver.sema, node);
+            resolver.visit_statement(ctx, then);
+            if let Some(otherwise) = otherwise {
+                resolver.visit_statement(ctx, otherwise);
+            }
+        }
+        SelectionStatement::Switch(condition, body) => {
+            resolver.visit_expression(ctx, condition);
+            let control = check_selection_statement(resolver.sema, node);
+            resolver.stmt_scopes.push_switch(id, control, vec![], None);
+            resolver.visit_statement(ctx, body);
+            leave_stmt_scope(resolver);
+        }
+    }
+}
+
+fn check_selection_statement(sema: &mut Sema, node: &SelectionStatementNode) -> QualifiedType {
     let res = match &node.stmt {
         SelectionStatement::If(e1, _, _) => check_scalar(sema, e1),
         SelectionStatement::Switch(e, _) => check_integral(sema, e),
@@ -104,7 +141,40 @@ fn expr_to_void(sema: &mut Sema, e: &ExpressionNode) -> Option<()> {
     Some(())
 }
 
-pub fn check_iteration_statement(sema: &mut Sema, node: &IterationStatementNode) {
+pub fn resolve_iteration_statement(
+    resolver: &mut SymbolResolver,
+    ctx: &Context,
+    id: StatementId,
+    node: &IterationStatementNode,
+) {
+    let body = loop_controls(resolver, ctx, node);
+    check_iteration_statement(resolver.sema, node);
+    resolver.stmt_scopes.push_loop(id);
+    resolver.visit_statement(ctx, body);
+    leave_stmt_scope(resolver);
+}
+
+fn loop_controls<'n>(
+    resolver: &mut SymbolResolver,
+    ctx: &Context,
+    node: &'n IterationStatementNode,
+) -> &'n StatementNode {
+    match &node.stmt {
+        IterationStatement::While(e, body) | IterationStatement::Do(body, e) => {
+            resolver.visit_expression(ctx, e);
+            body
+        }
+        IterationStatement::For(b) => {
+            let (init, condition, step, body) = &**b;
+            for e in [&init.expr, &condition.expr, step].into_iter().flatten() {
+                resolver.visit_expression(ctx, e);
+            }
+            body
+        }
+    }
+}
+
+fn check_iteration_statement(sema: &mut Sema, node: &IterationStatementNode) {
     let res = match &node.stmt {
         IterationStatement::While(e, _) => check_scalar(sema, e),
         IterationStatement::Do(_, e) => check_scalar(sema, e),
@@ -155,7 +225,13 @@ fn check_for(
     }
 }
 
-pub fn check_jump_statement(
+pub fn resolve_jump_statement(resolver: &mut SymbolResolver, ctx: &Context, id: StatementId, node: &JumpStatementNode) {
+    let return_ty = resolver.return_ty();
+    walk_jump_statement(resolver, ctx, node);
+    check_jump_statement(resolver, ctx, id, node, return_ty);
+}
+
+fn check_jump_statement(
     resolver: &mut SymbolResolver,
     ctx: &Context,
     id: StatementId,
