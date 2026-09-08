@@ -429,24 +429,21 @@ fn a_function_definition_records_its_parameters_in_order() {
             (
                 def.sym.resolve(&unit.ctx).name.id.resolve(&unit.ctx).clone(),
                 parameters,
-                def.is_complete,
             )
         })
         .collect();
-    assert_eq!(names, [("f".to_string(), vec!["a".to_string(), "b".to_string()], true)]);
+    assert_eq!(names, [("f".to_string(), vec!["a".to_string(), "b".to_string()])]);
 }
 
 #[test]
-fn a_function_definition_takes_its_type_from_its_symbol() {
-    let unit = accepted("int f(int a, char b) { return a; }");
-    let id = FunctionDefId::from(0);
-    let ty = unit
-        .ctx
-        .sema
-        .functions
-        .ty(id, &unit.ctx.sema.symbols)
-        .expect("function type");
-    assert_eq!(unit.ty_tree(ty), Ty::func(Ty::Int, [Ty::Int, Ty::Char]));
+fn a_function_definition_records_its_return_type() {
+    let unit = accepted("char *f(int a, char b) { return 0; }");
+    let def = unit.ctx.sema.functions.get(FunctionDefId::from(0));
+    assert_eq!(unit.ty_tree(def.return_ty), Ty::ptr(Ty::Char));
+    assert_eq!(
+        unit.ty_tree(def.sym.resolve(&unit.ctx).ty.expect("function type")),
+        Ty::func(Ty::ptr(Ty::Char), [Ty::Int, Ty::Char])
+    );
 }
 
 #[test]

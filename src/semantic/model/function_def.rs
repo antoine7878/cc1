@@ -4,36 +4,30 @@ use crate::ast::{Name, Storage};
 use crate::define_arena;
 use crate::parser::Span;
 use crate::semantic::model::cast::default_argument_promotions;
-use crate::semantic::{ExpressionKind, QualifiedType, ResolvedExpression, Sema, SymbolArena, SymbolId};
+use crate::semantic::{ExpressionKind, QualifiedType, ResolvedExpression, Sema, SymbolId};
 
 define_arena!(FunctionDef, FunctionDefArena, FunctionDefId, Sema, sema, functions);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FunctionDef {
     pub sym: SymbolId,
+    pub return_ty: QualifiedType,
     pub parameters: Vec<SymbolId>,
-    pub is_complete: bool,
     pub labels: Vec<Name>,
 }
 
 impl FunctionDefArena {
-    pub fn declare(&mut self, sym: SymbolId) -> FunctionDefId {
+    pub fn declare(&mut self, sym: SymbolId, return_ty: QualifiedType) -> FunctionDefId {
         self.alloc(FunctionDef {
             sym,
+            return_ty,
             parameters: Vec::new(),
-            is_complete: false,
             labels: Vec::new(),
         })
     }
 
-    pub fn ty(&self, id: FunctionDefId, symbols: &SymbolArena) -> Option<QualifiedType> {
-        symbols.get(self.get(id).sym).ty
-    }
-
     pub fn complete(&mut self, id: FunctionDefId, parameters: Vec<SymbolId>) {
-        let def = self.get_mut(id);
-        def.parameters = parameters;
-        def.is_complete = true;
+        self.get_mut(id).parameters = parameters;
     }
 }
 

@@ -13,7 +13,6 @@ pub struct FunctionHeader {
     pub id: FunctionDefId,
     pub params: DeclaredParams,
     pub declared: Option<ParamTypes>,
-    pub return_ty: QualifiedType,
 }
 
 pub fn bind_function_parameters(
@@ -79,10 +78,9 @@ pub fn define_function(
     let sym = resolver.declare(sym, decl_span);
     let declared = (previous == Some(sym)).then_some(declared).flatten();
     Some(FunctionHeader {
-        id: resolver.sema.functions.declare(sym),
+        id: resolver.sema.functions.declare(sym, return_ty),
         params,
         declared,
-        return_ty,
     })
 }
 

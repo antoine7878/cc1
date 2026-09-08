@@ -21,14 +21,8 @@ pub struct SymbolResolver<'a> {
     pub sema: &'a mut Sema,
     sym_scopes: SymbolScopes,
     pub stmt_scopes: StatementScopes,
-    f: Option<CurrentFunction>,
+    f: Option<FunctionDefId>,
     gotos: Vec<Name>,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct CurrentFunction {
-    def: FunctionDefId,
-    return_ty: QualifiedType,
 }
 
 impl DiagCollector for SymbolResolver<'_> {
@@ -165,22 +159,22 @@ impl SymbolResolver<'_> {
         if self.labels(f).any(|label| label == name.id) {
             return self.add_diag(Diag::err((), Diagnosis::DuplicateLabel(name)), span);
         }
-        self.sema.functions.get_mut(f.def).labels.push(name);
+        self.sema.functions.get_mut(f).labels.push(name);
     }
 
     pub fn return_ty(&self) -> Option<QualifiedType> {
-        self.f.map(|f| f.return_ty)
+        self.f.map(|f| self.sema.functions.get(f).return_ty)
     }
 
     pub fn reference_label(&mut self, name: Name) {
         self.gotos.push(name);
     }
 
-    fn labels(&self, f: CurrentFunction) -> impl Iterator<Item = StringId> {
-        self.sema.functions.get(f.def).labels.iter().map(|label| label.id)
+    fn labels(&self, f: FunctionDefId) -> impl Iterator<Item = StringId> {
+        self.sema.functions.get(f).labels.iter().map(|label| label.id)
     }
 
-    fn resolve_gotos(&mut self, f: CurrentFunction) {
+    fn resolve_gotos(&mut self, f: FunctionDefId) {
         let defined: Vec<StringId> = self.labels(f).collect();
         for goto in take(&mut self.gotos) {
             if !defined.contains(&goto.id) {
@@ -205,10 +199,7 @@ impl SymbolResolver<'_> {
 impl Visitor for SymbolResolver<'_> {
     fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
         let Some(header) = declaration::define_function(self, ctx, node) else { return };
-        let f = CurrentFunction {
-            def: header.id,
-            return_ty: header.return_ty,
-        };
+        let f = header.id;
         self.f = Some(f);
         declaration::bind_function_parameters(self, ctx, node, &header);
         self.visit_compound_statement(ctx, &node.body);
