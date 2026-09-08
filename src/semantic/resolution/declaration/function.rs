@@ -5,7 +5,7 @@ use crate::parser::Span;
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     DeclaredParams, Definition, Diag, DiagCollector, Diagnosis, FunctionDefId, ParamInfo, ParamTypes, QualifiedType,
-    ResolvedType, ScopeKind, Sema, Symbol, SymbolId, SymbolKind, SymbolResolver, constrain,
+    ResolvedType, Sema, Symbol, SymbolId, SymbolKind, SymbolResolver, constrain,
 };
 
 #[derive(Debug, Clone)]
@@ -21,7 +21,7 @@ pub fn bind_function_parameters(
     node: &FunctionDefinitionNode,
     header: &FunctionHeader,
 ) {
-    resolver.enter_scope(ScopeKind::Prototype);
+    resolver.enter_prototype();
     let lst = &node.old_style_declarations;
     let span = &node.declarator.span;
     let parameters = match &header.params {

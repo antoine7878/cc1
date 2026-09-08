@@ -1,6 +1,7 @@
 use std::mem::take;
 
 use crate::arena::ResolveWith;
+use crate::ast::statement::StatementId;
 use crate::ast::visit::{
     Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_statement, walk_translation_unit,
 };
@@ -20,7 +21,7 @@ use crate::semantic::{
 pub struct SymbolResolver<'a> {
     pub sema: &'a mut Sema,
     sym_scopes: SymbolScopes,
-    pub stmt_scopes: StatementScopes,
+    stmt_scopes: StatementScopes,
     f: Option<FunctionDefId>,
     gotos: Vec<Name>,
 }
@@ -44,30 +45,38 @@ impl<'a> SymbolResolver<'a> {
 
     pub fn resolve_unit(sema: &mut Sema, ctx: &Context) {
         let mut resolver = SymbolResolver::new(sema);
-        resolver.sym_scopes.push(ScopeKind::File);
+        resolver.enter_file();
         walk_translation_unit(&mut resolver, ctx, &ctx.ast);
-        resolver.sym_scopes.pop();
+        resolver.leave_scope();
         debug_assert!(resolver.sym_scopes.is_empty());
+        debug_assert!(resolver.stmt_scopes.is_empty());
     }
 }
 
-// ----- Scopes ----------------------------
+// ----- Symbol scopes ---------------------
 
 impl SymbolResolver<'_> {
     pub fn scope_kind(&self) -> ScopeKind {
         self.sym_scopes.kind()
     }
 
-    pub fn enter_scope(&mut self, kind: ScopeKind) {
-        self.sym_scopes.push(kind);
+    pub fn enter_file(&mut self) {
+        self.sym_scopes.push(ScopeKind::File);
+    }
+
+    pub fn enter_prototype(&mut self) {
+        self.sym_scopes.push(ScopeKind::Prototype);
+    }
+
+    pub fn enter_block(&mut self) {
+        match self.sym_scopes.kind() {
+            ScopeKind::Prototype => self.sym_scopes.set_kind(ScopeKind::Function),
+            _ => self.sym_scopes.push(ScopeKind::Block),
+        }
     }
 
     pub fn leave_scope(&mut self) {
         self.sym_scopes.pop();
-    }
-
-    pub fn promote_scope(&mut self, kind: ScopeKind) {
-        self.sym_scopes.set_kind(kind);
     }
 
     pub fn lookup_ordinary(&self, name: StringId) -> Option<SymbolId> {
@@ -76,6 +85,43 @@ impl SymbolResolver<'_> {
 
     pub fn current(&self, name: StringId) -> Option<SymbolId> {
         self.sym_scopes.current(name)
+    }
+}
+
+// ----- Statement scopes ------------------
+
+impl SymbolResolver<'_> {
+    pub fn enter_loop(&mut self, stmt: StatementId) {
+        self.stmt_scopes.push_loop(stmt);
+    }
+
+    pub fn enter_switch(&mut self, stmt: StatementId, control: QualifiedType) {
+        self.stmt_scopes.push_switch(stmt, control);
+    }
+
+    pub fn leave_stmt(&mut self) {
+        let (id, resolved) = self.stmt_scopes.pop().expect("a statement scope to leave");
+        self.sema.stmts.set(id, Some(resolved));
+    }
+
+    pub fn breakable(&self) -> Option<StatementId> {
+        self.stmt_scopes.breakable()
+    }
+
+    pub fn nearest_loop(&self) -> Option<StatementId> {
+        self.stmt_scopes.nearest_loop()
+    }
+
+    pub fn switch_control(&self) -> Option<QualifiedType> {
+        self.stmt_scopes.switch_control()
+    }
+
+    pub fn record_case(&mut self, value: Value, id: StatementId) -> Result<StatementId, Diagnosis> {
+        self.stmt_scopes.record_case(value, id)
+    }
+
+    pub fn record_default(&mut self, id: StatementId) -> Result<StatementId, Diagnosis> {
+        self.stmt_scopes.record_default(id)
     }
 }
 
@@ -230,9 +276,9 @@ impl Visitor for SymbolResolver<'_> {
     }
 
     fn visit_compound_statement(&mut self, ctx: &Context, node: &CompoundStatementNode) {
-        statement::enter_compound_statement(self);
+        self.enter_block();
         walk_compound_statement(self, ctx, node);
-        statement::leave_compound_statement(self);
+        self.leave_scope();
     }
 
     fn visit_statement(&mut self, ctx: &Context, node: &StatementNode) {

@@ -11,11 +11,10 @@ pub use analyzer::Analyzer;
 pub use diagnosis::{Diag, DiagCollector, Diagnosis, DiagnosisNode, ExpectedTokens, Severity};
 pub use eval::ice;
 
-pub use model::resolved_statement::{ResolvedStatement, StatementScopes};
 pub use model::*;
 pub use resolution::SymbolResolver;
 pub use resolution::declaration;
 pub use resolution::finish_externals;
 pub use resolution::mark_uses;
-pub use resolution::scope::{ScopeKind, SymbolScope, SymbolScopes};
+pub use resolution::scope::{ScopeKind, StatementScopes, SymbolScopes};
 pub use sema::Sema;

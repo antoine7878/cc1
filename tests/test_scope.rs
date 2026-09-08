@@ -1,5 +1,9 @@
-use cc1::ast::StringId;
-use cc1::semantic::{ScopeKind, SymbolId, SymbolScopes, TagDefId};
+use cc1::ast::statement::StatementId;
+use cc1::ast::{StringId, Value};
+use cc1::semantic::{
+    Diagnosis, QualifiedType, ResolvedStatement, ResolvedTypeId, ScopeKind, StatementScopes, SymbolId, SymbolScopes,
+    TagDefId,
+};
 
 fn name(index: usize) -> StringId {
     StringId::from(index)
@@ -130,4 +134,140 @@ fn an_inner_tag_shadows_an_outer_one() {
     assert_eq!(scopes.lookup_tag(name(0), true), Some(tag(1)));
     scopes.pop();
     assert_eq!(scopes.lookup_tag(name(0), false), Some(tag(0)));
+}
+
+fn stmt(index: usize) -> StatementId {
+    StatementId::from(index)
+}
+
+fn control() -> QualifiedType {
+    QualifiedType::plain(ResolvedTypeId::from(0))
+}
+
+fn switch_scope() -> StatementScopes {
+    let mut scopes = StatementScopes::default();
+    scopes.push_switch(stmt(0), control());
+    scopes
+}
+
+#[test]
+fn statement_scopes_start_empty() {
+    let scopes = StatementScopes::default();
+    assert!(scopes.is_empty());
+    assert_eq!(scopes.breakable(), None);
+    assert_eq!(scopes.nearest_loop(), None);
+    assert_eq!(scopes.switch_control(), None);
+}
+
+#[test]
+fn a_loop_is_both_breakable_and_continuable() {
+    let mut scopes = StatementScopes::default();
+    scopes.push_loop(stmt(1));
+    assert_eq!(scopes.breakable(), Some(stmt(1)));
+    assert_eq!(scopes.nearest_loop(), Some(stmt(1)));
+    assert_eq!(scopes.switch_control(), None);
+}
+
+#[test]
+fn a_switch_is_breakable_but_not_continuable() {
+    let scopes = switch_scope();
+    assert_eq!(scopes.breakable(), Some(stmt(0)));
+    assert_eq!(scopes.nearest_loop(), None);
+    assert_eq!(scopes.switch_control(), Some(control()));
+}
+
+#[test]
+fn break_binds_to_the_innermost_scope_and_continue_to_the_innermost_loop() {
+    let mut scopes = StatementScopes::default();
+    scopes.push_loop(stmt(1));
+    scopes.push_switch(stmt(2), control());
+    assert_eq!(scopes.breakable(), Some(stmt(2)));
+    assert_eq!(scopes.nearest_loop(), Some(stmt(1)));
+    scopes.push_loop(stmt(3));
+    assert_eq!(scopes.breakable(), Some(stmt(3)));
+    assert_eq!(scopes.nearest_loop(), Some(stmt(3)));
+}
+
+#[test]
+fn a_case_binds_to_the_enclosing_switch_across_a_loop() {
+    let mut scopes = switch_scope();
+    scopes.push_loop(stmt(1));
+    assert_eq!(scopes.switch_control(), Some(control()));
+    assert_eq!(scopes.record_case(Value::Int(0), stmt(2)).ok(), Some(stmt(0)));
+    assert_eq!(scopes.record_default(stmt(3)).ok(), Some(stmt(0)));
+}
+
+#[test]
+fn a_case_outside_a_switch_is_rejected() {
+    let mut scopes = StatementScopes::default();
+    scopes.push_loop(stmt(1));
+    assert!(matches!(
+        scopes.record_case(Value::Int(0), stmt(2)),
+        Err(Diagnosis::OutsideSwitch("case"))
+    ));
+    assert!(matches!(
+        scopes.record_default(stmt(3)),
+        Err(Diagnosis::OutsideSwitch("default"))
+    ));
+}
+
+#[test]
+fn a_case_value_is_unique_within_a_switch() {
+    let mut scopes = switch_scope();
+    assert_eq!(scopes.record_case(Value::Int(1), stmt(1)).ok(), Some(stmt(0)));
+    assert_eq!(scopes.record_case(Value::Int(2), stmt(2)).ok(), Some(stmt(0)));
+    assert!(matches!(
+        scopes.record_case(Value::Int(1), stmt(3)),
+        Err(Diagnosis::DuplicateCase(Value::Int(1)))
+    ));
+}
+
+#[test]
+fn a_nested_switch_owns_its_own_cases() {
+    let mut scopes = switch_scope();
+    scopes.record_case(Value::Int(1), stmt(1)).unwrap();
+    scopes.push_switch(stmt(2), control());
+    assert_eq!(scopes.record_case(Value::Int(1), stmt(3)).ok(), Some(stmt(2)));
+}
+
+#[test]
+fn a_switch_has_at_most_one_default() {
+    let mut scopes = switch_scope();
+    assert_eq!(scopes.record_default(stmt(1)).ok(), Some(stmt(0)));
+    assert!(matches!(
+        scopes.record_default(stmt(2)),
+        Err(Diagnosis::DuplicateDefault)
+    ));
+}
+
+#[test]
+fn leaving_a_scope_yields_the_statement_it_resolves() {
+    let mut scopes = StatementScopes::default();
+    scopes.push_loop(stmt(1));
+    assert!(matches!(scopes.pop(), Some((id, ResolvedStatement::Loop(_))) if id == stmt(1)));
+    assert!(scopes.is_empty());
+    assert_eq!(scopes.pop().map(|(id, _)| id), None);
+}
+
+#[test]
+fn leaving_a_switch_carries_its_cases_out() {
+    let mut scopes = switch_scope();
+    scopes.record_case(Value::Int(7), stmt(1)).unwrap();
+    scopes.record_default(stmt(2)).unwrap();
+    let Some((
+        id,
+        ResolvedStatement::Switch {
+            control,
+            cases,
+            default,
+        },
+    )) = scopes.pop()
+    else {
+        panic!("a switch statement")
+    };
+    assert_eq!(id, stmt(0));
+    assert_eq!(control, self::control());
+    assert_eq!(cases, vec![(Value::Int(7), stmt(1))]);
+    assert_eq!(default, Some(stmt(2)));
+    assert!(scopes.is_empty());
 }

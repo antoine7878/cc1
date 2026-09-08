@@ -6,10 +6,8 @@ use crate::ast::{
 };
 use crate::context::Context;
 use crate::semantic::resolution::expression::{self, operands};
-use crate::semantic::resolved_statement::StatementScope;
 use crate::semantic::{
-    AssignmentContext, Diag, DiagCollector, Diagnosis, QualifiedType, ResolvedStatement, ScopeKind, Sema,
-    SymbolResolver, cast,
+    AssignmentContext, Diag, DiagCollector, Diagnosis, QualifiedType, ResolvedStatement, Sema, SymbolResolver, cast,
 };
 
 pub type R = Result<(), Diagnosis>;
@@ -41,58 +39,27 @@ fn check_labeled_statement(resolver: &mut SymbolResolver, ctx: &Context, id: Sta
 
 fn check_case(resolver: &mut SymbolResolver, ctx: &Context, id: StatementId, expr: &ExpressionNode) -> R {
     let value = resolver.eval_constant(ctx, expr);
-    let sema = &mut resolver.sema;
-    let Some(StatementScope::Switch {
-        stmt, cases, control, ..
-    }) = resolver.stmt_scopes.nearest_switch()
-    else {
+    let Some(control) = resolver.switch_control() else {
         return Err(Diagnosis::OutsideSwitch("case"));
     };
-    let stmt = *stmt;
     let Some(value) = value else { return Err(Diagnosis::Poisoned) };
     if value.get_integer_value().is_none() {
         return Err(Diagnosis::NonIntegerConstantExpression);
     }
+    let sema = &resolver.sema;
     let ty = sema.types.get(control.id);
     let Some(value) = Fold::new(&sema.target).convert(ty, value) else {
         return Err(Diagnosis::Poisoned);
     };
-    if cases.iter().any(|(v, _)| value == *v) {
-        return Err(Diagnosis::DuplicateCase(value));
-    }
-    cases.push((value, id));
-    sema.stmts.set(id, Some(ResolvedStatement::Case(value, stmt)));
+    let stmt = resolver.record_case(value, id)?;
+    resolver.sema.stmts.set(id, Some(ResolvedStatement::Case(value, stmt)));
     Ok(())
 }
 
 fn check_default(resolver: &mut SymbolResolver, id: StatementId) -> R {
-    let Some(StatementScope::Switch { stmt, default, .. }) = resolver.stmt_scopes.nearest_switch() else {
-        return Err(Diagnosis::OutsideSwitch("default"));
-    };
-    let stmt = *stmt;
-    if default.is_some() {
-        return Err(Diagnosis::DuplicateDefault);
-    }
-    *default = Some(id);
+    let stmt = resolver.record_default(id)?;
     resolver.sema.stmts.set(id, Some(ResolvedStatement::Default(stmt)));
     Ok(())
-}
-
-pub fn enter_compound_statement(resolver: &mut SymbolResolver) {
-    match resolver.scope_kind() {
-        ScopeKind::Prototype => resolver.promote_scope(ScopeKind::Function),
-        _ => resolver.enter_scope(ScopeKind::Block),
-    }
-}
-
-pub fn leave_compound_statement(resolver: &mut SymbolResolver) {
-    resolver.leave_scope();
-}
-
-fn leave_stmt_scope(resolver: &mut SymbolResolver) {
-    let scope = resolver.stmt_scopes.pop().expect("a statement scope to leave");
-    let (id, rs): (StatementId, ResolvedStatement) = scope.into();
-    resolver.sema.stmts.set(id, Some(rs));
 }
 
 pub fn resolve_selection_statement(
@@ -113,9 +80,9 @@ pub fn resolve_selection_statement(
         SelectionStatement::Switch(condition, body) => {
             resolver.visit_expression(ctx, condition);
             let control = check_selection_statement(resolver.sema, node);
-            resolver.stmt_scopes.push_switch(id, control, vec![], None);
+            resolver.enter_switch(id, control);
             resolver.visit_statement(ctx, body);
-            leave_stmt_scope(resolver);
+            resolver.leave_stmt();
         }
     }
 }
@@ -149,9 +116,9 @@ pub fn resolve_iteration_statement(
 ) {
     let body = loop_controls(resolver, ctx, node);
     check_iteration_statement(resolver.sema, node);
-    resolver.stmt_scopes.push_loop(id);
+    resolver.enter_loop(id);
     resolver.visit_statement(ctx, body);
-    leave_stmt_scope(resolver);
+    resolver.leave_stmt();
 }
 
 fn loop_controls<'n>(
@@ -256,17 +223,15 @@ fn check_jump_statement(
 }
 
 fn check_break(resolver: &mut SymbolResolver, id: StatementId) -> R {
-    let &stmt = match resolver.stmt_scopes.last() {
-        Some(StatementScope::Loop(stmt)) => stmt,
-        Some(StatementScope::Switch { stmt, .. }) => stmt,
-        None => return Err(Diagnosis::BreakNotInLoop),
+    let Some(stmt) = resolver.breakable() else {
+        return Err(Diagnosis::BreakNotInLoop);
     };
     resolver.sema.stmts.set(id, Some(ResolvedStatement::Break(stmt)));
     Ok(())
 }
 
 fn check_continue(resolver: &mut SymbolResolver, id: StatementId) -> R {
-    let Some(stmt) = resolver.stmt_scopes.nearest_loop() else {
+    let Some(stmt) = resolver.nearest_loop() else {
         return Err(Diagnosis::ContinueNotInLoop);
     };
     resolver.sema.stmts.set(id, Some(ResolvedStatement::Continue(stmt)));

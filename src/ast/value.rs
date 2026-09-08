@@ -3,7 +3,7 @@ use crate::semantic::{Diag, Diagnosis, QualifiedType, ResolvedType, Sema};
 use crate::target::Target;
 use std::cmp::Ordering;
 
-use super::{BinaryOp, F80, UnaryOp, escape};
+use crate::ast::{BinaryOp, F80, UnaryOp, escape};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Value {
