@@ -1,9 +1,9 @@
-use std::env::args;
 use std::fmt;
 use std::process::exit;
 use std::str::Chars;
+use std::vec;
 
-use libft::{ArgError, ArgParser};
+use libft::{ArgError, ArgParser, argv};
 
 #[derive(Debug)]
 pub struct Args {
@@ -19,13 +19,11 @@ pub struct Args {
     pub v: bool,
     /// Write the resulting program to standard output instead of in_file.
     pub t: bool,
-    argv: std::env::Args,
+    argv: vec::IntoIter<String>,
 }
 
 impl Default for Args {
     fn default() -> Self {
-        let mut argv = args();
-        argv.next();
         Self {
             i: vec![],
             o: None,
@@ -33,13 +31,13 @@ impl Default for Args {
             n: false,
             v: false,
             t: false,
-            argv,
+            argv: argv(),
         }
     }
 }
 
 impl ArgParser for Args {
-    type Argv = std::env::Args;
+    type Argv = vec::IntoIter<String>;
 
     fn positional(&mut self, arg: String) {
         self.i.push(arg);

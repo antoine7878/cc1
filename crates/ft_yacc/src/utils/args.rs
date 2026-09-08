@@ -1,9 +1,9 @@
-use std::env::args;
 use std::path::Path;
 use std::process::exit;
 use std::str::Chars;
+use std::vec;
 
-use libft::{ArgError, ArgParser};
+use libft::{ArgError, ArgParser, argv};
 
 #[derive(Debug)]
 pub struct Args {
@@ -21,13 +21,11 @@ pub struct Args {
     pub v: bool,
     /// Generate Automaton graph
     pub g: bool,
-    argv: std::env::Args,
+    argv: vec::IntoIter<String>,
 }
 
 impl Default for Args {
     fn default() -> Self {
-        let mut argv = args();
-        argv.next();
         Self {
             mandatory: vec![],
             b: None,
@@ -36,13 +34,13 @@ impl Default for Args {
             t: false,
             v: false,
             g: false,
-            argv,
+            argv: argv(),
         }
     }
 }
 
 impl ArgParser for Args {
-    type Argv = std::env::Args;
+    type Argv = vec::IntoIter<String>;
 
     fn positional(&mut self, arg: String) {
         self.mandatory.push(arg);

@@ -1,10 +1,9 @@
-use std::env::args;
 use std::path::Path;
 use std::process::exit;
 use std::str::Chars;
 use std::vec;
 
-use libft::{ArgError, ArgParser};
+use libft::{ArgError, ArgParser, argv};
 
 #[derive(Debug, Default)]
 pub struct Args {
@@ -36,7 +35,7 @@ impl ArgParser for Args {
 
 impl Args {
     pub fn parse() -> Result<Self, ArgError> {
-        Self::from_argv(args().skip(1))?.check_input()
+        Self::from_argv(argv())?.check_input()
     }
 
     pub fn from_argv<I: IntoIterator<Item = String>>(argv: I) -> Result<Self, ArgError> {

@@ -7,7 +7,7 @@ pub mod escape;
 pub mod span;
 pub mod table;
 
-pub use args::{ArgError, ArgParser};
+pub use args::{ArgError, ArgParser, argv};
 pub use bitset::BitSet;
 pub use color::*;
 pub use diagnostic::{Severity, SourceMap, render};

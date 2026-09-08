@@ -1,10 +1,9 @@
-use std::env::args;
 use std::path::Path;
 use std::process::exit;
 use std::str::Chars;
 use std::vec;
 
-use libft::{ArgError, ArgParser};
+use libft::{ArgError, ArgParser, argv};
 
 use crate::context::Context;
 use crate::semantic::{Diagnosis, DiagnosisNode};
@@ -41,7 +40,7 @@ impl ArgParser for Args {
 
 impl Args {
     pub fn parse() -> Result<Self, ArgError> {
-        Self::from_argv(args().skip(1))?.check_input()
+        Self::from_argv(argv())?.check_input()
     }
 
     pub fn from_argv<I: IntoIterator<Item = String>>(argv: I) -> Result<Self, ArgError> {
@@ -62,9 +61,12 @@ impl Args {
     }
 
     pub fn check_input(self) -> Result<Self, ArgError> {
-        match Path::new(&self.inputs[0]).is_file() {
+        let Some(input) = self.inputs.first().cloned() else {
+            return Err(ArgError::BadArgumentCount(0, 1));
+        };
+        match Path::new(&input).is_file() {
             true => Ok(self),
-            false => Err(ArgError::NotAfile(self.inputs[0].clone())),
+            false => Err(ArgError::NotAfile(input)),
         }
     }
 
