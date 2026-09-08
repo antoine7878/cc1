@@ -63,7 +63,7 @@ impl Visitor for Emitter {
     fn visit_external_declaration(&mut self, ctx: &Context, node: &ExternalDeclarationNode) {
         match &node.decl {
             ExternalDeclaration::Function(fn_decl) => {
-                let &sym_id = ctx.sema.declarations.get(&fn_decl.declarator.id).unwrap();
+                let &sym_id = ctx.sema.declarations.get(&fn_decl.declarator.id).expect("no decl");
                 let sym = sym_id.resolve(ctx);
                 let qty = sym.ty.unwrap();
                 let ty = qty.id.resolve(ctx);
