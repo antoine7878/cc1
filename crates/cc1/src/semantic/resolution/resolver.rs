@@ -246,9 +246,9 @@ impl Visitor for SymbolResolver<'_> {
     fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
         // println!("COUCOU");
         let Some(header) = declaration::define_function(self, ctx, node) else { return };
-        // let sym_id = header.id.resolve(ctx).sym;
-        // self.sema.declarations.insert(node.declarator.id, sym_id);
-        // println!("OUIOUI");
+        let sym_id = header.id.resolve(ctx).sym;
+        self.sema.declarations.insert(node.declarator.id, sym_id);
+        println!("OUIOUI");
         let f = header.id;
         self.f = Some(f);
         declaration::bind_function_parameters(self, ctx, node, &header);
