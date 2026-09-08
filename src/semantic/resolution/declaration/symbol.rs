@@ -1,7 +1,10 @@
-use crate::arena::ResolveWith;
-use crate::ast::{DeclarationNode, DeclarationSpecifier, DeclaratorNode, InitDeclaratorNode, Storage, TypeSpecifier};
+use crate::arena::{ResolveMutWith, ResolveWith};
+use crate::ast::{
+    DeclarationNode, DeclarationSpecifier, DeclaratorNode, InitDeclaratorNode, InitializerNode, Storage, TypeSpecifier,
+};
 use crate::context::Context;
 use crate::parser::Span;
+use crate::semantic::model::initializer;
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, QualifiedType, ResolvedType, ScopeKind, Symbol, SymbolId, SymbolKind,
@@ -100,6 +103,25 @@ pub fn declare_init_declarator(
     let sym_id = declare_symbol(resolver, sym, declared_storage, &core.span);
     resolver.sema.declarations.insert(init_declarator.declarator.id, sym_id);
     Some(())
+}
+
+pub fn resolve_initializer(
+    resolver: &mut SymbolResolver,
+    ctx: &Context,
+    sym_id: SymbolId,
+    ty: QualifiedType,
+    node: &InitializerNode,
+) {
+    let duration = sym_id.resolve(resolver.sema).duration;
+    let init = initializer::resolve(resolver, ctx, ty, node, duration);
+    if let ResolvedType::Array { elem, len: None } = ty.id.resolve(resolver.sema)
+        && let Some(len) = init.len(ctx)
+    {
+        let id = resolver.sema.types.array(*elem, Some(len));
+        sym_id.resolve_mut(resolver.sema).ty = Some(QualifiedType::new(id, ty.is_const, ty.is_volatile));
+    }
+    let id = resolver.sema.inits.alloc(init);
+    sym_id.resolve_mut(resolver.sema).initializer = Some(id);
 }
 
 pub fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
