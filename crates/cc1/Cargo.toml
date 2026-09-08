@@ -1,0 +1,12 @@
+[package]
+name = "cc1"
+version.workspace = true
+edition.workspace = true
+autotests = false
+
+[dependencies]
+libft.workspace = true
+
+[[test]]
+name = "suite"
+path = "tests/main.rs"

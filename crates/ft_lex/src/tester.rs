@@ -63,7 +63,7 @@ mod test {
     }
 
     fn ft_lex_bin() -> String {
-        let bin = concat!(env!("CARGO_MANIFEST_DIR"), "/../target/release/ft_lex");
+        let bin = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/release/ft_lex");
         assert!(
             Path::new(bin).is_file(),
             "{bin} is missing: run `make ttest` (or `cargo build --release -p ft_lex -p ft_yacc`)"

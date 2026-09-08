@@ -1,0 +1,4 @@
+[package]
+name = "libft"
+version.workspace = true
+edition.workspace = true

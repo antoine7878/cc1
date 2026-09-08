@@ -3,11 +3,12 @@
     "arguments": [
       "/usr/bin/gcc",
       "-c",
+      "-m32",
       "-std=iso9899:1990",
       "-pedantic-errors",
-      "test/hello.c"
+      "rscs/hello.c"
     ],
-    "directory": "/home/ale-tell/42/cc1",
-    "file": "/home/ale-tell/42/cc1/test/hello.c"
+    "directory": "/Users/antoine/42/cc1",
+    "file": "/Users/antoine/42/cc1/rscs/hello.c"
   }
 ]

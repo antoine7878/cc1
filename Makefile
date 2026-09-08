@@ -1,18 +1,16 @@
 NAME = target/debug/cc1
 
-FT_LEX = target/release/ft_lex
-LEX_FILE = src/parser/c.l
-LEXER = src/parser/lex.rs
-
+FT_LEX  = target/release/ft_lex
 FT_YACC = target/release/ft_yacc
-YACC_FILE = src/parser/c.y
-PARSER = src/parser/yacc.rs
+
+GEN_CRATES = cc1
+GEN = $(foreach c,$(GEN_CRATES),crates/$(c)/src/parser/lex.rs crates/$(c)/src/parser/yacc.rs)
 
 # ----- cc1 --------------------
 
 all: $(NAME)
 
-$(NAME): $(LEXER) $(PARSER)
+$(NAME): $(GEN)
 	cargo build
 
 # ----- ft_lex / ft_yacc --------------------
@@ -20,11 +18,11 @@ $(NAME): $(LEXER) $(PARSER)
 $(FT_LEX) $(FT_YACC):
 	cargo build --release -p ft_lex -p ft_yacc
 
-$(LEXER): $(LEX_FILE) | $(FT_LEX)
-	$(FT_LEX) -c $(LEX_FILE) -o $(LEXER)
+crates/%/src/parser/lex.rs: crates/%/src/parser/c.l | $(FT_LEX)
+	$(FT_LEX) -c $< -o $@
 
-$(PARSER): $(YACC_FILE) | $(FT_YACC)
-	$(FT_YACC) $(YACC_FILE) -o $(PARSER)
+crates/%/src/parser/yacc.rs: crates/%/src/parser/c.y | $(FT_YACC)
+	$(FT_YACC) $< -o $@
 
 # ----- test --------------------
 
@@ -37,8 +35,7 @@ ctest: $(NAME)
 
 ttest:
 	cargo build --release -p ft_lex -p ft_yacc
-	cargo nextest run -p ft_lex -p ft_yacc -p libft -p cc1
-
+	cargo nextest run
 
 CFF = -m32 -std=iso9899:1990
 
@@ -54,31 +51,28 @@ empty :=
 space := $(empty) $(empty)
 
 COV_SKIP = \
-	src/main.rs \
-	src/report.rs \
-	src/ast/mod.rs \
-	src/ast/name.rs \
-	src/pipeline.rs \
-	src/ast/print.rs \
-	src/parser/lex.rs \
-	src/utils/table.rs \
-	src/parser/yacc.rs \
-	src/ast/display.rs \
-	src/parser/span.rs \
-	src/parser/driver.rs \
-	src/ast/type_specifier.rs \
-	src/semantic/diagnosis.rs
+	crates/cc1/src/main.rs \
+	crates/cc1/src/report.rs \
+	crates/cc1/src/ast/mod.rs \
+	crates/cc1/src/ast/name.rs \
+	crates/cc1/src/pipeline.rs \
+	crates/cc1/src/ast/print.rs \
+	crates/cc1/src/parser/lex.rs \
+	crates/cc1/src/utils/table.rs \
+	crates/cc1/src/parser/yacc.rs \
+	crates/cc1/src/ast/display.rs \
+	crates/cc1/src/parser/span.rs \
+	crates/cc1/src/parser/driver.rs \
+	crates/cc1/src/ast/type_specifier.rs \
+	crates/cc1/src/semantic/diagnosis.rs
 
 coverage: $(NAME)
 	cargo llvm-cov nextest --ignore-filename-regex '$(subst $(space),|,$(strip $(COV_SKIP)))'
 
 clean:
-	cargo clean -p cc1
-	cargo clean -p ft_lex
-	cargo clean -p ft_yacc
-	cargo clean -p libft
-	rm -rf $(LEXER) $(PARSER)
+	cargo clean
+	rm -f $(GEN)
 
 re: clean all
 
-.PHONY: all clean re test ctest ttest lexer parser $(FT_LEX) $(FT_YACC) $(NAME)
+.PHONY: all clean re test ctest ttest c cc coverage $(FT_LEX) $(FT_YACC) $(NAME)

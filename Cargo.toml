@@ -1,15 +1,10 @@
-[package]
-name = "cc1"
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
-autotests = false
 
-[dependencies]
-libft = { path = "libft" }
-
-[[test]]
-name = "suite"
-path = "tests/main.rs"
-
-[workspace]
-members = ["ft_lex", "ft_yacc", "libft"]
+[workspace.dependencies]
+libft = { path = "crates/libft" }

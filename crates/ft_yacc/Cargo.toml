@@ -1,0 +1,7 @@
+[package]
+name = "ft_yacc"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+libft.workspace = true

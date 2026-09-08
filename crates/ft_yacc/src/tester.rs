@@ -63,7 +63,7 @@ mod test {
     }
 
     fn ft_yacc_bin() -> String {
-        concat!(env!("CARGO_MANIFEST_DIR"), "/../target/release/ft_yacc").to_string()
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/release/ft_yacc").to_string()
     }
 
     fn ft_yacc_raw(args: &[&str]) -> Output {
@@ -131,7 +131,7 @@ mod test {
     }
 
     fn ft_lex(lex_file: &str, parser_file: &str) -> Vec<u8> {
-        let bin = concat!(env!("CARGO_MANIFEST_DIR"), "/../target/release/ft_lex");
+        let bin = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/release/ft_lex");
         assert_bin(bin);
         cmd_with_out(bin, &["-o", parser_file, lex_file])
     }
