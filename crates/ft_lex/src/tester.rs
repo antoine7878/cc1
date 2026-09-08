@@ -1,39 +1,41 @@
 #[cfg(test)]
 mod test {
-    use std::fs::{File, create_dir_all, remove_file};
-    use std::io::Write;
-    use std::path::Path;
-    use std::process::{Command, Stdio};
+    use std::env::temp_dir;
+    use std::fs::{create_dir, remove_dir_all};
+    use std::io::ErrorKind;
+    use std::path::{Path, PathBuf};
+    use std::process::{Command, Stdio, id};
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[derive(Debug)]
-    pub struct TmpFile {
-        pub name: String,
+    pub struct TmpDir {
+        pub path: PathBuf,
     }
 
     static COUNTER: AtomicU64 = AtomicU64::new(0);
 
-    impl TmpFile {
-        fn new(prefix: &str, extension: &str) -> Self {
-            create_dir_all("./test/gen").unwrap();
-            let count = COUNTER.fetch_add(1, Ordering::Relaxed);
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-                .to_string();
-            let name = format!("./test/gen/{}{}{}{}", prefix, now, count, extension);
-            let mut file = File::create(&name).unwrap();
-            file.write_all(b"test").unwrap();
-            Self { name }
+    impl TmpDir {
+        fn new(prefix: &str) -> Self {
+            let base = temp_dir();
+            loop {
+                let count = COUNTER.fetch_add(1, Ordering::Relaxed);
+                let path = base.join(format!("ft_lex-{}-{}-{}", prefix, id(), count));
+                match create_dir(&path) {
+                    Ok(()) => return Self { path },
+                    Err(e) if e.kind() == ErrorKind::AlreadyExists => continue,
+                    Err(e) => panic!("cannot create {}: {e}", path.display()),
+                }
+            }
+        }
+
+        fn join(&self, name: &str) -> String {
+            self.path.join(name).to_string_lossy().into_owned()
         }
     }
 
-    impl Drop for TmpFile {
+    impl Drop for TmpDir {
         fn drop(&mut self) {
-            let path = Path::new(&self.name);
-            let _ = remove_file(path);
+            let _ = remove_dir_all(&self.path);
         }
     }
 
@@ -85,11 +87,12 @@ mod test {
 
     fn test_lex(lexfile: &str, test_input: &str, expected_output: &[u8]) {
         let test_name = &lexfile[7..(lexfile.len() - 2)];
-        let exec_file = TmpFile::new("", "");
-        let parser_file = TmpFile::new(test_name, ".rs");
-        ft_lex(lexfile, &parser_file.name);
-        compile_parser(&parser_file.name, &exec_file.name);
-        run_parser(&exec_file.name, test_input, expected_output);
+        let dir = TmpDir::new(test_name);
+        let parser_file = dir.join("parser.rs");
+        let exec_file = dir.join("parser");
+        ft_lex(lexfile, &parser_file);
+        compile_parser(&parser_file, &exec_file);
+        run_parser(&exec_file, test_input, expected_output);
     }
 
     #[test]
@@ -188,15 +191,16 @@ mod test {
     }
 
     fn test_lex_multi(lexfiles: &[&str], test_input: &str, expected_output: &[u8]) {
-        let exec_file = TmpFile::new("", "");
-        let parser_file = TmpFile::new("multi_rust", ".rs");
-        let mut args = vec!["-c", "-o", &parser_file.name];
+        let dir = TmpDir::new("multi");
+        let parser_file = dir.join("parser.rs");
+        let exec_file = dir.join("parser");
+        let mut args = vec!["-c", "-o", parser_file.as_str()];
 
         args.extend(lexfiles);
 
         cmd_with_out(&ft_lex_bin(), &args);
-        compile_parser(&parser_file.name, &exec_file.name);
-        run_parser(&exec_file.name, test_input, expected_output);
+        compile_parser(&parser_file, &exec_file);
+        run_parser(&exec_file, test_input, expected_output);
     }
 
     #[test]
@@ -206,5 +210,24 @@ mod test {
             "salut\n",
             b"COUCOU\n",
         );
+    }
+
+    #[test]
+    fn tmp_dirs_are_unique_and_pid_scoped() {
+        let a = TmpDir::new("uniq");
+        let b = TmpDir::new("uniq");
+        assert_ne!(a.path, b.path);
+        assert!(a.path.is_dir() && b.path.is_dir());
+        assert!(a.path.to_string_lossy().contains(&id().to_string()));
+    }
+
+    #[test]
+    fn tmp_dir_is_removed_with_its_contents() {
+        let path = {
+            let dir = TmpDir::new("drop");
+            std::fs::write(dir.join("inner"), b"x").unwrap();
+            dir.path.clone()
+        };
+        assert!(!path.exists());
     }
 }

@@ -1,39 +1,41 @@
 #[cfg(test)]
 mod test {
-    use std::fs::{File, create_dir_all, remove_file};
-    use std::io::{Read, Write};
-    use std::path::Path;
-    use std::process::{Command, Output, Stdio};
+    use std::env::temp_dir;
+    use std::fs::{File, create_dir, remove_dir_all};
+    use std::io::{ErrorKind, Read, Write};
+    use std::path::{Path, PathBuf};
+    use std::process::{Command, Output, Stdio, id};
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[derive(Debug)]
-    pub struct TmpFile {
-        pub path: String,
+    pub struct TmpDir {
+        pub path: PathBuf,
     }
 
     static COUNTER: AtomicU64 = AtomicU64::new(0);
 
-    impl TmpFile {
-        fn new(prefix: &str, extension: &str) -> Self {
-            create_dir_all("test/gen").unwrap();
-            let count = COUNTER.fetch_add(1, Ordering::Relaxed);
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-                .to_string();
+    impl TmpDir {
+        fn new(prefix: &str) -> Self {
+            let base = temp_dir();
+            loop {
+                let count = COUNTER.fetch_add(1, Ordering::Relaxed);
+                let path = base.join(format!("ft_yacc-{}-{}-{}", prefix, id(), count));
+                match create_dir(&path) {
+                    Ok(()) => return Self { path },
+                    Err(e) if e.kind() == ErrorKind::AlreadyExists => continue,
+                    Err(e) => panic!("cannot create {}: {e}", path.display()),
+                }
+            }
+        }
 
-            let path = format!("test/gen/{}{}{}{}", prefix, now, count, extension);
-            let mut _file = File::create(&path).unwrap();
-            Self { path }
+        fn join(&self, name: &str) -> String {
+            self.path.join(name).to_string_lossy().into_owned()
         }
     }
 
-    impl Drop for TmpFile {
+    impl Drop for TmpDir {
         fn drop(&mut self) {
-            let path = Path::new(&self.path);
-            let _ = remove_file(path);
+            let _ = remove_dir_all(&self.path);
         }
     }
 
@@ -87,12 +89,6 @@ mod test {
         s
     }
 
-    fn tmp_stem(prefix: &str) -> String {
-        let count = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-        format!("test/gen/{}{}{}", prefix, now, count)
-    }
-
     fn ensure_build() {
         assert_bin(&ft_yacc_bin());
     }
@@ -106,19 +102,20 @@ mod test {
 
     fn test_diag(yacc_file: &str, expected: &[&str]) {
         ensure_build();
-        let stem = tmp_stem("diag_");
+        let dir = TmpDir::new("diag");
+        let stem = dir.join("out");
         let out = ft_yacc_raw(&["-b", &stem, yacc_file]);
         let text = combined(&out);
         println!("{text}");
         for e in expected {
             assert!(text.contains(e), "expected diagnostic to contain {e:?}, got:\n{text}");
         }
-        let _ = remove_file(format!("{stem}_tab.rs"));
     }
 
     fn test_conflict_report(yacc_file: &str, expected: &str) {
         ensure_build();
-        let stem = tmp_stem("conf_");
+        let dir = TmpDir::new("conf");
+        let stem = dir.join("out");
         let out = ft_yacc_raw(&["-b", &stem, yacc_file]);
         let text = combined(&out);
         println!("{text}");
@@ -127,7 +124,6 @@ mod test {
             text.contains(expected),
             "expected conflict report to contain {expected:?}, got:\n{text}"
         );
-        let _ = remove_file(format!("{stem}_tab.rs"));
     }
 
     fn ft_lex(lex_file: &str, parser_file: &str) -> Vec<u8> {
@@ -155,41 +151,33 @@ mod test {
         assert_eq!(out, expected_output)
     }
 
-    fn copy_yacc_file(original: &str, mod_name: &str) -> TmpFile {
+    fn copy_yacc_file(original: &str, mod_name: &str, dir: &TmpDir) -> String {
         let mut buffer = String::new();
         let mut original = File::open(original).unwrap();
         let _ = original.read_to_string(&mut buffer).unwrap();
-        let ret = TmpFile::new("yacc_", "");
-        let mut file = File::create(&ret.path).unwrap();
+        let path = dir.join("grammar.y");
+        let mut file = File::create(&path).unwrap();
         file.write_all(format!("%{{\nmod {};\n    use {}::{{YYLex, Span}};\n%}}\n", mod_name, mod_name).as_bytes())
             .unwrap();
         file.write_all(buffer.as_bytes()).unwrap();
-        ret
-    }
-
-    fn get_stem(path: &str) -> String {
-        Path::new(path).file_stem().unwrap().to_string_lossy().to_string()
+        path
     }
 
     fn test_yacc(lex_file: &str, yacc_file: &str, test_input: &str, expected_output: &[u8]) {
-        let mut yacc_file = yacc_file.to_string();
         ensure_build();
 
-        let exec_file = TmpFile::new("test_yacc", "");
-        let lexer_file = TmpFile::new("lex_yy", ".rs");
+        let dir = TmpDir::new("yacc");
+        let lexer_file = dir.join("lex_yy.rs");
+        let exec_file = dir.join("test_yacc");
+        let stem = dir.join("parser");
+        let parser_file = format!("{stem}_tab.rs");
 
-        let ext = "_tab.rs";
-        let parser_file = TmpFile::new("", ext);
-        let name = &parser_file.path;
-        let name = &name[..(name.len() - ext.len())];
+        let grammar = copy_yacc_file(yacc_file, "lex_yy", &dir);
 
-        let file = copy_yacc_file(&yacc_file, &get_stem(&lexer_file.path));
-        yacc_file = file.path.clone();
-
-        ft_lex(lex_file, &lexer_file.path);
-        ft_yacc(&yacc_file, name);
-        compile_parser(&parser_file.path, &exec_file.path);
-        let out = run_parser(&exec_file.path, test_input);
+        ft_lex(lex_file, &lexer_file);
+        ft_yacc(&grammar, &stem);
+        compile_parser(&parser_file, &exec_file);
+        let out = run_parser(&exec_file, test_input);
         assert_output(&out, expected_output);
     }
 
@@ -305,13 +293,13 @@ mod test {
     #[test]
     fn start_typed_ok() {
         ensure_build();
-        let stem = tmp_stem("startt_");
+        let dir = TmpDir::new("startt");
+        let stem = dir.join("out");
         let out = ft_yacc_raw(&["-b", &stem, "./test/tester/start2.y"]);
         let text = combined(&out);
         println!("{text}");
         assert!(out.status.success());
         assert!(!text.contains("Error"), "valid grammar rejected:\n{text}");
-        let _ = remove_file(format!("{stem}_tab.rs"));
     }
 
     #[test]
@@ -442,13 +430,13 @@ mod test {
     #[test]
     fn diag_posix_chan() {
         ensure_build();
-        let stem = tmp_stem("strict_");
+        let dir = TmpDir::new("strict");
+        let stem = dir.join("out");
         let out = ft_yacc_raw(&["-b", &stem, "./test/tester/err_dup_token.y"]);
         println!("{}", combined(&out));
         assert!(!out.status.success(), "yacc shall exit with status > 0 on error");
         assert!(!out.stderr.is_empty(), "diagnostics shall be written to stderr");
         assert!(out.stdout.is_empty(), "stdout shall not be used");
-        let _ = remove_file(format!("{stem}_tab.rs"));
     }
 
     // ----- conflict --------------------
@@ -476,13 +464,13 @@ mod test {
     #[test]
     fn conflict_none() {
         ensure_build();
-        let stem = tmp_stem("confn_");
+        let dir = TmpDir::new("confn");
+        let stem = dir.join("out");
         let out = ft_yacc_raw(&["-b", &stem, "./test/tester/calc_prec.y"]);
         let text = combined(&out);
         println!("{text}");
         assert!(out.status.success());
         assert!(!text.contains("conflict"), "resolved conflicts reported:\n{text}");
-        let _ = remove_file(format!("{stem}_tab.rs"));
     }
 
     // ----- options --------------------
@@ -490,42 +478,59 @@ mod test {
     #[test]
     fn opt_t_debug() {
         ensure_build();
-        let stem = tmp_stem("optt_");
+        let dir = TmpDir::new("optt");
+        let stem = dir.join("out");
         let out = ft_yacc_raw(&["-t", "-b", &stem, "./test/tester/mini.y"]);
         assert!(out.status.success());
         let src = read_file(&format!("{stem}_tab.rs"));
         assert!(src.contains("macro_rules! yylog"), "-t src:\n{src}");
-        let _ = remove_file(format!("{stem}_tab.rs"));
 
         let out = ft_yacc_raw(&["-b", &stem, "./test/tester/mini.y"]);
         assert!(out.status.success());
         let src = read_file(&format!("{stem}_tab.rs"));
         assert!(!src.contains("macro_rules! yylog"), "default src:\n{src}");
-        let _ = remove_file(format!("{stem}_tab.rs"));
     }
 
     #[test]
     fn opt_p_prefix() {
         ensure_build();
-        let stem = tmp_stem("optp_");
+        let dir = TmpDir::new("optp");
+        let stem = dir.join("out");
         let out = ft_yacc_raw(&["-p", "zz", "-b", &stem, "./test/tester/mini.y"]);
         assert!(out.status.success());
         let src = read_file(&format!("{stem}_tab.rs"));
         assert!(src.contains("zzparse"), "prefixed name missing:\n{src}");
         assert!(!src.contains("yyparse"), "unprefixed yyparse remains");
-        let _ = remove_file(format!("{stem}_tab.rs"));
     }
 
     #[test]
     fn opt_v_output() {
         ensure_build();
-        let stem = tmp_stem("optv_");
+        let dir = TmpDir::new("optv");
+        let stem = dir.join("out");
         let out = ft_yacc_raw(&["-v", "-b", &stem, "./test/tester/mini.y"]);
         println!("{}", combined(&out));
         assert!(out.status.success());
         let desc = read_file(&format!("{stem}.output"));
         assert!(desc.contains("Grammar"), "description file content:\n{desc}");
-        let _ = remove_file(format!("{stem}_tab.rs"));
-        let _ = remove_file(format!("{stem}.output"));
+    }
+
+    #[test]
+    fn tmp_dirs_are_unique_and_pid_scoped() {
+        let a = TmpDir::new("uniq");
+        let b = TmpDir::new("uniq");
+        assert_ne!(a.path, b.path);
+        assert!(a.path.is_dir() && b.path.is_dir());
+        assert!(a.path.to_string_lossy().contains(&id().to_string()));
+    }
+
+    #[test]
+    fn tmp_dir_is_removed_with_its_contents() {
+        let path = {
+            let dir = TmpDir::new("drop");
+            std::fs::write(dir.join("inner"), b"x").unwrap();
+            dir.path.clone()
+        };
+        assert!(!path.exists());
     }
 }
