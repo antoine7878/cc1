@@ -2,6 +2,7 @@ use std::process::exit;
 
 mod args;
 mod driver;
+mod job;
 mod stage;
 mod tool;
 

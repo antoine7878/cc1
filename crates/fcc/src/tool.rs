@@ -5,6 +5,8 @@ use std::path::PathBuf;
 pub enum Tool {
     Clang,
     Cc1,
+    Llc,
+    As,
 }
 
 impl Tool {
@@ -12,13 +14,17 @@ impl Tool {
         match self {
             Tool::Clang => "clang",
             Tool::Cc1 => "cc1",
+            Tool::Llc => "llc",
+            Tool::As => "as",
         }
     }
 
     pub fn env_var(self) -> &'static str {
         match self {
-            Tool::Clang => "FCC_CPP",
+            Tool::Clang => "FCC_CLANG",
             Tool::Cc1 => "FCC_CC1",
+            Tool::Llc => "FCC_LLC",
+            Tool::As => "FCC_AS",
         }
     }
 
@@ -72,10 +78,16 @@ mod tests {
     }
 
     #[test]
-    fn names_and_env_vars_are_distinct() {
-        assert_eq!(Tool::Clang.name(), "clang");
-        assert_eq!(Tool::Cc1.name(), "cc1");
-        assert_ne!(Tool::Clang.env_var(), Tool::Cc1.env_var());
+    fn every_tool_has_a_distinct_name_and_override() {
+        let tools = [Tool::Clang, Tool::Cc1, Tool::Llc, Tool::As];
+        let names: Vec<_> = tools.iter().map(|t| t.name()).collect();
+        let vars: Vec<_> = tools.iter().map(|t| t.env_var()).collect();
+        for i in 0..tools.len() {
+            for j in i + 1..tools.len() {
+                assert_ne!(names[i], names[j]);
+                assert_ne!(vars[i], vars[j]);
+            }
+        }
     }
 
     #[test]
