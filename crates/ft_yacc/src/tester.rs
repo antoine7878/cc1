@@ -1,43 +1,11 @@
 #[cfg(test)]
 mod test {
-    use std::env::temp_dir;
-    use std::fs::{File, create_dir, remove_dir_all};
-    use std::io::{ErrorKind, Read, Write};
-    use std::path::{Path, PathBuf};
-    use std::process::{Command, Output, Stdio, id};
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::fs::File;
+    use std::io::{Read, Write};
+    use std::process::{Command, Output, Stdio};
 
-    #[derive(Debug)]
-    pub struct TmpDir {
-        pub path: PathBuf,
-    }
-
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
-
-    impl TmpDir {
-        fn new(prefix: &str) -> Self {
-            let base = temp_dir();
-            loop {
-                let count = COUNTER.fetch_add(1, Ordering::Relaxed);
-                let path = base.join(format!("ft_yacc-{}-{}-{}", prefix, id(), count));
-                match create_dir(&path) {
-                    Ok(()) => return Self { path },
-                    Err(e) if e.kind() == ErrorKind::AlreadyExists => continue,
-                    Err(e) => panic!("cannot create {}: {e}", path.display()),
-                }
-            }
-        }
-
-        fn join(&self, name: &str) -> String {
-            self.path.join(name).to_string_lossy().into_owned()
-        }
-    }
-
-    impl Drop for TmpDir {
-        fn drop(&mut self) {
-            let _ = remove_dir_all(&self.path);
-        }
-    }
+    use libft::TmpDir;
+    use libft::testing::require_release_bin;
 
     fn run_cmd(cmd: &str, args: &[&str]) -> Output {
         println!("{}: {:?}", cmd, args);
@@ -65,7 +33,7 @@ mod test {
     }
 
     fn ft_yacc_bin() -> String {
-        concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/release/ft_yacc").to_string()
+        require_release_bin("ft_yacc").to_string_lossy().into_owned()
     }
 
     fn ft_yacc_raw(args: &[&str]) -> Output {
@@ -90,20 +58,13 @@ mod test {
     }
 
     fn ensure_build() {
-        assert_bin(&ft_yacc_bin());
-    }
-
-    fn assert_bin(bin: &str) {
-        assert!(
-            Path::new(bin).is_file(),
-            "{bin} is missing: run `make ttest` (or `cargo build --release -p ft_lex -p ft_yacc`)"
-        );
+        let _ = ft_yacc_bin();
     }
 
     fn test_diag(yacc_file: &str, expected: &[&str]) {
         ensure_build();
         let dir = TmpDir::new("diag");
-        let stem = dir.join("out");
+        let stem = dir.join_str("out");
         let out = ft_yacc_raw(&["-b", &stem, yacc_file]);
         let text = combined(&out);
         println!("{text}");
@@ -115,7 +76,7 @@ mod test {
     fn test_conflict_report(yacc_file: &str, expected: &str) {
         ensure_build();
         let dir = TmpDir::new("conf");
-        let stem = dir.join("out");
+        let stem = dir.join_str("out");
         let out = ft_yacc_raw(&["-b", &stem, yacc_file]);
         let text = combined(&out);
         println!("{text}");
@@ -127,9 +88,8 @@ mod test {
     }
 
     fn ft_lex(lex_file: &str, parser_file: &str) -> Vec<u8> {
-        let bin = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/release/ft_lex");
-        assert_bin(bin);
-        cmd_with_out(bin, &["-o", parser_file, lex_file])
+        let bin = require_release_bin("ft_lex").to_string_lossy().into_owned();
+        cmd_with_out(&bin, &["-o", parser_file, lex_file])
     }
 
     fn ft_yacc(yacc_file: &str, parser_file: &str) -> Vec<u8> {
@@ -155,7 +115,7 @@ mod test {
         let mut buffer = String::new();
         let mut original = File::open(original).unwrap();
         let _ = original.read_to_string(&mut buffer).unwrap();
-        let path = dir.join("grammar.y");
+        let path = dir.join_str("grammar.y");
         let mut file = File::create(&path).unwrap();
         file.write_all(format!("%{{\nmod {};\n    use {}::{{YYLex, Span}};\n%}}\n", mod_name, mod_name).as_bytes())
             .unwrap();
@@ -167,9 +127,9 @@ mod test {
         ensure_build();
 
         let dir = TmpDir::new("yacc");
-        let lexer_file = dir.join("lex_yy.rs");
-        let exec_file = dir.join("test_yacc");
-        let stem = dir.join("parser");
+        let lexer_file = dir.join_str("lex_yy.rs");
+        let exec_file = dir.join_str("test_yacc");
+        let stem = dir.join_str("parser");
         let parser_file = format!("{stem}_tab.rs");
 
         let grammar = copy_yacc_file(yacc_file, "lex_yy", &dir);
@@ -294,7 +254,7 @@ mod test {
     fn start_typed_ok() {
         ensure_build();
         let dir = TmpDir::new("startt");
-        let stem = dir.join("out");
+        let stem = dir.join_str("out");
         let out = ft_yacc_raw(&["-b", &stem, "./test/tester/start2.y"]);
         let text = combined(&out);
         println!("{text}");
@@ -431,7 +391,7 @@ mod test {
     fn diag_posix_chan() {
         ensure_build();
         let dir = TmpDir::new("strict");
-        let stem = dir.join("out");
+        let stem = dir.join_str("out");
         let out = ft_yacc_raw(&["-b", &stem, "./test/tester/err_dup_token.y"]);
         println!("{}", combined(&out));
         assert!(!out.status.success(), "yacc shall exit with status > 0 on error");
@@ -465,7 +425,7 @@ mod test {
     fn conflict_none() {
         ensure_build();
         let dir = TmpDir::new("confn");
-        let stem = dir.join("out");
+        let stem = dir.join_str("out");
         let out = ft_yacc_raw(&["-b", &stem, "./test/tester/calc_prec.y"]);
         let text = combined(&out);
         println!("{text}");
@@ -479,7 +439,7 @@ mod test {
     fn opt_t_debug() {
         ensure_build();
         let dir = TmpDir::new("optt");
-        let stem = dir.join("out");
+        let stem = dir.join_str("out");
         let out = ft_yacc_raw(&["-t", "-b", &stem, "./test/tester/mini.y"]);
         assert!(out.status.success());
         let src = read_file(&format!("{stem}_tab.rs"));
@@ -495,7 +455,7 @@ mod test {
     fn opt_p_prefix() {
         ensure_build();
         let dir = TmpDir::new("optp");
-        let stem = dir.join("out");
+        let stem = dir.join_str("out");
         let out = ft_yacc_raw(&["-p", "zz", "-b", &stem, "./test/tester/mini.y"]);
         assert!(out.status.success());
         let src = read_file(&format!("{stem}_tab.rs"));
@@ -507,30 +467,11 @@ mod test {
     fn opt_v_output() {
         ensure_build();
         let dir = TmpDir::new("optv");
-        let stem = dir.join("out");
+        let stem = dir.join_str("out");
         let out = ft_yacc_raw(&["-v", "-b", &stem, "./test/tester/mini.y"]);
         println!("{}", combined(&out));
         assert!(out.status.success());
         let desc = read_file(&format!("{stem}.output"));
         assert!(desc.contains("Grammar"), "description file content:\n{desc}");
-    }
-
-    #[test]
-    fn tmp_dirs_are_unique_and_pid_scoped() {
-        let a = TmpDir::new("uniq");
-        let b = TmpDir::new("uniq");
-        assert_ne!(a.path, b.path);
-        assert!(a.path.is_dir() && b.path.is_dir());
-        assert!(a.path.to_string_lossy().contains(&id().to_string()));
-    }
-
-    #[test]
-    fn tmp_dir_is_removed_with_its_contents() {
-        let path = {
-            let dir = TmpDir::new("drop");
-            std::fs::write(dir.join("inner"), b"x").unwrap();
-            dir.path.clone()
-        };
-        assert!(!path.exists());
     }
 }

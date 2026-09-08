@@ -377,16 +377,13 @@ reports!(
     ["<test>:1:30: error: Use of undeclared identifier 'x'"]
 );
 
-use std::env::temp_dir;
 use std::fs;
-use std::process;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use cc1::context::Context;
+use libft::TmpDir;
 
-fn scratch_file(contents: &str) -> std::path::PathBuf {
-    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-    let path = temp_dir().join(format!("cc1-src-{}-{}.c", process::id(), nanos));
+fn scratch_file(dir: &TmpDir, contents: &str) -> std::path::PathBuf {
+    let path = dir.join("src.c");
     fs::write(&path, contents).unwrap();
     path
 }
@@ -394,21 +391,21 @@ fn scratch_file(contents: &str) -> std::path::PathBuf {
 #[test]
 fn source_line_reads_the_requested_1_based_line() {
     let ctx = Context::default();
-    let path = scratch_file("one\ntwo\nthree\n");
+    let dir = TmpDir::new("cc1-source-line");
+    let path = scratch_file(&dir, "one\ntwo\nthree\n");
     let name = path.to_str().unwrap();
 
     assert_eq!(ctx.source_line(name, 1).as_deref(), Some("one"));
     assert_eq!(ctx.source_line(name, 3).as_deref(), Some("three"));
     assert_eq!(ctx.source_line(name, 4), None);
     assert_eq!(ctx.source_line(name, 0), None);
-
-    fs::remove_file(&path).ok();
 }
 
 #[test]
 fn source_line_reads_the_file_only_once() {
     let ctx = Context::default();
-    let path = scratch_file("first\nsecond\n");
+    let dir = TmpDir::new("cc1-source-cache");
+    let path = scratch_file(&dir, "first\nsecond\n");
     let name = path.to_str().unwrap();
 
     assert_eq!(ctx.source_line(name, 2).as_deref(), Some("second"));

@@ -84,11 +84,11 @@ fn an_unknown_option_is_rejected() {
 
 #[test]
 fn an_existing_input_passes_the_file_check() {
-    let path = std::env::temp_dir().join("cc1_args_probe.i");
+    let dir = libft::TmpDir::new("cc1-args-probe");
+    let path = dir.join("probe.i");
     std::fs::write(&path, "int main(void) { return 0; }\n").unwrap();
     let args = parse(&[path.to_str().unwrap()]).unwrap();
     assert!(args.check_input().is_ok());
-    std::fs::remove_file(&path).ok();
 }
 
 #[test]

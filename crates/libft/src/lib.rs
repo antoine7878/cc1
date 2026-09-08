@@ -6,6 +6,8 @@ pub mod dot;
 pub mod escape;
 pub mod span;
 pub mod table;
+pub mod testing;
+pub mod tmpdir;
 
 pub use args::{ArgError, ArgParser, argv};
 pub use bitset::BitSet;
@@ -15,3 +17,4 @@ pub use dot::Dot;
 pub use escape::simple_escape;
 pub use span::{Position, Span};
 pub use table::print_table;
+pub use tmpdir::TmpDir;

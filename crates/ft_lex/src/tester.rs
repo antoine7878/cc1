@@ -1,43 +1,9 @@
 #[cfg(test)]
 mod test {
-    use std::env::temp_dir;
-    use std::fs::{create_dir, remove_dir_all};
-    use std::io::ErrorKind;
-    use std::path::{Path, PathBuf};
-    use std::process::{Command, Stdio, id};
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::process::{Command, Stdio};
 
-    #[derive(Debug)]
-    pub struct TmpDir {
-        pub path: PathBuf,
-    }
-
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
-
-    impl TmpDir {
-        fn new(prefix: &str) -> Self {
-            let base = temp_dir();
-            loop {
-                let count = COUNTER.fetch_add(1, Ordering::Relaxed);
-                let path = base.join(format!("ft_lex-{}-{}-{}", prefix, id(), count));
-                match create_dir(&path) {
-                    Ok(()) => return Self { path },
-                    Err(e) if e.kind() == ErrorKind::AlreadyExists => continue,
-                    Err(e) => panic!("cannot create {}: {e}", path.display()),
-                }
-            }
-        }
-
-        fn join(&self, name: &str) -> String {
-            self.path.join(name).to_string_lossy().into_owned()
-        }
-    }
-
-    impl Drop for TmpDir {
-        fn drop(&mut self) {
-            let _ = remove_dir_all(&self.path);
-        }
-    }
+    use libft::TmpDir;
+    use libft::testing::require_release_bin;
 
     fn compile_parser(parser_file: &str, exec_file: &str) {
         cmd_with_out("rustc", &[parser_file, "-o", exec_file]);
@@ -65,12 +31,7 @@ mod test {
     }
 
     fn ft_lex_bin() -> String {
-        let bin = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/release/ft_lex");
-        assert!(
-            Path::new(bin).is_file(),
-            "{bin} is missing: run `make ttest` (or `cargo build --release -p ft_lex -p ft_yacc`)"
-        );
-        bin.to_string()
+        require_release_bin("ft_lex").to_string_lossy().into_owned()
     }
 
     fn ft_lex(lex_file: &str, parser_file: &str) -> Vec<u8> {
@@ -88,8 +49,8 @@ mod test {
     fn test_lex(lexfile: &str, test_input: &str, expected_output: &[u8]) {
         let test_name = &lexfile[7..(lexfile.len() - 2)];
         let dir = TmpDir::new(test_name);
-        let parser_file = dir.join("parser.rs");
-        let exec_file = dir.join("parser");
+        let parser_file = dir.join_str("parser.rs");
+        let exec_file = dir.join_str("parser");
         ft_lex(lexfile, &parser_file);
         compile_parser(&parser_file, &exec_file);
         run_parser(&exec_file, test_input, expected_output);
@@ -192,8 +153,8 @@ mod test {
 
     fn test_lex_multi(lexfiles: &[&str], test_input: &str, expected_output: &[u8]) {
         let dir = TmpDir::new("multi");
-        let parser_file = dir.join("parser.rs");
-        let exec_file = dir.join("parser");
+        let parser_file = dir.join_str("parser.rs");
+        let exec_file = dir.join_str("parser");
         let mut args = vec!["-c", "-o", parser_file.as_str()];
 
         args.extend(lexfiles);
@@ -210,24 +171,5 @@ mod test {
             "salut\n",
             b"COUCOU\n",
         );
-    }
-
-    #[test]
-    fn tmp_dirs_are_unique_and_pid_scoped() {
-        let a = TmpDir::new("uniq");
-        let b = TmpDir::new("uniq");
-        assert_ne!(a.path, b.path);
-        assert!(a.path.is_dir() && b.path.is_dir());
-        assert!(a.path.to_string_lossy().contains(&id().to_string()));
-    }
-
-    #[test]
-    fn tmp_dir_is_removed_with_its_contents() {
-        let path = {
-            let dir = TmpDir::new("drop");
-            std::fs::write(dir.join("inner"), b"x").unwrap();
-            dir.path.clone()
-        };
-        assert!(!path.exists());
     }
 }
