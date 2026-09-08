@@ -1,7 +1,7 @@
 use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name, TypeSpecifier};
 use crate::ast_node;
 use crate::context::Context;
-use crate::parser::Span;
+use libft::Span;
 
 ast_node! {
     pub struct FunctionParametersNode {

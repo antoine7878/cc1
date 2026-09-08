@@ -10,12 +10,12 @@ use crate::ast::{
     Statement, StatementNode, StringId, Tag, Value,
 };
 use crate::context::Context;
-use crate::parser::Span;
 use crate::semantic::resolution::{expression, statement};
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, Linkage, QualifiedType, ScopeKind, Sema,
     StatementScopes, Symbol, SymbolId, SymbolKind, SymbolScopes, TagDefId, constrain, declaration, ice,
 };
+use libft::Span;
 
 #[derive(Debug)]
 pub struct SymbolResolver<'a> {

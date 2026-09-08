@@ -8,7 +8,7 @@ pub mod resolution;
 pub mod sema;
 
 pub use analyzer::Analyzer;
-pub use diagnosis::{Diag, DiagCollector, Diagnosis, DiagnosisNode, ExpectedTokens, Severity};
+pub use diagnosis::{Diag, DiagCollector, Diagnosis, DiagnosisNode, ExpectedTokens};
 pub use eval::ice;
 
 pub use model::*;

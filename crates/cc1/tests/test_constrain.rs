@@ -4,7 +4,6 @@ use cc1::ast::{
     TypeSpecifier, Value,
 };
 use cc1::ast::{DeclaratorNode, Node};
-use cc1::parser::Span;
 use cc1::semantic::constrain::parameter::{check_complete_parameter, is_valid_old_style, param_storage_only_register};
 use cc1::semantic::constrain::specifier::{
     basic_type, check_external_specifiers, check_function_storage, check_qualifier, extern_function_only,
@@ -15,6 +14,7 @@ use cc1::semantic::constrain::ty::{
 };
 use cc1::semantic::{Diag, QualifiedType, ResolvedType, ScopeKind, Sema};
 use cc1::target::I386;
+use libft::Span;
 
 fn reported<T>(diag: &Diag<T>) -> String {
     match &diag.diagnosis {

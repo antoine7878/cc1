@@ -6,9 +6,10 @@ use crate::ast::{
     AstArenas, ExpressionNode, Name, StringId, StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, Value,
     ValueNode,
 };
-use crate::parser::{ParseState, Span};
+use crate::parser::ParseState;
 use crate::semantic::{DiagnosisNode, Sema};
 use crate::target::Target;
+use libft::{SourceMap, Span};
 
 #[derive(Debug)]
 pub struct Context {
@@ -63,20 +64,6 @@ impl Context {
         self.file_name = file_name;
     }
 
-    pub fn file_of(&self, span: Span) -> Option<&String> {
-        self.arenas.names.try_get(StringId::from(span.start.file))
-    }
-
-    pub fn source_line(&self, path: &str, line_no: usize) -> Option<String> {
-        let mut cache = self.source_cache.borrow_mut();
-        let lines = cache.entry(path.to_string()).or_insert_with(|| {
-            read_to_string(path)
-                .ok()
-                .map(|text| text.lines().map(str::to_string).collect())
-        });
-        lines.as_ref()?.get(line_no.checked_sub(1)?).cloned()
-    }
-
     pub fn struct_or_union(
         &mut self,
         tag: Tag,
@@ -89,5 +76,21 @@ impl Context {
             Tag::Union => TypeSpecifier::Union(self.arenas.unions.add(name, fields, span)),
             Tag::Enum => panic!("only for structs and unions"),
         }
+    }
+}
+
+impl SourceMap for Context {
+    fn path_of(&self, file: usize) -> Option<&str> {
+        self.arenas.names.try_get(StringId::from(file)).map(String::as_str)
+    }
+
+    fn source_line(&self, path: &str, line_no: usize) -> Option<String> {
+        let mut cache = self.source_cache.borrow_mut();
+        let lines = cache.entry(path.to_string()).or_insert_with(|| {
+            read_to_string(path)
+                .ok()
+                .map(|text| text.lines().map(str::to_string).collect())
+        });
+        lines.as_ref()?.get(line_no.checked_sub(1)?).cloned()
     }
 }

@@ -1,7 +1,7 @@
 use crate::ast::{AstArenas, DeclarationSpecifier, ExpressionNode, FunctionParametersNode, Name, Qualifier};
 use crate::context::Context;
-use crate::parser::Span;
 use crate::{ast_node, define_arena};
+use libft::Span;
 
 define_arena!(
     Declarator,

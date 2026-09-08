@@ -9,7 +9,8 @@ use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUni
 use crate::ast::{BinaryOp, MemberOp, UnaryOp};
 
 use crate::context::Context;
-use crate::parser::{YYLex, Span};
+use libft::Span;
+use crate::parser::YYLex;
 use crate::parser::yyerror;
 use crate::semantic::{Diagnosis, DiagnosisNode};
 

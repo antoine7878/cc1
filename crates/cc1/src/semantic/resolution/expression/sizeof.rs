@@ -1,10 +1,10 @@
 use crate::arena::OptionPoisoned;
 use crate::ast::{ExpressionNode, Type, Value};
 use crate::context::Context;
-use crate::parser::Span;
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{QualifiedType, Sema, SymbolResolver, constrain, declaration, layout};
+use libft::Span;
 
 pub fn size_of_e(sema: &mut Sema, node: &ExpressionNode, e: &ExpressionNode) -> R {
     let (ty, is_bit_field) = with_ops(&mut *sema, [e], |sema, [re]| {

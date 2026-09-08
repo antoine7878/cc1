@@ -1,5 +1,5 @@
 use crate::context::Context;
-use crate::utils::print_table;
+use libft::print_table;
 
 impl Context {
     pub fn dump_symbols(&self) {

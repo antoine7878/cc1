@@ -4,7 +4,7 @@
 %{
 use crate::ast::{Name, StringLiteralNode, ValueNode, Value};
 use crate::context::Context;
-use crate::parser::span::{Position, Span};
+use libft::{Position, Span};
 use crate::parser::{YYToken, YYFeedback};
 use crate::semantic::{Diag, DiagnosisNode};
 

@@ -2,12 +2,12 @@ use std::fmt;
 
 use crate::arena::ResolveWith;
 use crate::ast::{self};
-use crate::parser::Span;
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId,
     Sema,
 };
+use libft::Span;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ImplicitCast {

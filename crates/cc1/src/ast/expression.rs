@@ -1,8 +1,8 @@
 use crate::ast::{
     AstArenas, BinaryOp, DeclarationSpecifier, DeclaratorNode, MemberOp, Name, StringLiteralNode, UnaryOp, ValueNode,
 };
-use crate::parser::Span;
 use crate::{ast_node, define_arena};
+use libft::Span;
 
 define_arena!(
     Expression,

@@ -1,6 +1,6 @@
 use crate::ast::{CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode};
 use crate::ast_node;
-use crate::parser::Span;
+use libft::Span;
 
 ast_node! {
     pub struct TranslationUnitNode {

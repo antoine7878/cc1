@@ -1,9 +1,17 @@
 pub mod args;
 pub mod bitset;
+pub mod color;
+pub mod diagnostic;
 pub mod dot;
 pub mod escape;
+pub mod span;
+pub mod table;
 
 pub use args::{ArgError, ArgParser};
 pub use bitset::BitSet;
+pub use color::*;
+pub use diagnostic::{Severity, SourceMap, render};
 pub use dot::Dot;
 pub use escape::simple_escape;
+pub use span::{Position, Span};
+pub use table::print_table;

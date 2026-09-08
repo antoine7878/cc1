@@ -4,11 +4,11 @@ use crate::ast::{
     ParameterDeclaration, Tag, TypeSpecifier,
 };
 use crate::context::Context;
-use crate::parser::Span;
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     DeclaredParams, Diag, DiagCollector, Diagnosis, ParamInfo, QualifiedType, ResolvedType, SymbolResolver, constrain,
 };
+use libft::Span;
 
 pub fn base_type(
     resolver: &mut SymbolResolver,

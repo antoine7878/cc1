@@ -10,6 +10,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ccp"
+version = "0.1.0"
+dependencies = [
+ "libft",
+]
+
+[[package]]
+name = "fcc"
+version = "0.1.0"
+dependencies = [
+ "libft",
+]
+
+[[package]]
 name = "ft_lex"
 version = "0.1.0"
 dependencies = [

@@ -1,10 +1,10 @@
 use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, ExpressionNode, Value};
 use crate::context::Context;
-use crate::parser::Span;
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{Diag, DiagCollector, Diagnosis, ResolvedExpression, ResolvedType, Sema, cast, ice};
+use libft::Span;
 
 pub fn multiplicative(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {

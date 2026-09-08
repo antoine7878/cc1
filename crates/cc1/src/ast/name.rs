@@ -2,8 +2,8 @@ use std::fmt;
 
 use crate::ast::{AstArenas, Node};
 use crate::define_interner;
-use crate::parser::Span;
-use crate::utils::{BLUE, RESET};
+use libft::Span;
+use libft::{BLUE, RESET};
 
 define_interner!(String, StringArena, StringId, AstArenas, arenas, names);
 

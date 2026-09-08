@@ -1,11 +1,11 @@
 use crate::arena::ResolveWith;
 use crate::ast::{EnumId, ExpressionNode, Name, StructDeclaration, Tag};
 use crate::context::Context;
-use crate::parser::Span;
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, Member, QualifiedType, Symbol, SymbolKind, SymbolResolver, TagDefId, constrain,
 };
+use libft::Span;
 
 pub fn struct_or_union_tag(
     resolver: &mut SymbolResolver,

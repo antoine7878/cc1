@@ -1,12 +1,12 @@
 use crate::arena::ResolveWith;
 use crate::ast::{DeclarationNode, DeclarationSpecifier, DeclaratorNode, FunctionDefinitionNode, Name, Storage};
 use crate::context::Context;
-use crate::parser::Span;
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     DeclaredParams, Definition, Diag, DiagCollector, Diagnosis, FunctionDefId, ParamInfo, ParamTypes, QualifiedType,
     ResolvedType, Sema, Symbol, SymbolId, SymbolKind, SymbolResolver, constrain,
 };
+use libft::Span;
 
 #[derive(Debug, Clone)]
 pub struct FunctionHeader {

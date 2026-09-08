@@ -1,4 +1,4 @@
-use crate::utils::{BLUE, RESET};
+use crate::color::{BLUE, RESET};
 
 pub fn print_table<const N: usize>(headers: &[&str; N], rows: &[[String; N]]) {
     if rows.is_empty() {

@@ -3,13 +3,13 @@ use crate::ast::{
     DeclarationNode, DeclarationSpecifier, DeclaratorNode, InitDeclaratorNode, InitializerNode, Storage, TypeSpecifier,
 };
 use crate::context::Context;
-use crate::parser::Span;
 use crate::semantic::model::initializer;
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, QualifiedType, ResolvedType, ScopeKind, Symbol, SymbolId, SymbolKind,
     SymbolResolver, constrain,
 };
+use libft::Span;
 
 pub fn requires_complete_object(resolver: &SymbolResolver, ty: QualifiedType, storage: Storage, is_init: bool) -> bool {
     if ty.is_void(resolver.sema) {

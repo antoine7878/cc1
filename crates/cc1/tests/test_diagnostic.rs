@@ -1,3 +1,5 @@
+use libft::SourceMap;
+
 use crate::common::{Unit, strip_ansi};
 
 reports!(

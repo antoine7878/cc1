@@ -5,13 +5,13 @@ use crate::arena::{HasTable, ResolveMutWith, ResolveWith, SideTable};
 use crate::ast::statement::StatementId;
 use crate::ast::{AstArenas, DeclaratorId, ExpressionId, StringId, Value};
 use crate::context::Context;
-use crate::parser::Span;
 use crate::semantic::{
     Builtins, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, InitializerArena, Linkage,
     MemberRef, ResolvedExpression, ResolvedStatement, ResolvedTypeArena, ResolvedTypeId, Symbol, SymbolArena, SymbolId,
     TagDefArena,
 };
 use crate::target::{Layout, Target};
+use libft::Span;
 
 #[derive(Debug, Clone)]
 pub struct External {

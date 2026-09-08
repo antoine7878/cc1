@@ -2,8 +2,8 @@ use crate::ast::{AstArenas, escape};
 use crate::ast_node;
 use crate::context::Context;
 use crate::define_interner;
-use crate::parser::Span;
 use crate::semantic::{Diag, QualifiedType, Sema};
+use libft::Span;
 
 define_interner!(StringConstant, StringPool, StringConstId, AstArenas, arenas, strings);
 

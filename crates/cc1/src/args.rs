@@ -7,9 +7,9 @@ use std::vec;
 use libft::{ArgError, ArgParser};
 
 use crate::context::Context;
-use crate::parser::Span;
 use crate::semantic::{Diagnosis, DiagnosisNode};
 use crate::target::{I386, Target, X86_64};
+use libft::Span;
 
 #[derive(Debug)]
 pub struct Args {

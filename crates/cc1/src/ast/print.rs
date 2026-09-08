@@ -16,7 +16,7 @@ use crate::ast::{
 };
 use crate::context::Context;
 use crate::semantic::ExpressionKind;
-use crate::utils::{CYAN, GRAY, GREEN, RESET};
+use libft::{CYAN, GRAY, GREEN, RESET};
 
 pub struct AstPrinter {
     depth: usize,

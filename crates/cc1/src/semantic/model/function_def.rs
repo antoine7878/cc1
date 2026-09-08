@@ -2,9 +2,9 @@ use std::iter::zip;
 
 use crate::ast::{Name, Storage};
 use crate::define_arena;
-use crate::parser::Span;
 use crate::semantic::model::cast::default_argument_promotions;
 use crate::semantic::{ExpressionKind, QualifiedType, ResolvedExpression, Sema, SymbolId};
+use libft::Span;
 
 define_arena!(FunctionDef, FunctionDefArena, FunctionDefId, Sema, sema, functions);
 

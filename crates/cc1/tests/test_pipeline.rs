@@ -1,9 +1,9 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use cc1::context::Context;
-use cc1::parser::Span;
 use cc1::pipeline::Pipeline;
 use cc1::semantic::{Diagnosis, DiagnosisNode, ExpectedTokens};
+use libft::Span;
 
 static TAPPED: AtomicUsize = AtomicUsize::new(0);
 static CHECKED: AtomicUsize = AtomicUsize::new(0);

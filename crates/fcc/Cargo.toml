@@ -1,0 +1,7 @@
+[package]
+name = "fcc"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+libft.workspace = true

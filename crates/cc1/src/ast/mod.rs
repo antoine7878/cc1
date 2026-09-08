@@ -41,7 +41,7 @@ pub use unit::{ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionN
 pub use value::{Fold, Value, ValueNode};
 pub use visit::Visitor;
 
-use crate::parser::Span;
+use libft::Span;
 
 pub trait Node {
     fn span(&self) -> Span;
@@ -56,12 +56,12 @@ macro_rules! ast_node {
     ) => {
         #[derive(Clone, Debug, PartialEq)]
         $vis struct $name {
-            pub span: $crate::parser::Span,
+            pub span: ::libft::Span,
             $($field_vis $field: $ty,)*
         }
 
         impl $name {
-            pub fn new($($field: $ty,)* span: $crate::parser::Span) -> Self {
+            pub fn new($($field: $ty,)* span: ::libft::Span) -> Self {
                 Self {
                     $($field,)*
                     span,
@@ -72,13 +72,13 @@ macro_rules! ast_node {
 
         impl std::fmt::Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}{}{} {}", $crate::utils::BLUE, stringify!($name), $crate::utils::RESET, self.span)
+                write!(f, "{}{}{} {}", ::libft::BLUE, stringify!($name), ::libft::RESET, self.span)
             }
         }
 
 
         impl $crate::ast::Node for $name {
-            fn span(&self) -> $crate::parser::Span {
+            fn span(&self) -> ::libft::Span {
                 self.span
             }
         }

@@ -3,9 +3,8 @@ use std::io::{self, Write, stderr};
 
 use crate::ast::{Name, StringId, UnaryOp, Value};
 use crate::context::Context;
-use crate::parser::Span;
 use crate::semantic::{QualifiedType, SymbolKind};
-use crate::utils::{RED, RESET, YELLOW};
+use libft::{Severity, Span, render};
 
 #[derive(Clone, Debug)]
 pub enum Diagnosis {
@@ -226,7 +225,7 @@ impl DiagnosisNode {
     }
 
     pub fn write<W: Write>(&self, w: &mut W, ctx: &Context) -> io::Result<()> {
-        report(w, ctx, self.span, self.severity(), self.message(ctx))
+        render(w, ctx, "cc1", self.span, self.severity(), self.message(ctx))
     }
 
     #[rustfmt::skip]
@@ -423,29 +422,6 @@ impl DiagnosisNode {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Severity {
-    Warning,
-    Error,
-}
-
-impl Severity {
-    pub fn color(&self) -> &'static str {
-        match self {
-            Severity::Warning => YELLOW,
-            Severity::Error => RED,
-        }
-    }
-}
-
-impl Display for Severity {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Severity::Warning => write!(f, "warning"),
-            Severity::Error => write!(f, "error"),
-        }
-    }
-}
 pub trait DiagCollector {
     fn diagnosis(&mut self) -> &mut Vec<DiagnosisNode>;
 
@@ -493,50 +469,6 @@ impl<T> Diag<T> {
 pub struct DiagnosisNode {
     pub span: Span,
     pub inner: Diagnosis,
-}
-
-pub fn report<W: Write, D: Display>(
-    w: &mut W,
-    ctx: &Context,
-    span: Span,
-    severity: Severity,
-    msg: D,
-) -> io::Result<()> {
-    let line_no = span.start.line;
-    let padding = line_no.to_string().len();
-    let mid_pad = 9usize.saturating_sub(padding);
-
-    let color = severity.color();
-
-    let Some(path) = ctx.file_of(span) else {
-        return writeln!(w, "cc1: {color}{severity}:{RESET} {msg}");
-    };
-
-    writeln!(
-        w,
-        "{path}:{line_no}:{}: {color}{severity}:{RESET} {msg}",
-        span.start.col,
-    )?;
-
-    let Some(line) = ctx.source_line(path, line_no) else { return Ok(()) };
-    let line = line.replace('\t', " ");
-    let col_no = caret_end(span, &line);
-
-    writeln!(w, "     {:>padding$}|{:>mid_pad$}{line}", line_no, "")?;
-    writeln!(
-        w,
-        "     {:>padding$}|{:>mid_pad$}{color}{:>col_no$}{RESET} ",
-        "",
-        "",
-        "^".repeat(col_no + 1 - span.start.col)
-    )
-}
-
-fn caret_end(span: Span, line: &str) -> usize {
-    match span.start.line == span.end.line {
-        true => span.end.col.max(span.start.col),
-        false => line.len().max(span.start.col),
-    }
 }
 
 pub const MAX_EXPECTED: usize = 5;
