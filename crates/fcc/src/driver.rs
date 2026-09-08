@@ -43,8 +43,7 @@ fn compile(args: &Args, input: &str, tmp: &Path, id: usize) -> Result<Option<Str
     if entry == Stage::Link {
         return Ok(Some(input.to_string()));
     }
-    let steps = plan(input, args.last, args.output.as_deref(), tmp, id)
-        .map_err(|e| format!("fcc: {e}"))?;
+    let steps = plan(input, args.last, args.output.as_deref(), tmp, id).map_err(|e| format!("fcc: {e}"))?;
     for step in &steps {
         drive(args, step)?;
     }

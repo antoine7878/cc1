@@ -55,7 +55,10 @@ mod tests {
 
     #[test]
     fn explicit_output_wins() {
-        assert_eq!(output_of("a.c", Stage::Compile, Some("out.ll")), PathBuf::from("out.ll"));
+        assert_eq!(
+            output_of("a.c", Stage::Compile, Some("out.ll")),
+            PathBuf::from("out.ll")
+        );
         assert_eq!(output_of("a.c", Stage::Preprocess, Some("a.i")), PathBuf::from("a.i"));
     }
 

@@ -237,8 +237,14 @@ mod tests {
 
     #[test]
     fn rejects_output_with_several_sources() {
-        assert!(matches!(argv(&["-c", "-o", "x.o", "a.c", "b.c"]).check(), Err(ArgError::Process(_))));
-        assert!(matches!(argv(&["-c", "-o", "x.o", "a.c", "b.o"]).check(), Err(ArgError::NotAfile(_))));
+        assert!(matches!(
+            argv(&["-c", "-o", "x.o", "a.c", "b.c"]).check(),
+            Err(ArgError::Process(_))
+        ));
+        assert!(matches!(
+            argv(&["-c", "-o", "x.o", "a.c", "b.o"]).check(),
+            Err(ArgError::NotAfile(_))
+        ));
     }
 
     #[test]
