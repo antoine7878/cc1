@@ -41,12 +41,9 @@ pub use unit::{ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionN
 pub use value::{Fold, Value, ValueNode};
 pub use visit::Visitor;
 
-use libft::Span;
-
 pub trait Node {
-    fn span(&self) -> Span;
+    fn span(&self) -> libft::Span;
 }
-
 #[macro_export]
 macro_rules! ast_node {
     (

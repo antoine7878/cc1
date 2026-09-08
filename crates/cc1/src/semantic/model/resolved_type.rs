@@ -115,6 +115,22 @@ impl ResolvedType {
                 | ResolvedType::UnsignedLong
         )
     }
+
+    pub fn interge_prefix(&self) -> &str {
+        match self {
+            ResolvedType::Char
+            | ResolvedType::SignedChar
+            | ResolvedType::Short
+            | ResolvedType::Int
+            | ResolvedType::Long => "i",
+            ResolvedType::UnsignedChar
+            | ResolvedType::UnsignedShort
+            | ResolvedType::UnsignedInt
+            | ResolvedType::UnsignedLong => "u",
+            ResolvedType::Float | ResolvedType::Double | ResolvedType::LongDouble => "f",
+            _ => "",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -294,9 +310,7 @@ impl QualifiedType {
             _ => false,
         }
     }
-}
 
-impl QualifiedType {
     pub fn describe<'a>(&'a self, sema: &'a Sema, ctx: &'a Context) -> TypeName<'a> {
         TypeName(self, sema, ctx)
     }

@@ -201,7 +201,7 @@ fn missing_value_at_end_of_argv() {
 #[test]
 fn wrong_type_reports_the_offending_value() {
     match Mock::err(&["-n", "x1"]) {
-        ArgError::WrongType('n', value) => assert_eq!(value, "x1"),
+        ArgError::WrongValue('n', value) => assert_eq!(value, "x1"),
         other => panic!("unexpected {other:?}"),
     }
 }
@@ -223,7 +223,7 @@ fn error_messages_mention_the_option() {
         "Unknown option --long"
     );
     assert_eq!(
-        ArgError::WrongType('n', "x".into()).to_string(),
+        ArgError::WrongValue('n', "x".into()).to_string(),
         "x is not a value of option -n "
     );
     assert_eq!(
@@ -326,7 +326,7 @@ fn reference(argv: &[String]) -> Result<State, ArgError> {
                 'o' => state.output = Some(value()?),
                 'n' => {
                     let raw = value()?;
-                    let parsed = raw.parse().map_err(|_| ArgError::WrongType('n', raw))?;
+                    let parsed = raw.parse().map_err(|_| ArgError::WrongValue('n', raw))?;
                     state.count = Some(parsed);
                 }
                 c => return Err(ArgError::UnknownOption(c)),

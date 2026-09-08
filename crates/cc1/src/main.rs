@@ -1,10 +1,9 @@
 use cc1::args::parse_args;
-use cc1::ast::print::AstPrinter;
+// use cc1::ast::print::AstPrinter;
 use cc1::context::Context;
-use cc1::parser;
 use cc1::pipeline::Pipeline;
 use cc1::semantic::Analyzer;
-
+use cc1::{codegen, parser};
 fn main() {
     Pipeline::default()
         .pass_group([parse_args])
@@ -18,7 +17,8 @@ fn main() {
             Analyzer::finalize_layouts,
         ])
         .checkpoint()
-        .report(AstPrinter::print)
-        .report(Context::dump_symbols)
+        .pass_group([codegen::generate])
+        // .report(AstPrinter::print)
+        // .report(Context::dump_symbols)
         .finally(Context::dump_diagnostics);
 }

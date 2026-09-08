@@ -1,6 +1,5 @@
 FROM ubuntu:24.04
 
-
 RUN dpkg --add-architecture i386 && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -9,6 +8,9 @@ RUN dpkg --add-architecture i386 && \
     gcc-multilib \
     binutils \
     bison \
+    clang \
+    llvm \
+    wget \
     make \
     flex \
     curl \
@@ -16,7 +18,6 @@ RUN dpkg --add-architecture i386 && \
     zsh \
     git \
     vim \
-    clang \
     gdb
 
 RUN rm -rf /var/lib/apt/lists/*

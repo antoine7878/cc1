@@ -20,6 +20,8 @@ dependencies = [
 name = "fcc"
 version = "0.1.0"
 dependencies = [
+ "cc1",
+ "ccp",
  "libft",
 ]
 

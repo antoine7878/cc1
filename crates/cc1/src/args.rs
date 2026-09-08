@@ -12,8 +12,9 @@ use libft::Span;
 
 #[derive(Debug)]
 pub struct Args {
-    pub inputs: Vec<String>,
+    pub infiles: Vec<String>,
     pub target: Target,
+    pub outfile: Option<String>,
     argv: vec::IntoIter<String>,
 }
 
@@ -21,7 +22,7 @@ impl ArgParser for Args {
     type Argv = vec::IntoIter<String>;
 
     fn positional(&mut self, arg: String) {
-        self.inputs.push(arg);
+        self.infiles.push(arg);
     }
 
     fn argv(&mut self) -> &mut Self::Argv {
@@ -31,6 +32,7 @@ impl ArgParser for Args {
     fn flag(&mut self, c: char, it: &mut Chars) -> Result<(), ArgError> {
         match c {
             'm' => self.target = machine(&self.value::<String>(it, 'm')?)?,
+            'o' => self.outfile = self.value(it, 'o')?,
             'h' => Self::help(),
             c => return Err(ArgError::UnknownOption(c)),
         }
@@ -38,35 +40,29 @@ impl ArgParser for Args {
     }
 }
 
+impl Default for Args {
+    fn default() -> Self {
+        Self {
+            infiles: Vec::default(),
+            target: X86_64,
+            outfile: None,
+            argv: argv(),
+        }
+    }
+}
+
 impl Args {
     pub fn parse() -> Result<Self, ArgError> {
-        Self::from_argv(argv())?.check_input()
-    }
-
-    pub fn from_argv<I: IntoIterator<Item = String>>(argv: I) -> Result<Self, ArgError> {
-        let mut parsed = Self {
-            inputs: Vec::new(),
-            target: X86_64,
-            argv: argv.into_iter().collect::<Vec<_>>().into_iter(),
-        };
+        let mut parsed = Self::default();
         parsed.walk()?;
         parsed.check()
     }
 
     fn check(self) -> Result<Self, ArgError> {
-        match self.inputs.len() {
-            1 => Ok(self),
-            len => Err(ArgError::BadArgumentCount(len, 1)),
-        }
-    }
-
-    pub fn check_input(self) -> Result<Self, ArgError> {
-        let Some(input) = self.inputs.first().cloned() else {
-            return Err(ArgError::BadArgumentCount(0, 1));
-        };
-        match Path::new(&input).is_file() {
-            true => Ok(self),
-            false => Err(ArgError::NotAfile(input)),
+        match self.infiles.len() {
+            1 if Path::new(&self.infiles[0]).is_file() => Ok(self),
+            1 => Err(ArgError::NotAfile(self.infiles[0].clone())),
+            n => Err(ArgError::BadArgumentCount(n, 1)),
         }
     }
 
@@ -82,7 +78,7 @@ fn machine(value: &str) -> Result<Target, ArgError> {
     match value {
         "32" => Ok(I386),
         "64" => Ok(X86_64),
-        _ => Err(ArgError::WrongType('m', value.to_string())),
+        _ => Err(ArgError::WrongValue('m', value.to_string())),
     }
 }
 
@@ -90,7 +86,7 @@ pub fn parse_args(mut ctx: Context) -> Context {
     match Args::parse() {
         Ok(mut args) => {
             ctx.set_target(args.target);
-            ctx.set_file_name(args.inputs.swap_remove(0));
+            ctx.set_file_name(args.infiles.swap_remove(0));
         }
         Err(error) => ctx.diagnosis.push(DiagnosisNode::new(
             Diagnosis::BadArguments(error.to_string()),

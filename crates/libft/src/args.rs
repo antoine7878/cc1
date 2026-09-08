@@ -6,7 +6,7 @@ use std::vec;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArgError {
     MissingValue(char),
-    WrongType(char, String),
+    WrongValue(char, String),
     UnknownOption(char),
     UnknownLongOption(String),
     BadArgumentCount(usize, usize),
@@ -20,7 +20,7 @@ impl fmt::Display for ArgError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ArgError::MissingValue(opt) => write!(f, "Option -{} is missing a value", opt),
-            ArgError::WrongType(opt, val) => write!(f, "{} is not a value of option -{} ", val, opt),
+            ArgError::WrongValue(opt, val) => write!(f, "{} is not a value of option -{} ", val, opt),
             ArgError::UnknownOption(opt) => write!(f, "Unknown option -{}", opt),
             ArgError::UnknownLongOption(opt) => write!(f, "Unknown option {}", opt),
             ArgError::BadArgumentCount(a, b) => write!(f, "Bad argument count, got {}, expected {}", a, b),
@@ -73,6 +73,6 @@ pub trait ArgParser: Sized {
                 _ => return Err(ArgError::MissingValue(opt)),
             }
         }
-        T::try_from(str_value.clone()).map_err(|_| ArgError::WrongType(opt, str_value))
+        T::try_from(str_value.clone()).map_err(|_| ArgError::WrongValue(opt, str_value))
     }
 }

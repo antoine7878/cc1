@@ -1,41 +1,44 @@
-NAME = target/debug/cc1
+CC1 = target/debug/cc1
+FCC = target/debug/fcc
 
 FT_LEX  = target/release/ft_lex
 FT_YACC = target/release/ft_yacc
 
-GEN_CRATES = cc1
-GEN = $(foreach c,$(GEN_CRATES),crates/$(c)/src/parser/lex.rs crates/$(c)/src/parser/yacc.rs)
+C_L = crates/cc1/src/parser/c.l
+C_Y = crates/cc1/src/parser/c.y
 
-# ----- cc1 --------------------
+LEX_RS =  crates/cc1/src/parser/lex.rs
+YACC_RS = crates/cc1/src/parser/yacc.rs
 
-all: $(NAME)
-
-$(NAME): $(GEN)
-	cargo build
-
-# ----- ft_lex / ft_yacc --------------------
+all: $(LEX_RS) $(YACC_RS)
+	cargo build -p ccp -p cc1 -p fcc
 
 $(FT_LEX) $(FT_YACC):
 	cargo build --release -p ft_lex -p ft_yacc
 
-crates/%/src/parser/lex.rs: crates/%/src/parser/c.l | $(FT_LEX)
+$(LEX_RS): $(C_L) | $(FT_LEX)
 	$(FT_LEX) -c $< -o $@
 
-crates/%/src/parser/yacc.rs: crates/%/src/parser/c.y | $(FT_YACC)
+$(YACC_RS): $(C_Y)
 	$(FT_YACC) $< -o $@
 
 # ----- test --------------------
 
-test: $(NAME)
-	clang -E -std=c89 rscs/hello.c > rscs/hello.i
-	./$(NAME) -m32 rscs/hello.i
+# test: all
+# 	clang -E -std=c89 rscs/hello.c > rscs/hello.i
+# 	./$(CC1) -m32 rscs/hello.i
 
-ctest: $(NAME)
+test: all
+	rm -f ./hello.s ./hello.o ./a.out
+	cargo run --bin fcc -- -m32 ./rscs/hello.c && ./a.out || echo $$?
+
+ctest: all
 	cargo nextest run -p cc1
 
-ttest:
-	cargo build --release -p ft_lex -p ft_yacc
+ttest: all
 	cargo nextest run
+
+# ----- reference --------------------
 
 CFF = -m32 -std=iso9899:1990
 
@@ -46,6 +49,12 @@ cc:
 	gcc $(CFF) rscs/hello.c
 	./a.out
 	rm ./a.out
+
+llvm:
+	clang -S -emit-llvm rscs/hello.c
+	llc hello.ll
+	as -c hello.s -o hello.o
+	clang hello.o
 
 empty :=
 space := $(empty) $(empty)
@@ -66,12 +75,12 @@ COV_SKIP = \
 	crates/cc1/src/ast/type_specifier.rs \
 	crates/cc1/src/semantic/diagnosis.rs
 
-coverage: $(NAME)
+coverage: all
 	cargo llvm-cov nextest --ignore-filename-regex '$(subst $(space),|,$(strip $(COV_SKIP)))'
 
 clean:
 	cargo clean
-	rm -f $(GEN)
+	rm -f $(LEX_RS) $(YACC_RS)
 
 re: clean all
 

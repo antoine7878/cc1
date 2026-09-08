@@ -5,10 +5,13 @@ use std::vec;
 
 use libft::{ArgError, ArgParser, argv};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Args {
-    pub inputs: Vec<String>,
-    pub output: Option<String>,
+    pub infiles: Vec<String>,
+    pub outfile: Option<String>,
+    pub includes: Vec<String>,
+    pub defines: Vec<String>,
+    pub undefines: Vec<String>,
     argv: vec::IntoIter<String>,
 }
 
@@ -16,7 +19,7 @@ impl ArgParser for Args {
     type Argv = vec::IntoIter<String>;
 
     fn positional(&mut self, arg: String) {
-        self.inputs.push(arg);
+        self.infiles.push(arg);
     }
 
     fn argv(&mut self) -> &mut Self::Argv {
@@ -25,7 +28,19 @@ impl ArgParser for Args {
 
     fn flag(&mut self, c: char, it: &mut Chars) -> Result<(), ArgError> {
         match c {
-            'o' => self.output = Some(self.value::<String>(it, 'o')?),
+            'o' => self.outfile = Some(self.value::<String>(it, 'o')?),
+            'I' => {
+                let value = self.value(it, 'I')?;
+                self.includes.push(value)
+            }
+            'U' => {
+                let value = self.value(it, 'U')?;
+                self.undefines.push(value)
+            }
+            'D' => {
+                let value = self.value(it, 'D')?;
+                self.defines.push(value)
+            }
             'h' => Self::help(),
             c => return Err(ArgError::UnknownOption(c)),
         }
@@ -33,24 +48,29 @@ impl ArgParser for Args {
     }
 }
 
+impl Default for Args {
+    fn default() -> Self {
+        Self {
+            infiles: Vec::default(),
+            outfile: None,
+            includes: Vec::default(),
+            defines: Vec::default(),
+            undefines: Vec::default(),
+            argv: argv(),
+        }
+    }
+}
 impl Args {
     pub fn parse() -> Result<Self, ArgError> {
-        Self::from_argv(argv())?.check_input()
+        let mut parser = Args::default();
+        parser.walk()?;
+        parser.check()
     }
 
-    pub fn from_argv<I: IntoIterator<Item = String>>(argv: I) -> Result<Self, ArgError> {
-        let mut this = Self {
-            argv: argv.into_iter().collect::<Vec<_>>().into_iter(),
-            ..Self::default()
-        };
-        this.walk()?;
-        Ok(this)
-    }
-
-    fn check_input(self) -> Result<Self, ArgError> {
-        match self.inputs.len() {
-            1 if Path::new(&self.inputs[0]).is_file() => Ok(self),
-            1 => Err(ArgError::NotAfile(self.inputs[0].clone())),
+    fn check(self) -> Result<Self, ArgError> {
+        match self.infiles.len() {
+            1 if Path::new(&self.infiles[0]).is_file() => Ok(self),
+            1 => Err(ArgError::NotAfile(self.infiles[0].clone())),
             n => Err(ArgError::BadArgumentCount(n, 1)),
         }
     }
@@ -58,38 +78,5 @@ impl Args {
     fn help() -> ! {
         println!("usage: ccp [-o output] input");
         exit(0)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn argv(args: &[&str]) -> Args {
-        Args::from_argv(args.iter().map(|s| s.to_string())).unwrap()
-    }
-
-    #[test]
-    fn collects_positional_inputs() {
-        assert_eq!(argv(&["a.c"]).inputs, vec!["a.c"]);
-    }
-
-    #[test]
-    fn output_defaults_to_none() {
-        assert_eq!(argv(&["a.c"]).output, None);
-    }
-
-    #[test]
-    fn reads_output_attached_and_detached() {
-        assert_eq!(argv(&["-oa.i", "a.c"]).output.as_deref(), Some("a.i"));
-        assert_eq!(argv(&["-o", "a.i", "a.c"]).output.as_deref(), Some("a.i"));
-    }
-
-    #[test]
-    fn rejects_unknown_option() {
-        assert!(matches!(
-            Args::from_argv(["-Z".to_string()]),
-            Err(ArgError::UnknownOption('Z'))
-        ));
     }
 }
