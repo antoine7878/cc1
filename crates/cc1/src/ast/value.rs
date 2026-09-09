@@ -3,7 +3,7 @@ use std::fmt;
 
 use crate::ast_node;
 use crate::semantic::{Diag, Diagnosis, QualifiedType, ResolvedType, Sema};
-use crate::target::Target;
+use crate::target::{FloatFormat, Target};
 
 use crate::ast::{BinaryOp, F80, UnaryOp, escape};
 
@@ -107,13 +107,13 @@ impl Value {
         }
     }
 
-    fn parse_float(s: &str) -> Self {
+    fn parse_float(s: &str, target: &Target) -> Self {
         let s = s.to_lowercase();
         let suffix = Self::get_float_suffix(s.as_str());
         let s = &s[0..(s.len() - suffix.len())];
         match suffix {
             "f" => Value::Float(s.parse::<f32>().unwrap()),
-            "l" => Value::LongDouble(F80::from(s)),
+            "l" => Value::LongDouble(target.long_double_format.round(F80::from(s))),
             _ => Value::Double(s.parse::<f64>().unwrap()),
         }
     }
@@ -173,7 +173,7 @@ impl Value {
         if s.contains('\'') {
             Diag::ok(Self::parse_char(s, target))
         } else if !lower.starts_with("0x") && (lower.contains('.') || lower.contains('e')) {
-            Diag::ok(Self::parse_float(s))
+            Diag::ok(Self::parse_float(s, target))
         } else {
             Self::parse_integer(s, target)
         }
@@ -310,9 +310,13 @@ impl<'a> Fold<'a> {
         match ty {
             ResolvedType::Float => Some(Value::Float(value.to_f64() as f32)),
             ResolvedType::Double => Some(Value::Double(value.to_f64())),
-            ResolvedType::LongDouble => Some(Value::LongDouble(value.to_f80())),
+            ResolvedType::LongDouble => Some(self.long_double(value.to_f80())),
             _ => self.target.cast(ty, value),
         }
+    }
+
+    fn long_double(&self, value: F80) -> Value {
+        Value::LongDouble(self.target.long_double_format.round(value))
     }
 
     fn shift(&self, ty: &ResolvedType, op: BinaryOp, lhs: Value, rhs: Value) -> Value {
@@ -347,7 +351,7 @@ impl<'a> Fold<'a> {
     fn floating(&self, ty: &ResolvedType, op: BinaryOp, lhs: Value, rhs: Value) -> Value {
         use BinaryOp::{Add, Div, Mul, Sub};
 
-        if matches!(ty, ResolvedType::LongDouble) {
+        if matches!(ty, ResolvedType::LongDouble) && self.target.long_double_format == FloatFormat::X87 {
             let (a, b) = (lhs.to_f80(), rhs.to_f80());
             return Value::LongDouble(match op {
                 Add => a + b,
@@ -423,7 +427,7 @@ impl<'a> Fold<'a> {
 
     fn neg(&self, ty: &ResolvedType, value: Value) -> Diag<Value> {
         if matches!(ty, ResolvedType::LongDouble) {
-            return Diag::ok(Value::LongDouble(-value.to_f80()));
+            return Diag::ok(self.long_double(-value.to_f80()));
         }
         if ty.is_floating() {
             let negated = self.convert(ty, Value::Double(-value.to_f64()));

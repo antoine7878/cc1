@@ -53,8 +53,8 @@ impl<W: Write> Generator<W> {
 
 impl<W: Write> Visitor for Generator<W> {
     fn visit_translation_unit(&mut self, ctx: &Context, node: &TranslationUnitNode) {
-        emitln!(self, r#"target datalayout = "<{} layout>""#, ctx.target.name);
-        emitln!(self, r#"target triple = "{}-pc-linux-gnu""#, ctx.target.name);
+        emitln!(self, r#"target datalayout = "{}""#, ctx.target.datalayout);
+        emitln!(self, r#"target triple = "{}""#, ctx.target.triple);
         emitln!(self);
         walk_translation_unit(self, ctx, node);
     }
@@ -122,7 +122,7 @@ impl LLVM for ResolvedType {
             | ResolvedType::Int => emit!(w, "i{}", ctx.target.layout(self).unwrap().size * 8),
             ResolvedType::Float => emit!(w, "{}", ctx.target.float.floating_name()),
             ResolvedType::Double => emit!(w, "{}", ctx.target.double.floating_name()),
-            ResolvedType::LongDouble => emit!(w, "{}", ctx.target.long_double.floating_name()),
+            ResolvedType::LongDouble => emit!(w, "{}", ctx.target.long_double_format.llvm()),
             ResolvedType::Function { .. } => todo!(),
             ResolvedType::Tag { .. } => todo!(),
             ResolvedType::Array { .. } => todo!(),

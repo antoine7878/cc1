@@ -1,7 +1,7 @@
 use crate::common::{Unit, repr};
 use cc1::ast::{F80, Value};
 use cc1::semantic::{QualifiedType, ResolvedType, ResolvedTypeId, TagDefId};
-use cc1::target::{I386, Target, X86_64};
+use cc1::target::{ARM64_DARWIN, FloatFormat, I386, Target, X86_64};
 
 fn layout(target: &Target, ty: &ResolvedType) -> Option<(u32, u32)> {
     target.layout(ty).map(|l| (l.size, l.align))
@@ -243,4 +243,69 @@ fn the_selected_target_drives_ptrdiff_t() {
     assert!(Unit::compile_for(X86_64, subtract).accepts());
     assert_eq!(I386.ptrdiff_t, ResolvedType::Int);
     assert_eq!(X86_64.ptrdiff_t, ResolvedType::Long);
+}
+
+#[test]
+fn arm64_scalar_layouts() {
+    assert_eq!(layout(&ARM64_DARWIN, &ResolvedType::Char), Some((1, 1)));
+    assert_eq!(layout(&ARM64_DARWIN, &ResolvedType::Short), Some((2, 2)));
+    assert_eq!(layout(&ARM64_DARWIN, &ResolvedType::Int), Some((4, 4)));
+    assert_eq!(layout(&ARM64_DARWIN, &ResolvedType::Long), Some((8, 8)));
+    assert_eq!(layout(&ARM64_DARWIN, &ResolvedType::UnsignedLong), Some((8, 8)));
+    assert_eq!(layout(&ARM64_DARWIN, &ResolvedType::Float), Some((4, 4)));
+    assert_eq!(layout(&ARM64_DARWIN, &ResolvedType::Double), Some((8, 8)));
+    assert_eq!(layout(&ARM64_DARWIN, &ResolvedType::LongDouble), Some((8, 8)));
+    assert_eq!(layout(&ARM64_DARWIN, &pointer_to_int()), Some((8, 8)));
+}
+
+#[test]
+fn arm64_abi_types_and_ranges() {
+    assert_eq!(ARM64_DARWIN.name, "arm64");
+    assert_eq!(ARM64_DARWIN.size_t, ResolvedType::UnsignedLong);
+    assert_eq!(ARM64_DARWIN.ptrdiff_t, ResolvedType::Long);
+    assert_eq!(ARM64_DARWIN.wchar_t, ResolvedType::Int);
+    assert!(ARM64_DARWIN.char_signed);
+    assert!(ARM64_DARWIN.is_signed(&ResolvedType::Char));
+    assert_eq!(ARM64_DARWIN.max_value(&ResolvedType::Long), Some(i64::MAX as u64));
+    assert_eq!(ARM64_DARWIN.min_value(&ResolvedType::Long), Some(i64::MIN));
+    assert_eq!(ARM64_DARWIN.value_size(Value::LongDouble(F80::from(0.0))), 8);
+}
+
+#[test]
+fn long_double_format_follows_the_target() {
+    assert_eq!(I386.long_double_format, FloatFormat::X87);
+    assert_eq!(X86_64.long_double_format, FloatFormat::X87);
+    assert_eq!(ARM64_DARWIN.long_double_format, FloatFormat::Ieee64);
+    assert_eq!(FloatFormat::X87.llvm(), "x86_fp80");
+    assert_eq!(FloatFormat::Ieee64.llvm(), "double");
+}
+
+#[test]
+fn each_target_carries_its_module_header() {
+    assert_eq!(I386.triple, "i386-pc-linux-gnu");
+    assert_eq!(X86_64.triple, "x86_64-pc-linux-gnu");
+    assert_eq!(ARM64_DARWIN.triple, "arm64-apple-macosx26.0.0");
+    assert!(I386.datalayout.starts_with("e-m:e-p:32:32-"));
+    assert!(X86_64.datalayout.contains("f80:128"));
+    assert_eq!(
+        ARM64_DARWIN.datalayout,
+        "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32"
+    );
+}
+
+#[test]
+fn arm64_compiled_sizes() {
+    assert_eq!(probe(ARM64_DARWIN, "long"), "8");
+    assert_eq!(probe(ARM64_DARWIN, "int *"), "8");
+    assert_eq!(probe(ARM64_DARWIN, "double"), "8");
+    assert_eq!(probe(ARM64_DARWIN, "long double"), "8");
+}
+
+#[test]
+fn the_float_format_rounds_to_its_own_precision() {
+    let tenth = F80::from("0.1");
+    assert_eq!(FloatFormat::X87.round(tenth), tenth);
+    assert_eq!(FloatFormat::Ieee64.round(tenth), F80::from(0.1));
+    assert_ne!(FloatFormat::Ieee64.round(tenth), tenth);
+    assert_eq!(FloatFormat::Ieee64.round(F80::from(1.5)), F80::from(1.5));
 }

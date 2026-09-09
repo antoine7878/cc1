@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use cc1::ast::{BinaryOp, F80, Fold, UnaryOp, Value};
 use cc1::semantic::{Diag, Diagnosis, ResolvedType};
-use cc1::target::{I386, X86_64};
+use cc1::target::{ARM64_DARWIN, I386, X86_64};
 
 trait FoldValue {
     fn fold_value(self) -> Value;
@@ -803,4 +803,59 @@ fn the_minimum_of_a_signed_type_is_recognised() {
     assert!(!fold.is_min(&ResolvedType::Int, Value::Int(0)));
     assert!(!fold.is_min(&ResolvedType::UnsignedInt, Value::UnsignedInt(0)));
     assert!(!fold.is_min(&ResolvedType::UnsignedLong, Value::UnsignedLong(0)));
+}
+
+#[test]
+fn long_double_folds_in_binary64_when_the_target_has_no_x87() {
+    let fold = Fold::new(&ARM64_DARWIN);
+    let third = fold.binary(
+        &ResolvedType::LongDouble,
+        BinaryOp::Div,
+        Value::LongDouble(F80::from(1.0)),
+        Value::LongDouble(F80::from(3.0)),
+    );
+    assert_eq!(third.res, Value::LongDouble(F80::from(1.0 / 3.0)));
+    assert_ne!(
+        Fold::new(&X86_64)
+            .binary(
+                &ResolvedType::LongDouble,
+                BinaryOp::Div,
+                Value::LongDouble(F80::from(1.0)),
+                Value::LongDouble(F80::from(3.0)),
+            )
+            .res,
+        third.res
+    );
+}
+
+#[test]
+fn converting_to_long_double_rounds_to_the_target_format() {
+    assert_eq!(
+        Fold::new(&ARM64_DARWIN).convert(&ResolvedType::LongDouble, Value::Double(0.1)),
+        Some(Value::LongDouble(F80::from(0.1)))
+    );
+    assert_eq!(
+        Fold::new(&ARM64_DARWIN).unary(&ResolvedType::LongDouble, UnaryOp::Minus, Value::Double(1.5)).res,
+        Value::LongDouble(F80::from(-1.5))
+    );
+}
+
+#[test]
+fn long_double_literals_round_to_the_target_format() {
+    assert_eq!(
+        Value::parse("0.1l", &ARM64_DARWIN).res,
+        Value::LongDouble(F80::from(0.1))
+    );
+    assert_ne!(
+        Value::parse("0.1l", &X86_64).res,
+        Value::LongDouble(F80::from(0.1))
+    );
+    assert_eq!(Value::parse("0.1l", &X86_64).res, Value::LongDouble(F80::from("0.1")));
+}
+
+#[test]
+fn an_exact_long_double_literal_is_the_same_on_every_target() {
+    for target in [&I386, &X86_64, &ARM64_DARWIN] {
+        assert_eq!(Value::parse("1.5l", target).res, Value::LongDouble(F80::from(1.5)));
+    }
 }

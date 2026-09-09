@@ -7,7 +7,7 @@ use libft::{ArgError, ArgParser, argv};
 
 use crate::context::Context;
 use crate::semantic::{Diagnosis, DiagnosisNode};
-use crate::target::{I386, Target, X86_64};
+use crate::target::{ARM64_DARWIN, I386, Target, X86_64};
 use libft::Span;
 
 #[derive(Debug)]
@@ -67,9 +67,10 @@ impl Args {
     }
 
     pub fn help() {
-        println!("usage: cc1 [-m32|-m64] file");
+        println!("usage: cc1 [-m32|-m64|-marm64] file");
         println!("-m32      generate code for i386");
         println!("-m64      generate code for x86_64 (default)");
+        println!("-marm64   generate code for arm64 darwin");
         exit(0);
     }
 }
@@ -78,6 +79,7 @@ fn machine(value: &str) -> Result<Target, ArgError> {
     match value {
         "32" => Ok(I386),
         "64" => Ok(X86_64),
+        "arm64" | "aarch64" => Ok(ARM64_DARWIN),
         _ => Err(ArgError::WrongValue('m', value.to_string())),
     }
 }
