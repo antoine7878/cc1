@@ -239,3 +239,73 @@ fn loaned_id_reads_as_none_but_seen_while_loan_is_alive() {
     assert_eq!(holder.table.get(id0), None);
     assert!(holder.table.seen(id0));
 }
+
+#[test]
+fn index_reads_known_value() {
+    let mut table = table();
+    table.resize(1);
+    let id = Id::from(0usize);
+    table.set(id, Some("a".to_string()));
+    assert_eq!(table[id], "a".to_string());
+}
+
+#[test]
+fn index_mut_mutates_in_place() {
+    let mut table = table();
+    table.resize(1);
+    let id = Id::from(0usize);
+    table.set(id, Some("a".to_string()));
+    table[id].push('b');
+    assert_eq!(table.get(id), Some(&"ab".to_string()));
+}
+
+#[test]
+#[should_panic(expected = "out of bounds")]
+fn index_past_the_end_panics() {
+    let table = table();
+    let _ = &table[Id::from(42usize)];
+}
+
+#[test]
+#[should_panic(expected = "not known")]
+fn index_unknown_panics() {
+    let mut table = table();
+    table.resize(1);
+    let _ = &table[Id::from(0usize)];
+}
+
+#[test]
+#[should_panic(expected = "not known")]
+fn index_poisoned_panics() {
+    let mut table = table();
+    table.resize(1);
+    let id = Id::from(0usize);
+    table.set(id, None);
+    let _ = &table[id];
+}
+
+#[test]
+#[should_panic(expected = "not known")]
+fn index_borrowed_panics() {
+    let mut table = table();
+    table.resize(1);
+    let id = Id::from(0usize);
+    table.set(id, Some("a".to_string()));
+    table.take(id);
+    let _ = &table[id];
+}
+
+#[test]
+#[should_panic(expected = "out of bounds")]
+fn index_mut_past_the_end_panics() {
+    let mut table = table();
+    let _ = &mut table[Id::from(42usize)];
+}
+
+#[test]
+#[should_panic(expected = "not known")]
+fn index_mut_unknown_panics() {
+    let mut table = table();
+    table.resize(1);
+    let _ = &mut table[Id::from(0usize)];
+}

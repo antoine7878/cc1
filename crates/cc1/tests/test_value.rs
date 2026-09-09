@@ -7,16 +7,19 @@ use cc1::target::{I386, X86_64};
 trait FoldValue {
     fn fold_value(self) -> Value;
 }
+
 impl FoldValue for Value {
     fn fold_value(self) -> Value {
         self
     }
 }
+
 impl FoldValue for Diag<Value> {
     fn fold_value(self) -> Value {
         self.res
     }
 }
+
 impl FoldValue for Option<Value> {
     fn fold_value(self) -> Value {
         self.expect("conversion should succeed")

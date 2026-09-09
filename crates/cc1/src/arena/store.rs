@@ -66,3 +66,10 @@ pub fn out_of_bounds<Id: Debug, Val>(kind: &str, id: Id, len: usize) -> ! {
     let ty = type_name::<Val>().rsplit("::").next().unwrap_or("?");
     panic!("{kind} {ty}: {id:?} out of bounds (len {len})")
 }
+
+#[cold]
+#[inline(never)]
+pub fn not_known<Id: Debug, Val>(kind: &str, id: Id) -> ! {
+    let ty = type_name::<Val>().rsplit("::").next().unwrap_or("?");
+    panic!("{kind} {ty}: {id:?} not known")
+}

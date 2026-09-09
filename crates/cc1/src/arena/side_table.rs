@@ -1,8 +1,9 @@
 use std::iter::zip;
 use std::marker::PhantomData;
+use std::ops::{Index, IndexMut};
 
-use crate::arena::store::out_of_bounds;
 use crate::arena::ArenaKey;
+use crate::arena::store::{not_known, out_of_bounds};
 use crate::semantic::Diagnosis;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -92,6 +93,35 @@ impl<Id: ArenaKey, Val> SideTable<Id, Val> {
         match self.slots.get_mut(id.into()) {
             Some(slot) => slot,
             None => out_of_bounds::<Id, Val>("side table", id, len),
+        }
+    }
+
+    fn missing(id: Id, len: usize) -> ! {
+        if id.into() >= len {
+            out_of_bounds::<Id, Val>("side table", id, len)
+        }
+        not_known::<Id, Val>("side table", id)
+    }
+}
+
+impl<Id: ArenaKey, Val> Index<Id> for SideTable<Id, Val> {
+    type Output = Val;
+
+    fn index(&self, id: Id) -> &Val {
+        let len = self.slots.len();
+        match self.get(id) {
+            Some(value) => value,
+            None => Self::missing(id, len),
+        }
+    }
+}
+
+impl<Id: ArenaKey, Val> IndexMut<Id> for SideTable<Id, Val> {
+    fn index_mut(&mut self, id: Id) -> &mut Val {
+        let len = self.slots.len();
+        match self.get_mut(id) {
+            Some(value) => value,
+            None => Self::missing(id, len),
         }
     }
 }

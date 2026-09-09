@@ -29,8 +29,9 @@ $(YACC_RS): $(C_Y)
 # 	./$(CC1) -m32 rscs/hello.i
 
 test: all
-	rm -f ./hello.s ./hello.o ./a.out
-	cargo run --bin fcc -- -m32 ./rscs/hello.c && ./a.out || echo $$?
+	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
+	cargo run --bin fcc -- ./rscs/hello.c
+	./a.out || echo $$?
 
 ctest: all
 	cargo nextest run -p cc1
@@ -51,7 +52,8 @@ cc:
 	rm ./a.out
 
 llvm:
-	clang -S -emit-llvm rscs/hello.c
+	clang -O0 -S -m64 -emit-llvm rscs/hello.c -o hello_64.ll
+	clang -O0 -S -m32 -emit-llvm rscs/hello.c -o hello_32.ll
 
 empty :=
 space := $(empty) $(empty)
