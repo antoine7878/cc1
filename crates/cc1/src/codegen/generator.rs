@@ -1,88 +1,92 @@
-use std::io::{self, Write, stdout};
+use std::io::{Write, stdout};
 
-use crate::ast::{ExternalDeclaration, ExternalDeclarationNode, Visitor};
+use crate::ast::visit::{walk_external_declaration, walk_translation_unit};
+use crate::ast::{
+    ExternalDeclaration, ExternalDeclarationNode, JumpStatement, JumpStatementNode, TranslationUnitNode, Visitor,
+};
 use crate::context::Context;
-use crate::semantic::{QualifiedType, ResolvedType};
+use crate::semantic::ResolvedType;
 
 pub fn generate(ctx: Context) -> Context {
-    if let Err(e) = try_generate(&ctx) {
-        eprint!("llvm err: {}", e);
-    }
+    let mut generator = Generator::new(stdout());
+    walk_translation_unit(&mut generator, &ctx, &ctx.ast);
     ctx
 }
 
-fn print_target<W: Write>(w: &mut W, ctx: &Context) -> io::Result<()> {
-    writeln!(w, r#"target datalayout = "<{} layout>""#, ctx.target.name)?;
-    writeln!(w, r#"target triple = "{}-pc-linux-gnu""#, ctx.target.name)?;
-    writeln!(w)
+#[derive(Debug)]
+pub struct Generator<W: Write> {
+    w: W,
 }
 
-fn try_generate(ctx: &Context) -> io::Result<()> {
-    let w = &mut stdout();
-    print_target(w, ctx)?;
-    let mut emitter = Emitter::default();
-    for ext_decl in &ctx.ast.declarations {
-        emitter.visit_external_declaration(ctx, ext_decl);
-        w.write_all(emitter.entry_allocas.as_bytes())?;
-        w.write_all(emitter.body.as_bytes())?;
-        emitter.clear();
-    }
-    Ok(())
-}
-
-#[derive(Debug, Default)]
-pub struct Emitter {
-    entry_allocas: String,
-    body: String,
-}
-
-impl Emitter {
-    fn clear(&mut self) {
-        self.entry_allocas.clear();
-        self.body.clear();
+impl<W: Write> Generator<W> {
+    fn new(w: W) -> Self {
+        Self { w }
     }
 }
 
-macro_rules! emit {
-    ($buf:expr, $($arg:tt)*) => {{
-        let _ = ::std::fmt::Write::write_fmt(&mut $buf, ::std::format_args!($($arg)*));
-    }};
+impl<W: Write> Write for Generator<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.w.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.w.flush()
+    }
 }
+
+// macro_rules! emit {
+//     ($self:ident, $($arg:tt)*) => {{
+//         let _ = write!($self.w, $($arg)*);
+//     }};
+// }
 
 macro_rules! emitln {
-    ($buf:expr) => {{
-        $buf.push('\n');
+    ($self:ident) => {{
+        let _ = write!($self, "\n");
     }};
-    ($buf:expr, $($arg:tt)*) => {{
-        let _ = ::std::fmt::Write::write_fmt(&mut $buf, ::std::format_args!($($arg)*));
-        $buf.push('\n');
+    ($self:ident, $($arg:tt)*) => {{
+        let _ = write!($self, $($arg)*);
+        let _ = write!($self, "\n");
     }};
 }
 
-impl Visitor for Emitter {
+impl<W: Write> Visitor for Generator<W> {
+    fn visit_translation_unit(&mut self, ctx: &Context, node: &TranslationUnitNode) {
+        emitln!(self, r#"target datalayout = "<{} layout>""#, ctx.target.name);
+        emitln!(self, r#"target triple = "{}-pc-linux-gnu""#, ctx.target.name);
+        emitln!(self);
+        walk_translation_unit(self, ctx, node);
+    }
+
     fn visit_external_declaration(&mut self, ctx: &Context, node: &ExternalDeclarationNode) {
         match &node.decl {
             ExternalDeclaration::Function(fn_decl) => {
-                let &sym_id = ctx.sema.declarations.get(&fn_decl.declarator.id).expect("no decl");
-                let sym = sym_id.resolve(ctx);
-                let qty = sym.ty.unwrap();
-                let ty = qty.id.resolve(ctx);
-                let ResolvedType::Function { ret, params: _ } = ty else { panic!() };
+                let sym = ctx.sema.declarations[&fn_decl.declarator.id].resolve(ctx);
+                let ty = sym.ty.expect("pas sym type").id.resolve(ctx);
+                let ResolvedType::Function { ret, params: _ } = ty else { panic!("pas function") };
                 let ret_ty = ret.id.resolve(ctx);
                 emitln!(
-                    self.body,
-                    "define {}{} @{}({}) {{\n",
-                    ret_ty.interge_prefix(),
-                    ctx.target.layout(ty).unwrap().size * 8,
+                    self,
+                    "define i{} @{}({}) {{\n",
+                    ctx.target.layout(ret_ty).expect("pas layout").size * 8,
                     sym.name.id.resolve(ctx),
                     ""
                 );
-                emitln!(self.body, "}}");
+                emitln!(self, "ret i32 42");
+                emitln!(self, "}}");
             }
             ExternalDeclaration::Declaration(_decl) => todo!(),
         }
-        // define i32 @main() {
-        //   ret i32 42
-        // }
+        walk_external_declaration(self, ctx, node);
+    }
+
+    fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode) {
+        match node.stmt {
+            JumpStatement::Return(Some(e)) => {
+                let ty = ctx.sema.expr_types.get(node.id);
+                emitln!(self, "ret")
+            }
+            _ => todo!(),
+        }
     }
 }
