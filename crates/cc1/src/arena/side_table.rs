@@ -1,6 +1,7 @@
 use std::iter::zip;
 use std::marker::PhantomData;
 
+use crate::arena::store::out_of_bounds;
 use crate::arena::ArenaKey;
 use crate::semantic::Diagnosis;
 
@@ -65,10 +66,11 @@ impl<Id: ArenaKey, Val> SideTable<Id, Val> {
     }
 
     pub fn set(&mut self, id: Id, value: Option<Val>) {
-        self.slots[id.into()] = match value {
+        let slot = match value {
             Some(v) => Slot::Known(v),
             None => Slot::Poisoned,
         };
+        *self.slot_mut(id) = slot;
     }
 
     pub fn take(&mut self, id: Id) -> Option<Val> {
@@ -82,7 +84,15 @@ impl<Id: ArenaKey, Val> SideTable<Id, Val> {
     }
 
     pub fn give(&mut self, id: Id, value: Val) {
-        self.slots[id.into()] = Slot::Known(value);
+        *self.slot_mut(id) = Slot::Known(value);
+    }
+
+    fn slot_mut(&mut self, id: Id) -> &mut Slot<Val> {
+        let len = self.slots.len();
+        match self.slots.get_mut(id.into()) {
+            Some(slot) => slot,
+            None => out_of_bounds::<Id, Val>("side table", id, len),
+        }
     }
 }
 

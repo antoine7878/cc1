@@ -1,3 +1,5 @@
+use std::any::type_name;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::slice;
 
@@ -26,7 +28,11 @@ impl<Id: ArenaKey, Val> Arena<Id, Val> {
     }
 
     pub fn get(&self, id: Id) -> &Val {
-        &self.data[id.into()]
+        let len = self.data.len();
+        match self.data.get(id.into()) {
+            Some(value) => value,
+            None => out_of_bounds::<Id, Val>("arena", id, len),
+        }
     }
 
     pub fn try_get(&self, id: Id) -> Option<&Val> {
@@ -34,7 +40,11 @@ impl<Id: ArenaKey, Val> Arena<Id, Val> {
     }
 
     pub fn get_mut(&mut self, id: Id) -> &mut Val {
-        &mut self.data[id.into()]
+        let len = self.data.len();
+        match self.data.get_mut(id.into()) {
+            Some(value) => value,
+            None => out_of_bounds::<Id, Val>("arena", id, len),
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -48,4 +58,11 @@ impl<Id: ArenaKey, Val> Arena<Id, Val> {
     pub fn iter(&self) -> slice::Iter<'_, Val> {
         self.data.iter()
     }
+}
+
+#[cold]
+#[inline(never)]
+pub fn out_of_bounds<Id: Debug, Val>(kind: &str, id: Id, len: usize) -> ! {
+    let ty = type_name::<Val>().rsplit("::").next().unwrap_or("?");
+    panic!("{kind} {ty}: {id:?} out of bounds (len {len})")
 }

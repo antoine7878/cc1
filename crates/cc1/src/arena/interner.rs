@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::slice;
 
+use crate::arena::store::out_of_bounds;
 use crate::arena::{Arena, ArenaKey};
 
 #[derive(Debug)]
@@ -31,7 +32,10 @@ impl<Id: ArenaKey, Val: Clone + Hash + Eq> Interner<Id, Val> {
     }
 
     pub fn get(&self, id: Id) -> &Val {
-        self.arena.get(id)
+        match self.arena.try_get(id) {
+            Some(value) => value,
+            None => out_of_bounds::<Id, Val>("interner", id, self.arena.len()),
+        }
     }
 
     pub fn try_get(&self, id: Id) -> Option<&Val> {
