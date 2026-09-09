@@ -33,6 +33,11 @@ test: all
 	cargo run --bin fcc -- -e ./rscs/hello.c -o /dev/stdout
 	@# ./a.out || echo $$?
 
+ftest: all
+	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
+	cargo run --bin fcc -- ./rscs/hello.c -o /dev/stdout
+	./a.out || echo $$?
+
 ctest: all
 	cargo nextest run -p cc1
 
@@ -41,7 +46,7 @@ ttest: all
 
 # ----- reference --------------------
 
-CFF = -m32 -std=iso9899:1990
+CFF = -m32 -std=iso9899:1990 -pedantic-errors
 
 c:
 	gcc -c $(CFF) rscs/hello.c -o /dev/null

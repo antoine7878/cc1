@@ -6,7 +6,7 @@ use crate::ast::Tag;
 use crate::context::Context;
 use crate::define_interner;
 use crate::semantic::{ParamTypes, Sema, TagDefId};
-use crate::target::Target;
+use crate::target::{Layout, Target};
 
 define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, Sema, sema, types);
 
@@ -358,6 +358,10 @@ impl QualifiedType {
 
     pub fn is_integer(&self, sema: &Sema) -> bool {
         self.id.resolve(sema).is_integer()
+    }
+
+    pub fn layout(&self, ctx: &Context) -> Option<Layout> {
+        ctx.target.layout(self.id.resolve(ctx))
     }
 }
 

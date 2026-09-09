@@ -1,28 +1,20 @@
+pub mod alloca_collector;
+pub mod expression;
 pub mod generator;
-pub use generator::*;
+pub mod types;
 
-use crate::context::Context;
-
-use std::io::Write;
-
-pub trait LLVM {
-    fn emit<W: Write>(&self, w: &mut Generator<W>, ctx: &Context);
-}
+pub use alloca_collector::AllocaCollector;
+pub use generator::{Generator, generate};
 
 #[macro_export]
-macro_rules! emit {
-    ($self:ident, $($arg:tt)*) => {{
-        $self.lead();
-        let _ = write!($self, $($arg)*);
-        $self.start_line = false;
+macro_rules! emit { ($self:ident, $($arg:tt)*) => {{
+        let _ = write!($self.w, $($arg)*);
     }};
 }
 
 #[macro_export]
 macro_rules! emitln {
     ($self:ident $(, $($arg:tt)*)?) => {{
-        $self.lead();
-        let _ = writeln!($self $(, $($arg)*)?);
-        $self.start_line = true;
+        let _ = writeln!($self.w $(, $($arg)*)?);
     }};
 }

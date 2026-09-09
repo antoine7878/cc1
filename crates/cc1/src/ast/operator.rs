@@ -32,6 +32,7 @@ pub enum BinaryOp {
     LogicalAnd,
     LogicalOr,
 }
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemberOp {
     Dot,

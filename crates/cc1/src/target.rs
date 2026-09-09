@@ -36,11 +36,10 @@ impl Layout {
         Self { size, align }
     }
 
-    pub fn floating_name(&self) -> &str {
+    pub fn llvm(&self) -> &str {
         match self {
             Layout { size: 4, .. } => "float",
             Layout { size: 8, .. } => "double",
-            Layout { size: 12, .. } => "x86_fp80",
             _ => unimplemented!(),
         }
     }
