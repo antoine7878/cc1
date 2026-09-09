@@ -493,6 +493,12 @@ impl fmt::UpperHex for F80 {
     }
 }
 
+impl fmt::Display for F80 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", f64::from(*self))
+    }
+}
+
 impl fmt::Debug for F80 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", f64::from(*self))

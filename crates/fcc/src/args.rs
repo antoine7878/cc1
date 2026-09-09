@@ -21,7 +21,7 @@ pub struct Args {
     pub defines: Vec<String>,
     pub undefines: Vec<String>,
     pub optlevel: Option<String>,
-    pub output: Option<String>,
+    pub outfile: Option<String>,
     pub strip: bool,
     pub last: Stage,
     pub target: String,
@@ -67,7 +67,7 @@ impl ArgParser for Args {
                 self.link_order.push(LinkItem::Lib(value));
             }
             'O' => self.optlevel = Some(self.value(it, 'O')?),
-            'o' => self.output = Some(self.value(it, 'o')?),
+            'o' => self.outfile = Some(self.value(it, 'o')?),
             'm' => self.target = self.value(it, 'm')?,
             'h' => Self::help(),
             c => return Err(ArgError::UnknownOption(c)),
@@ -84,7 +84,7 @@ impl Default for Args {
             defines: Vec::default(),
             undefines: Vec::default(),
             optlevel: None,
-            output: None,
+            outfile: None,
             strip: false,
             last: Stage::Link,
             target: "64".to_string(),
@@ -118,7 +118,7 @@ impl Args {
         for path in self.paths() {
             entry_stage(path).map_err(ArgError::Process)?;
         }
-        if self.output.is_some() && self.last != Stage::Link && self.sources() > 1 {
+        if self.outfile.is_some() && self.last != Stage::Link && self.sources() > 1 {
             return Err(ArgError::Process(
                 "cannot specify -o with -c, -E or -S and multiple input files".to_string(),
             ));

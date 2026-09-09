@@ -43,7 +43,7 @@ fn compile(args: &Args, input: &str, tmp: &Path, id: usize) -> Result<Option<Str
     if entry == Stage::Link {
         return Ok(Some(input.to_string()));
     }
-    let steps = plan(input, args.last, args.output.as_deref(), tmp, id).map_err(|e| format!("fcc: {e}"))?;
+    let steps = plan(input, args.last, args.outfile.as_deref(), tmp, id).map_err(|e| format!("fcc: {e}"))?;
     for step in &steps {
         drive(args, step)?;
     }
@@ -102,7 +102,11 @@ fn link_argv(args: &Args, items: &[String]) -> Vec<String> {
     }
     argv.extend(items.iter().cloned());
     argv.push("-o".to_string());
-    argv.push(output_of("", Stage::Link, args.output.as_deref()).display().to_string());
+    argv.push(
+        output_of("", Stage::Link, args.outfile.as_deref())
+            .display()
+            .to_string(),
+    );
     argv
 }
 

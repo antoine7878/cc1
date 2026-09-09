@@ -1,7 +1,9 @@
+use std::cmp::Ordering;
+use std::fmt;
+
 use crate::ast_node;
 use crate::semantic::{Diag, Diagnosis, QualifiedType, ResolvedType, Sema};
 use crate::target::Target;
-use std::cmp::Ordering;
 
 use crate::ast::{BinaryOp, F80, UnaryOp, escape};
 
@@ -34,6 +36,20 @@ impl ValueNode {
             Value::LongDouble(_) => sema.builtins.long_double,
         };
         QualifiedType::plain(ty)
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Int(i) => write!(f, "{}", i),
+            Value::Long(i) => write!(f, "{}", i),
+            Value::UnsignedLong(i) => write!(f, "{}", i),
+            Value::UnsignedInt(i) => write!(f, "{}", i),
+            Value::Float(i) => write!(f, "{}", i),
+            Value::Double(i) => write!(f, "{}", i),
+            Value::LongDouble(i) => write!(f, "{}", i),
+        }
     }
 }
 
