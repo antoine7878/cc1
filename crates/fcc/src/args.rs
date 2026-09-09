@@ -42,32 +42,33 @@ impl ArgParser for Args {
     fn flag(&mut self, c: char, it: &mut Chars) -> Result<(), ArgError> {
         match c {
             'E' => self.last = Stage::Preprocess,
+            'e' => self.last = Stage::Compile,
             'S' => self.last = Stage::Lower,
             'c' => self.last = Stage::Assemble,
             's' => self.strip = true,
             'D' => {
-                let value = self.value::<String>(it, 'D')?;
+                let value = self.value(it, 'D')?;
                 self.defines.push(value);
             }
             'U' => {
-                let value = self.value::<String>(it, 'U')?;
+                let value = self.value(it, 'U')?;
                 self.undefines.push(value);
             }
             'I' => {
-                let value = self.value::<String>(it, 'I')?;
+                let value = self.value(it, 'I')?;
                 self.includes.push(value);
             }
             'L' => {
-                let value = self.value::<String>(it, 'L')?;
+                let value = self.value(it, 'L')?;
                 self.link_order.push(LinkItem::LibDir(value));
             }
             'l' => {
-                let value = self.value::<String>(it, 'l')?;
+                let value = self.value(it, 'l')?;
                 self.link_order.push(LinkItem::Lib(value));
             }
-            'O' => self.optlevel = Some(self.value::<String>(it, 'O')?),
-            'o' => self.output = Some(self.value::<String>(it, 'o')?),
-            'm' => self.target = self.value::<String>(it, 'm')?,
+            'O' => self.optlevel = Some(self.value(it, 'O')?),
+            'o' => self.output = Some(self.value(it, 'o')?),
+            'm' => self.target = self.value(it, 'm')?,
             'h' => Self::help(),
             c => return Err(ArgError::UnknownOption(c)),
         }

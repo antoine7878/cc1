@@ -22,7 +22,7 @@ pub struct SymbolResolver<'a> {
     pub sema: &'a mut Sema,
     sym_scopes: SymbolScopes,
     stmt_scopes: StatementScopes,
-    f: Option<FunctionDefId>,
+    current_function: Option<FunctionDefId>,
     gotos: Vec<Name>,
 }
 
@@ -38,7 +38,7 @@ impl<'a> SymbolResolver<'a> {
             sema,
             sym_scopes: SymbolScopes::default(),
             stmt_scopes: StatementScopes::default(),
-            f: None,
+            current_function: None,
             gotos: Vec::new(),
         }
     }
@@ -201,7 +201,7 @@ impl SymbolResolver<'_> {
 
 impl SymbolResolver<'_> {
     pub fn define_label(&mut self, name: Name, span: &Span) {
-        let f = self.f.expect("a label inside a function");
+        let f = self.current_function.expect("a label inside a function");
         if self.labels(f).any(|label| label == name.id) {
             return self.add_diag(Diag::err((), Diagnosis::DuplicateLabel(name)), span);
         }
@@ -209,7 +209,7 @@ impl SymbolResolver<'_> {
     }
 
     pub fn return_ty(&self) -> Option<QualifiedType> {
-        self.f.map(|f| self.sema.functions.get(f).return_ty)
+        self.current_function.map(|f| self.sema.functions.get(f).return_ty)
     }
 
     pub fn reference_label(&mut self, name: Name) {
@@ -244,17 +244,18 @@ impl SymbolResolver<'_> {
 
 impl Visitor for SymbolResolver<'_> {
     fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
-        // println!("COUCOU");
         let Some(header) = declaration::define_function(self, ctx, node) else { return };
-        let sym_id = header.id.resolve(ctx).sym;
-        self.sema.declarations.insert(node.declarator.id, sym_id);
-        println!("OUIOUI");
         let f = header.id;
-        self.f = Some(f);
+        self.current_function = Some(f);
         declaration::bind_function_parameters(self, ctx, node, &header);
         self.visit_compound_statement(ctx, &node.body);
         self.resolve_gotos(f);
-        self.f = None;
+        self.current_function = None;
+
+        println!("COUCOU");
+        let sym_id = header.id.resolve(ctx).sym;
+        self.sema.declarations.insert(node.declarator.id, sym_id);
+        println!("OUIOUI");
     }
 
     fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode) {

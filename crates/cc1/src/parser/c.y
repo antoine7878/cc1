@@ -15,7 +15,6 @@ use crate::parser::yyerror;
 use crate::semantic::{Diagnosis, DiagnosisNode};
 
 fn concat_string_literals(ctx: &mut Context, lhs: StringLiteralNode, rhs: StringLiteralNode, span: Span) -> StringLiteralNode {
-    // 6.1.4 If one is a wide string literal and the other is not, the behavior is undefined.
     if lhs.is_wide(ctx) != rhs.is_wide(ctx) {
         ctx.diagnosis.push(DiagnosisNode::new(Diagnosis::MixedWideStringConcat, span));
     }

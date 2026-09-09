@@ -52,9 +52,6 @@ cc:
 
 llvm:
 	clang -S -emit-llvm rscs/hello.c
-	llc hello.ll
-	as -c hello.s -o hello.o
-	clang hello.o
 
 empty :=
 space := $(empty) $(empty)
