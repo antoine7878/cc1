@@ -10,6 +10,15 @@ impl Layout {
     pub const fn new(size: u32, align: u32) -> Self {
         Self { size, align }
     }
+
+    pub fn floating_name(&self) -> &str {
+        match self {
+            Layout { size: 4, .. } => "float",
+            Layout { size: 8, .. } => "double",
+            Layout { size: 12, .. } => "x86_fp80",
+            _ => unimplemented!(),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -28,6 +37,7 @@ pub struct Target {
     pub wchar_t: ResolvedType,
     pub char_signed: bool,
     pub byte_size: u32,
+    pub long_double_llvm: &'static str,
 }
 
 pub const I386: Target = Target {
@@ -45,6 +55,7 @@ pub const I386: Target = Target {
     wchar_t: ResolvedType::Long,
     char_signed: true,
     byte_size: 8,
+    long_double_llvm: "x86_fp80",
 };
 
 pub const X86_64: Target = Target {
@@ -62,6 +73,7 @@ pub const X86_64: Target = Target {
     wchar_t: ResolvedType::Int,
     char_signed: true,
     byte_size: 8,
+    long_double_llvm: "x86_fp80",
 };
 
 impl Default for Target {

@@ -120,9 +120,9 @@ impl LLVM for ResolvedType {
             | ResolvedType::UnsignedInt
             | ResolvedType::UnsignedLong
             | ResolvedType::Int => emit!(w, "i{}", ctx.target.layout(self).unwrap().size * 8),
-            ResolvedType::Float => emit!(w, "float"),
-            ResolvedType::Double => emit!(w, "double"),
-            ResolvedType::LongDouble => emit!(w, "x86_fp80"),
+            ResolvedType::Float => emit!(w, "{}", ctx.target.float.floating_name()),
+            ResolvedType::Double => emit!(w, "{}", ctx.target.double.floating_name()),
+            ResolvedType::LongDouble => emit!(w, "{}", ctx.target.long_double.floating_name()),
             ResolvedType::Function { .. } => todo!(),
             ResolvedType::Tag { .. } => todo!(),
             ResolvedType::Array { .. } => todo!(),
