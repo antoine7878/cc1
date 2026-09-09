@@ -252,10 +252,8 @@ impl Visitor for SymbolResolver<'_> {
         self.resolve_gotos(f);
         self.current_function = None;
 
-        println!("COUCOU");
-        let sym_id = header.id.resolve(ctx).sym;
+        let sym_id = header.id.resolve(self.sema).sym;
         self.sema.declarations.insert(node.declarator.id, sym_id);
-        println!("OUIOUI");
     }
 
     fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode) {
