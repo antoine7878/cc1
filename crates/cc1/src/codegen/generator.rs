@@ -4,6 +4,7 @@ use crate::ast::visit::walk_translation_unit;
 use crate::ast::{
     ExpressionNode, FunctionDefinitionNode, JumpStatement, JumpStatementNode, TranslationUnitNode, Visitor,
 };
+use crate::codegen::Globals;
 use crate::codegen::llvm::Builder;
 use crate::codegen::local::Locals;
 use crate::context::ctx;
@@ -18,6 +19,7 @@ pub fn generate() {
 pub struct Generator<W: Write> {
     pub b: Builder<W>,
     pub locals: Locals,
+    pub globals: Globals,
 }
 
 impl<W: Write> Generator<W> {
@@ -25,6 +27,7 @@ impl<W: Write> Generator<W> {
         Self {
             b: Builder::new(w),
             locals: Locals::default(),
+            globals: Globals::default(),
         }
     }
 
@@ -38,8 +41,9 @@ impl<W: Write> Generator<W> {
 
 impl<W: Write> Visitor for Generator<W> {
     fn visit_translation_unit(&mut self, node: &TranslationUnitNode) {
-        let ctx = ctx();
-        self.b.target(ctx.target.datalayout, ctx.target.triple);
+        self.b.target(ctx().target.datalayout, ctx().target.triple);
+        self.b.blank();
+        self.globals.emit(&mut self.b);
         walk_translation_unit(self, node);
     }
 

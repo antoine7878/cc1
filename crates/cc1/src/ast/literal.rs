@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::ast::escape;
 use crate::ast_node;
 use crate::define_interner;
@@ -10,6 +12,15 @@ define_interner!(StringConstant, StringPool, StringConstId);
 pub struct StringConstant {
     pub units: Vec<u32>,
     pub is_wide: bool,
+}
+
+impl fmt::Display for StringConstant {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for c in &self.units {
+            write!(f, "{}", char::from_u32(*c).unwrap())?;
+        }
+        Ok(())
+    }
 }
 
 ast_node! {

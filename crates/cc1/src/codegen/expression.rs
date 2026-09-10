@@ -3,13 +3,15 @@ use std::io::Write;
 use crate::ast::{BinaryOp, Expression, ExpressionNode, UnaryOp};
 use crate::codegen::Generator;
 use crate::codegen::llvm::{LlvmOperator, LlvmValue};
-use crate::semantic::sema;
+use crate::semantic::{ResolvedType, sema};
 
 impl<W: Write> Generator<W> {
     pub fn fold_expression(&mut self, node: &ExpressionNode) -> LlvmValue {
         match node.id.resolve() {
-            Expression::Constant(value_node) => LlvmValue::Literal(value_node.value),
+            Expression::Constant(value_node) => LlvmValue::Constant(value_node.value),
             Expression::Identifier(_) => self.ident(node),
+            Expression::StringLiteral(s) => self.globals.get(s.id),
+            Expression::ConstantExpression(e) => LlvmValue::Constant(sema().expr_consts[e.id]),
             Expression::Binary(op, e1, e2) => self.binary(op, node, e1, e2),
             Expression::Unary(op, e) => self.unary(op, node, e),
             _ => todo!(),
@@ -83,13 +85,12 @@ impl<W: Write> Generator<W> {
     }
 
     fn unary_deref(&mut self, _node: &ExpressionNode, e: &ExpressionNode) -> LlvmValue {
-        todo!()
-        // let re = &sema().expr_types[e.id];
-        // let qty = re.casted_ty();
-        // let v = self.fold_expression(e);
-        // let align = qty.layout().unwrap().align;
-        // self.b.load(qty.llvm(), slot, align);
-        // v
+        let re = &sema().expr_types[e.id];
+        let qty = re.casted_ty();
+        let v = self.fold_expression(e);
+        let ResolvedType::Pointer(qty) = qty.id.resolve() else { unreachable!() };
+        let align = qty.layout().unwrap().align;
+        self.b.load(qty.llvm(), v, align)
     }
 
     fn binary(&mut self, op: &BinaryOp, node: &ExpressionNode, e1: &ExpressionNode, e2: &ExpressionNode) -> LlvmValue {
