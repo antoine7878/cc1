@@ -1,4 +1,4 @@
-use crate::ast::Value;
+use crate::ast::ConstValue;
 use crate::ast::statement::StatementId;
 use crate::semantic::{Diagnosis, QualifiedType, ResolvedStatement};
 
@@ -8,7 +8,7 @@ pub enum StatementScope {
     Switch {
         stmt: StatementId,
         control: QualifiedType,
-        cases: Vec<(Value, StatementId)>,
+        cases: Vec<(ConstValue, StatementId)>,
         default: Option<StatementId>,
     },
 }
@@ -65,7 +65,7 @@ impl StatementScopes {
         })
     }
 
-    pub fn record_case(&mut self, value: Value, id: StatementId) -> Result<StatementId, Diagnosis> {
+    pub fn record_case(&mut self, value: ConstValue, id: StatementId) -> Result<StatementId, Diagnosis> {
         let Some(StatementScope::Switch { stmt, cases, .. }) = self.nearest_switch() else {
             return Err(Diagnosis::OutsideSwitch("case"));
         };

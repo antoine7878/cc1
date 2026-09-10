@@ -1,5 +1,5 @@
 use crate::ast::{
-    BinaryOp, DeclarationSpecifier, DeclaratorNode, MemberOp, Name, StringLiteralNode, UnaryOp, ValueNode,
+    BinaryOp, DeclarationSpecifier, DeclaratorNode, MemberOp, Name, StringLiteralNode, UnaryOp, ConstValueNode,
 };
 use crate::{ast_node, define_arena};
 use libft::Span;
@@ -15,7 +15,7 @@ ast_node! {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
     Identifier(Name),
-    Constant(ValueNode),
+    Constant(ConstValueNode),
     StringLiteral(StringLiteralNode),
     ConstantExpression(ExpressionNode),
     Unary(UnaryOp, ExpressionNode),
@@ -41,7 +41,7 @@ impl ExpressionArena {
         ExpressionNode::new(self.alloc(Expression::Identifier(name)), span)
     }
 
-    pub fn constant(&mut self, value: ValueNode, span: Span) -> ExpressionNode {
+    pub fn constant(&mut self, value: ConstValueNode, span: Span) -> ExpressionNode {
         ExpressionNode::new(self.alloc(Expression::Constant(value)), span)
     }
 

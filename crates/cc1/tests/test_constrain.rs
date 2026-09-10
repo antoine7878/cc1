@@ -1,7 +1,7 @@
 use cc1::ast::declaration::DeclaratorId;
 use cc1::ast::{
-    DeclarationSpecifier, InitDeclaratorNode, Initializer, InitializerNode, Name, Qualifier, Storage, StringId,
-    TypeSpecifier, Value,
+    ConstValue, DeclarationSpecifier, InitDeclaratorNode, Initializer, InitializerNode, Name, Qualifier, Storage,
+    StringId, TypeSpecifier,
 };
 use cc1::ast::{DeclaratorNode, Node};
 use cc1::semantic::constrain::parameter::{check_complete_parameter, is_valid_old_style, param_storage_only_register};
@@ -142,24 +142,24 @@ fn qualifiers_are_picked_out_of_the_specifier_list() {
     );
 }
 
-fn width(ty: &ResolvedType, value: Option<Value>) -> Diag<Option<i32>> {
+fn width(ty: &ResolvedType, value: Option<ConstValue>) -> Diag<Option<i32>> {
     check_bit_width(&I386, ty, value, None)
 }
 
 #[test]
 fn a_bit_field_must_have_int_type() {
-    let diag = width(&ResolvedType::Int, Some(Value::Int(3)));
+    let diag = width(&ResolvedType::Int, Some(ConstValue::Int(3)));
     assert_eq!(diag.res, Some(3));
     assert_eq!(reported(&diag), "None");
 
-    let diag = width(&ResolvedType::Char, Some(Value::Int(3)));
+    let diag = width(&ResolvedType::Char, Some(ConstValue::Int(3)));
     assert_eq!(diag.res, None);
     assert_eq!(reported(&diag), "NonIntBitFieldType");
 }
 
 #[test]
 fn a_bit_field_width_must_be_an_integer_constant() {
-    let diag = width(&ResolvedType::Int, Some(Value::Double(1.0)));
+    let diag = width(&ResolvedType::Int, Some(ConstValue::Double(1.0)));
     assert_eq!(diag.res, None);
     assert_eq!(reported(&diag), "NonIntegerConstantExpression");
 }
@@ -173,39 +173,39 @@ fn a_member_without_a_width_is_not_a_bit_field() {
 
 #[test]
 fn a_bit_field_width_may_reach_the_width_of_its_type() {
-    let diag = width(&ResolvedType::Int, Some(Value::Int(32)));
+    let diag = width(&ResolvedType::Int, Some(ConstValue::Int(32)));
     assert_eq!(diag.res, Some(32));
     assert_eq!(reported(&diag), "None");
 
-    let diag = width(&ResolvedType::UnsignedInt, Some(Value::Int(32)));
+    let diag = width(&ResolvedType::UnsignedInt, Some(ConstValue::Int(32)));
     assert_eq!(diag.res, Some(32));
     assert_eq!(reported(&diag), "None");
 }
 
 #[test]
 fn a_bit_field_width_must_not_exceed_the_width_of_its_type() {
-    let diag = width(&ResolvedType::Int, Some(Value::Int(33)));
+    let diag = width(&ResolvedType::Int, Some(ConstValue::Int(33)));
     assert_eq!(diag.res, None);
     assert_eq!(reported(&diag), "BitFieldWidthTooLarge(None, 33, 32)");
 }
 
 #[test]
 fn a_wide_bit_field_width_is_not_truncated_to_its_low_bits() {
-    let diag = width(&ResolvedType::Int, Some(Value::Long(1 << 32)));
+    let diag = width(&ResolvedType::Int, Some(ConstValue::Long(1 << 32)));
     assert_eq!(diag.res, None);
     assert_eq!(reported(&diag), "BitFieldWidthTooLarge(None, 4294967296, 32)");
 }
 
 #[test]
 fn a_bit_field_width_must_not_be_negative() {
-    let diag = width(&ResolvedType::Int, Some(Value::Int(-1)));
+    let diag = width(&ResolvedType::Int, Some(ConstValue::Int(-1)));
     assert_eq!(diag.res, None);
     assert_eq!(reported(&diag), "NegativeBitFieldWidth(None, -1)");
 }
 
 #[test]
 fn an_anonymous_bit_field_may_have_zero_width() {
-    let diag = width(&ResolvedType::Int, Some(Value::Int(0)));
+    let diag = width(&ResolvedType::Int, Some(ConstValue::Int(0)));
     assert_eq!(diag.res, Some(0));
     assert_eq!(reported(&diag), "None");
 }

@@ -35,7 +35,7 @@ test: all
 
 ftest: all
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
-	cargo run --bin fcc -- ./rscs/hello.c -o /dev/stdout
+	cargo run --bin fcc -- ./rscs/hello.c
 	./a.out || echo $$?
 
 ctest: all

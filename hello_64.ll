@@ -1,48 +1,24 @@
 ; ModuleID = 'rscs/hello.c'
 source_filename = "rscs/hello.c"
-target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32"
-target triple = "arm64-apple-macosx26.0.0"
+target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-pc-linux-gnu"
 
-; Function Attrs: noinline nounwind optnone ssp uwtable(sync)
-define i32 @fs() #0 {
-  %1 = alloca i32, align 4
-  %2 = alloca i32, align 4
-  %3 = load i32, ptr %1, align 4
-  %4 = load i32, ptr %2, align 4
-  %5 = icmp ne i32 %3, %4
-  %6 = zext i1 %5 to i32
-  ret i32 %6
+; Function Attrs: noinline nounwind optnone uwtable
+define dso_local i32 @f1() #0 {
+  %1 = alloca ptr, align 8
+  %2 = load ptr, ptr %1, align 8
+  %3 = load i32, ptr %2, align 4
+  ret i32 %3
 }
 
-; Function Attrs: noinline nounwind optnone ssp uwtable(sync)
-define i32 @fu() #0 {
-  %1 = alloca i32, align 4
-  %2 = alloca i32, align 4
-  %3 = load i32, ptr %1, align 4
-  %4 = load i32, ptr %2, align 4
-  %5 = icmp ne i32 %3, %4
-  %6 = zext i1 %5 to i32
-  ret i32 %6
-}
+attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cmov,+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }
 
-; Function Attrs: noinline nounwind optnone ssp uwtable(sync)
-define i32 @ff() #0 {
-  %1 = alloca double, align 8
-  %2 = alloca double, align 8
-  %3 = load double, ptr %1, align 8
-  %4 = load double, ptr %2, align 8
-  %5 = fcmp une double %3, %4
-  %6 = zext i1 %5 to i32
-  ret i32 %6
-}
+!llvm.module.flags = !{!0, !1, !2, !3, !4}
+!llvm.ident = !{!5}
 
-attributes #0 = { noinline nounwind optnone ssp uwtable(sync) "frame-pointer"="non-leaf-no-reserve" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="apple-m1" "target-features"="+aes,+altnzcv,+ccdp,+ccidx,+ccpp,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fptoint,+fullfp16,+jsconv,+lse,+neon,+pauth,+perfmon,+predres,+ras,+rcpc,+rdm,+sb,+sha2,+sha3,+specrestrict,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8a" "tune-cpu"="apple-m5" }
-
-!llvm.module.flags = !{!0, !1, !2, !3}
-!llvm.ident = !{!4}
-
-!0 = !{i32 2, !"SDK Version", [2 x i32] [i32 26, i32 5]}
+!0 = !{i32 1, !"wchar_size", i32 4}
 !1 = !{i32 8, !"PIC Level", i32 2}
-!2 = !{i32 7, !"uwtable", i32 1}
-!3 = !{i32 7, !"frame-pointer", i32 4}
-!4 = !{!"Homebrew clang version 23.1.0"}
+!2 = !{i32 7, !"PIE Level", i32 2}
+!3 = !{i32 7, !"uwtable", i32 2}
+!4 = !{i32 7, !"frame-pointer", i32 2}
+!5 = !{!"Ubuntu clang version 18.1.3 (1ubuntu1)"}

@@ -5,8 +5,8 @@ use crate::ast::visit::{
     Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_statement, walk_translation_unit,
 };
 use crate::ast::{
-    CompoundStatementNode, DeclarationNode, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, Name,
-    Statement, StatementNode, StringId, Tag, Value,
+    CompoundStatementNode, ConstValue, DeclarationNode, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode,
+    Name, Statement, StatementNode, StringId, Tag,
 };
 use crate::context::ctx;
 use crate::semantic::resolution::{expression, statement};
@@ -115,7 +115,7 @@ impl SymbolResolver<'_> {
         self.stmt_scopes.switch_control()
     }
 
-    pub fn record_case(&mut self, value: Value, id: StatementId) -> Result<StatementId, Diagnosis> {
+    pub fn record_case(&mut self, value: ConstValue, id: StatementId) -> Result<StatementId, Diagnosis> {
         self.stmt_scopes.record_case(value, id)
     }
 
@@ -232,7 +232,7 @@ impl SymbolResolver<'_> {
 // ----- Resolution ------------------------
 
 impl SymbolResolver<'_> {
-    pub fn eval_constant(&mut self, expr: &ExpressionNode) -> Option<Value> {
+    pub fn eval_constant(&mut self, expr: &ExpressionNode) -> Option<ConstValue> {
         if self.sema.expr_consts.seen(expr.id) {
             return self.sema.expr_consts.get(expr.id).copied();
         }

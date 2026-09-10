@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 use std::io::Write;
 
-use crate::ast::visit::walk_declarator;
-use crate::ast::{DeclaratorNode, FunctionDefinitionNode, StringId, Visitor};
+use crate::ast::visit::walk_init_declarator;
+use crate::ast::{FunctionDefinitionNode, InitDeclaratorNode, StringId, Visitor};
 use crate::codegen::llvm::Builder;
 use crate::semantic::{Duration, SymbolId, sema};
 
@@ -52,9 +52,9 @@ impl Locals {
 }
 
 impl Visitor for Locals {
-    fn visit_declarator(&mut self, node: &DeclaratorNode) {
-        walk_declarator(self, node);
-        let sym_id = sema().declarations[&node.id];
+    fn visit_init_declarator(&mut self, node: &InitDeclaratorNode) {
+        walk_init_declarator(self, node);
+        let sym_id = sema().declarations[&node.declarator.id];
         let sym = sym_id.resolve();
         if sym.duration != Duration::Automatic {
             return;

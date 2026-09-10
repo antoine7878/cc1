@@ -7,7 +7,7 @@ use crate::ast::{
     IterationStatementNode, JumpStatement, JumpStatementNode, Labeled, LabeledStatementNode, Name,
     ParameterDeclaration, Qualifier, SelectionStatement, SelectionStatementNode, Statement, StatementNode,
     StringLiteralNode, Struct, StructDeclaration, StructMemberDeclarator, TranslationUnitNode, Type, TypeSpecifier,
-    Union, ValueNode, Variant,
+    Union, ConstValueNode, Variant,
 };
 
 pub trait Visitor {
@@ -111,7 +111,7 @@ pub trait Visitor {
 
     fn visit_name(&mut self, _node: &Name) {}
 
-    fn visit_value(&mut self, _node: &ValueNode) {}
+    fn visit_value(&mut self, _node: &ConstValueNode) {}
 
     fn visit_string_literal(&mut self, node: &StringLiteralNode) {
         walk_string_literal(self, node);

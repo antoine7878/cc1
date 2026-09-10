@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use crate::ast::{BinaryOp, Expression, ExpressionNode, Fold, Tag, UnaryOp, Value};
+use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, Fold, Tag, UnaryOp};
 use crate::semantic::{Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedType, Sema, SymbolKind};
 
 struct DiagSink<'a>(&'a mut Vec<DiagnosisNode>);
@@ -13,7 +13,7 @@ impl DiagCollector for DiagSink<'_> {
 
 /// Folds an already resolved expression. Binding happens in the resolution pass, so a caller that
 /// is still binding must go through `SymbolResolver::eval_constant`.
-pub fn eval_constant(sema: &mut Sema, expr: &ExpressionNode) -> Option<Value> {
+pub fn eval_constant(sema: &mut Sema, expr: &ExpressionNode) -> Option<ConstValue> {
     if sema.expr_consts.seen(expr.id) {
         return sema.expr_consts.get(expr.id).copied();
     }
@@ -28,7 +28,7 @@ pub fn eval_constant(sema: &mut Sema, expr: &ExpressionNode) -> Option<Value> {
     value
 }
 
-pub fn try_fold(sema: &mut Sema, expr: &ExpressionNode) -> Option<Value> {
+pub fn try_fold(sema: &mut Sema, expr: &ExpressionNode) -> Option<ConstValue> {
     if sema.expr_consts.seen(expr.id) {
         return sema.expr_consts.get(expr.id).copied();
     }
@@ -49,7 +49,7 @@ fn node_ty(sema: &Sema, expr: &ExpressionNode) -> Result<QualifiedType, Diagnosi
     sema.expr_types.get(expr.id).map(|re| re.ty).ok_or(Diagnosis::Poisoned)
 }
 
-fn operand(sema: &mut Sema, e: &ExpressionNode, sink: &mut DiagSink) -> Result<Value, Diagnosis> {
+fn operand(sema: &mut Sema, e: &ExpressionNode, sink: &mut DiagSink) -> Result<ConstValue, Diagnosis> {
     let value = fold(sema, e, sink)?;
     let casted = sema
         .expr_types
@@ -62,7 +62,7 @@ fn operand(sema: &mut Sema, e: &ExpressionNode, sink: &mut DiagSink) -> Result<V
         .ok_or(Diagnosis::NonIntegerConstantExpression)
 }
 
-fn divisor(sema: &Sema, ty: &ResolvedType, lhs: Value, rhs: Value, op: BinaryOp) -> Result<(), Diagnosis> {
+fn divisor(sema: &Sema, ty: &ResolvedType, lhs: ConstValue, rhs: ConstValue, op: BinaryOp) -> Result<(), Diagnosis> {
     if rhs.is_zero() {
         return match op {
             BinaryOp::Div => Err(Diagnosis::DivisionByZero),
@@ -76,7 +76,7 @@ fn divisor(sema: &Sema, ty: &ResolvedType, lhs: Value, rhs: Value, op: BinaryOp)
     Ok(())
 }
 
-fn fold(sema: &mut Sema, expr: &ExpressionNode, sink: &mut DiagSink) -> Result<Value, Diagnosis> {
+fn fold(sema: &mut Sema, expr: &ExpressionNode, sink: &mut DiagSink) -> Result<ConstValue, Diagnosis> {
     if let Some(value) = sema.expr_consts.get(expr.id) {
         return Ok(*value);
     }
@@ -118,7 +118,7 @@ fn integral_operands(sema: &Sema, expr: &ExpressionNode) -> Result<(), Diagnosis
     Ok(())
 }
 
-fn identifier(sema: &Sema, expr: &ExpressionNode) -> Result<Value, Diagnosis> {
+fn identifier(sema: &Sema, expr: &ExpressionNode) -> Result<ConstValue, Diagnosis> {
     let id = sema
         .expr_bindings
         .get(expr.id)
@@ -128,7 +128,10 @@ fn identifier(sema: &Sema, expr: &ExpressionNode) -> Result<Value, Diagnosis> {
     if symbol.kind != SymbolKind::Variant {
         return Err(Diagnosis::NonConstantExpression);
     }
-    symbol.value.map(Value::Int).ok_or(Diagnosis::NonConstantExpression)
+    symbol
+        .value
+        .map(ConstValue::Int)
+        .ok_or(Diagnosis::NonConstantExpression)
 }
 
 fn unary_op(
@@ -137,7 +140,7 @@ fn unary_op(
     op: UnaryOp,
     e: &ExpressionNode,
     sink: &mut DiagSink,
-) -> Result<Value, Diagnosis> {
+) -> Result<ConstValue, Diagnosis> {
     match op {
         UnaryOp::Plus => operand(sema, e, sink),
         UnaryOp::Minus | UnaryOp::BitNot => {
@@ -160,7 +163,7 @@ fn binary_op(
     e1: &ExpressionNode,
     e2: &ExpressionNode,
     sink: &mut DiagSink,
-) -> Result<Value, Diagnosis> {
+) -> Result<ConstValue, Diagnosis> {
     match op {
         BinaryOp::LogicalAnd | BinaryOp::LogicalOr => logical(sema, op, e1, e2, sink),
         BinaryOp::Greater
@@ -180,14 +183,14 @@ fn logical(
     e1: &ExpressionNode,
     e2: &ExpressionNode,
     sink: &mut DiagSink,
-) -> Result<Value, Diagnosis> {
+) -> Result<ConstValue, Diagnosis> {
     let lhs = fold(sema, e1, sink)?.is_true();
     let value = match op {
         BinaryOp::LogicalAnd => lhs && fold(sema, e2, sink)?.is_true(),
         BinaryOp::LogicalOr => lhs || fold(sema, e2, sink)?.is_true(),
         _ => unreachable!(),
     };
-    Ok(Value::from(value))
+    Ok(ConstValue::from(value))
 }
 
 fn comparison(
@@ -196,7 +199,7 @@ fn comparison(
     e1: &ExpressionNode,
     e2: &ExpressionNode,
     sink: &mut DiagSink,
-) -> Result<Value, Diagnosis> {
+) -> Result<ConstValue, Diagnosis> {
     let lhs = operand(sema, e1, sink)?;
     let rhs = operand(sema, e2, sink)?;
     let ordering = Fold::new(&sema.target).compare(lhs, rhs);
@@ -209,7 +212,7 @@ fn comparison(
         BinaryOp::Neq => matches!(ordering, Some(Ordering::Less | Ordering::Greater)),
         _ => unreachable!(),
     };
-    Ok(Value::from(holds))
+    Ok(ConstValue::from(holds))
 }
 
 fn divide(
@@ -219,7 +222,7 @@ fn divide(
     e1: &ExpressionNode,
     e2: &ExpressionNode,
     sink: &mut DiagSink,
-) -> Result<Value, Diagnosis> {
+) -> Result<ConstValue, Diagnosis> {
     let lhs = operand(sema, e1, sink)?;
     let rhs = operand(sema, e2, sink)?;
     let ty = scalar_ty(sema, node_ty(sema, expr)?);
@@ -234,7 +237,7 @@ fn arithmetic(
     e1: &ExpressionNode,
     e2: &ExpressionNode,
     sink: &mut DiagSink,
-) -> Result<Value, Diagnosis> {
+) -> Result<ConstValue, Diagnosis> {
     let lhs = operand(sema, e1, sink)?;
     let rhs = operand(sema, e2, sink)?;
     let ty = scalar_ty(sema, node_ty(sema, expr)?);
@@ -248,14 +251,19 @@ fn conditional(
     e1: &ExpressionNode,
     e2: &ExpressionNode,
     sink: &mut DiagSink,
-) -> Result<Value, Diagnosis> {
+) -> Result<ConstValue, Diagnosis> {
     match fold(sema, condition, sink)?.is_true() {
         true => operand(sema, e1, sink),
         false => operand(sema, e2, sink),
     }
 }
 
-fn cast(sema: &mut Sema, expr: &ExpressionNode, e: &ExpressionNode, sink: &mut DiagSink) -> Result<Value, Diagnosis> {
+fn cast(
+    sema: &mut Sema,
+    expr: &ExpressionNode,
+    e: &ExpressionNode,
+    sink: &mut DiagSink,
+) -> Result<ConstValue, Diagnosis> {
     if node_ty(sema, expr)?.is_void(sema) {
         return Err(Diagnosis::NonIntegerConstantExpression);
     }

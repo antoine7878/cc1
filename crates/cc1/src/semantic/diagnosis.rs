@@ -1,7 +1,7 @@
 use std::fmt::{self, Display};
 use std::io::{self, Write, stderr};
 
-use crate::ast::{Name, StringId, UnaryOp, Value};
+use crate::ast::{ConstValue, Name, StringId, UnaryOp};
 use crate::context::ctx;
 use crate::semantic::{QualifiedType, SymbolKind};
 use libft::{Severity, Span, render};
@@ -9,7 +9,7 @@ use libft::{Severity, Span, render};
 #[derive(Clone, Debug)]
 pub enum Diagnosis {
     OutsideSwitch(&'static str),
-    DuplicateCase(Value),
+    DuplicateCase(ConstValue),
     DuplicateDefault,
     BreakNotInLoop,
     ContinueNotInLoop,

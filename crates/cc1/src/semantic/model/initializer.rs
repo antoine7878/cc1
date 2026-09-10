@@ -3,7 +3,7 @@ use std::slice::Iter;
 
 use crate::ast;
 use crate::ast::visit::Visitor;
-use crate::ast::{Expression, ExpressionId, ExpressionNode, InitializerNode, StringConstId, Tag, Value};
+use crate::ast::{ConstValue, Expression, ExpressionId, ExpressionNode, InitializerNode, StringConstId, Tag};
 use crate::define_arena;
 use crate::semantic::resolution::expression;
 use crate::semantic::{
@@ -16,7 +16,7 @@ define_arena!(Initializer, InitializerArena, InitializerId);
 #[derive(Clone, Debug)]
 pub enum Initializer {
     Zero,
-    Value(Value),
+    Value(ConstValue),
     Address(Place),
     String(StringConstId),
     List(Vec<Initializer>),

@@ -1,5 +1,5 @@
 use crate::{
-    ast::{StringId, Value, statement::StatementId},
+    ast::{ConstValue, StringId, statement::StatementId},
     semantic::QualifiedType,
 };
 
@@ -8,10 +8,10 @@ pub enum ResolvedStatement {
     Loop(StatementId),
     Switch {
         control: QualifiedType,
-        cases: Vec<(Value, StatementId)>,
+        cases: Vec<(ConstValue, StatementId)>,
         default: Option<StatementId>,
     },
-    Case(Value, StatementId),
+    Case(ConstValue, StatementId),
     Default(StatementId),
     Break(StatementId),
     Continue(StatementId),

@@ -1,5 +1,5 @@
 use cc1::ast::statement::StatementId;
-use cc1::ast::{StringId, Value};
+use cc1::ast::{ConstValue, StringId};
 use cc1::semantic::{
     Diagnosis, QualifiedType, ResolvedStatement, ResolvedTypeId, ScopeKind, StatementScopes, SymbolId, SymbolScopes,
     TagDefId,
@@ -193,7 +193,7 @@ fn a_case_binds_to_the_enclosing_switch_across_a_loop() {
     let mut scopes = switch_scope();
     scopes.push_loop(stmt(1));
     assert_eq!(scopes.switch_control(), Some(control()));
-    assert_eq!(scopes.record_case(Value::Int(0), stmt(2)).ok(), Some(stmt(0)));
+    assert_eq!(scopes.record_case(ConstValue::Int(0), stmt(2)).ok(), Some(stmt(0)));
     assert_eq!(scopes.record_default(stmt(3)).ok(), Some(stmt(0)));
 }
 
@@ -202,7 +202,7 @@ fn a_case_outside_a_switch_is_rejected() {
     let mut scopes = StatementScopes::default();
     scopes.push_loop(stmt(1));
     assert!(matches!(
-        scopes.record_case(Value::Int(0), stmt(2)),
+        scopes.record_case(ConstValue::Int(0), stmt(2)),
         Err(Diagnosis::OutsideSwitch("case"))
     ));
     assert!(matches!(
@@ -214,20 +214,20 @@ fn a_case_outside_a_switch_is_rejected() {
 #[test]
 fn a_case_value_is_unique_within_a_switch() {
     let mut scopes = switch_scope();
-    assert_eq!(scopes.record_case(Value::Int(1), stmt(1)).ok(), Some(stmt(0)));
-    assert_eq!(scopes.record_case(Value::Int(2), stmt(2)).ok(), Some(stmt(0)));
+    assert_eq!(scopes.record_case(ConstValue::Int(1), stmt(1)).ok(), Some(stmt(0)));
+    assert_eq!(scopes.record_case(ConstValue::Int(2), stmt(2)).ok(), Some(stmt(0)));
     assert!(matches!(
-        scopes.record_case(Value::Int(1), stmt(3)),
-        Err(Diagnosis::DuplicateCase(Value::Int(1)))
+        scopes.record_case(ConstValue::Int(1), stmt(3)),
+        Err(Diagnosis::DuplicateCase(ConstValue::Int(1)))
     ));
 }
 
 #[test]
 fn a_nested_switch_owns_its_own_cases() {
     let mut scopes = switch_scope();
-    scopes.record_case(Value::Int(1), stmt(1)).unwrap();
+    scopes.record_case(ConstValue::Int(1), stmt(1)).unwrap();
     scopes.push_switch(stmt(2), control());
-    assert_eq!(scopes.record_case(Value::Int(1), stmt(3)).ok(), Some(stmt(2)));
+    assert_eq!(scopes.record_case(ConstValue::Int(1), stmt(3)).ok(), Some(stmt(2)));
 }
 
 #[test]
@@ -252,7 +252,7 @@ fn leaving_a_scope_yields_the_statement_it_resolves() {
 #[test]
 fn leaving_a_switch_carries_its_cases_out() {
     let mut scopes = switch_scope();
-    scopes.record_case(Value::Int(7), stmt(1)).unwrap();
+    scopes.record_case(ConstValue::Int(7), stmt(1)).unwrap();
     scopes.record_default(stmt(2)).unwrap();
     let Some((
         id,
@@ -267,7 +267,7 @@ fn leaving_a_switch_carries_its_cases_out() {
     };
     assert_eq!(id, stmt(0));
     assert_eq!(control, self::control());
-    assert_eq!(cases, vec![(Value::Int(7), stmt(1))]);
+    assert_eq!(cases, vec![(ConstValue::Int(7), stmt(1))]);
     assert_eq!(default, Some(stmt(2)));
     assert!(scopes.is_empty());
 }

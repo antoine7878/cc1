@@ -5,7 +5,7 @@ use crate::ast::{Qualifier, Type, ExpressionNode, Name, DeclarationSpecifier, In
 use crate::ast::{DeclarationNode, InitDeclaratorNode, DeclaratorNode, InitializerNode, Storage, FunctionParametersNode, Tag};
 use crate::ast::{StructDeclaration, StructMemberDeclarator, VariantId, EnumId, LabeledStatementNode, StatementNode, Labeled, CompoundStatementNode};
 use crate::ast::{ExpressionStatementNode, SelectionStatementNode, IterationStatementNode, JumpStatementNode, JumpStatement};
-use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode, ValueNode, StringLiteralNode};
+use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode, ConstValueNode, StringLiteralNode};
 use crate::ast::{BinaryOp, MemberOp, UnaryOp};
 
 use crate::context::Context;
@@ -57,7 +57,7 @@ macro_rules! spec {
 %}
 
 %token<Name> IDENTIFIER TYPE_NAME
-%token<ValueNode> CONSTANT
+%token<ConstValueNode> CONSTANT
 %token<StringLiteralNode> STRING_LITERAL
 %token TYPEDEF EXTERN STATIC AUTO REGISTER
 %token CHAR SHORT INT LONG SIGNED UNSIGNED FLOAT DOUBLE CONST VOLATILE VOID

@@ -37,10 +37,10 @@ impl fmt::Display for LlvmType {
             ResolvedType::Float => write!(f, "{}", target.float.llvm()),
             ResolvedType::Double => write!(f, "{}", target.double.llvm()),
             ResolvedType::LongDouble => write!(f, "{}", target.long_double.llvm()),
+            ResolvedType::Pointer(_) => write!(f, "ptr"),
             ResolvedType::Function { .. } => todo!(),
             ResolvedType::Tag { .. } => todo!(),
             ResolvedType::Array { .. } => todo!(),
-            ResolvedType::Pointer(_) => todo!(),
         }
     }
 }

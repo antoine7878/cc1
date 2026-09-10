@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::fs::read_to_string;
 
 use crate::ast::{
-    AstArenas, ExpressionNode, Name, StringId, StructDeclaration, Tag, TranslationUnitNode, TypeSpecifier, Value,
-    ValueNode,
+    AstArenas, ConstValue, ConstValueNode, ExpressionNode, Name, StringId, StructDeclaration, Tag, TranslationUnitNode,
+    TypeSpecifier,
 };
 use crate::parser::ParseState;
 use crate::semantic::DiagnosisNode;
@@ -45,9 +45,9 @@ impl Default for Context {
 impl Context {
     pub fn with_target(target: Target) -> Self {
         let mut arenas = AstArenas::default();
-        let value_node = ValueNode {
+        let value_node = ConstValueNode {
             span: Span::default(),
-            value: Value::Int(1),
+            value: ConstValue::Int(1),
         };
         let one = arenas.expressions.constant(value_node, Span::default());
         Self {

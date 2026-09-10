@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::arena::{Global, Has, HasMut, HasTable, Owned, SideTable};
 use crate::ast::statement::StatementId;
-use crate::ast::{AstArenas, DeclaratorId, ExpressionId, StringId, Value};
+use crate::ast::{AstArenas, ConstValue, DeclaratorId, ExpressionId, StringId};
 use crate::semantic::{
     Builtins, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDef, FunctionDefArena, FunctionDefId,
     Initializer, InitializerArena, InitializerId, Linkage, MemberRef, ResolvedExpression, ResolvedStatement,
@@ -46,7 +46,7 @@ pub struct Sema {
 
     pub expr_types: SideTable<ExpressionId, ResolvedExpression>,
     pub expr_bindings: SideTable<ExpressionId, SymbolId>,
-    pub expr_consts: SideTable<ExpressionId, Value>,
+    pub expr_consts: SideTable<ExpressionId, ConstValue>,
     pub member_refs: SideTable<ExpressionId, MemberRef>,
     pub declarations: HashMap<DeclaratorId, SymbolId>,
     pub externals: HashMap<StringId, External>,

@@ -1,4 +1,4 @@
-use crate::ast::{BinaryOp, ExpressionNode, Value};
+use crate::ast::{BinaryOp, ConstValue, ExpressionNode};
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{Diag, DiagCollector, Diagnosis, ResolvedExpression, ResolvedType, Sema, cast, ice};
@@ -59,7 +59,7 @@ pub fn shift_types(
     sema: &mut Sema,
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,
-    count: Option<Value>,
+    count: Option<ConstValue>,
     span: &Span,
 ) -> R {
     let l = lhs.casted_ty().id.resolve_with(sema);

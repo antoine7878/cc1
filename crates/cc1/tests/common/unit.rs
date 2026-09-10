@@ -3,7 +3,7 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 
 use cc1::ast::statement::StatementId;
-use cc1::ast::{Expression, ExpressionId, Name, StringConstant, Tag, Value};
+use cc1::ast::{ConstValue, Expression, ExpressionId, Name, StringConstant, Tag};
 use cc1::context::{self, Context, install};
 use cc1::parser::parse_reader;
 use cc1::semantic::{
@@ -159,7 +159,7 @@ impl Unit {
             .collect()
     }
 
-    pub fn const_values(&self) -> Vec<Option<Value>> {
+    pub fn const_values(&self) -> Vec<Option<ConstValue>> {
         (0..self.sema.expr_consts.len())
             .map(ExpressionId::from)
             .filter(|&id| self.sema.expr_consts.seen(id))
@@ -482,7 +482,7 @@ impl Unit {
 
 /// Renders a folded/cast constant the same way for `test_target`, `test_value` and
 /// `Unit::folded` — `None` for a value the target could not represent.
-pub fn repr(value: Option<Value>) -> String {
+pub fn repr(value: Option<ConstValue>) -> String {
     match value {
         Some(value) => format!("{value:?}"),
         None => "None".to_string(),

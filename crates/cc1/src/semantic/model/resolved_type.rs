@@ -135,6 +135,18 @@ impl ResolvedType {
                 | ResolvedType::UnsignedLong
         )
     }
+
+    pub fn class(&self) -> Option<Class> {
+        if self.is_floating() {
+            Some(Class::Float)
+        } else if self.is_signed() {
+            Some(Class::Signed)
+        } else if self.is_unsigned() {
+            Some(Class::Unsigned)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -387,6 +399,17 @@ impl QualifiedType {
     pub fn is_unsigned(&self, sema: &Sema) -> bool {
         self.id.resolve_with(sema).is_unsigned()
     }
+
+    pub fn class(&self, sema: &Sema) -> Option<Class> {
+        self.id.resolve_with(sema).class()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Class {
+    Signed,
+    Unsigned,
+    Float,
 }
 
 impl fmt::Display for QualifiedType {

@@ -2,7 +2,7 @@
 %custom_span_types
 
 %{
-use crate::ast::{Name, StringLiteralNode, ValueNode, Value};
+use crate::ast::{Name, StringLiteralNode, ConstValueNode, ConstValue};
 use crate::context::Context;
 use libft::{Position, Span};
 use crate::parser::{YYToken, YYFeedback};
@@ -144,13 +144,13 @@ fn alloc_ident<R: Read>(lex: &mut YYLex<R>) -> Name {
     lex.ctx.arenas.names.add(name, span)
 }
 
-fn alloc_constant<R: Read>(lex: &mut YYLex<R>) -> ValueNode {
+fn alloc_constant<R: Read>(lex: &mut YYLex<R>) -> ConstValueNode {
     let span = lex.span;
-    let Diag { res: value, diagnosis } = Value::parse(lex.yytext.as_str(), &lex.ctx.target);
+    let Diag { res: value, diagnosis } = ConstValue::parse(lex.yytext.as_str(), &lex.ctx.target);
     if let Some(diagnosis) = diagnosis {
         lex.ctx.diagnosis.push(DiagnosisNode::new(diagnosis, span));
     }
-    ValueNode::new(value, span)
+    ConstValueNode::new(value, span)
 }
 
 fn alloc_string<R: Read>(lex: &mut YYLex<R>) -> StringLiteralNode {

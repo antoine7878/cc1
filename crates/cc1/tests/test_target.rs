@@ -1,5 +1,5 @@
 use crate::common::{Unit, repr};
-use cc1::ast::{F80, Value};
+use cc1::ast::{ConstValue, F80};
 use cc1::semantic::{QualifiedType, ResolvedType, ResolvedTypeId, TagDefId};
 use cc1::target::{ARM64_DARWIN, FloatFormat, I386, Target, X86_64};
 
@@ -165,44 +165,50 @@ fn truncate_is_defined_for_integer_types_only() {
 
 #[test]
 fn cast_narrows_and_retypes() {
-    assert_eq!(repr(I386.cast(&ResolvedType::Int, Value::Long(4294967297))), "Int(1)");
-    assert_eq!(repr(I386.cast(&ResolvedType::Char, Value::Int(321))), "Int(65)");
-    assert_eq!(repr(I386.cast(&ResolvedType::UnsignedChar, Value::Int(-1))), "Int(255)");
     assert_eq!(
-        repr(I386.cast(&ResolvedType::UnsignedInt, Value::Int(-1))),
+        repr(I386.cast(&ResolvedType::Int, ConstValue::Long(4294967297))),
+        "Int(1)"
+    );
+    assert_eq!(repr(I386.cast(&ResolvedType::Char, ConstValue::Int(321))), "Int(65)");
+    assert_eq!(
+        repr(I386.cast(&ResolvedType::UnsignedChar, ConstValue::Int(-1))),
+        "Int(255)"
+    );
+    assert_eq!(
+        repr(I386.cast(&ResolvedType::UnsignedInt, ConstValue::Int(-1))),
         "UnsignedInt(4294967295)"
     );
     assert_eq!(
-        repr(I386.cast(&ResolvedType::Long, Value::UnsignedLong(4294967295))),
+        repr(I386.cast(&ResolvedType::Long, ConstValue::UnsignedLong(4294967295))),
         "Long(-1)"
     );
     assert_eq!(
-        repr(X86_64.cast(&ResolvedType::Long, Value::UnsignedLong(4294967295))),
+        repr(X86_64.cast(&ResolvedType::Long, ConstValue::UnsignedLong(4294967295))),
         "Long(4294967295)"
     );
     assert_eq!(
-        repr(X86_64.cast(&ResolvedType::UnsignedLong, Value::Int(-1))),
+        repr(X86_64.cast(&ResolvedType::UnsignedLong, ConstValue::Int(-1))),
         "UnsignedLong(18446744073709551615)"
     );
 }
 
 #[test]
 fn cast_is_defined_for_integer_types_only() {
-    assert_eq!(repr(I386.cast(&ResolvedType::Float, Value::Int(1))), "None");
-    assert_eq!(repr(I386.cast(&ResolvedType::Void, Value::Int(1))), "None");
-    assert_eq!(repr(I386.cast(&pointer_to_int(), Value::Int(1))), "None");
+    assert_eq!(repr(I386.cast(&ResolvedType::Float, ConstValue::Int(1))), "None");
+    assert_eq!(repr(I386.cast(&ResolvedType::Void, ConstValue::Int(1))), "None");
+    assert_eq!(repr(I386.cast(&pointer_to_int(), ConstValue::Int(1))), "None");
 }
 
 #[test]
 fn value_size_follows_the_value_type() {
-    assert_eq!(I386.value_size(Value::Int(0)), 4);
-    assert_eq!(I386.value_size(Value::UnsignedInt(0)), 4);
-    assert_eq!(I386.value_size(Value::Long(0)), 4);
-    assert_eq!(I386.value_size(Value::Float(0.0)), 4);
-    assert_eq!(I386.value_size(Value::Double(0.0)), 8);
-    assert_eq!(I386.value_size(Value::LongDouble(F80::from(0.0))), 12);
-    assert_eq!(X86_64.value_size(Value::Long(0)), 8);
-    assert_eq!(X86_64.value_size(Value::LongDouble(F80::from(0.0))), 16);
+    assert_eq!(I386.value_size(ConstValue::Int(0)), 4);
+    assert_eq!(I386.value_size(ConstValue::UnsignedInt(0)), 4);
+    assert_eq!(I386.value_size(ConstValue::Long(0)), 4);
+    assert_eq!(I386.value_size(ConstValue::Float(0.0)), 4);
+    assert_eq!(I386.value_size(ConstValue::Double(0.0)), 8);
+    assert_eq!(I386.value_size(ConstValue::LongDouble(F80::from(0.0))), 12);
+    assert_eq!(X86_64.value_size(ConstValue::Long(0)), 8);
+    assert_eq!(X86_64.value_size(ConstValue::LongDouble(F80::from(0.0))), 16);
 }
 
 #[test]
@@ -268,7 +274,7 @@ fn arm64_abi_types_and_ranges() {
     assert!(ARM64_DARWIN.is_signed(&ResolvedType::Char));
     assert_eq!(ARM64_DARWIN.max_value(&ResolvedType::Long), Some(i64::MAX as u64));
     assert_eq!(ARM64_DARWIN.min_value(&ResolvedType::Long), Some(i64::MIN));
-    assert_eq!(ARM64_DARWIN.value_size(Value::LongDouble(F80::from(0.0))), 8);
+    assert_eq!(ARM64_DARWIN.value_size(ConstValue::LongDouble(F80::from(0.0))), 8);
 }
 
 #[test]

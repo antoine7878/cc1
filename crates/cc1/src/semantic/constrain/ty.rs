@@ -1,4 +1,4 @@
-use crate::ast::{Name, Value};
+use crate::ast::{ConstValue, Name};
 use crate::semantic::diagnosis::{Diag, Diagnosis};
 use crate::semantic::{DeclaredParams, QualifiedType, ResolvedType};
 use crate::target::Target;
@@ -51,7 +51,7 @@ pub fn check_element_type(is_object: bool, ty: QualifiedType) -> Diag<()> {
 pub fn check_bit_width(
     target: &Target,
     ty: &ResolvedType,
-    value: Option<Value>,
+    value: Option<ConstValue>,
     name: Option<Name>,
 ) -> Diag<Option<i32>> {
     if !matches!(ty, ResolvedType::Int | ResolvedType::UnsignedInt) {

@@ -1,5 +1,5 @@
 use crate::{
-    ast::{F80, Value},
+    ast::{ConstValue, F80},
     semantic::ResolvedType,
 };
 
@@ -133,13 +133,13 @@ impl Default for Target {
 }
 
 impl Target {
-    pub fn value_size(&self, value: Value) -> u64 {
+    pub fn value_size(&self, value: ConstValue) -> u64 {
         match value {
-            Value::Int(_) | Value::UnsignedInt(_) => self.int,
-            Value::Long(_) | Value::UnsignedLong(_) => self.long,
-            Value::Float(_) => self.float,
-            Value::Double(_) => self.double,
-            Value::LongDouble(_) => self.long_double,
+            ConstValue::Int(_) | ConstValue::UnsignedInt(_) => self.int,
+            ConstValue::Long(_) | ConstValue::UnsignedLong(_) => self.long,
+            ConstValue::Float(_) => self.float,
+            ConstValue::Double(_) => self.double,
+            ConstValue::LongDouble(_) => self.long_double,
         }
         .size
         .into()
@@ -160,16 +160,16 @@ impl Target {
         Some(layout)
     }
 
-    pub fn cast(&self, ty: &ResolvedType, val: Value) -> Option<Value> {
+    pub fn cast(&self, ty: &ResolvedType, val: ConstValue) -> Option<ConstValue> {
         if !self.is_integral(ty) {
             return None;
         }
         let v = val.truncate(self.bits(ty)?, self.is_signed(ty));
         Some(match ty {
-            ResolvedType::Long => Value::Long(v.to_i64()),
-            ResolvedType::UnsignedLong => Value::UnsignedLong(v.to_u64()),
-            ResolvedType::UnsignedInt => Value::UnsignedInt(v.to_u64() as u32),
-            _ => Value::Int(v.to_i64() as i32),
+            ResolvedType::Long => ConstValue::Long(v.to_i64()),
+            ResolvedType::UnsignedLong => ConstValue::UnsignedLong(v.to_u64()),
+            ResolvedType::UnsignedInt => ConstValue::UnsignedInt(v.to_u64() as u32),
+            _ => ConstValue::Int(v.to_i64() as i32),
         })
     }
 

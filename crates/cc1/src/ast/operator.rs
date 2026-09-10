@@ -11,6 +11,7 @@ pub enum UnaryOp {
     BitNot,
     LogicalNot,
 }
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinaryOp {
     Add,
@@ -45,9 +46,7 @@ impl BinaryOp {
                 | BinaryOp::Left
                 | BinaryOp::Right
                 | BinaryOp::BitAnd
-                | BinaryOp::LogicalAnd
                 | BinaryOp::BitOr
-                | BinaryOp::LogicalOr
                 | BinaryOp::BitXor
         )
     }

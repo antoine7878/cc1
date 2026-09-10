@@ -1,5 +1,5 @@
 use crate::arena::OptionPoisoned;
-use crate::ast::{ExpressionNode, Type, Value};
+use crate::ast::{ConstValue, ExpressionNode, Type};
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{QualifiedType, Sema, SymbolResolver, constrain, declaration, layout};
@@ -39,7 +39,7 @@ fn set_sizeof_constant(sema: &mut Sema, node: &ExpressionNode, ty: QualifiedType
     if let Some(layout) = layout::of(sema, ty.id)
         && let Some(value) = sema
             .target
-            .cast(&sema.target.size_t, Value::UnsignedLong(layout.size.into()))
+            .cast(&sema.target.size_t, ConstValue::UnsignedLong(layout.size.into()))
     {
         sema.expr_consts.set(node.id, Some(value));
     }
