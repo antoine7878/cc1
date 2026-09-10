@@ -12,7 +12,7 @@ impl<T> ArenaKey for T where T: From<usize> + Into<usize> + Copy + Debug + Parti
 pub struct ArenaId<T>(u32, PhantomData<fn() -> T>);
 
 impl<T> ArenaId<T> {
-    pub fn resolve_in<H: Has<T>>(self, holder: &H) -> &T {
+    pub fn resolve_with<H: Has<T>>(self, holder: &H) -> &T {
         holder.get(self)
     }
 

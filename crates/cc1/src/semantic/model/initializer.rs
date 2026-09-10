@@ -91,7 +91,7 @@ fn string_at(resolver: &mut SymbolResolver, ty: QualifiedType, cursor: &mut Curs
 
 fn fill(resolver: &mut SymbolResolver, ty: QualifiedType, cursor: &mut Cursor, constant: bool) -> Initializer {
     let mut values = Vec::new();
-    match ty.id.resolve_in(resolver.sema).clone() {
+    match ty.id.resolve_with(resolver.sema).clone() {
         ResolvedType::Array { elem, len } => {
             while len.is_none_or(|len| values.len() < len) && cursor.peek().is_some() {
                 values.push(walk(resolver, elem, cursor, constant));
@@ -141,10 +141,10 @@ fn walk(resolver: &mut SymbolResolver, ty: QualifiedType, cursor: &mut Cursor, c
 }
 
 fn string(resolver: &mut SymbolResolver, ty: QualifiedType, e: &ExpressionNode) -> Option<Initializer> {
-    let &ResolvedType::Array { elem, len } = ty.id.resolve_in(resolver.sema) else {
+    let &ResolvedType::Array { elem, len } = ty.id.resolve_with(resolver.sema) else {
         return None;
     };
-    if !elem.id.resolve_in(resolver.sema).is_char() {
+    if !elem.id.resolve_with(resolver.sema).is_char() {
         return None;
     }
     let Expression::StringLiteral(literal) = e.id.resolve() else {
@@ -168,7 +168,7 @@ fn excess(resolver: &mut SymbolResolver, cursor: &mut Cursor) {
 }
 
 fn is_aggregate(sema: &Sema, ty: QualifiedType) -> bool {
-    match ty.id.resolve_in(sema) {
+    match ty.id.resolve_with(sema) {
         ResolvedType::Array { .. } => true,
         ResolvedType::Tag(id) => matches!(sema.tags.get(*id).kind, Tag::Struct | Tag::Union),
         _ => false,
@@ -176,12 +176,12 @@ fn is_aggregate(sema: &Sema, ty: QualifiedType) -> bool {
 }
 
 fn member_types(sema: &Sema, id: TagDefId) -> Vec<QualifiedType> {
-    let tag = id.resolve_in(sema);
+    let tag = id.resolve_with(sema);
     let named = tag
         .members
         .iter()
         .filter_map(|member| member.sym)
-        .filter_map(|sym| sym.resolve_in(sema).ty);
+        .filter_map(|sym| sym.resolve_with(sema).ty);
     match tag.kind {
         Tag::Union => named.take(1).collect(),
         _ => named.collect(),

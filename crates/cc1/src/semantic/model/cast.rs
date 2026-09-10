@@ -45,13 +45,13 @@ pub fn lvalue_conversion(sema: &mut Sema, re: &mut ResolvedExpression, span: &Sp
 }
 
 pub fn function_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
-    let ResolvedType::Function { .. } = re.ty.id.resolve_in(sema) else { return };
+    let ResolvedType::Function { .. } = re.ty.id.resolve_with(sema) else { return };
     let to = QualifiedType::plain(sema.types.pointer(re.ty));
     re.casts.push(ImplicitCast::new(CastKind::FunctionToPointer, to));
 }
 
 pub fn array_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
-    let ResolvedType::Array { elem, .. } = re.ty.id.resolve_in(sema) else { return };
+    let ResolvedType::Array { elem, .. } = re.ty.id.resolve_with(sema) else { return };
     let to = QualifiedType::plain(sema.types.pointer(*elem));
     re.casts.push(ImplicitCast::new(CastKind::ArrayToPointer, to))
 }
@@ -60,7 +60,7 @@ pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
     if !matches!(re.kind, ExpressionKind::LValue) {
         return;
     }
-    let ty = re.ty.id.resolve_in(sema);
+    let ty = re.ty.id.resolve_with(sema);
     if matches!(ty, ResolvedType::Array { .. } | ResolvedType::Function { .. }) {
         return;
     }
@@ -75,9 +75,9 @@ pub fn promote(sema: &Sema, re: &mut ResolvedExpression) {
     use ResolvedType::*;
 
     let qty = re.casted_ty();
-    match qty.id.resolve_in(sema) {
+    match qty.id.resolve_with(sema) {
         Char | SignedChar | UnsignedChar | Short | UnsignedShort => (),
-        &Tag(id) if id.resolve_in(sema).kind == ast::Tag::Enum => (),
+        &Tag(id) if id.resolve_with(sema).kind == ast::Tag::Enum => (),
         _ => return,
     }
 
@@ -92,7 +92,7 @@ fn convert_type(ty: ResolvedTypeId) -> QualifiedType {
 
 pub fn convert(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId, is_null_ptr: bool) {
     let from = from_re.casted_ty();
-    let implicit_cast = match (from.id.resolve_in(sema), to_id.resolve_in(sema)) {
+    let implicit_cast = match (from.id.resolve_with(sema), to_id.resolve_with(sema)) {
         _ if from.id == to_id => return,
         (f, t) if f.is_arithmetic(sema) && t.is_arithmetic(sema) => return num_conv(sema, from_re, to_id),
         (_, ResolvedType::Void) => ImplicitCast::new(CastKind::ToVoid, convert_type(to_id)),
@@ -126,7 +126,7 @@ pub fn arithmetic_conversion(sema: &Sema, from: QualifiedType, to: QualifiedType
     if from.id == to.id {
         return None;
     }
-    let (f, t) = (from.id.resolve_in(sema), to.id.resolve_in(sema));
+    let (f, t) = (from.id.resolve_with(sema), to.id.resolve_with(sema));
     let kind = match (f.is_integral(sema), t.is_integral(sema)) {
         (true, true) => CastKind::IntegerConversion,
         (true, false) => CastKind::IntegerToFloating,
@@ -143,8 +143,8 @@ pub fn usual_arithmetic(
 ) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
     use ResolvedType::*;
 
-    let l = lhs.casted_ty().id.resolve_in(sema);
-    let r = rhs.casted_ty().id.resolve_in(sema);
+    let l = lhs.casted_ty().id.resolve_with(sema);
+    let r = rhs.casted_ty().id.resolve_with(sema);
     if !l.is_arithmetic(sema) || !r.is_arithmetic(sema) {
         return Ok((lhs.casted_ty(), RValue));
     }
@@ -172,7 +172,10 @@ pub fn usual_arithmetic(
 }
 
 fn is_object_or_incomplete(sema: &Sema, ty: ResolvedTypeId) -> bool {
-    !matches!(ty.resolve_in(sema), ResolvedType::Function { .. } | ResolvedType::Void)
+    !matches!(
+        ty.resolve_with(sema),
+        ResolvedType::Function { .. } | ResolvedType::Void
+    )
 }
 
 fn can_assign_pointer(sema: &Sema, lp: QualifiedType, rp: QualifiedType) -> bool {
@@ -216,12 +219,12 @@ pub fn assignment_conversion(
     is_null_ptr: bool,
     assign_ctx: AssignmentContext,
 ) -> Result<QualifiedType, Diagnosis> {
-    let l = lhs.ty.id.resolve_in(sema);
+    let l = lhs.ty.id.resolve_with(sema);
     let rhs_ty = rhs.casted_ty();
-    let r = rhs_ty.id.resolve_in(sema);
+    let r = rhs_ty.id.resolve_with(sema);
     match (l, r) {
         (l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => (),
-        (&ResolvedType::Tag(id), _) if !id.resolve_in(sema).is_enum() && lhs.ty.is_compatible(sema, &rhs_ty) => (),
+        (&ResolvedType::Tag(id), _) if !id.resolve_with(sema).is_enum() && lhs.ty.is_compatible(sema, &rhs_ty) => (),
         (ResolvedType::Pointer(lp), ResolvedType::Pointer(rp)) if can_assign_pointer(sema, *lp, *rp) => {
             if !lp.has_qualifiers_of(rp) {
                 return Err(assign_ctx.discarded(lhs.ty, rhs_ty));
@@ -247,10 +250,10 @@ pub fn pointer_integer_arithmetic(
     pointer: &mut ResolvedExpression,
     integral: &mut ResolvedExpression,
 ) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
-    let ResolvedType::Pointer(inner) = pointer.casted_ty().id.resolve_in(sema) else {
+    let ResolvedType::Pointer(inner) = pointer.casted_ty().id.resolve_with(sema) else {
         return Err(Diagnosis::Poisoned);
     };
-    match inner.id.resolve_in(sema) {
+    match inner.id.resolve_with(sema) {
         t if !t.is_complete(sema) => Err(Diagnosis::InvalidOperand),
         ResolvedType::Function { .. } => Err(Diagnosis::InvalidOperand),
         _ => {
@@ -265,14 +268,14 @@ pub fn pointer_minus_pointer(
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,
 ) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
-    let ResolvedType::Pointer(lp) = lhs.casted_ty().id.resolve_in(sema) else {
+    let ResolvedType::Pointer(lp) = lhs.casted_ty().id.resolve_with(sema) else {
         return Err(Diagnosis::Poisoned);
     };
-    let ResolvedType::Pointer(rp) = rhs.casted_ty().id.resolve_in(sema) else {
+    let ResolvedType::Pointer(rp) = rhs.casted_ty().id.resolve_with(sema) else {
         return Err(Diagnosis::Poisoned);
     };
-    let l = lp.id.resolve_in(sema);
-    let r = rp.id.resolve_in(sema);
+    let l = lp.id.resolve_with(sema);
+    let r = rp.id.resolve_with(sema);
     if !l.is_object(sema) || !r.is_object(sema) {
         return Err(Diagnosis::InvalidOperand);
     }

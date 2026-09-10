@@ -88,7 +88,7 @@ impl ResolvedType {
 
     pub fn is_integral(&self, sema: &Sema) -> bool {
         match self {
-            ResolvedType::Tag(id) => (*id).resolve_in(sema).kind == Tag::Enum,
+            ResolvedType::Tag(id) => (*id).resolve_with(sema).kind == Tag::Enum,
             _ => self.is_integer(),
         }
     }
@@ -210,7 +210,7 @@ impl QualifiedType {
     }
 
     pub fn is_char(&self, sema: &Sema) -> bool {
-        self.id.resolve_in(sema).is_char()
+        self.id.resolve_with(sema).is_char()
     }
 
     pub fn same_qualifiers_as(&self, other: &Self) -> bool {
@@ -228,8 +228,8 @@ impl QualifiedType {
         if self == other {
             return Some(*self);
         }
-        let l = self.id.resolve_in(sema).clone();
-        let r = other.id.resolve_in(sema).clone();
+        let l = self.id.resolve_with(sema).clone();
+        let r = other.id.resolve_with(sema).clone();
         match (l, r) {
             (ResolvedType::Array { elem: e1, len: l1 }, ResolvedType::Array { elem: e2, len: l2 }) => {
                 let elem = Self::composite(&e1, sema, &e2)?;
@@ -279,7 +279,7 @@ impl QualifiedType {
         if self.id == other.id {
             return true;
         }
-        match (self.id.resolve_in(sema), other.id.resolve_in(sema)) {
+        match (self.id.resolve_with(sema), other.id.resolve_with(sema)) {
             (ResolvedType::Function { ret: r1, params: p1 }, ResolvedType::Function { ret: r2, params: p2 }) => {
                 r1.is_compatible(sema, r2) && p1.is_compatible(sema, p2)
             }
@@ -288,58 +288,54 @@ impl QualifiedType {
             }
             (ResolvedType::Pointer(l), ResolvedType::Pointer(r)) => l.is_compatible(sema, r),
             (ResolvedType::Tag(id), ResolvedType::Int) | (ResolvedType::Int, ResolvedType::Tag(id)) => {
-                (*id).resolve_in(sema).kind == Tag::Enum
+                (*id).resolve_with(sema).kind == Tag::Enum
             }
             _ => false,
         }
     }
 
-    pub fn describe(&self) -> TypeName<'_> {
-        TypeName(self)
-    }
-
     pub fn is_void(&self, sema: &Sema) -> bool {
-        self.id.resolve_in(sema).is_void()
+        self.id.resolve_with(sema).is_void()
     }
 
     pub fn is_complete(&self, sema: &Sema) -> bool {
-        self.id.resolve_in(sema).is_complete(sema)
+        self.id.resolve_with(sema).is_complete(sema)
     }
 
     pub fn is_scalar(&self, sema: &Sema) -> bool {
-        self.id.resolve_in(sema).is_scalar(sema)
+        self.id.resolve_with(sema).is_scalar(sema)
     }
 
     pub fn is_pointer(&self, sema: &Sema) -> bool {
-        self.id.resolve_in(sema).is_pointer()
+        self.id.resolve_with(sema).is_pointer()
     }
 
     pub fn is_function(&self, sema: &Sema) -> bool {
-        self.id.resolve_in(sema).is_function()
+        self.id.resolve_with(sema).is_function()
     }
 
     pub fn is_object(&self, sema: &Sema) -> bool {
-        self.id.resolve_in(sema).is_object(sema)
+        self.id.resolve_with(sema).is_object(sema)
     }
 
     pub fn is_array(&self, sema: &Sema) -> bool {
-        self.id.resolve_in(sema).is_array()
+        self.id.resolve_with(sema).is_array()
     }
 
     pub fn is_arithmetic(&self, sema: &Sema) -> bool {
-        self.id.resolve_in(sema).is_arithmetic(sema)
+        self.id.resolve_with(sema).is_arithmetic(sema)
     }
 
     pub fn is_tag(&self, sema: &Sema) -> bool {
-        self.id.resolve_in(sema).is_tag()
+        self.id.resolve_with(sema).is_tag()
     }
 
     pub fn is_integral(&self, sema: &Sema) -> bool {
-        self.id.resolve_in(sema).is_integral(sema)
+        self.id.resolve_with(sema).is_integral(sema)
     }
 
     pub fn has_const_member(&self, sema: &Sema) -> bool {
-        match self.id.resolve_in(sema) {
+        match self.id.resolve_with(sema) {
             ResolvedType::Array { elem, .. } => elem.is_const || elem.has_const_member(sema),
             ResolvedType::Tag(id) => sema.tags.get(*id).members.iter().any(|member| {
                 member
@@ -352,11 +348,11 @@ impl QualifiedType {
     }
 
     pub fn is_floating(&self, sema: &Sema) -> bool {
-        self.id.resolve_in(sema).is_floating()
+        self.id.resolve_with(sema).is_floating()
     }
 
     pub fn is_integer(&self, sema: &Sema) -> bool {
-        self.id.resolve_in(sema).is_integer()
+        self.id.resolve_with(sema).is_integer()
     }
 
     pub fn layout(&self) -> Option<Layout> {
@@ -364,11 +360,9 @@ impl QualifiedType {
     }
 }
 
-pub struct TypeName<'a>(&'a QualifiedType);
-
-impl fmt::Display for TypeName<'_> {
+impl fmt::Display for QualifiedType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let TypeName(ty) = *self;
+        let ty = self;
         if ty.is_const {
             f.write_str("const ")?;
         }
@@ -391,8 +385,8 @@ impl fmt::Display for TypeName<'_> {
             ResolvedType::LongDouble => f.write_str("long double"),
             ResolvedType::Pointer(inner) => {
                 match inner.id.resolve() {
-                    ResolvedType::Function { .. } | ResolvedType::Array { .. } => write!(f, "({})", inner.describe())?,
-                    _ => write!(f, "{}", inner.describe())?,
+                    ResolvedType::Function { .. } | ResolvedType::Array { .. } => write!(f, "({})", inner)?,
+                    _ => write!(f, "{}", inner)?,
                 }
                 f.write_str(" *")
             }
@@ -406,7 +400,7 @@ impl fmt::Display for TypeName<'_> {
                 while let ResolvedType::Array { elem: inner, .. } = base.id.resolve() {
                     base = inner;
                 }
-                write!(f, "{}", base.describe())?;
+                write!(f, "{}", base)?;
                 let (mut elem, mut len) = (elem, len);
                 loop {
                     f.write_str("[")?;
@@ -420,7 +414,7 @@ impl fmt::Display for TypeName<'_> {
                 Ok(())
             }
             ResolvedType::Function { ret, params } => {
-                write!(f, "{}(", ret.describe())?;
+                write!(f, "{}(", ret)?;
                 if let ParamTypes::Prototype { params, is_variadic } = params {
                     if params.is_empty() {
                         f.write_str("void")?;
@@ -429,7 +423,7 @@ impl fmt::Display for TypeName<'_> {
                             if i > 0 {
                                 f.write_str(", ")?;
                             }
-                            write!(f, "{}", param.describe())?;
+                            write!(f, "{}", param)?;
                         }
                     }
                     if *is_variadic {

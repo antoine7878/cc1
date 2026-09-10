@@ -10,7 +10,7 @@ use crate::semantic::{
 
 pub fn identifier(sema: &mut Sema, node: &ExpressionNode) -> R {
     let id = sema.expr_bindings.get(node.id).copied().ok_poisoned()?;
-    let sym = id.resolve_in(sema);
+    let sym = id.resolve_with(sema);
     Ok((sym.ty.ok_poisoned()?, sym.expression_kind()))
 }
 
@@ -23,7 +23,7 @@ pub fn constant(sema: &mut Sema, e: &ExpressionNode) -> R {
 
 pub fn array_subscript(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     let (qty, _) = binary_op(sema, &BinaryOp::Add, e1, e2)?;
-    let ResolvedType::Pointer(inner) = qty.id.resolve_in(sema) else {
+    let ResolvedType::Pointer(inner) = qty.id.resolve_with(sema) else {
         return Err(Diagnosis::SubscriptNotArray);
     };
     Ok((*inner, LValue))
@@ -32,13 +32,13 @@ pub fn array_subscript(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode
 pub fn fn_call(sema: &mut Sema, fn_node: &ExpressionNode, args: &[ExpressionNode]) -> R {
     with_converted(sema, [fn_node], |sema, [re]| {
         let ty = re.casted_ty();
-        let ResolvedType::Pointer(inner) = ty.id.resolve_in(sema) else {
+        let ResolvedType::Pointer(inner) = ty.id.resolve_with(sema) else {
             return Err(Diagnosis::CallingNotFunction(ty));
         };
-        let ResolvedType::Function { ret, params } = inner.id.resolve_in(sema).clone() else {
+        let ResolvedType::Function { ret, params } = inner.id.resolve_with(sema).clone() else {
             return Err(Diagnosis::CallingNotFunction(ty));
         };
-        let returned = ret.id.resolve_in(sema);
+        let returned = ret.id.resolve_with(sema);
         if !returned.is_void() && !returned.is_complete(sema) {
             return Err(Diagnosis::CallingIncompleteReturn(ret));
         }
@@ -83,16 +83,16 @@ pub fn member(sema: &mut Sema, node: &ExpressionNode, op: MemberOp, e: &Expressi
             MemberOp::Dot => (&re.casted_ty(), re.kind),
             MemberOp::Arrow => {
                 cast::lvalue_conversion(sema, re, &e.span);
-                let ResolvedType::Pointer(inner) = re.casted_ty().id.resolve_in(sema) else {
+                let ResolvedType::Pointer(inner) = re.casted_ty().id.resolve_with(sema) else {
                     return Err(Diagnosis::AccessNotPointer(re.casted_ty()));
                 };
                 (inner, LValue)
             }
         };
-        let &ResolvedType::Tag(tag_id) = tag_qty.id.resolve_in(sema) else {
+        let &ResolvedType::Tag(tag_id) = tag_qty.id.resolve_with(sema) else {
             return Err(Diagnosis::AccessNotStuctOrUnion(tag_qty));
         };
-        let tag = tag_id.resolve_in(sema);
+        let tag = tag_id.resolve_with(sema);
         if !tag.is_complete {
             return Err(Diagnosis::IncompleteType(tag_qty));
         }
@@ -104,7 +104,7 @@ pub fn member(sema: &mut Sema, node: &ExpressionNode, op: MemberOp, e: &Expressi
         };
         sema.expr_bindings.set(node.id, Some(sym_id));
         sema.member_refs.set(node.id, Some(MemberRef { tag: tag_id, index }));
-        let sym = sym_id.resolve_in(sema);
+        let sym = sym_id.resolve_with(sema);
         let ty = sym.ty.ok_or(Diagnosis::Poisoned)?;
         let qty = QualifiedType::new(
             ty.id,

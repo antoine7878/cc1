@@ -58,12 +58,12 @@ pub fn is_null_pointer_constant(sema: &mut Sema, node: &ExpressionNode) -> bool 
 }
 
 fn is_void_pointer(sema: &Sema, qualif: QualifiedType) -> bool {
-    let ResolvedType::Pointer(inner) = qualif.id.resolve_in(sema) else { return false };
+    let ResolvedType::Pointer(inner) = qualif.id.resolve_with(sema) else { return false };
     inner.is_void(sema) && !qualif.is_const && !qualif.is_volatile && !inner.is_const && !inner.is_volatile
 }
 
 pub fn is_bit_field(sema: &Sema, sym: Option<SymbolId>) -> bool {
     let Some(id) = sym else { return false };
-    let sym = id.resolve_in(sema);
+    let sym = id.resolve_with(sema);
     sym.kind == SymbolKind::Member && sym.value.is_some()
 }

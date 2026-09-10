@@ -260,7 +260,7 @@ impl DiagnosisNode {
             Diagnosis::MixedWideStringConcat => "concatenation of a wide and a narrow string literal is undefined".to_string(),
 
             // 6.2.2.1
-            Diagnosis::IncompleteType(ty) => format!("incomplete definition of type '{}'", ty.describe()),
+            Diagnosis::IncompleteType(ty) => format!("incomplete definition of type '{}'", ty),
 
             // 6.3
             Diagnosis::ArithmeticOverflow => "integer overflow in constant expression".to_string(),
@@ -272,37 +272,37 @@ impl DiagnosisNode {
             Diagnosis::SubscriptNotArray => "subscripted value is not an array, pointer, or vector".to_string(),
 
             // 6.3.2.2
-            Diagnosis::CallingNotFunction(ty) => format!("called object type '{}' is not a function or function pointer", ty.describe()),
-            Diagnosis::CallingIncompleteReturn(ty) => format!("calling a function with incomplete return type '{}'", ty.describe()),
+            Diagnosis::CallingNotFunction(ty) => format!("called object type '{}' is not a function or function pointer", ty),
+            Diagnosis::CallingIncompleteReturn(ty) => format!("calling a function with incomplete return type '{}'", ty),
             Diagnosis::TooManyArguments(expected, have) => format!("too many arguments to function call, expected {expected}, have {have}"),
             Diagnosis::TooFewArguments(expected, have) => format!("too few arguments to function call, expected {expected}, have {have}"),
             Diagnosis::BadArguments(error) => error.clone(),
-            Diagnosis::ArgumentDiscardedQualifiers(n, to, from) => format!("passing '{}' to parameter {n} of type '{}' discards qualifiers", from.describe(), to.describe()),
-            Diagnosis::ArgumentIncompatibleTypes(n, to, from) => format!("passing '{}' to parameter {n} of incompatible type '{}'", from.describe(), to.describe()),
+            Diagnosis::ArgumentDiscardedQualifiers(n, to, from) => format!("passing '{}' to parameter {n} of type '{}' discards qualifiers", from, to),
+            Diagnosis::ArgumentIncompatibleTypes(n, to, from) => format!("passing '{}' to parameter {n} of incompatible type '{}'", from, to),
 
             // 6.3.2.3
-            Diagnosis::AccessNotStuctOrUnion(ty) => format!("member reference base type '{}' is not a structure or union", ty.describe()),
-            Diagnosis::AccessNotPointer(ty) => format!("member reference base type '{}' is not pointer", ty.describe()),
-            Diagnosis::AccessNotMember(ty, name_id ) => format!("no member named '{}' in '{}'", name_id.resolve(), ty.describe()),
+            Diagnosis::AccessNotStuctOrUnion(ty) => format!("member reference base type '{}' is not a structure or union", ty),
+            Diagnosis::AccessNotPointer(ty) => format!("member reference base type '{}' is not pointer", ty),
+            Diagnosis::AccessNotMember(ty, name_id ) => format!("no member named '{}' in '{}'", name_id.resolve(), ty),
 
             // 6.3.2.4
-            Diagnosis::BadPostIncDec(UnaryOp::PostInc | UnaryOp::PreInc, ty) => format!("cannot increment value of type '{}'", ty.describe()),
-            Diagnosis::BadPostIncDec(UnaryOp::PostDec | UnaryOp::PreDec, ty) => format!("cannot decrement value of type '{}'", ty.describe()),
+            Diagnosis::BadPostIncDec(UnaryOp::PostInc | UnaryOp::PreInc, ty) => format!("cannot increment value of type '{}'", ty),
+            Diagnosis::BadPostIncDec(UnaryOp::PostDec | UnaryOp::PreDec, ty) => format!("cannot decrement value of type '{}'", ty),
             Diagnosis::BadPostIncDec(_, _) => unreachable!(),
 
             // 6.3.3.2
             Diagnosis::BitFieldAddress => "address of bit-field requested".to_string(),
             Diagnosis::RegisterAddress => "address of register variable requested".to_string(),
-            Diagnosis::RValueAddress(ty) => format!( "cannot take the address of an rvalue of type '{}'", ty.describe()),
-            Diagnosis::IndirectionNotPointer(ty) => format!("indirection requires pointer operand ('{}' invalid)", ty.describe()),
+            Diagnosis::RValueAddress(ty) => format!( "cannot take the address of an rvalue of type '{}'", ty),
+            Diagnosis::IndirectionNotPointer(ty) => format!("indirection requires pointer operand ('{}' invalid)", ty),
             Diagnosis::IndirectionToVoid => "ISO C does not allow indirection on operand of type 'void *'".to_string(),
 
             // 6.3.3.3
-            Diagnosis::InvalidUnary(ty) => format!("invalid argument type '{}' to unary expression", ty.describe()),
+            Diagnosis::InvalidUnary(ty) => format!("invalid argument type '{}' to unary expression", ty),
 
             // 6.3.3.4
             Diagnosis::SizeofVoid => "invalid application of 'sizeof' to a void type".to_string(),
-            Diagnosis::SizeofIncomplete(ty) => format!("invalid application of 'sizeof' to an incomplete type '{}'", ty.describe()),
+            Diagnosis::SizeofIncomplete(ty) => format!("invalid application of 'sizeof' to an incomplete type '{}'", ty),
             Diagnosis::SizeofFunction => "invalid application of 'sizeof' to a function type".to_string(),
             Diagnosis::SizeofBitfield => "invalid application of 'sizeof' to bit-field".to_string(),
 
@@ -313,30 +313,30 @@ impl DiagnosisNode {
             // 6.3.5
             Diagnosis::DivisionByZero => "division by zero is undefined".to_string(),
             Diagnosis::ModuloByZero =>  "remainder by zero is undefined".to_string(),
-            Diagnosis::InvalidBinaryOperand(lhs, rhs) => format!("invalid operands to binary expression ('{}' and '{}')", lhs.describe(), rhs.describe()),
+            Diagnosis::InvalidBinaryOperand(lhs, rhs) => format!("invalid operands to binary expression ('{}' and '{}')", lhs, rhs),
 
             // 6.3.7
             Diagnosis::ShiftCountNegative => "shift count is negative".to_string(),
             Diagnosis::ShiftCountOutOfRange => "shift count >= width of type".to_string(),
 
             // 6.3.8
-            Diagnosis::OrderedFunctionPointers(lhs, rhs) => format!("ordered comparison of function pointers ('{}' and '{}')", lhs.describe(), rhs.describe()),
-            Diagnosis::MixedCompletenessComparison(lhs, rhs) => format!("ordered comparison needs two complete or two incomplete pointee types ('{}' and '{}')", lhs.describe(), rhs.describe()),
+            Diagnosis::OrderedFunctionPointers(lhs, rhs) => format!("ordered comparison of function pointers ('{}' and '{}')", lhs, rhs),
+            Diagnosis::MixedCompletenessComparison(lhs, rhs) => format!("ordered comparison needs two complete or two incomplete pointee types ('{}' and '{}')", lhs, rhs),
 
             // 6.3.9
-            Diagnosis::InvalidComparison(lhs, rhs) => format!("comparison of distinct pointer types ('{}' and '{}')", lhs.describe(), rhs.describe()),
+            Diagnosis::InvalidComparison(lhs, rhs) => format!("comparison of distinct pointer types ('{}' and '{}')", lhs, rhs),
 
             // 6.3.15
-            Diagnosis::NotScalar(ty) => format!("used type '{}' where arithmetic or pointer type is required", ty.describe()),
-            Diagnosis::IncompatibleOperands(lhs, rhs) => format!("incompatible operand types ('{}' and '{}')", lhs.describe(), rhs.describe()),
-            Diagnosis::PointerMismatch(lhs, rhs) => format!("pointer type mismatch ('{}' and '{}')", lhs.describe(), rhs.describe()),
+            Diagnosis::NotScalar(ty) => format!("used type '{}' where arithmetic or pointer type is required", ty),
+            Diagnosis::IncompatibleOperands(lhs, rhs) => format!("incompatible operand types ('{}' and '{}')", lhs, rhs),
+            Diagnosis::PointerMismatch(lhs, rhs) => format!("pointer type mismatch ('{}' and '{}')", lhs, rhs),
 
             // 6.3.16
             Diagnosis::AssignToRValue => "expression is not assignable".to_string(),
-            Diagnosis::ConstAssignment(ty) => format!("cannot assign to variable with const-qualified type '{}'", ty.describe()),
-            Diagnosis::ConstMemberAssignment(ty) => format!("cannot assign to '{}' because it has a const-qualified member", ty.describe()),
-            Diagnosis::AssignmentDiscardedQualifiers(to, from) => format!("assigning to '{}' from '{}' discards qualifiers", to.describe(), from.describe()),
-            Diagnosis::AssignmentIncompatibleTypes(to, from) => format!("assignment to '{}' from incompatible pointer type '{}'", to.describe(), from.describe()),
+            Diagnosis::ConstAssignment(ty) => format!("cannot assign to variable with const-qualified type '{}'", ty),
+            Diagnosis::ConstMemberAssignment(ty) => format!("cannot assign to '{}' because it has a const-qualified member", ty),
+            Diagnosis::AssignmentDiscardedQualifiers(to, from) => format!("assigning to '{}' from '{}' discards qualifiers", to, from),
+            Diagnosis::AssignmentIncompatibleTypes(to, from) => format!("assignment to '{}' from incompatible pointer type '{}'", to, from),
 
             // 6.4
             Diagnosis::ConstantOverflow => "overflow in constant expression".to_string(),
@@ -346,7 +346,7 @@ impl DiagnosisNode {
             // 6.5
             Diagnosis::EmptyDeclaration => "Declaration declares nothing".to_string(),
             Diagnosis::InvalidTypeSpecifier => "Invalid type specifier or combination thereof".to_string(),
-            Diagnosis::IncompleteVariable(ty) => format!("variable has incomplete type '{}'", ty.describe()),
+            Diagnosis::IncompleteVariable(ty) => format!("variable has incomplete type '{}'", ty),
 
             // 6.5.1
             Diagnosis::MultipleStorageSpecifiers => "Multiple storage class declaration".to_string(),
@@ -354,7 +354,7 @@ impl DiagnosisNode {
 
             // 6.5.2.1
             Diagnosis::TagWithoutMember(kind) => format!("{kind} has no named member"),
-            Diagnosis::InvalidMemberType(ty) => format!("field has incomplete or function type '{}'", ty.describe()),
+            Diagnosis::InvalidMemberType(ty) => format!("field has incomplete or function type '{}'", ty),
             Diagnosis::NonIntBitFieldType => "Bit-field has non-integral type".to_string(),
             Diagnosis::NegativeBitFieldWidth(Some(name), width) => format!("bit-field '{}' has negative width ({width})", name.id.resolve()),
             Diagnosis::NegativeBitFieldWidth(None, width) => format!("anonymous bit-field has negative width ({width})"),
@@ -375,11 +375,11 @@ impl DiagnosisNode {
             Diagnosis::NonIntArraySize => "Array len has non-integral type".to_string(),
             Diagnosis::NegativeArraySize => "size of array is negative".to_string(),
             Diagnosis::ZeroArraySize => "size of array is zero".to_string(),
-            Diagnosis::InvalidElementType(ty) => format!("array has incomplete or function element type '{}'", ty.describe()),
+            Diagnosis::InvalidElementType(ty) => format!("array has incomplete or function element type '{}'", ty),
 
             // 6.5.4.3
-            Diagnosis::FunctionReturningArray(ty) => format!("function cannot return array type '{}'", ty.describe()),
-            Diagnosis::FunctionReturningFunction(ty) => format!("function cannot return function type '{}'", ty.describe()),
+            Diagnosis::FunctionReturningArray(ty) => format!("function cannot return array type '{}'", ty),
+            Diagnosis::FunctionReturningFunction(ty) => format!("function cannot return function type '{}'", ty),
             Diagnosis::VoidParameter => "Parameter shall not have void type".to_string(),
             Diagnosis::ParameterNotRegister => "Parameter shall only by declared with register storage".to_string(),
             Diagnosis::DuplicateParameterName => "Duplicate paramter identifier".to_string(),
@@ -388,26 +388,26 @@ impl DiagnosisNode {
             Diagnosis::ArrayInitTooLong => "excess elements in array initializer".to_string(),
             Diagnosis::BlockScopeLinkageInitializer => "declaration of block scope identifier with linkage cannot have an initializer".to_string(),
             Diagnosis::NonConstantInitializer => "initializer element is not a compile-time constant".to_string(),
-            Diagnosis::InitDiscardedQualifiers(to, from) => format!("initializing '{}' with an expression of type '{}' discards qualifiers", to.describe(), from.describe()),
-            Diagnosis::InitIncompatibleTypes(to, from) => format!("initialization of '{}' from incompatible pointer type '{}'", to.describe(), from.describe()),
+            Diagnosis::InitDiscardedQualifiers(to, from) => format!("initializing '{}' with an expression of type '{}' discards qualifiers", to, from),
+            Diagnosis::InitIncompatibleTypes(to, from) => format!("initialization of '{}' from incompatible pointer type '{}'", to, from),
 
             // 6.6.1
 
             // 6.6.4
-            Diagnosis::NonScalarStatement(ty) => format!("statement requires expression of scalar type ('{}' invalid)", ty.describe()),
+            Diagnosis::NonScalarStatement(ty) => format!("statement requires expression of scalar type ('{}' invalid)", ty),
 
             // 6.6.4.2
-            Diagnosis::NonIntegralStatement(ty) => format!("statement requires expression of integer type ('{}' invalid)", ty.describe()),
+            Diagnosis::NonIntegralStatement(ty) => format!("statement requires expression of integer type ('{}' invalid)", ty),
 
             // 6.6.6.4
             Diagnosis::ReturnWithoutValue => "'return' with no value, in function returning non-void".to_string(),
-            Diagnosis::ReturnDiscardedQualifiers(to, from) => format!("returning '{}' from a function with result type '{}' discards qualifiers", from.describe(), to.describe()),
-            Diagnosis::ReturnIncompatibleTypes(to, from) => format!("returning '{}' from a function with incompatible result type '{}'", from.describe(), to.describe()),
+            Diagnosis::ReturnDiscardedQualifiers(to, from) => format!("returning '{}' from a function with result type '{}' discards qualifiers", from, to),
+            Diagnosis::ReturnIncompatibleTypes(to, from) => format!("returning '{}' from a function with incompatible result type '{}'", from, to),
 
             // 6.7
             Diagnosis::AutoRegisterExternal => "External declaration auto of register".to_string(),
             Diagnosis::InternalNeverDefined(name) => format!("'{}' used but never defined", name.id.resolve()),
-            Diagnosis::TentativeNeverCompleted(ty) => format!("tentative definition has type '{}' that is never completed", ty.describe()),
+            Diagnosis::TentativeNeverCompleted(ty) => format!("tentative definition has type '{}' that is never completed", ty),
 
             // 6.7.1
             Diagnosis::NotFunctionTypeDeclarator => "Declarator shall be function type".to_string(),
@@ -415,8 +415,8 @@ impl DiagnosisNode {
             Diagnosis::UnnamedPrototypeParameter => "Parameter shall include an identifier".to_string(),
             Diagnosis::ParameterTypeListWithList => "Parameter style function declration shall not be followed by a declaration list".to_string(),
             Diagnosis::MissingParameterInOldStyle => "Missing parameter".to_string(),
-            Diagnosis::IncompleteParameter(ty) => format!("parameter has incomplete type '{}'", ty.describe()),
-            Diagnosis::IncompleteReturn(ty) => format!("function definition has incomplete return type '{}'", ty.describe()),
+            Diagnosis::IncompleteParameter(ty) => format!("parameter has incomplete type '{}'", ty),
+            Diagnosis::IncompleteReturn(ty) => format!("function definition has incomplete return type '{}'", ty),
         }
     }
 }

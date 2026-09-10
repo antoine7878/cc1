@@ -59,7 +59,7 @@ fn place(sema: &mut Sema, e: &ExpressionNode) -> Option<Place> {
 
 fn object(sema: &Sema, e: &ExpressionNode) -> Option<Place> {
     let sym_id = sema.expr_bindings.get(e.id).copied()?;
-    let sym = sym_id.resolve_in(sema);
+    let sym = sym_id.resolve_with(sema);
     let addressable = sym.duration == Duration::Static || sym.kind == SymbolKind::Function;
     addressable.then(|| Place::at(AddressBase::Symbol(sym_id), 0))
 }
@@ -67,7 +67,7 @@ fn object(sema: &Sema, e: &ExpressionNode) -> Option<Place> {
 fn decays(sema: &Sema, e: &ExpressionNode) -> bool {
     let Some(re) = sema.expr_types.get(e.id) else { return false };
     matches!(
-        re.ty.id.resolve_in(sema),
+        re.ty.id.resolve_with(sema),
         ResolvedType::Array { .. } | ResolvedType::Function { .. }
     )
 }
@@ -103,7 +103,7 @@ fn cast(sema: &mut Sema, node: &ExpressionNode, inner: &ExpressionNode) -> Optio
 
 fn pointee_size(sema: &mut Sema, e: &ExpressionNode) -> Option<i64> {
     let ty = sema.expr_types.get(e.id)?.casted_ty();
-    let &ResolvedType::Pointer(inner) = ty.id.resolve_in(sema) else { return None };
+    let &ResolvedType::Pointer(inner) = ty.id.resolve_with(sema) else { return None };
     layout::of(sema, inner.id).map(|layout| i64::from(layout.size))
 }
 

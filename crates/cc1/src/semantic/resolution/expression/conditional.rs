@@ -13,8 +13,8 @@ pub fn conditional(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode, e3
         }
         let l_ty = lhs.casted_ty();
         let r_ty = rhs.casted_ty();
-        let l = l_ty.id.resolve_in(sema);
-        let r = r_ty.id.resolve_in(sema);
+        let l = l_ty.id.resolve_with(sema);
+        let r = r_ty.id.resolve_with(sema);
         if l.is_arithmetic(sema) && r.is_arithmetic(sema) {
             return cast::usual_arithmetic(sema, lhs, rhs);
         }

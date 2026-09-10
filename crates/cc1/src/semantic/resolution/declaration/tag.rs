@@ -34,7 +34,7 @@ pub fn struct_or_union_tag(
             let bit_width = declarator.bit_width.as_ref().and_then(|e| {
                 let value = resolver.eval_constant(e);
                 let sema = &*resolver.sema;
-                let checked = constrain::ty::check_bit_width(&sema.target, ty.id.resolve_in(sema), value, name);
+                let checked = constrain::ty::check_bit_width(&sema.target, ty.id.resolve_with(sema), value, name);
                 checked.collect(resolver, &e.span)
             });
             let is_member_object = ty.is_object(resolver.sema);
@@ -47,10 +47,10 @@ pub fn struct_or_union_tag(
             }
             match (name, bit_width) {
                 (Some(name), _) => {
-                    if members
-                        .iter()
-                        .any(|m| m.sym.is_some_and(|id| id.resolve_in(resolver.sema).name.id == name.id))
-                    {
+                    if members.iter().any(|m| {
+                        m.sym
+                            .is_some_and(|id| id.resolve_with(resolver.sema).name.id == name.id)
+                    }) {
                         resolver.add_diag(
                             Diag::err((), Diagnosis::DuplicateDeclaration(SymbolKind::Member, name)),
                             &decl.span,
@@ -78,7 +78,7 @@ pub fn enum_tag(resolver: &mut SymbolResolver, id: EnumId) -> Option<TagDefId> {
     let is_definition = !enum_node.variants.is_empty();
     let tag = resolver.declare_tag(Tag::Enum, enum_node.name, is_definition, &enum_node.span);
     if !is_definition {
-        let is_complete = tag.resolve_in(resolver.sema).is_complete;
+        let is_complete = tag.resolve_with(resolver.sema).is_complete;
         constrain::ty::check_enum_reference(is_complete, enum_node.name).collect(resolver, &enum_node.span);
         return Some(tag);
     }

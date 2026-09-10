@@ -1,9 +1,10 @@
 use std::fmt::{self, Display, Formatter};
 use std::io::Write;
 
-use crate::ast::Value;
+use crate::ast::{self, BinaryOp, Value};
 use crate::codegen::TyName;
 use crate::codegen::local::Local;
+use crate::semantic::{QualifiedType, ResolvedType};
 
 #[derive(Debug)]
 pub enum LLVMValue {
@@ -25,22 +26,63 @@ pub enum Op {
     Add,
     Sub,
     Mul,
+    UDiv,
     SDiv,
+    URem,
     SRem,
     FAdd,
     FSub,
+    FMul,
+    FDiv,
+    FRem,
+    Shl,
+    LShr,
+    AShr,
+    And,
+    Or,
+    Xor,
 }
 
+impl Op {
+    fn new(value: QualifiedType, op: ast::BinaryOp) -> Self {
+        Op::Xor
+        // match op {
+        //     BinaryOp::Add => Op::Add, }
+        // match value.id.resolve() {
+        //     ResolvedType::Char
+        //     | ResolvedType::SignedChar
+        //     | ResolvedType::Short
+        //     | ResolvedType::Int
+        //     | ResolvedType::Long => Op::Add,
+        //     ResolvedType::UnsignedInt
+        //     | ResolvedType::UnsignedChar
+        //     | ResolvedType::UnsignedShort
+        //     | ResolvedType::UnsignedLong => Op::Add,
+        //     _ => Op::Xor,
+        // }
+    }
+}
 impl Display for Op {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Op::Add => "add nsw",
-            Op::Sub => "sub nsw",
-            Op::Mul => "mul nsw",
+            Op::Add => "add",
+            Op::Sub => "sub",
+            Op::Mul => "mul",
+            Op::UDiv => "udiv",
             Op::SDiv => "sdiv",
+            Op::URem => "urem",
             Op::SRem => "srem",
             Op::FAdd => "fadd",
             Op::FSub => "fsub",
+            Op::FMul => "fmul",
+            Op::FDiv => "fdiv",
+            Op::FRem => "frem",
+            Op::Shl => "shl",
+            Op::LShr => "lshr",
+            Op::AShr => "ashr",
+            Op::And => "and",
+            Op::Or => "or",
+            Op::Xor => "xor",
         })
     }
 }

@@ -16,8 +16,8 @@ pub fn multiplicative_types(
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,
 ) -> R {
-    let l = lhs.casted_ty().id.resolve_in(sema);
-    let r = rhs.casted_ty().id.resolve_in(sema);
+    let l = lhs.casted_ty().id.resolve_with(sema);
+    let r = rhs.casted_ty().id.resolve_with(sema);
     if !match op {
         BinaryOp::Mul | BinaryOp::Div => l.is_arithmetic(sema) && r.is_arithmetic(sema),
         BinaryOp::Mod => l.is_integral(sema) && r.is_integral(sema),
@@ -32,8 +32,8 @@ pub fn additive(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &Expres
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
         match (
             op,
-            lhs.casted_ty().id.resolve_in(sema),
-            rhs.casted_ty().id.resolve_in(sema),
+            lhs.casted_ty().id.resolve_with(sema),
+            rhs.casted_ty().id.resolve_with(sema),
         ) {
             (_, l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => cast::usual_arithmetic(sema, lhs, rhs),
             (_, ResolvedType::Pointer(_), o) if o.is_integral(sema) => cast::pointer_integer_arithmetic(sema, lhs, rhs),
@@ -62,14 +62,14 @@ pub fn shift_types(
     count: Option<Value>,
     span: &Span,
 ) -> R {
-    let l = lhs.casted_ty().id.resolve_in(sema);
-    let r = rhs.casted_ty().id.resolve_in(sema);
+    let l = lhs.casted_ty().id.resolve_with(sema);
+    let r = rhs.casted_ty().id.resolve_with(sema);
     if !l.is_integral(sema) || !r.is_integral(sema) {
         return Err(Diagnosis::InvalidBinaryOperand(lhs.casted_ty(), rhs.casted_ty()));
     }
     cast::promote(sema, lhs);
     cast::promote(sema, rhs);
-    let l = lhs.casted_ty().id.resolve_in(sema);
+    let l = lhs.casted_ty().id.resolve_with(sema);
     let l_layout = sema.target.layout(l).unwrap();
     let Some(count) = count else { return Ok((lhs.casted_ty(), RValue)) };
     if count.is_negative() {

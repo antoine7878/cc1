@@ -95,7 +95,7 @@ fn extract_declarator(
             params,
         } => {
             let list = resolve_params(resolver, params);
-            constrain::ty::check_return_type(inner_most.id.resolve_in(resolver.sema), inner_most)
+            constrain::ty::check_return_type(inner_most.id.resolve_with(resolver.sema), inner_most)
                 .collect(resolver, &declarator.span);
             let id = resolver.sema.types.function(inner_most, list.types());
             let (ty, leaf, inner_list) = extract_declarator(resolver, inner, QualifiedType::plain(id), false);
@@ -136,7 +136,7 @@ fn resolve_prototype(
         .filter_map(|param| resolve_parameter(resolver, param))
         .collect();
     for param in &params {
-        let is_void = matches!(param.ty.id.resolve_in(resolver.sema), ResolvedType::Void);
+        let is_void = matches!(param.ty.id.resolve_with(resolver.sema), ResolvedType::Void);
         let is_special_case = params.len() == 1 && param.name.is_some();
         constrain::parameter::check_void_parameter(is_void && !is_special_case).collect(resolver, &param.span);
     }

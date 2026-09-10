@@ -203,7 +203,7 @@ impl Sema {
 
     pub fn linkage_of_name(&self, name: StringId) -> Option<Linkage> {
         let id = self.externals.get(&name)?.symbol;
-        Some(id.resolve_in(self).linkage)
+        Some(id.resolve_with(self).linkage)
     }
 
     pub fn register_external(&mut self, sym: Symbol, span: &Span, lexical: Option<SymbolId>) -> SymbolId {
@@ -230,20 +230,20 @@ impl Sema {
             return id;
         };
         let entry_symbol = entry.symbol;
-        let entry_linkage = entry_symbol.resolve_in(self).linkage;
+        let entry_linkage = entry_symbol.resolve_with(self).linkage;
 
         if entry_linkage != linkage {
             self.add_diag(Diag::err((), Diagnosis::ConflictingLinkage(name)), span);
         }
 
-        let old_ty = entry_symbol.resolve_in(self).ty;
+        let old_ty = entry_symbol.resolve_with(self).ty;
         if let Some((old_ty, new_ty)) = Option::zip(old_ty, new_ty)
             && let Some(merged) = old_ty.composite(self, &new_ty)
         {
             entry_symbol.resolve_mut(self).ty = Some(merged);
         }
 
-        let old_definition = entry_symbol.resolve_in(self).definition;
+        let old_definition = entry_symbol.resolve_with(self).definition;
         entry_symbol.resolve_mut(self).definition = promote_definition(old_definition, definition);
 
         let entry = self.externals.get_mut(&name.id).unwrap();

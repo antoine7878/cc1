@@ -4,8 +4,8 @@ use crate::semantic::{Diagnosis, ResolvedExpression, ResolvedType, Sema, cast};
 
 pub fn relational(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
-        let l = lhs.casted_ty().id.resolve_in(sema);
-        let r = rhs.casted_ty().id.resolve_in(sema);
+        let l = lhs.casted_ty().id.resolve_with(sema);
+        let r = rhs.casted_ty().id.resolve_with(sema);
         let ret = int_rvalue(sema);
         if l.is_arithmetic(sema) && r.is_arithmetic(sema) {
             cast::usual_arithmetic(sema, lhs, rhs)?;

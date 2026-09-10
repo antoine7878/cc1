@@ -36,9 +36,9 @@ pub fn try_fold(sema: &mut Sema, expr: &ExpressionNode) -> Option<Value> {
 }
 
 fn scalar_ty(sema: &Sema, qty: QualifiedType) -> ResolvedType {
-    let ty = qty.id.resolve_in(sema);
+    let ty = qty.id.resolve_with(sema);
     if let ResolvedType::Tag(id) = ty
-        && (*id).resolve_in(sema).kind == Tag::Enum
+        && (*id).resolve_with(sema).kind == Tag::Enum
     {
         return ResolvedType::Int;
     }
@@ -124,7 +124,7 @@ fn identifier(sema: &Sema, expr: &ExpressionNode) -> Result<Value, Diagnosis> {
         .get(expr.id)
         .copied()
         .ok_or(Diagnosis::NonConstantExpression)?;
-    let symbol = id.resolve_in(sema);
+    let symbol = id.resolve_with(sema);
     if symbol.kind != SymbolKind::Variant {
         return Err(Diagnosis::NonConstantExpression);
     }

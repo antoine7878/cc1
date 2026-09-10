@@ -44,8 +44,8 @@ pub fn additive_assignment(sema: &mut Sema, e1: &ExpressionNode, e2: &Expression
     with_assign_ops(sema, e1, e2, |sema, lhs, rhs| {
         constrain::expression::check_assignable(sema, lhs.kind, lhs.ty).into_result()?;
         let target = lhs.ty.unqualified();
-        let l = lhs.ty.id.resolve_in(sema);
-        let r = rhs.casted_ty().id.resolve_in(sema);
+        let l = lhs.ty.id.resolve_with(sema);
+        let r = rhs.casted_ty().id.resolve_with(sema);
 
         if matches!(l, ResolvedType::Pointer(inner) if inner.is_object(sema)) && r.is_integral(sema) {
             cast::lvalue_conversion(sema, lhs, &e1.span);

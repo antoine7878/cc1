@@ -20,7 +20,7 @@ pub fn dump_symbols() {
                 symbol.duration.to_string(),
                 symbol.definition.to_string(),
                 symbol.value.map_or("-".to_string(), |v| v.to_string()),
-                symbol.ty.map_or(String::default(), |ty| ty.describe().to_string()),
+                symbol.ty.map_or(String::default(), |ty| ty.to_string()),
                 symbol.used.to_string(),
             ]
         })
