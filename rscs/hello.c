@@ -1,6 +1,7 @@
-void f1(void) {
-	unsigned int ur;
+int f1(void) {
 	int a;
-	ur + ur;
-	a + a;
+	a = 1;
+	a = 2;
+	a = 3;
+	return a;
 }

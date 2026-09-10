@@ -3,12 +3,12 @@ use std::io::Write;
 
 use crate::ast::Value;
 use crate::codegen::TyName;
+use crate::codegen::local::LocalName;
 
 #[derive(Debug)]
 pub enum LLVMValue {
     SSA(usize),
     Literal(Value),
-    // Global(NameId),
 }
 
 impl Display for LLVMValue {
@@ -87,13 +87,13 @@ impl<W: Write> Builder<W> {
         self.line(format_args!("}}"));
     }
 
-    pub fn alloca(&mut self, id: usize, ty: TyName<'_>, align: u32) {
-        self.line(format_args!("  %{id} = alloca {ty}, align {align}"));
+    pub fn alloca(&mut self, slot: LocalName<'_>, ty: TyName<'_>, align: u32) {
+        self.line(format_args!("  {slot} = alloca {ty}, align {align}"));
     }
 
-    pub fn load(&mut self, ty: TyName<'_>, slot: usize, align: u32) -> LLVMValue {
+    pub fn load(&mut self, ty: TyName<'_>, slot: LocalName<'_>, align: u32) -> LLVMValue {
         let r = self.fresh();
-        self.line(format_args!("  {r} = load {ty}, ptr %{slot}, align {align}"));
+        self.line(format_args!("  {r} = load {ty}, ptr {slot}, align {align}"));
         r
     }
 

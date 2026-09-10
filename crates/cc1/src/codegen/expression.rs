@@ -19,9 +19,9 @@ impl<W: Write> Generator<W> {
         let re = &ctx.sema.expr_types[node.id];
         let qty = re.casted_ty();
         let sym_id = ctx.sema.expr_bindings[node.id];
-        let slot = self.locals[&sym_id];
+        let local = self.locals.get(sym_id);
         let align = qty.layout(ctx).unwrap().align;
-        self.b.load(qty.llvm(ctx), slot, align)
+        self.b.load(qty.llvm(ctx), local.llvm(ctx), align)
     }
 
     fn binary(

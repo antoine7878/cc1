@@ -1,14 +1,13 @@
-use std::collections::HashMap;
 use std::io::{Write, stdout};
 
 use crate::ast::visit::walk_translation_unit;
 use crate::ast::{
     ExpressionNode, FunctionDefinitionNode, JumpStatement, JumpStatementNode, TranslationUnitNode, Visitor,
 };
-use crate::codegen::AllocaCollector;
 use crate::codegen::llvm::Builder;
+use crate::codegen::local::Locals;
 use crate::context::Context;
-use crate::semantic::{ResolvedType, SymbolId};
+use crate::semantic::ResolvedType;
 
 pub fn generate(ctx: Context) -> Context {
     let mut generator = Generator::new(stdout());
@@ -19,36 +18,22 @@ pub fn generate(ctx: Context) -> Context {
 #[derive(Debug)]
 pub struct Generator<W: Write> {
     pub b: Builder<W>,
-    pub locals: HashMap<SymbolId, usize>,
+    pub locals: Locals,
 }
 
 impl<W: Write> Generator<W> {
     fn new(w: W) -> Self {
         Self {
             b: Builder::new(w),
-            locals: HashMap::new(),
+            locals: Locals::default(),
         }
     }
 
     fn allocas(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
-        self.locals.clear();
-        AllocaCollector::run(&mut self.locals, ctx, node);
-        self.b.reset(self.locals.len());
-        let mut it: Vec<(SymbolId, usize)> = self
-            .locals
-            .iter()
-            .map(|(&sym_id, &alloc_id)| (sym_id, alloc_id))
-            .collect();
-        it.sort_by_key(|(_, id)| *id);
-        for (sym_id, alloc_id) in it {
-            self.alloca(ctx, sym_id, alloc_id);
-        }
+        self.locals.collect(ctx, node);
+        self.b.reset(0);
+        self.locals.emit(ctx, &mut self.b);
         self.b.blank();
-    }
-
-    fn alloca(&mut self, ctx: &Context, sym_id: SymbolId, id: usize) {
-        let qty = sym_id.resolve(ctx).ty.unwrap();
-        self.b.alloca(id, qty.llvm(ctx), qty.layout(ctx).unwrap().align);
     }
 }
 
