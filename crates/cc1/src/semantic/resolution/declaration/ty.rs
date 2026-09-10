@@ -1,4 +1,3 @@
-use crate::arena::ResolveWith;
 use crate::ast::{
     DeclarationSpecifier, Declarator, DeclaratorNode, ExpressionNode, FunctionParameters, FunctionParametersNode,
     ParameterDeclaration, Tag, TypeSpecifier,

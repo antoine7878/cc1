@@ -1,4 +1,3 @@
-use crate::arena::ResolveWith;
 use crate::ast::ExpressionNode;
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{Diagnosis, ResolvedExpression, ResolvedType, Sema, cast};

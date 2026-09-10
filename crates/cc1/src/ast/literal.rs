@@ -1,19 +1,11 @@
-use crate::arena::ResolveWith;
-use crate::ast::{AstArenas, escape};
+use crate::ast::escape;
 use crate::ast_node;
 use crate::context::{Context, ctx};
 use crate::define_interner;
 use crate::semantic::{Diag, QualifiedType, Sema};
 use libft::Span;
 
-define_interner!(
-    StringConstant,
-    StringPool,
-    StringConstId,
-    AstArenas,
-    crate::context::ctx().arenas,
-    strings
-);
+define_interner!(StringConstant, StringPool, StringConstId);
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct StringConstant {

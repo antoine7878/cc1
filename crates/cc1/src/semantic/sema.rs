@@ -1,13 +1,13 @@
 use std::cell::Cell;
 use std::collections::HashMap;
 
-use crate::arena::{HasTable, ResolveMutWith, ResolveWith, SideTable};
+use crate::arena::{Global, Has, HasMut, HasTable, Owned, SideTable};
 use crate::ast::statement::StatementId;
 use crate::ast::{AstArenas, DeclaratorId, ExpressionId, StringId, Value};
 use crate::semantic::{
-    Builtins, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, InitializerArena, Linkage,
-    MemberRef, ResolvedExpression, ResolvedStatement, ResolvedTypeArena, ResolvedTypeId, Symbol, SymbolArena, SymbolId,
-    TagDefArena,
+    Builtins, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDef, FunctionDefArena, FunctionDefId,
+    Initializer, InitializerArena, InitializerId, Linkage, MemberRef, ResolvedExpression, ResolvedStatement,
+    ResolvedType, ResolvedTypeArena, ResolvedTypeId, Symbol, SymbolArena, SymbolId, TagDef, TagDefArena, TagDefId,
 };
 use crate::target::{Layout, Target};
 use libft::Span;
@@ -88,6 +88,86 @@ impl Sema {
             target,
         }
     }
+}
+
+impl Global for Sema {
+    fn global() -> &'static Self {
+        sema()
+    }
+}
+
+impl Has<Symbol> for Sema {
+    fn get(&self, id: SymbolId) -> &Symbol {
+        self.symbols.get(id)
+    }
+}
+
+impl HasMut<Symbol> for Sema {
+    fn get_mut(&mut self, id: SymbolId) -> &mut Symbol {
+        self.symbols.get_mut(id)
+    }
+}
+
+impl Owned for Symbol {
+    type Holder = Sema;
+}
+
+impl Has<ResolvedType> for Sema {
+    fn get(&self, id: ResolvedTypeId) -> &ResolvedType {
+        self.types.get(id)
+    }
+}
+
+impl Owned for ResolvedType {
+    type Holder = Sema;
+}
+
+impl Has<TagDef> for Sema {
+    fn get(&self, id: TagDefId) -> &TagDef {
+        self.tags.get(id)
+    }
+}
+
+impl HasMut<TagDef> for Sema {
+    fn get_mut(&mut self, id: TagDefId) -> &mut TagDef {
+        self.tags.get_mut(id)
+    }
+}
+
+impl Owned for TagDef {
+    type Holder = Sema;
+}
+
+impl Has<FunctionDef> for Sema {
+    fn get(&self, id: FunctionDefId) -> &FunctionDef {
+        self.functions.get(id)
+    }
+}
+
+impl HasMut<FunctionDef> for Sema {
+    fn get_mut(&mut self, id: FunctionDefId) -> &mut FunctionDef {
+        self.functions.get_mut(id)
+    }
+}
+
+impl Owned for FunctionDef {
+    type Holder = Sema;
+}
+
+impl Has<Initializer> for Sema {
+    fn get(&self, id: InitializerId) -> &Initializer {
+        self.inits.get(id)
+    }
+}
+
+impl HasMut<Initializer> for Sema {
+    fn get_mut(&mut self, id: InitializerId) -> &mut Initializer {
+        self.inits.get_mut(id)
+    }
+}
+
+impl Owned for Initializer {
+    type Holder = Sema;
 }
 
 impl HasTable<StatementId, ResolvedStatement> for Sema {

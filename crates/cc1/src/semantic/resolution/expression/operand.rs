@@ -1,6 +1,6 @@
 use std::iter::zip;
 
-use crate::arena::{Loan, OptionPoisoned, ResolveWith};
+use crate::arena::{Loan, OptionPoisoned};
 use crate::ast::{Expression, ExpressionId, ExpressionNode};
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::{

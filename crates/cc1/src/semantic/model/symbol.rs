@@ -4,7 +4,7 @@ use crate::ast::{Name, Storage};
 use crate::define_arena;
 use crate::semantic::{ExpressionKind, InitializerId, QualifiedType, ScopeKind, Sema};
 
-define_arena!(Symbol, SymbolArena, SymbolId, Sema, crate::semantic::sema(), symbols);
+define_arena!(Symbol, SymbolArena, SymbolId);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Linkage {

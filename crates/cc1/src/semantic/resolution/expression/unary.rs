@@ -1,4 +1,4 @@
-use crate::arena::{OptionPoisoned, ResolveWith};
+use crate::arena::OptionPoisoned;
 use crate::ast::{ExpressionNode, Storage, Type, UnaryOp};
 use crate::semantic::ExpressionKind::{LValue, RValue};
 use crate::semantic::resolution::expression::*;

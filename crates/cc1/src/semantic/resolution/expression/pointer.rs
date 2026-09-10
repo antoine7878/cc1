@@ -1,4 +1,3 @@
-use crate::arena::ResolveWith;
 use crate::semantic::{QualifiedType, ResolvedExpression, ResolvedType, Sema, cast};
 
 pub enum PointerMatch {

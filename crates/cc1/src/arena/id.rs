@@ -2,12 +2,30 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::marker::PhantomData;
 
+use crate::arena::{Global, Has, HasMut, Owned};
+
 pub trait ArenaKey: From<usize> + Into<usize> + Copy + Debug + PartialEq + Eq {}
 
 impl<T> ArenaKey for T where T: From<usize> + Into<usize> + Copy + Debug + PartialEq + Eq {}
 
 #[repr(transparent)]
 pub struct ArenaId<T>(u32, PhantomData<fn() -> T>);
+
+impl<T> ArenaId<T> {
+    pub fn resolve_in<H: Has<T>>(self, holder: &H) -> &T {
+        holder.get(self)
+    }
+
+    pub fn resolve_mut<H: HasMut<T>>(self, holder: &mut H) -> &mut T {
+        holder.get_mut(self)
+    }
+}
+
+impl<T: Owned> ArenaId<T> {
+    pub fn resolve(self) -> &'static T {
+        T::Holder::global().get(self)
+    }
+}
 
 impl<T> PartialEq for ArenaId<T> {
     fn eq(&self, other: &Self) -> bool {

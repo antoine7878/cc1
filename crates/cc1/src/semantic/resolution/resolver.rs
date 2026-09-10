@@ -1,6 +1,5 @@
 use std::mem::take;
 
-use crate::arena::ResolveWith;
 use crate::ast::statement::StatementId;
 use crate::ast::visit::{
     Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_statement, walk_translation_unit,

@@ -1,7 +1,6 @@
 use std::iter::Peekable;
 use std::slice::Iter;
 
-use crate::arena::ResolveWith;
 use crate::ast;
 use crate::ast::visit::Visitor;
 use crate::ast::{Expression, ExpressionId, ExpressionNode, InitializerNode, StringConstId, Tag, Value};
@@ -13,14 +12,7 @@ use crate::semantic::{
     SymbolResolver, TagDefId, address, ice,
 };
 
-define_arena!(
-    Initializer,
-    InitializerArena,
-    InitializerId,
-    Sema,
-    crate::semantic::sema(),
-    inits
-);
+define_arena!(Initializer, InitializerArena, InitializerId);
 
 #[derive(Clone, Debug)]
 pub enum Initializer {

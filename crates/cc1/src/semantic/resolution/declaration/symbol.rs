@@ -1,4 +1,3 @@
-use crate::arena::{ResolveMutWith, ResolveWith};
 use crate::ast::{
     DeclarationNode, DeclarationSpecifier, DeclaratorNode, InitDeclaratorNode, InitializerNode, Storage, TypeSpecifier,
 };

@@ -1,4 +1,3 @@
-use crate::arena::ResolveWith;
 use crate::ast::{DeclarationNode, DeclarationSpecifier, DeclaratorNode, FunctionDefinitionNode, Name, Storage};
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{

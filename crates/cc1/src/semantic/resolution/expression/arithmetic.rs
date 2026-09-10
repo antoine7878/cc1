@@ -1,4 +1,3 @@
-use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, ExpressionNode, Value};
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::resolution::expression::*;

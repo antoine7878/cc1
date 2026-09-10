@@ -1,4 +1,3 @@
-use crate::arena::ResolveMutWith;
 use crate::ast::visit::{Visitor, walk_expression, walk_translation_unit};
 use crate::ast::{Expression, ExpressionNode};
 use crate::context::ctx;

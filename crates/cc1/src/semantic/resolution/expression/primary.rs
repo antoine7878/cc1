@@ -1,6 +1,6 @@
 use std::iter::zip;
 
-use crate::arena::{OptionPoisoned, ResolveWith};
+use crate::arena::OptionPoisoned;
 use crate::ast::{BinaryOp, ExpressionNode, MemberOp, Name, Tag};
 use crate::semantic::ExpressionKind::{LValue, RValue};
 use crate::semantic::resolution::expression::*;

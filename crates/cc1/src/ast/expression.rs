@@ -1,17 +1,10 @@
 use crate::ast::{
-    AstArenas, BinaryOp, DeclarationSpecifier, DeclaratorNode, MemberOp, Name, StringLiteralNode, UnaryOp, ValueNode,
+    BinaryOp, DeclarationSpecifier, DeclaratorNode, MemberOp, Name, StringLiteralNode, UnaryOp, ValueNode,
 };
 use crate::{ast_node, define_arena};
 use libft::Span;
 
-define_arena!(
-    Expression,
-    ExpressionArena,
-    ExpressionId,
-    AstArenas,
-    crate::context::ctx().arenas,
-    expressions
-);
+define_arena!(Expression, ExpressionArena, ExpressionId);
 
 ast_node! {
     pub struct ExpressionNode {

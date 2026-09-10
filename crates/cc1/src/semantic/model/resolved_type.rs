@@ -1,21 +1,13 @@
 use std::fmt;
 use std::iter::zip;
 
-use crate::arena::ResolveWith;
 use crate::ast::Tag;
 use crate::context::ctx;
 use crate::define_interner;
 use crate::semantic::{ParamTypes, Sema, TagDefId};
 use crate::target::{Layout, Target};
 
-define_interner!(
-    ResolvedType,
-    ResolvedTypeArena,
-    ResolvedTypeId,
-    Sema,
-    crate::semantic::sema(),
-    types
-);
+define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId);
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum ResolvedType {

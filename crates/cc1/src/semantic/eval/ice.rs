@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 
-use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, Expression, ExpressionNode, Fold, Tag, UnaryOp, Value};
 use crate::semantic::{Diag, DiagCollector, Diagnosis, DiagnosisNode, QualifiedType, ResolvedType, Sema, SymbolKind};
 

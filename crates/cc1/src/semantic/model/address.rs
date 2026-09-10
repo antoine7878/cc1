@@ -1,4 +1,3 @@
-use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, Expression, ExpressionNode, MemberOp, StringConstId, UnaryOp};
 use crate::semantic::{Duration, ResolvedType, Sema, SymbolId, SymbolKind, ice, layout};
 

@@ -1,4 +1,3 @@
-use crate::arena::ResolveWith;
 use crate::ast::Tag;
 use crate::semantic::{Member, ResolvedType, ResolvedTypeId, Sema, TagDefId};
 use crate::target::Layout;

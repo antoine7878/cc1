@@ -6,14 +6,7 @@ use crate::semantic::model::cast::default_argument_promotions;
 use crate::semantic::{ExpressionKind, QualifiedType, ResolvedExpression, Sema, SymbolId};
 use libft::Span;
 
-define_arena!(
-    FunctionDef,
-    FunctionDefArena,
-    FunctionDefId,
-    Sema,
-    crate::semantic::sema(),
-    functions
-);
+define_arena!(FunctionDef, FunctionDefArena, FunctionDefId);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FunctionDef {

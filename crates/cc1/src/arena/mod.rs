@@ -8,61 +8,34 @@ pub use interner::Interner;
 pub use side_table::{HasTable, Loan, OptionPoisoned, SideTable, Slot};
 pub use store::Arena;
 
-pub trait ResolveWith<H> {
-    type Output;
-    fn resolve_in(self, holder: &H) -> &Self::Output;
+pub trait Global {
+    fn global() -> &'static Self;
 }
 
-pub trait ResolveMutWith<H> {
-    type Output;
-    fn resolve_mut(self, holder: &mut H) -> &mut Self::Output;
+pub trait Has<T> {
+    fn get(&self, id: ArenaId<T>) -> &T;
+}
+
+pub trait HasMut<T>: Has<T> {
+    fn get_mut(&mut self, id: ArenaId<T>) -> &mut T;
+}
+
+pub trait Owned: Sized {
+    type Holder: Has<Self> + Global;
 }
 
 #[macro_export]
 macro_rules! define_arena {
-    ($ty:ident, $arena:ident, $id:ident, $holder:ty, $global:expr, $($field:ident).+) => {
+    ($ty:ident, $arena:ident, $id:ident) => {
         pub type $id = $crate::arena::ArenaId<$ty>;
         pub type $arena = $crate::arena::Arena<$id, $ty>;
-
-        impl $crate::arena::ResolveWith<$holder> for $id {
-            type Output = $ty;
-            fn resolve_in(self, holder: &$holder) -> &$ty {
-                holder.$($field).+.get(self)
-            }
-        }
-
-        impl $crate::arena::ResolveMutWith<$holder> for $id {
-            type Output = $ty;
-            fn resolve_mut(self, holder: &mut $holder) -> &mut $ty {
-                holder.$($field).+.get_mut(self)
-            }
-        }
-
-        impl $id {
-            pub fn resolve(self) -> &'static $ty {
-                $global.$($field).+.get(self)
-            }
-        }
     };
 }
 
 #[macro_export]
 macro_rules! define_interner {
-    ($ty:ident, $arena:ident, $id:ident, $holder:ty, $global:expr, $($field:ident).+) => {
+    ($ty:ident, $arena:ident, $id:ident) => {
         pub type $id = $crate::arena::ArenaId<$ty>;
         pub type $arena = $crate::arena::Interner<$id, $ty>;
-
-        impl $crate::arena::ResolveWith<$holder> for $id {
-            type Output = $ty;
-            fn resolve_in(self, holder: &$holder) -> &$ty {
-                holder.$($field).+.get(self)
-            }
-        }
-
-        impl $id {
-            pub fn resolve(self) -> &'static $ty {
-                $global.$($field).+.get(self)
-            }
-        }
     };
 }

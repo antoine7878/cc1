@@ -1,6 +1,5 @@
 use std::fmt;
 
-use crate::arena::ResolveWith;
 use crate::ast::{self};
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::{

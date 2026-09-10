@@ -1,32 +1,11 @@
-use crate::ast::{AstArenas, DeclarationSpecifier, DeclaratorNode, ExpressionNode, Name};
+use crate::ast::{DeclarationSpecifier, DeclaratorNode, ExpressionNode, Name};
 use crate::{ast_node, define_arena};
 use libft::Span;
 
-define_arena!(
-    Struct,
-    StructArena,
-    StructId,
-    AstArenas,
-    crate::context::ctx().arenas,
-    structs
-);
-define_arena!(
-    Union,
-    UnionArena,
-    UnionId,
-    AstArenas,
-    crate::context::ctx().arenas,
-    unions
-);
-define_arena!(Enum, EnumArena, EnumId, AstArenas, crate::context::ctx().arenas, enums);
-define_arena!(
-    Variant,
-    VariantArena,
-    VariantId,
-    AstArenas,
-    crate::context::ctx().arenas,
-    variants
-);
+define_arena!(Struct, StructArena, StructId);
+define_arena!(Union, UnionArena, UnionId);
+define_arena!(Enum, EnumArena, EnumId);
+define_arena!(Variant, VariantArena, VariantId);
 
 ast_node! {
     pub struct Struct {

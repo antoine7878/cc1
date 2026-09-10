@@ -1,15 +1,8 @@
-use crate::ast::{AstArenas, DeclarationSpecifier, ExpressionNode, FunctionParametersNode, Name, Qualifier};
+use crate::ast::{DeclarationSpecifier, ExpressionNode, FunctionParametersNode, Name, Qualifier};
 use crate::{ast_node, define_arena};
 use libft::Span;
 
-define_arena!(
-    Declarator,
-    DeclaratorArena,
-    DeclaratorId,
-    AstArenas,
-    crate::context::ctx().arenas,
-    declarators
-);
+define_arena!(Declarator, DeclaratorArena, DeclaratorId);
 
 ast_node! {
     pub struct DeclarationNode {

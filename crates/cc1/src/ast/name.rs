@@ -1,18 +1,11 @@
 use std::fmt;
 
-use crate::ast::{AstArenas, Node};
+use crate::ast::Node;
 use crate::define_interner;
 use libft::Span;
 use libft::{BLUE, RESET};
 
-define_interner!(
-    String,
-    StringArena,
-    StringId,
-    AstArenas,
-    crate::context::ctx().arenas,
-    names
-);
+define_interner!(String, StringArena, StringId);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct Name {

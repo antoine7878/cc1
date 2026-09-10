@@ -1,4 +1,3 @@
-use crate::arena::ResolveWith;
 use crate::ast::{EnumId, ExpressionNode, Name, StructDeclaration, Tag};
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
