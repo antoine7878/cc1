@@ -4,23 +4,23 @@ use crate::context::ctx;
 use crate::semantic::{QualifiedType, ResolvedType};
 
 impl ResolvedType {
-    pub fn llvm(&'static self) -> TyName {
-        TyName { ty: self }
+    pub fn llvm(&'static self) -> LlvmType {
+        LlvmType { ty: self }
     }
 }
 
 impl QualifiedType {
-    pub fn llvm(&self) -> TyName {
+    pub fn llvm(&self) -> LlvmType {
         self.id.resolve().llvm()
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct TyName {
+pub struct LlvmType {
     ty: &'static ResolvedType,
 }
 
-impl fmt::Display for TyName {
+impl fmt::Display for LlvmType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let target = &ctx().target;
         match self.ty {

@@ -4,13 +4,36 @@ target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:
 target triple = "arm64-apple-macosx26.0.0"
 
 ; Function Attrs: noinline nounwind optnone ssp uwtable(sync)
-define i32 @f1() #0 {
+define i32 @fs() #0 {
   %1 = alloca i32, align 4
-  store i32 1, ptr %1, align 4
-  store i32 2, ptr %1, align 4
-  store i32 3, ptr %1, align 4
-  %2 = load i32, ptr %1, align 4
-  ret i32 %2
+  %2 = alloca i32, align 4
+  %3 = load i32, ptr %1, align 4
+  %4 = load i32, ptr %2, align 4
+  %5 = icmp ne i32 %3, %4
+  %6 = zext i1 %5 to i32
+  ret i32 %6
+}
+
+; Function Attrs: noinline nounwind optnone ssp uwtable(sync)
+define i32 @fu() #0 {
+  %1 = alloca i32, align 4
+  %2 = alloca i32, align 4
+  %3 = load i32, ptr %1, align 4
+  %4 = load i32, ptr %2, align 4
+  %5 = icmp ne i32 %3, %4
+  %6 = zext i1 %5 to i32
+  ret i32 %6
+}
+
+; Function Attrs: noinline nounwind optnone ssp uwtable(sync)
+define i32 @ff() #0 {
+  %1 = alloca double, align 8
+  %2 = alloca double, align 8
+  %3 = load double, ptr %1, align 8
+  %4 = load double, ptr %2, align 8
+  %5 = fcmp une double %3, %4
+  %6 = zext i1 %5 to i32
+  ret i32 %6
 }
 
 attributes #0 = { noinline nounwind optnone ssp uwtable(sync) "frame-pointer"="non-leaf-no-reserve" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="apple-m1" "target-features"="+aes,+altnzcv,+ccdp,+ccidx,+ccpp,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fptoint,+fullfp16,+jsconv,+lse,+neon,+pauth,+perfmon,+predres,+ras,+rcpc,+rdm,+sb,+sha2,+sha3,+specrestrict,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8a" "tune-cpu"="apple-m5" }

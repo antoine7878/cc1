@@ -57,8 +57,8 @@ cc:
 	rm ./a.out
 
 llvm:
-	clang -O0 -S -m64 -emit-llvm rscs/hello.c -o hello_64.ll
-	clang -O0 -S -m32 -emit-llvm rscs/hello.c -o hello_32.ll
+	clang $(CFF) -O0 -S -m64 -emit-llvm rscs/hello.c -o hello_64.ll
+	clang $(CFF) -O0 -S -m32 -emit-llvm rscs/hello.c -o hello_32.ll
 
 empty :=
 space := $(empty) $(empty)

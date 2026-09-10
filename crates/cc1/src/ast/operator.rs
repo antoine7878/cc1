@@ -33,6 +33,42 @@ pub enum BinaryOp {
     LogicalOr,
 }
 
+impl BinaryOp {
+    pub fn is_arithmetic(&self) -> bool {
+        matches!(
+            self,
+            BinaryOp::Add
+                | BinaryOp::Sub
+                | BinaryOp::Mul
+                | BinaryOp::Div
+                | BinaryOp::Mod
+                | BinaryOp::Left
+                | BinaryOp::Right
+                | BinaryOp::BitAnd
+                | BinaryOp::LogicalAnd
+                | BinaryOp::BitOr
+                | BinaryOp::LogicalOr
+                | BinaryOp::BitXor
+        )
+    }
+
+    pub fn is_logical(&self) -> bool {
+        matches!(self, BinaryOp::LogicalAnd | BinaryOp::LogicalOr)
+    }
+
+    pub fn is_comparison(&self) -> bool {
+        matches!(
+            self,
+            BinaryOp::Greater
+                | BinaryOp::Lower
+                | BinaryOp::GreaterEq
+                | BinaryOp::LowerEq
+                | BinaryOp::Eq
+                | BinaryOp::Neq
+        )
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemberOp {
     Dot,

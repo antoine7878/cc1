@@ -4,6 +4,7 @@ use std::iter::zip;
 use crate::ast::Tag;
 use crate::context::ctx;
 use crate::define_interner;
+use crate::semantic::resolution::expression::R;
 use crate::semantic::{ParamTypes, Sema, TagDefId};
 use crate::target::{Layout, Target};
 
@@ -93,13 +94,6 @@ impl ResolvedType {
         }
     }
 
-    pub fn is_floating(&self) -> bool {
-        matches!(
-            self,
-            ResolvedType::Float | ResolvedType::Double | ResolvedType::LongDouble
-        )
-    }
-
     pub fn is_integer(&self) -> bool {
         matches!(
             self,
@@ -111,6 +105,34 @@ impl ResolvedType {
                 | ResolvedType::Int
                 | ResolvedType::UnsignedInt
                 | ResolvedType::Long
+                | ResolvedType::UnsignedLong
+        )
+    }
+
+    pub fn is_floating(&self) -> bool {
+        matches!(
+            self,
+            ResolvedType::Float | ResolvedType::Double | ResolvedType::LongDouble
+        )
+    }
+
+    pub fn is_signed(&self) -> bool {
+        matches!(
+            self,
+            ResolvedType::Char
+                | ResolvedType::SignedChar
+                | ResolvedType::Short
+                | ResolvedType::Int
+                | ResolvedType::Long
+        )
+    }
+
+    pub fn is_unsigned(&self) -> bool {
+        matches!(
+            self,
+            ResolvedType::UnsignedChar
+                | ResolvedType::UnsignedShort
+                | ResolvedType::UnsignedInt
                 | ResolvedType::UnsignedLong
         )
     }
@@ -347,16 +369,24 @@ impl QualifiedType {
         }
     }
 
-    pub fn is_floating(&self, sema: &Sema) -> bool {
-        self.id.resolve_with(sema).is_floating()
-    }
-
     pub fn is_integer(&self, sema: &Sema) -> bool {
         self.id.resolve_with(sema).is_integer()
     }
 
     pub fn layout(&self) -> Option<Layout> {
         ctx().target.layout(self.id.resolve())
+    }
+
+    pub fn is_floating(&self, sema: &Sema) -> bool {
+        self.id.resolve_with(sema).is_floating()
+    }
+
+    pub fn is_signed(&self, sema: &Sema) -> bool {
+        self.id.resolve_with(sema).is_signed()
+    }
+
+    pub fn is_unsigned(&self, sema: &Sema) -> bool {
+        self.id.resolve_with(sema).is_unsigned()
     }
 }
 
