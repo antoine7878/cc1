@@ -9,7 +9,7 @@ use crate::ast::{
     CompoundStatementNode, DeclarationNode, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, Name,
     Statement, StatementNode, StringId, Tag, Value,
 };
-use crate::context::{Context, ctx};
+use crate::context::ctx;
 use crate::semantic::resolution::{expression, statement};
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, Linkage, QualifiedType, ScopeKind, Sema,
@@ -43,10 +43,10 @@ impl<'a> SymbolResolver<'a> {
         }
     }
 
-    pub fn resolve_unit(sema: &mut Sema, ctx: &Context) {
+    pub fn resolve_unit(sema: &mut Sema) {
         let mut resolver = SymbolResolver::new(sema);
         resolver.enter_file();
-        walk_translation_unit(&mut resolver, &ctx.ast);
+        walk_translation_unit(&mut resolver, &ctx().ast);
         resolver.leave_scope();
         debug_assert!(resolver.sym_scopes.is_empty());
         debug_assert!(resolver.stmt_scopes.is_empty());
@@ -233,22 +233,21 @@ impl SymbolResolver<'_> {
 // ----- Resolution ------------------------
 
 impl SymbolResolver<'_> {
-    pub fn eval_constant(&mut self, ctx: &Context, expr: &ExpressionNode) -> Option<Value> {
+    pub fn eval_constant(&mut self, expr: &ExpressionNode) -> Option<Value> {
         if self.sema.expr_consts.seen(expr.id) {
             return self.sema.expr_consts.get(expr.id).copied();
         }
         self.visit_expression(expr);
-        ice::eval_constant(self.sema, ctx, expr)
+        ice::eval_constant(self.sema, expr)
     }
 }
 
 impl Visitor for SymbolResolver<'_> {
     fn visit_function_definition(&mut self, node: &FunctionDefinitionNode) {
-        let ctx = ctx();
-        let Some(header) = declaration::define_function(self, ctx, node) else { return };
+        let Some(header) = declaration::define_function(self, node) else { return };
         let f = header.id;
         self.current_function = Some(f);
-        declaration::bind_function_parameters(self, ctx, node, &header);
+        declaration::bind_function_parameters(self, node, &header);
         self.visit_compound_statement(&node.body);
         self.resolve_gotos(f);
         self.current_function = None;
@@ -258,26 +257,24 @@ impl Visitor for SymbolResolver<'_> {
     }
 
     fn visit_declaration(&mut self, node: &DeclarationNode) {
-        let ctx = ctx();
         let specifiers = &node.specifiers;
         let span = &node.span;
-        declaration::check_declaration(self, ctx, node);
+        declaration::check_declaration(self, node);
         let declared_storage = constrain::specifier::get_storage(specifiers).collect(self, span);
-        let qualif = declaration::base_type(self, ctx, specifiers, span);
+        let qualif = declaration::base_type(self, specifiers, span);
         for init_declarator in &node.init_declarators {
-            declaration::declare_init_declarator(self, ctx, init_declarator, qualif, declared_storage);
+            declaration::declare_init_declarator(self, init_declarator, qualif, declared_storage);
         }
         walk_declaration(self, node);
     }
 
     fn visit_init_declarator(&mut self, node: &InitDeclaratorNode) {
-        let ctx = ctx();
         let decl = &node.declarator;
         let Some(&sym) = self.sema.declarations.get(&decl.id) else { return };
         let Some(ty) = sym.resolve_in(self.sema).ty else { return };
         self.visit_declarator(&node.declarator);
         if let Some(init) = &node.initializer {
-            declaration::resolve_initializer(self, ctx, sym, ty, init);
+            declaration::resolve_initializer(self, sym, ty, init);
         }
     }
 
@@ -288,20 +285,18 @@ impl Visitor for SymbolResolver<'_> {
     }
 
     fn visit_statement(&mut self, node: &StatementNode) {
-        let ctx = ctx();
         match node.id.resolve() {
-            Statement::Iteration(inner) => statement::resolve_iteration_statement(self, ctx, node.id, inner),
-            Statement::Selection(inner) => statement::resolve_selection_statement(self, ctx, node.id, inner),
-            Statement::Labeled(inner) => statement::resolve_labeled_statement(self, ctx, node.id, inner),
-            Statement::Jump(inner) => statement::resolve_jump_statement(self, ctx, node.id, inner),
+            Statement::Iteration(inner) => statement::resolve_iteration_statement(self, node.id, inner),
+            Statement::Selection(inner) => statement::resolve_selection_statement(self, node.id, inner),
+            Statement::Labeled(inner) => statement::resolve_labeled_statement(self, node.id, inner),
+            Statement::Jump(inner) => statement::resolve_jump_statement(self, node.id, inner),
             _ => walk_statement(self, node),
         }
     }
 
     fn visit_expression(&mut self, node: &ExpressionNode) {
-        let ctx = ctx();
-        expression::bind_callee(self, ctx, node);
+        expression::bind_callee(self, node);
         walk_expression(self, node);
-        expression::bind(self, ctx, node);
+        expression::bind(self, node);
     }
 }

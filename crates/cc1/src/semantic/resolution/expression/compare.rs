@@ -1,6 +1,5 @@
 use crate::arena::ResolveWith;
 use crate::ast::ExpressionNode;
-use crate::context::Context;
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{Diagnosis, ResolvedExpression, ResolvedType, Sema, cast};
 
@@ -32,9 +31,9 @@ pub fn relational(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> 
     })
 }
 
-pub fn equality(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let null1 = is_null_pointer_constant(sema, ctx, e1);
-    let null2 = is_null_pointer_constant(sema, ctx, e2);
+pub fn equality(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+    let null1 = is_null_pointer_constant(sema, e1);
+    let null2 = is_null_pointer_constant(sema, e2);
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
         let ret = int_rvalue(sema);
         if lhs.casted_ty().is_arithmetic(sema) && rhs.casted_ty().is_arithmetic(sema) {

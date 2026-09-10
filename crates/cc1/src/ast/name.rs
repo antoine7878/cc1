@@ -5,7 +5,14 @@ use crate::define_interner;
 use libft::Span;
 use libft::{BLUE, RESET};
 
-define_interner!(String, StringArena, StringId, AstArenas, crate::context::ctx().arenas, names);
+define_interner!(
+    String,
+    StringArena,
+    StringId,
+    AstArenas,
+    crate::context::ctx().arenas,
+    names
+);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct Name {

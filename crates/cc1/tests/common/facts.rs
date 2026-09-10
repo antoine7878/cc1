@@ -1,6 +1,5 @@
 use cc1::ast::visit::{Visitor, walk_expression, walk_statement, walk_translation_unit};
 use cc1::ast::{Expression, ExpressionNode, Statement, StatementNode};
-use cc1::context::Context;
 use cc1::semantic::Sema;
 
 use crate::common::Unit;
@@ -9,7 +8,6 @@ use crate::common::Unit;
 /// find. Diagnostic tests cannot catch a missing fact, only a wrong one, so this is the check
 /// that says the side tables are actually complete.
 struct FactChecker<'a> {
-    ctx: &'a Context,
     sema: &'a Sema,
     missing: Vec<String>,
 }
@@ -66,7 +64,6 @@ impl Unit {
     /// Every fact a code generator would need and not find, empty when the unit is complete.
     pub fn missing_facts(&self) -> Vec<String> {
         let mut checker = FactChecker {
-            ctx: self.ctx,
             sema: self.sema,
             missing: Vec::new(),
         };

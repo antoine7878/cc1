@@ -1,6 +1,5 @@
 use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, ExpressionNode, Value};
-use crate::context::Context;
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{Diag, DiagCollector, Diagnosis, ResolvedExpression, ResolvedType, Sema, cast, ice};
@@ -32,7 +31,11 @@ pub fn multiplicative_types(
 
 pub fn additive(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
-        match (op, lhs.casted_ty().id.resolve_in(sema), rhs.casted_ty().id.resolve_in(sema)) {
+        match (
+            op,
+            lhs.casted_ty().id.resolve_in(sema),
+            rhs.casted_ty().id.resolve_in(sema),
+        ) {
             (_, l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => cast::usual_arithmetic(sema, lhs, rhs),
             (_, ResolvedType::Pointer(_), o) if o.is_integral(sema) => cast::pointer_integer_arithmetic(sema, lhs, rhs),
             (BinaryOp::Add, o, ResolvedType::Pointer(_)) if o.is_integral(sema) => {
@@ -46,8 +49,8 @@ pub fn additive(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &Expres
     })
 }
 
-pub fn shift(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let count = ice::try_fold(sema, ctx, e2);
+pub fn shift(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+    let count = ice::try_fold(sema, e2);
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| {
         shift_types(sema, lhs, rhs, count, &e2.span)
     })

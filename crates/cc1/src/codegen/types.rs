@@ -1,32 +1,28 @@
 use std::fmt;
 
-use crate::context::Context;
+use crate::context::ctx;
 use crate::semantic::{QualifiedType, ResolvedType};
 
 impl ResolvedType {
-    pub fn llvm<'a>(&'a self, ctx: &'a Context) -> TyName<'a> {
-        TyName::new(self, ctx)
+    pub fn llvm(&'static self) -> TyName {
+        TyName { ty: self }
     }
 }
 
 impl QualifiedType {
-    pub fn llvm<'a>(&'a self, ctx: &'a Context) -> TyName<'a> {
-        self.id.resolve().llvm(ctx)
+    pub fn llvm(&self) -> TyName {
+        self.id.resolve().llvm()
     }
 }
 
-pub struct TyName<'a> {
-    ty: &'a ResolvedType,
-    ctx: &'a Context,
-}
-impl<'a> TyName<'a> {
-    fn new(ty: &'a ResolvedType, ctx: &'a Context) -> Self {
-        Self { ty, ctx }
-    }
+#[derive(Debug, Clone, Copy)]
+pub struct TyName {
+    ty: &'static ResolvedType,
 }
 
-impl<'a> fmt::Display for TyName<'a> {
+impl fmt::Display for TyName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let target = &ctx().target;
         match self.ty {
             ResolvedType::Char
             | ResolvedType::SignedChar
@@ -36,11 +32,11 @@ impl<'a> fmt::Display for TyName<'a> {
             | ResolvedType::Long
             | ResolvedType::UnsignedInt
             | ResolvedType::UnsignedLong
-            | ResolvedType::Int => write!(f, "i{}", self.ctx.target.layout(self.ty).unwrap().size * 8),
+            | ResolvedType::Int => write!(f, "i{}", target.layout(self.ty).unwrap().size * 8),
             ResolvedType::Void => write!(f, "void"),
-            ResolvedType::Float => write!(f, "{}", self.ctx.target.float.llvm()),
-            ResolvedType::Double => write!(f, "{}", self.ctx.target.double.llvm()),
-            ResolvedType::LongDouble => write!(f, "{}", self.ctx.target.long_double.llvm()),
+            ResolvedType::Float => write!(f, "{}", target.float.llvm()),
+            ResolvedType::Double => write!(f, "{}", target.double.llvm()),
+            ResolvedType::LongDouble => write!(f, "{}", target.long_double.llvm()),
             ResolvedType::Function { .. } => todo!(),
             ResolvedType::Tag { .. } => todo!(),
             ResolvedType::Array { .. } => todo!(),

@@ -1,6 +1,5 @@
 use crate::arena::ResolveWith;
 use crate::ast::{DeclarationNode, DeclarationSpecifier, DeclaratorNode, FunctionDefinitionNode, Name, Storage};
-use crate::context::Context;
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     DeclaredParams, Definition, Diag, DiagCollector, Diagnosis, FunctionDefId, ParamInfo, ParamTypes, QualifiedType,
@@ -15,39 +14,30 @@ pub struct FunctionHeader {
     pub declared: Option<ParamTypes>,
 }
 
-pub fn bind_function_parameters(
-    resolver: &mut SymbolResolver,
-    ctx: &Context,
-    node: &FunctionDefinitionNode,
-    header: &FunctionHeader,
-) {
+pub fn bind_function_parameters(resolver: &mut SymbolResolver, node: &FunctionDefinitionNode, header: &FunctionHeader) {
     resolver.enter_prototype();
     let lst = &node.old_style_declarations;
     let span = &node.declarator.span;
     let parameters = match &header.params {
         DeclaredParams::Unspecified => param_empty(resolver.sema, lst, span),
-        DeclaredParams::Names(names) => param_old_style(resolver, ctx, names, lst, span),
+        DeclaredParams::Names(names) => param_old_style(resolver, names, lst, span),
         DeclaredParams::Prototype { params, .. } => param_prototype(resolver, params, lst, span),
     };
     if let Some(declared) = &header.declared
         && !matches!(header.params, DeclaredParams::Prototype { .. })
-        && let Some(name) = node.declarator.ident(ctx)
+        && let Some(name) = node.declarator.ident()
     {
         check_identifier_list(resolver.sema, declared, &header.params, &parameters, name, span);
     }
     resolver.sema.functions.complete(header.id, parameters);
 }
 
-pub fn define_function(
-    resolver: &mut SymbolResolver,
-    ctx: &Context,
-    node: &FunctionDefinitionNode,
-) -> Option<FunctionHeader> {
+pub fn define_function(resolver: &mut SymbolResolver, node: &FunctionDefinitionNode) -> Option<FunctionHeader> {
     let span = &node.span;
     let decl_span = &node.declarator.span;
 
-    let qualif = base_type(resolver, ctx, &node.specifiers, span);
-    let (rty, decl, params) = declared_function(resolver, ctx, qualif, &node.declarator)?;
+    let qualif = base_type(resolver, &node.specifiers, span);
+    let (rty, decl, params) = declared_function(resolver, qualif, &node.declarator)?;
     let params = constrain::ty::extract_function_declarator(params).collect(resolver, decl_span)?;
 
     let declared_storage = constrain::specifier::get_storage(&node.specifiers).collect(resolver, span);
@@ -56,7 +46,7 @@ pub fn define_function(
     constrain::specifier::check_function_storage(storage).collect(resolver, span);
     constrain::specifier::check_external_specifiers(&node.specifiers).collect(resolver, span);
 
-    let name = decl.ident(ctx)?;
+    let name = decl.ident()?;
     let previous = resolver.current(name.id);
     let declared = previous.and_then(|id| param_types(resolver.sema, id));
     let ty = match &declared {
@@ -165,7 +155,6 @@ fn add_parameter(resolver: &mut SymbolResolver, param: &ParamInfo) -> Option<Sym
 
 fn param_old_style(
     resolver: &mut SymbolResolver,
-    ctx: &Context,
     names: &[Name],
     lst: &[DeclarationNode],
     span: &Span,
@@ -181,7 +170,7 @@ fn param_old_style(
                 init_declarators
                     .iter()
                     .map(|decl| {
-                        add_parameter_declarator(resolver, ctx, specifiers, &decl.declarator, span)
+                        add_parameter_declarator(resolver, specifiers, &decl.declarator, span)
                             .map(|sym_id| sym_id.resolve_in(resolver.sema).name.id)
                     })
                     .collect::<Vec<_>>()
@@ -211,19 +200,18 @@ fn param_old_style(
 
 fn add_parameter_declarator(
     resolver: &mut SymbolResolver,
-    ctx: &Context,
     specifiers: &[DeclarationSpecifier],
     decl: &DeclaratorNode,
     span: &Span,
 ) -> Option<SymbolId> {
-    let qualif = base_type(resolver, ctx, specifiers, span);
-    let (ty, decl) = declared_type(resolver, ctx, qualif, decl)?;
+    let qualif = base_type(resolver, specifiers, span);
+    let (ty, decl) = declared_type(resolver, qualif, decl)?;
     let ty = resolver.sema.types.adjust_parameter(ty);
     let declared_storage = constrain::specifier::get_storage(specifiers).collect(resolver, span);
     if let Some(storage) = declared_storage {
         constrain::parameter::param_storage_only_register(storage).collect(resolver, span)?;
     }
-    let name = decl.ident(ctx)?;
+    let name = decl.ident()?;
     if !ty.is_void(resolver.sema) {
         constrain::parameter::check_complete_parameter(ty.is_complete(resolver.sema), ty).collect(resolver, &decl.span);
     }

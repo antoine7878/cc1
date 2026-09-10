@@ -3,12 +3,19 @@ use std::iter::zip;
 
 use crate::arena::ResolveWith;
 use crate::ast::Tag;
-use crate::context::Context;
+use crate::context::ctx;
 use crate::define_interner;
 use crate::semantic::{ParamTypes, Sema, TagDefId};
 use crate::target::{Layout, Target};
 
-define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, Sema, crate::semantic::sema(), types);
+define_interner!(
+    ResolvedType,
+    ResolvedTypeArena,
+    ResolvedTypeId,
+    Sema,
+    crate::semantic::sema(),
+    types
+);
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum ResolvedType {
@@ -295,8 +302,8 @@ impl QualifiedType {
         }
     }
 
-    pub fn describe<'a>(&'a self, sema: &'a Sema, ctx: &'a Context) -> TypeName<'a> {
-        TypeName(self, sema, ctx)
+    pub fn describe<'a>(&'a self, sema: &'a Sema) -> TypeName<'a> {
+        TypeName(self, sema)
     }
 
     pub fn is_void(&self, sema: &Sema) -> bool {
@@ -360,16 +367,16 @@ impl QualifiedType {
         self.id.resolve_in(sema).is_integer()
     }
 
-    pub fn layout(&self, ctx: &Context) -> Option<Layout> {
-        ctx.target.layout(self.id.resolve())
+    pub fn layout(&self) -> Option<Layout> {
+        ctx().target.layout(self.id.resolve())
     }
 }
 
-pub struct TypeName<'a>(&'a QualifiedType, &'a Sema, &'a Context);
+pub struct TypeName<'a>(&'a QualifiedType, &'a Sema);
 
 impl fmt::Display for TypeName<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let TypeName(ty, sema, ctx) = *self;
+        let TypeName(ty, sema) = *self;
         if ty.is_const {
             f.write_str("const ")?;
         }
@@ -393,9 +400,9 @@ impl fmt::Display for TypeName<'_> {
             ResolvedType::Pointer(inner) => {
                 match inner.id.resolve_in(sema) {
                     ResolvedType::Function { .. } | ResolvedType::Array { .. } => {
-                        write!(f, "({})", inner.describe(sema, ctx))?
+                        write!(f, "({})", inner.describe(sema))?
                     }
-                    _ => write!(f, "{}", inner.describe(sema, ctx))?,
+                    _ => write!(f, "{}", inner.describe(sema))?,
                 }
                 f.write_str(" *")
             }
@@ -409,7 +416,7 @@ impl fmt::Display for TypeName<'_> {
                 while let ResolvedType::Array { elem: inner, .. } = base.id.resolve_in(sema) {
                     base = inner;
                 }
-                write!(f, "{}", base.describe(sema, ctx))?;
+                write!(f, "{}", base.describe(sema))?;
                 let (mut elem, mut len) = (elem, len);
                 loop {
                     f.write_str("[")?;
@@ -423,7 +430,7 @@ impl fmt::Display for TypeName<'_> {
                 Ok(())
             }
             ResolvedType::Function { ret, params } => {
-                write!(f, "{}(", ret.describe(sema, ctx))?;
+                write!(f, "{}(", ret.describe(sema))?;
                 if let ParamTypes::Prototype { params, is_variadic } = params {
                     if params.is_empty() {
                         f.write_str("void")?;
@@ -432,7 +439,7 @@ impl fmt::Display for TypeName<'_> {
                             if i > 0 {
                                 f.write_str(", ")?;
                             }
-                            write!(f, "{}", param.describe(sema, ctx))?;
+                            write!(f, "{}", param.describe(sema))?;
                         }
                     }
                     if *is_variadic {

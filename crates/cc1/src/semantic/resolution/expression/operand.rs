@@ -2,7 +2,6 @@ use std::iter::zip;
 
 use crate::arena::{Loan, OptionPoisoned, ResolveWith};
 use crate::ast::{Expression, ExpressionId, ExpressionNode};
-use crate::context::Context;
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::{
     Diagnosis, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, Sema, SymbolId, SymbolKind, cast, ice,
@@ -46,7 +45,7 @@ where
 
 /// Operands are resolved before the parent that inspects them, so the cast type is read back from
 /// the expression table instead of resolving the type name a second time.
-pub fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> bool {
+pub fn is_null_pointer_constant(sema: &mut Sema, node: &ExpressionNode) -> bool {
     let mut node = node;
     if let Expression::Cast(_, op) = node.id.resolve()
         && let Some(re) = sema.expr_types.get(node.id)
@@ -55,7 +54,7 @@ pub fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &Expressio
         node = op;
     }
     let Some(re) = sema.expr_types.get(node.id) else { return false };
-    re.ty.is_integer(sema) && ice::try_fold(sema, ctx, node).is_some_and(|v| v.is_zero())
+    re.ty.is_integer(sema) && ice::try_fold(sema, node).is_some_and(|v| v.is_zero())
 }
 
 fn is_void_pointer(sema: &Sema, qualif: QualifiedType) -> bool {

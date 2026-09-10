@@ -2,7 +2,6 @@ use crate::arena::{ResolveMutWith, ResolveWith};
 use crate::ast::{
     DeclarationNode, DeclarationSpecifier, DeclaratorNode, InitDeclaratorNode, InitializerNode, Storage, TypeSpecifier,
 };
-use crate::context::Context;
 use crate::semantic::model::initializer;
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
@@ -25,25 +24,24 @@ pub fn requires_complete_object(resolver: &SymbolResolver, ty: QualifiedType, st
     matches!(resolver.scope_kind(), ScopeKind::Block | ScopeKind::Function) && storage != Storage::Extern
 }
 
-pub fn check_declaration(resolver: &mut SymbolResolver, ctx: &Context, node: &DeclarationNode) {
+pub fn check_declaration(resolver: &mut SymbolResolver, node: &DeclarationNode) {
     let specifiers = &node.specifiers;
     let span = &node.span;
     if resolver.scope_kind() == ScopeKind::File {
         constrain::specifier::check_external_specifiers(specifiers).collect(resolver, span);
     }
-    if node.init_declarators.is_empty() && !declares_tag(ctx, specifiers) {
+    if node.init_declarators.is_empty() && !declares_tag(specifiers) {
         resolver.add_diag(Diag::err((), Diagnosis::EmptyDeclaration), span);
     }
 }
 
 pub fn declared_type_watched(
     resolver: &mut SymbolResolver,
-    ctx: &Context,
     qualif: Option<QualifiedType>,
     decl: &DeclaratorNode,
 ) -> Option<(QualifiedType, DeclaratorNode, bool)> {
     let before = resolver.sema.diagnosis.len();
-    let (ty, core) = declared_type(resolver, ctx, qualif, decl)?;
+    let (ty, core) = declared_type(resolver, qualif, decl)?;
     Some((ty, core, resolver.sema.diagnosis.len() != before))
 }
 
@@ -87,13 +85,12 @@ pub fn declare_symbol(
 
 pub fn declare_init_declarator(
     resolver: &mut SymbolResolver,
-    ctx: &Context,
     init_declarator: &InitDeclaratorNode,
     qualif: Option<QualifiedType>,
     declared_storage: Option<Storage>,
 ) -> Option<()> {
-    let (ty, core, already_diagnosed) = declared_type_watched(resolver, ctx, qualif, &init_declarator.declarator)?;
-    let name = core.ident(ctx)?;
+    let (ty, core, already_diagnosed) = declared_type_watched(resolver, qualif, &init_declarator.declarator)?;
+    let name = core.ident()?;
     let is_init = init_declarator.initializer.is_some();
     let (storage, kind) = classify(resolver, ty, declared_storage, &core.span);
     if kind == SymbolKind::Variable && !already_diagnosed && requires_complete_object(resolver, ty, storage, is_init) {
@@ -105,17 +102,11 @@ pub fn declare_init_declarator(
     Some(())
 }
 
-pub fn resolve_initializer(
-    resolver: &mut SymbolResolver,
-    ctx: &Context,
-    sym_id: SymbolId,
-    ty: QualifiedType,
-    node: &InitializerNode,
-) {
+pub fn resolve_initializer(resolver: &mut SymbolResolver, sym_id: SymbolId, ty: QualifiedType, node: &InitializerNode) {
     let duration = sym_id.resolve_in(resolver.sema).duration;
-    let init = initializer::resolve(resolver, ctx, ty, node, duration);
+    let init = initializer::resolve(resolver, ty, node, duration);
     if let ResolvedType::Array { elem, len: None } = ty.id.resolve_in(resolver.sema)
-        && let Some(len) = init.len(ctx)
+        && let Some(len) = init.len()
     {
         let id = resolver.sema.types.array(*elem, Some(len));
         sym_id.resolve_mut(resolver.sema).ty = Some(QualifiedType::new(id, ty.is_const, ty.is_volatile));
@@ -124,7 +115,7 @@ pub fn resolve_initializer(
     sym_id.resolve_mut(resolver.sema).initializer = Some(id);
 }
 
-pub fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
+pub fn declares_tag(specifiers: &[DeclarationSpecifier]) -> bool {
     specifiers.iter().any(|specifier| match specifier {
         DeclarationSpecifier::Type(TypeSpecifier::Struct(id)) => id.resolve().name.is_some(),
         DeclarationSpecifier::Type(TypeSpecifier::Union(id)) => id.resolve().name.is_some(),

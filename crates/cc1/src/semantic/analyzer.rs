@@ -1,4 +1,4 @@
-use crate::context::{Context, ctx, install};
+use crate::context::{Context, install};
 use crate::semantic::{self, Sema, SymbolResolver, eval, finish_externals, layout, mark_uses};
 
 pub struct Analyzer;
@@ -12,17 +12,17 @@ impl Analyzer {
     }
 
     pub fn resolve_names(mut sema: Sema) -> Sema {
-        SymbolResolver::resolve_unit(&mut sema, ctx());
+        SymbolResolver::resolve_unit(&mut sema);
         sema
     }
 
     pub fn check_constants(mut sema: Sema) -> Sema {
-        eval::check_constants(&mut sema, ctx());
+        eval::check_constants(&mut sema);
         sema
     }
 
     pub fn mark_uses(mut sema: Sema) -> Sema {
-        mark_uses(&mut sema, ctx());
+        mark_uses(&mut sema);
         sema
     }
 

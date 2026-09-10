@@ -1,6 +1,5 @@
 use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name, TypeSpecifier};
 use crate::ast_node;
-use crate::context::Context;
 use libft::Span;
 
 ast_node! {
@@ -25,11 +24,11 @@ ast_node! {
 }
 
 impl ParameterDeclaration {
-    pub fn is_abstract_void(&self, ctx: &Context) -> bool {
+    pub fn is_abstract_void(&self) -> bool {
         matches!(
             self.specifiers.as_slice(),
             [DeclarationSpecifier::Type(TypeSpecifier::Void)]
-        ) && self.declarator.is_abstract(ctx)
+        ) && self.declarator.is_abstract()
     }
 }
 

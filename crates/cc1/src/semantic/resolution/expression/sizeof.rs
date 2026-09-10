@@ -1,6 +1,5 @@
 use crate::arena::OptionPoisoned;
 use crate::ast::{ExpressionNode, Type, Value};
-use crate::context::Context;
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{QualifiedType, Sema, SymbolResolver, constrain, declaration, layout};
@@ -15,9 +14,9 @@ pub fn size_of_e(sema: &mut Sema, node: &ExpressionNode, e: &ExpressionNode) -> 
     Ok(result)
 }
 
-pub fn size_of_ty(resolver: &mut SymbolResolver, ctx: &Context, node: &ExpressionNode, ty: &Type, span: &Span) -> R {
-    let base = declaration::base_type(resolver, ctx, &ty.specifiers, span);
-    let (ty, _) = declaration::declared_type(resolver, ctx, base, &ty.declarator).ok_poisoned()?;
+pub fn size_of_ty(resolver: &mut SymbolResolver, node: &ExpressionNode, ty: &Type, span: &Span) -> R {
+    let base = declaration::base_type(resolver, &ty.specifiers, span);
+    let (ty, _) = declaration::declared_type(resolver, base, &ty.declarator).ok_poisoned()?;
     let result = size_t(resolver.sema, ty, false)?;
     set_sizeof_constant(resolver.sema, node, ty);
     Ok(result)

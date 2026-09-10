@@ -319,7 +319,7 @@ impl Unit {
                 cases,
                 default,
             } => {
-                let control = control.describe(self.sema, self.ctx);
+                let control = control.describe(self.sema);
                 let cases: Vec<String> = cases
                     .iter()
                     .map(|(value, id)| format!("{}->#{}", repr(Some(*value)), usize::from(*id)))
@@ -397,7 +397,7 @@ impl Unit {
                     symbol.kind.to_string(),
                     symbol
                         .ty
-                        .map(|ty| ty.describe(self.sema, self.ctx).to_string())
+                        .map(|ty| ty.describe(self.sema).to_string())
                         .unwrap_or_default(),
                 )
             })
@@ -466,7 +466,7 @@ impl Unit {
             .iter()
             .map(|diag| {
                 let mut buf = Vec::new();
-                let _ = diag.write(&mut buf, self.ctx);
+                let _ = diag.write(&mut buf);
                 strip_ansi(&String::from_utf8_lossy(&buf)).trim_end().to_string()
             })
             .collect()
@@ -476,7 +476,7 @@ impl Unit {
         let mut out = String::new();
         for diag in self.diagnosis() {
             let mut buf = Vec::new();
-            let _ = diag.write(&mut buf, self.ctx);
+            let _ = diag.write(&mut buf);
             out.push_str(&String::from_utf8_lossy(&buf));
         }
         out

@@ -5,7 +5,6 @@ use std::io::Write;
 use crate::ast::visit::walk_declarator;
 use crate::ast::{DeclaratorNode, FunctionDefinitionNode, StringId, Visitor};
 use crate::codegen::llvm::Builder;
-use crate::context::Context;
 use crate::semantic::{Duration, SymbolId, sema};
 
 #[derive(Debug, Clone, Copy)]
@@ -14,22 +13,10 @@ pub struct Local {
     pub dup: u32,
 }
 
-impl Local {
-    pub fn llvm<'a>(self, ctx: &'a Context) -> LocalName<'a> {
-        LocalName { local: self, ctx }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct LocalName<'a> {
-    local: Local,
-    ctx: &'a Context,
-}
-
-impl Display for LocalName<'_> {
+impl Display for Local {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let name = self.local.name.resolve();
-        match self.local.dup {
+        let name = self.name.resolve();
+        match self.dup {
             0 => write!(f, "%{name}"),
             dup => write!(f, "%{name}.{dup}"),
         }
@@ -44,7 +31,7 @@ pub struct Locals {
 }
 
 impl Locals {
-    pub fn collect(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
+    pub fn collect(&mut self, node: &FunctionDefinitionNode) {
         self.map.clear();
         self.order.clear();
         self.seen.clear();
@@ -55,11 +42,11 @@ impl Locals {
         self.map[&sym_id]
     }
 
-    pub fn emit<W: Write>(&self, ctx: &Context, b: &mut Builder<W>) {
+    pub fn emit<W: Write>(&self, b: &mut Builder<W>) {
         for &sym_id in &self.order {
             let qty = sym_id.resolve().ty.unwrap();
             let local = self.map[&sym_id];
-            b.alloca(local.llvm(ctx), qty.llvm(ctx), qty.layout(ctx).unwrap().align);
+            b.alloca(local, qty.llvm(), qty.layout().unwrap().align);
         }
     }
 }
@@ -73,7 +60,13 @@ impl Visitor for Locals {
             return;
         }
         let dup = self.seen.entry(sym.name.id).or_insert(0);
-        self.map.insert(sym_id, Local { name: sym.name.id, dup: *dup });
+        self.map.insert(
+            sym_id,
+            Local {
+                name: sym.name.id,
+                dup: *dup,
+            },
+        );
         self.order.push(sym_id);
         *dup += 1;
     }

@@ -14,7 +14,7 @@ use crate::ast::{
     ParameterDeclaration, Qualifier, SelectionStatementNode, Struct, StructDeclaration, StructMemberDeclarator,
     TranslationUnitNode, Type, TypeSpecifier, Union, Variant,
 };
-use crate::context::{Context, ctx};
+use crate::context::ctx;
 use crate::semantic::{ExpressionKind, sema};
 use libft::{CYAN, GRAY, GREEN, RESET};
 
@@ -31,17 +31,17 @@ struct Line {
 }
 
 impl AstPrinter {
-    pub fn print(ctx: &Context) {
-        let _ = Self::write_ast(stdout(), ctx);
+    pub fn print() {
+        let _ = Self::write_ast(stdout());
     }
 
-    pub fn write_ast<W: Write>(mut w: W, ctx: &Context) -> io::Result<()> {
+    pub fn write_ast<W: Write>(mut w: W) -> io::Result<()> {
         let mut printer = Self {
             depth: 0,
             lines: Vec::new(),
             open: Vec::new(),
         };
-        printer.visit_translation_unit(&ctx.ast);
+        printer.visit_translation_unit(&ctx().ast);
         printer.render(&mut w)
     }
 
@@ -71,16 +71,16 @@ impl AstPrinter {
         self.lines[idx].children = self.open.pop().expect("open node");
     }
 
-    fn print_name_node(&mut self, ctx: &Context, name: &Name) {
+    fn print_name_node(&mut self, name: &Name) {
         self.print_node(name, |printer| {
             printer.put(format_args!("{}", name.id.resolve()));
         });
     }
 
-    fn print_expression_type(&mut self, ctx: &Context, id: ExpressionId) {
+    fn print_expression_type(&mut self, id: ExpressionId) {
         let sema = sema();
         let Some(resolved) = sema.expr_types.get(id) else { return };
-        self.put(format_args!("{GREEN}'{}'{CYAN}", resolved.ty.describe(sema, ctx)));
+        self.put(format_args!("{GREEN}'{}'{CYAN}", resolved.ty.describe(sema)));
         if matches!(resolved.kind, ExpressionKind::LValue) {
             self.put(format_args!(" lvalue"));
         }
@@ -88,13 +88,13 @@ impl AstPrinter {
             self.put(format_args!(
                 " {GRAY}{}{CYAN} {GREEN}'{}'{CYAN}",
                 cast.kind,
-                cast.to.describe(sema, ctx)
+                cast.to.describe(sema)
             ));
         }
         self.put(format_args!(" "));
     }
 
-    fn print_specifier(&mut self, ctx: &Context, spec: &DeclarationSpecifier) {
+    fn print_specifier(&mut self, spec: &DeclarationSpecifier) {
         let tagged = |keyword: &str, name: Option<&Name>| match name {
             Some(name) => format!("{keyword} {}", name.id.resolve()),
             None => keyword.to_string(),
@@ -156,10 +156,9 @@ impl Visitor for AstPrinter {
     }
 
     fn visit_function_definition(&mut self, node: &FunctionDefinitionNode) {
-        let ctx = ctx();
         self.print_node(node, |printer| {
             for spec in &node.specifiers {
-                printer.print_specifier(ctx, spec);
+                printer.print_specifier(spec);
                 printer.put(format_args!(" "));
             }
             printer.visit_declarator(&node.declarator);
@@ -168,11 +167,10 @@ impl Visitor for AstPrinter {
     }
 
     fn visit_declaration(&mut self, node: &DeclarationNode) {
-        let ctx = ctx();
         self.print_node(node, |printer| {
             for spec in &node.specifiers {
                 printer.put(format_args!(" "));
-                printer.print_specifier(ctx, spec);
+                printer.print_specifier(spec);
             }
             walk_declaration(printer, node);
         });
@@ -238,11 +236,10 @@ impl Visitor for AstPrinter {
     }
 
     fn visit_expression(&mut self, node: &ExpressionNode) {
-        let ctx = ctx();
         self.print_node(node, |printer| {
             let expr = node.id.resolve();
             printer.put(format_args!("{} ", expr));
-            printer.print_expression_type(ctx, node.id);
+            printer.print_expression_type(node.id);
             if let Expression::Member(op, tag, ident) = expr {
                 printer.visit_expression(tag);
                 printer.put(format_args!("{}", op.symbol()));
@@ -253,21 +250,19 @@ impl Visitor for AstPrinter {
         });
     }
     fn visit_type(&mut self, node: &Type) {
-        let ctx = ctx();
         self.print_node(node, |printer| {
             for spec in &node.specifiers {
-                printer.print_specifier(ctx, spec);
+                printer.print_specifier(spec);
             }
             printer.visit_declarator(&node.declarator);
         });
     }
 
     fn visit_function_parameters(&mut self, node: &FunctionParametersNode) {
-        let ctx = ctx();
         self.print_node(node, |printer| {
             if let FunctionParameters::OldStyle(names) = &node.param {
                 for name in names {
-                    printer.print_name_node(ctx, name);
+                    printer.print_name_node(name);
                 }
             } else {
                 walk_function_parameters(printer, node);
@@ -276,11 +271,10 @@ impl Visitor for AstPrinter {
     }
 
     fn visit_parameter_declaration(&mut self, node: &ParameterDeclaration) {
-        let ctx = ctx();
         self.print_node(node, |printer| {
             for spec in &node.specifiers {
                 printer.put(format_args!(" "));
-                printer.print_specifier(ctx, spec);
+                printer.print_specifier(spec);
             }
             printer.visit_declarator(&node.declarator);
         });
@@ -303,11 +297,10 @@ impl Visitor for AstPrinter {
     }
 
     fn visit_struct_declaration(&mut self, node: &StructDeclaration) {
-        let ctx = ctx();
         self.print_node(node, |printer| {
             for spec in &node.specifiers {
                 printer.put(format_args!(" "));
-                printer.print_specifier(ctx, spec);
+                printer.print_specifier(spec);
             }
             for declarator in &node.struct_declarators {
                 printer.visit_struct_declarator(declarator);

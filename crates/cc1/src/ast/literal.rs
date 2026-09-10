@@ -1,12 +1,19 @@
 use crate::arena::ResolveWith;
 use crate::ast::{AstArenas, escape};
 use crate::ast_node;
-use crate::context::Context;
+use crate::context::{Context, ctx};
 use crate::define_interner;
 use crate::semantic::{Diag, QualifiedType, Sema};
 use libft::Span;
 
-define_interner!(StringConstant, StringPool, StringConstId, AstArenas, crate::context::ctx().arenas, strings);
+define_interner!(
+    StringConstant,
+    StringPool,
+    StringConstId,
+    AstArenas,
+    crate::context::ctx().arenas,
+    strings
+);
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct StringConstant {
@@ -33,8 +40,8 @@ impl StringLiteralNode {
         self.constant(ctx).units.len()
     }
 
-    pub fn ty(&self, sema: &mut Sema, ctx: &Context) -> QualifiedType {
-        let constant = self.constant(ctx);
+    pub fn ty(&self, sema: &mut Sema) -> QualifiedType {
+        let constant = self.constant(ctx());
         let (is_wide, len) = (constant.is_wide, constant.units.len());
         let base_id = if is_wide { sema.builtins.int } else { sema.builtins.char };
         let base = QualifiedType::plain(base_id);

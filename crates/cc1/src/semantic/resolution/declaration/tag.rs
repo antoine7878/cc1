@@ -1,6 +1,5 @@
 use crate::arena::ResolveWith;
 use crate::ast::{EnumId, ExpressionNode, Name, StructDeclaration, Tag};
-use crate::context::Context;
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, Member, QualifiedType, Symbol, SymbolKind, SymbolResolver, TagDefId, constrain,
@@ -9,7 +8,6 @@ use libft::Span;
 
 pub fn struct_or_union_tag(
     resolver: &mut SymbolResolver,
-    ctx: &Context,
     kind: Tag,
     name: Option<Name>,
     fields: &[StructDeclaration],
@@ -27,15 +25,15 @@ pub fn struct_or_union_tag(
         if field.struct_declarators.is_empty() {
             resolver.add_diag(Diag::err((), Diagnosis::EmptyDeclaration), &field.span);
         }
-        let qual = base_type(resolver, ctx, &field.specifiers, &field.span);
+        let qual = base_type(resolver, &field.specifiers, &field.span);
         for declarator in &field.struct_declarators {
             let decl = &declarator.declarator;
             let diag_count_before = resolver.sema.diagnosis.len();
-            let Some((ty, node)) = declared_type(resolver, ctx, qual, decl) else { continue };
+            let Some((ty, node)) = declared_type(resolver, qual, decl) else { continue };
             let already_diagnosed = resolver.sema.diagnosis.len() != diag_count_before;
-            let name = node.ident(ctx);
+            let name = node.ident();
             let bit_width = declarator.bit_width.as_ref().and_then(|e| {
-                let value = resolver.eval_constant(ctx, e);
+                let value = resolver.eval_constant(e);
                 let sema = &*resolver.sema;
                 let checked = constrain::ty::check_bit_width(&sema.target, ty.id.resolve_in(sema), value, name);
                 checked.collect(resolver, &e.span)
@@ -76,7 +74,7 @@ pub fn struct_or_union_tag(
     tag
 }
 
-pub fn enum_tag(resolver: &mut SymbolResolver, ctx: &Context, id: EnumId) -> Option<TagDefId> {
+pub fn enum_tag(resolver: &mut SymbolResolver, id: EnumId) -> Option<TagDefId> {
     let enum_node = id.resolve();
     let is_definition = !enum_node.variants.is_empty();
     let tag = resolver.declare_tag(Tag::Enum, enum_node.name, is_definition, &enum_node.span);
@@ -92,7 +90,7 @@ pub fn enum_tag(resolver: &mut SymbolResolver, ctx: &Context, id: EnumId) -> Opt
     for variant_id in &enum_node.variants {
         let variant = variant_id.resolve();
         if let Some(expr) = &variant.value
-            && let Some(v) = variant_value(resolver, ctx, expr)
+            && let Some(v) = variant_value(resolver, expr)
         {
             value = v;
         }
@@ -111,8 +109,8 @@ pub fn enum_tag(resolver: &mut SymbolResolver, ctx: &Context, id: EnumId) -> Opt
     Some(tag)
 }
 
-fn variant_value(resolver: &mut SymbolResolver, ctx: &Context, expr: &ExpressionNode) -> Option<i64> {
-    let value = resolver.eval_constant(ctx, expr)?;
+fn variant_value(resolver: &mut SymbolResolver, expr: &ExpressionNode) -> Option<i64> {
+    let value = resolver.eval_constant(expr)?;
     value.get_integer_value().map_or_else(
         || resolver.add_diag(Diag::err(None, Diagnosis::NonIntegerConstantExpression), &expr.span),
         |v| Some(v as i64),

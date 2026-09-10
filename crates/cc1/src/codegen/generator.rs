@@ -6,13 +6,12 @@ use crate::ast::{
 };
 use crate::codegen::llvm::Builder;
 use crate::codegen::local::Locals;
-use crate::context::{Context, ctx};
+use crate::context::ctx;
 use crate::semantic::{ResolvedType, sema};
 
 pub fn generate() {
-    let ctx = ctx();
     let mut generator = Generator::new(stdout());
-    generator.visit_translation_unit(&ctx.ast);
+    generator.visit_translation_unit(&ctx().ast);
 }
 
 #[derive(Debug)]
@@ -29,10 +28,10 @@ impl<W: Write> Generator<W> {
         }
     }
 
-    fn allocas(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
-        self.locals.collect(ctx, node);
+    fn allocas(&mut self, node: &FunctionDefinitionNode) {
+        self.locals.collect(node);
         self.b.reset(0);
-        self.locals.emit(ctx, &mut self.b);
+        self.locals.emit(&mut self.b);
         self.b.blank();
     }
 }
@@ -46,23 +45,21 @@ impl<W: Write> Visitor for Generator<W> {
     }
 
     fn visit_function_definition(&mut self, node: &FunctionDefinitionNode) {
-        let ctx = ctx();
         let sym = sema().declarations[&node.declarator.id].resolve();
         let ty = sym.ty.unwrap().id.resolve();
         let ResolvedType::Function { ret, .. } = ty else { unreachable!() };
         let ret_ty = ret.id.resolve();
-        self.b.define(ret_ty.llvm(ctx), sym.name.id.resolve());
-        self.allocas(ctx, node);
+        self.b.define(ret_ty.llvm(), sym.name.id.resolve());
+        self.allocas(node);
         self.visit_compound_statement(&node.body);
         self.b.end_function();
     }
 
     fn visit_jump_statement(&mut self, node: &JumpStatementNode) {
-        let ctx = ctx();
         match &node.stmt {
             JumpStatement::Return(Some(e)) => {
-                let ty = sema().expr_types[e.id].ty.llvm(ctx);
-                let v = self.fold_expression(ctx, e);
+                let ty = sema().expr_types[e.id].ty.llvm();
+                let v = self.fold_expression(e);
                 self.b.ret(ty, v);
             }
             JumpStatement::Return(None) => self.b.ret_void(),
@@ -71,7 +68,6 @@ impl<W: Write> Visitor for Generator<W> {
     }
 
     fn visit_expression(&mut self, node: &ExpressionNode) {
-        let ctx = ctx();
-        self.fold_expression(ctx, node);
+        self.fold_expression(node);
     }
 }

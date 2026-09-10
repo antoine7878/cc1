@@ -3,7 +3,6 @@ use crate::semantic::sema;
 use libft::print_table;
 
 pub fn dump_symbols() {
-    let ctx = ctx();
     let sema = sema();
     if sema.symbols.is_empty() {
         return;
@@ -21,9 +20,7 @@ pub fn dump_symbols() {
                 symbol.duration.to_string(),
                 symbol.definition.to_string(),
                 symbol.value.map_or("-".to_string(), |v| v.to_string()),
-                symbol
-                    .ty
-                    .map_or(String::default(), |ty| ty.describe(sema, ctx).to_string()),
+                symbol.ty.map_or(String::default(), |ty| ty.describe(sema).to_string()),
                 symbol.used.to_string(),
             ]
         })
@@ -46,8 +43,7 @@ pub fn dump_symbols() {
 }
 
 pub fn dump_diagnostics() {
-    let ctx = ctx();
-    for diag in ctx.diagnosis.iter().chain(&sema().diagnosis) {
-        let _ = diag.print(ctx);
+    for diag in ctx().diagnosis.iter().chain(&sema().diagnosis) {
+        let _ = diag.print();
     }
 }

@@ -1,7 +1,7 @@
 use crate::arena::ResolveMutWith;
 use crate::ast::visit::{Visitor, walk_expression, walk_translation_unit};
 use crate::ast::{Expression, ExpressionNode};
-use crate::context::Context;
+use crate::context::ctx;
 use crate::semantic::Sema;
 
 struct UseMarker<'a> {
@@ -10,10 +10,7 @@ struct UseMarker<'a> {
 
 impl Visitor for UseMarker<'_> {
     fn visit_expression(&mut self, node: &ExpressionNode) {
-        if matches!(
-            node.id.resolve(),
-            Expression::SizeofExpr(_) | Expression::SizeofType(_)
-        ) {
+        if matches!(node.id.resolve(), Expression::SizeofExpr(_) | Expression::SizeofType(_)) {
             return;
         }
         walk_expression(self, node);
@@ -25,7 +22,7 @@ impl Visitor for UseMarker<'_> {
     }
 }
 
-pub fn mark_uses(sema: &mut Sema, ctx: &Context) {
+pub fn mark_uses(sema: &mut Sema) {
     let mut marker = UseMarker { sema };
-    walk_translation_unit(&mut marker, &ctx.ast);
+    walk_translation_unit(&mut marker, &ctx().ast);
 }

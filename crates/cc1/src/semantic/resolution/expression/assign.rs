@@ -1,6 +1,5 @@
 use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, ExpressionNode};
-use crate::context::Context;
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{
@@ -18,14 +17,8 @@ where
     })
 }
 
-pub fn init(
-    sema: &mut Sema,
-    ctx: &Context,
-    l_ty: QualifiedType,
-    init_node: &ExpressionNode,
-    assign_ctx: AssignmentContext,
-) -> R {
-    let is_null = is_null_pointer_constant(sema, ctx, init_node);
+pub fn init(sema: &mut Sema, l_ty: QualifiedType, init_node: &ExpressionNode, assign_ctx: AssignmentContext) -> R {
+    let is_null = is_null_pointer_constant(sema, init_node);
     with_converted(sema, [init_node], |sema, [re]| {
         let mut l_re = ResolvedExpression::new(l_ty, ExpressionKind::LValue);
         let out = cast::assignment_conversion(sema, &mut l_re, re, is_null, assign_ctx);
@@ -39,8 +32,8 @@ pub fn init(
     })
 }
 
-pub fn simple_assignment(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let is_null = is_null_pointer_constant(sema, ctx, e2);
+pub fn simple_assignment(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+    let is_null = is_null_pointer_constant(sema, e2);
     with_assign_ops(sema, e1, e2, |sema, lhs, rhs| {
         constrain::expression::check_assignable(sema, lhs.kind, lhs.ty).into_result()?;
         let q = cast::assignment_conversion(sema, lhs, rhs, is_null, AssignmentContext::Assignment)?;
@@ -69,14 +62,8 @@ pub fn additive_assignment(sema: &mut Sema, e1: &ExpressionNode, e2: &Expression
     })
 }
 
-pub fn compound_assignment(
-    sema: &mut Sema,
-    ctx: &Context,
-    op: &BinaryOp,
-    e1: &ExpressionNode,
-    e2: &ExpressionNode,
-) -> R {
-    let count = ice::try_fold(sema, ctx, e2);
+pub fn compound_assignment(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+    let count = ice::try_fold(sema, e2);
     with_assign_ops(sema, e1, e2, |sema, lhs, rhs| {
         constrain::expression::check_assignable(sema, lhs.kind, lhs.ty).into_result()?;
         let target = lhs.ty.unqualified();

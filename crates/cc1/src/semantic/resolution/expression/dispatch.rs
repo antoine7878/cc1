@@ -1,14 +1,13 @@
 use crate::ast::{BinaryOp, Expression, ExpressionNode, UnaryOp};
-use crate::context::Context;
 use crate::semantic::ExpressionKind::{LValue, RValue};
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{Diag, DiagCollector, ResolvedExpression, Sema, SymbolResolver, cast};
 
-pub fn resolve_expression(resolver: &mut SymbolResolver, ctx: &Context, node: &ExpressionNode) {
+pub fn resolve_expression(resolver: &mut SymbolResolver, node: &ExpressionNode) {
     if resolver.sema.expr_types.seen(node.id) {
         return;
     }
-    let resolved = match type_of(resolver, ctx, node) {
+    let resolved = match type_of(resolver, node) {
         Ok((ty, kind)) => Some(ResolvedExpression::new(ty, kind)),
         Err(diag) => {
             resolver.add_diag(Diag::err((), diag), &node.span);
@@ -18,34 +17,34 @@ pub fn resolve_expression(resolver: &mut SymbolResolver, ctx: &Context, node: &E
     resolver.sema.expr_types.set(node.id, resolved);
 }
 
-fn type_of(resolver: &mut SymbolResolver, ctx: &Context, node: &ExpressionNode) -> R {
+fn type_of(resolver: &mut SymbolResolver, node: &ExpressionNode) -> R {
     let sema = &mut *resolver.sema;
     match node.id.resolve() {
         Expression::Identifier(_) => identifier(sema, node),
         Expression::Constant(value) => Ok((value.ty(sema), RValue)),
-        Expression::StringLiteral(value) => Ok((value.ty(sema, ctx), LValue)),
+        Expression::StringLiteral(value) => Ok((value.ty(sema), LValue)),
         Expression::ConstantExpression(e) => constant(sema, e),
-        Expression::ArraySubscripting(e1, e2) => array_subscript(sema, ctx, e1, e2),
-        Expression::FunctionCall(fn_node, args) => fn_call(sema, ctx, fn_node, args),
+        Expression::ArraySubscripting(e1, e2) => array_subscript(sema, e1, e2),
+        Expression::FunctionCall(fn_node, args) => fn_call(sema, fn_node, args),
         Expression::Member(op, e, name) => member(sema, node, *op, e, name),
         Expression::Unary(op, e) => unary_op(sema, *op, e),
         Expression::SizeofExpr(e) => size_of_e(sema, node, e),
-        Expression::SizeofType(ty) => size_of_ty(resolver, ctx, node, ty, &node.span),
-        Expression::Binary(op, e1, e2) => binary_op(sema, ctx, op, e1, e2),
-        Expression::Ternary(e1, e2, e3) => conditional(sema, ctx, e1, e2, e3),
-        Expression::Assign(op, e1, e2) => assignment(sema, ctx, op, e1, e2),
-        Expression::Cast(ty_node, operand) => cast(resolver, ctx, node, ty_node, operand),
+        Expression::SizeofType(ty) => size_of_ty(resolver, node, ty, &node.span),
+        Expression::Binary(op, e1, e2) => binary_op(sema, op, e1, e2),
+        Expression::Ternary(e1, e2, e3) => conditional(sema, e1, e2, e3),
+        Expression::Assign(op, e1, e2) => assignment(sema, op, e1, e2),
+        Expression::Cast(ty_node, operand) => cast(resolver, node, ty_node, operand),
         Expression::List(es) => list(sema, es),
     }
 }
 
-pub fn binary_op(sema: &mut Sema, ctx: &Context, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+pub fn binary_op(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     match op {
         BinaryOp::Add | BinaryOp::Sub => additive(sema, op, e1, e2),
         BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => multiplicative(sema, op, e1, e2),
-        BinaryOp::Right | BinaryOp::Left => shift(sema, ctx, e1, e2),
+        BinaryOp::Right | BinaryOp::Left => shift(sema, e1, e2),
         BinaryOp::Greater | BinaryOp::Lower | BinaryOp::GreaterEq | BinaryOp::LowerEq => relational(sema, e1, e2),
-        BinaryOp::Eq | BinaryOp::Neq => equality(sema, ctx, e1, e2),
+        BinaryOp::Eq | BinaryOp::Neq => equality(sema, e1, e2),
         BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor => bitwise(sema, e1, e2),
         BinaryOp::LogicalAnd | BinaryOp::LogicalOr => logic(sema, e1, e2),
     }
@@ -62,9 +61,9 @@ fn unary_op(sema: &mut Sema, op: UnaryOp, e: &ExpressionNode) -> R {
     }
 }
 
-fn assignment(sema: &mut Sema, ctx: &Context, op: &Option<BinaryOp>, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+fn assignment(sema: &mut Sema, op: &Option<BinaryOp>, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
     match op {
-        None => simple_assignment(sema, ctx, e1, e2),
+        None => simple_assignment(sema, e1, e2),
         Some(BinaryOp::Add | BinaryOp::Sub) => additive_assignment(sema, e1, e2),
         Some(
             op @ (BinaryOp::Mul
@@ -75,7 +74,7 @@ fn assignment(sema: &mut Sema, ctx: &Context, op: &Option<BinaryOp>, e1: &Expres
             | BinaryOp::BitAnd
             | BinaryOp::BitOr
             | BinaryOp::BitXor),
-        ) => compound_assignment(sema, ctx, op, e1, e2),
+        ) => compound_assignment(sema, op, e1, e2),
         _ => unreachable!(),
     }
 }

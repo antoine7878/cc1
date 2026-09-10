@@ -1,10 +1,9 @@
 use crate::ast::{Expression, ExpressionNode};
-use crate::context::Context;
 use crate::semantic::resolution::declaration;
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{Diag, DiagCollector, Diagnosis, SymbolResolver};
 
-pub fn bind_callee(resolver: &mut SymbolResolver, ctx: &Context, node: &ExpressionNode) {
+pub fn bind_callee(resolver: &mut SymbolResolver, node: &ExpressionNode) {
     if let Expression::FunctionCall(f, _) = node.id.resolve()
         && let Expression::Identifier(fn_name) = f.id.resolve()
         && resolver.lookup_ordinary(fn_name.id).is_none()
@@ -13,7 +12,7 @@ pub fn bind_callee(resolver: &mut SymbolResolver, ctx: &Context, node: &Expressi
     }
 }
 
-pub fn bind(resolver: &mut SymbolResolver, ctx: &Context, node: &ExpressionNode) {
+pub fn bind(resolver: &mut SymbolResolver, node: &ExpressionNode) {
     if resolver.sema.expr_bindings.seen(node.id) {
         return;
     }
@@ -24,5 +23,5 @@ pub fn bind(resolver: &mut SymbolResolver, ctx: &Context, node: &ExpressionNode)
         }
         resolver.sema.expr_bindings.set(node.id, sym);
     }
-    resolve_expression(resolver, ctx, node);
+    resolve_expression(resolver, node);
 }

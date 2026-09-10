@@ -3,7 +3,7 @@ use std::io::Write;
 
 use crate::ast::Value;
 use crate::codegen::TyName;
-use crate::codegen::local::LocalName;
+use crate::codegen::local::Local;
 
 #[derive(Debug)]
 pub enum LLVMValue {
@@ -79,7 +79,7 @@ impl<W: Write> Builder<W> {
         self.line(format_args!(""));
     }
 
-    pub fn define(&mut self, ret: TyName<'_>, name: impl Display) {
+    pub fn define(&mut self, ret: TyName, name: impl Display) {
         self.line(format_args!("define {ret} @{name}() {{"));
     }
 
@@ -87,23 +87,23 @@ impl<W: Write> Builder<W> {
         self.line(format_args!("}}"));
     }
 
-    pub fn alloca(&mut self, slot: LocalName<'_>, ty: TyName<'_>, align: u32) {
+    pub fn alloca(&mut self, slot: Local, ty: TyName, align: u32) {
         self.line(format_args!("  {slot} = alloca {ty}, align {align}"));
     }
 
-    pub fn load(&mut self, ty: TyName<'_>, slot: LocalName<'_>, align: u32) -> LLVMValue {
+    pub fn load(&mut self, ty: TyName, slot: Local, align: u32) -> LLVMValue {
         let r = self.fresh();
         self.line(format_args!("  {r} = load {ty}, ptr {slot}, align {align}"));
         r
     }
 
-    pub fn binop(&mut self, op: Op, ty: TyName<'_>, a: LLVMValue, b: LLVMValue) -> LLVMValue {
+    pub fn binop(&mut self, op: Op, ty: TyName, a: LLVMValue, b: LLVMValue) -> LLVMValue {
         let r = self.fresh();
         self.line(format_args!("  {r} = {op} {ty} {a}, {b}"));
         r
     }
 
-    pub fn ret(&mut self, ty: TyName<'_>, v: LLVMValue) {
+    pub fn ret(&mut self, ty: TyName, v: LLVMValue) {
         self.line(format_args!("  ret {ty} {v}"));
     }
 

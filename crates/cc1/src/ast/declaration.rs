@@ -1,5 +1,4 @@
 use crate::ast::{AstArenas, DeclarationSpecifier, ExpressionNode, FunctionParametersNode, Name, Qualifier};
-use crate::context::Context;
 use crate::{ast_node, define_arena};
 use libft::Span;
 
@@ -33,11 +32,11 @@ ast_node! {
 }
 
 impl DeclaratorNode {
-    pub fn ident(&self, ctx: &Context) -> Option<Name> {
-        self.id.resolve().ident(ctx)
+    pub fn ident(&self) -> Option<Name> {
+        self.id.resolve().ident()
     }
 
-    pub fn is_abstract(&self, ctx: &Context) -> bool {
+    pub fn is_abstract(&self) -> bool {
         matches!(self.id.resolve(), Declarator::Abstract)
     }
 }
@@ -61,13 +60,13 @@ pub enum Declarator {
 }
 
 impl Declarator {
-    pub fn ident(&self, ctx: &Context) -> Option<Name> {
+    pub fn ident(&self) -> Option<Name> {
         match self {
             Declarator::Ident(n) => Some(*n),
             Declarator::Abstract => None,
             Declarator::Pointer { inner: declarator, .. }
             | Declarator::Array { declarator, .. }
-            | Declarator::Function { declarator, .. } => declarator.ident(ctx),
+            | Declarator::Function { declarator, .. } => declarator.ident(),
         }
     }
 }

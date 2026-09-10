@@ -4,7 +4,6 @@ use crate::ast::{
     ExpressionNode, ExpressionStatementNode, Fold, IterationStatement, IterationStatementNode, JumpStatement,
     JumpStatementNode, Labeled, LabeledStatementNode, SelectionStatement, SelectionStatementNode, StatementNode,
 };
-use crate::context::Context;
 use crate::semantic::resolution::expression::{self, operands};
 use crate::semantic::{
     AssignmentContext, Diag, DiagCollector, Diagnosis, QualifiedType, ResolvedStatement, Sema, SymbolResolver, cast,
@@ -12,24 +11,19 @@ use crate::semantic::{
 
 pub type R = Result<(), Diagnosis>;
 
-pub fn resolve_labeled_statement(
-    resolver: &mut SymbolResolver,
-    ctx: &Context,
-    id: StatementId,
-    node: &LabeledStatementNode,
-) {
-    check_labeled_statement(resolver, ctx, id, node);
+pub fn resolve_labeled_statement(resolver: &mut SymbolResolver, id: StatementId, node: &LabeledStatementNode) {
+    check_labeled_statement(resolver, id, node);
     walk_labeled_statement(resolver, node);
 }
 
-fn check_labeled_statement(resolver: &mut SymbolResolver, ctx: &Context, id: StatementId, node: &LabeledStatementNode) {
+fn check_labeled_statement(resolver: &mut SymbolResolver, id: StatementId, node: &LabeledStatementNode) {
     let res = match &node.inner {
         Labeled::Identifier(name, _) => {
             resolver.define_label(*name, &node.span);
             resolver.sema.stmts.set(id, Some(ResolvedStatement::Label(name.id)));
             Ok(())
         }
-        Labeled::Case(expr, _) => check_case(resolver, ctx, id, expr),
+        Labeled::Case(expr, _) => check_case(resolver, id, expr),
         Labeled::Default(_) => check_default(resolver, id),
     };
     if let Err(diag) = res {
@@ -37,8 +31,8 @@ fn check_labeled_statement(resolver: &mut SymbolResolver, ctx: &Context, id: Sta
     }
 }
 
-fn check_case(resolver: &mut SymbolResolver, ctx: &Context, id: StatementId, expr: &ExpressionNode) -> R {
-    let value = resolver.eval_constant(ctx, expr);
+fn check_case(resolver: &mut SymbolResolver, id: StatementId, expr: &ExpressionNode) -> R {
+    let value = resolver.eval_constant(expr);
     let Some(control) = resolver.switch_control() else {
         return Err(Diagnosis::OutsideSwitch("case"));
     };
@@ -62,12 +56,7 @@ fn check_default(resolver: &mut SymbolResolver, id: StatementId) -> R {
     Ok(())
 }
 
-pub fn resolve_selection_statement(
-    resolver: &mut SymbolResolver,
-    ctx: &Context,
-    id: StatementId,
-    node: &SelectionStatementNode,
-) {
+pub fn resolve_selection_statement(resolver: &mut SymbolResolver, id: StatementId, node: &SelectionStatementNode) {
     match &node.stmt {
         SelectionStatement::If(condition, then, otherwise) => {
             resolver.visit_expression(condition);
@@ -108,24 +97,15 @@ fn expr_to_void(sema: &mut Sema, e: &ExpressionNode) -> Option<()> {
     Some(())
 }
 
-pub fn resolve_iteration_statement(
-    resolver: &mut SymbolResolver,
-    ctx: &Context,
-    id: StatementId,
-    node: &IterationStatementNode,
-) {
-    let body = loop_controls(resolver, ctx, node);
+pub fn resolve_iteration_statement(resolver: &mut SymbolResolver, id: StatementId, node: &IterationStatementNode) {
+    let body = loop_controls(resolver, node);
     check_iteration_statement(resolver.sema, node);
     resolver.enter_loop(id);
     resolver.visit_statement(body);
     resolver.leave_stmt();
 }
 
-fn loop_controls<'n>(
-    resolver: &mut SymbolResolver,
-    ctx: &Context,
-    node: &'n IterationStatementNode,
-) -> &'n StatementNode {
+fn loop_controls<'n>(resolver: &mut SymbolResolver, node: &'n IterationStatementNode) -> &'n StatementNode {
     match &node.stmt {
         IterationStatement::While(e, body) | IterationStatement::Do(body, e) => {
             resolver.visit_expression(e);
@@ -192,15 +172,14 @@ fn check_for(
     }
 }
 
-pub fn resolve_jump_statement(resolver: &mut SymbolResolver, ctx: &Context, id: StatementId, node: &JumpStatementNode) {
+pub fn resolve_jump_statement(resolver: &mut SymbolResolver, id: StatementId, node: &JumpStatementNode) {
     let return_ty = resolver.return_ty();
     walk_jump_statement(resolver, node);
-    check_jump_statement(resolver, ctx, id, node, return_ty);
+    check_jump_statement(resolver, id, node, return_ty);
 }
 
 fn check_jump_statement(
     resolver: &mut SymbolResolver,
-    ctx: &Context,
     id: StatementId,
     node: &JumpStatementNode,
     return_ty: Option<QualifiedType>,
@@ -211,9 +190,7 @@ fn check_jump_statement(
             resolver.sema.stmts.set(id, Some(ResolvedStatement::Goto(name.id)));
             Ok(())
         }
-        JumpStatement::Return(_) => {
-            check_return(resolver.sema, ctx, node, return_ty.expect("a return inside a function"))
-        }
+        JumpStatement::Return(_) => check_return(resolver.sema, node, return_ty.expect("a return inside a function")),
         JumpStatement::Break => check_break(resolver, id),
         JumpStatement::Continue => check_continue(resolver, id),
     };
@@ -238,11 +215,9 @@ fn check_continue(resolver: &mut SymbolResolver, id: StatementId) -> R {
     Ok(())
 }
 
-fn check_return(sema: &mut Sema, ctx: &Context, node: &JumpStatementNode, return_ty: QualifiedType) -> R {
+fn check_return(sema: &mut Sema, node: &JumpStatementNode, return_ty: QualifiedType) -> R {
     match &node.stmt {
-        JumpStatement::Return(Some(e)) => {
-            expression::init(sema, ctx, return_ty, e, AssignmentContext::Return).map(|_| ())
-        }
+        JumpStatement::Return(Some(e)) => expression::init(sema, return_ty, e, AssignmentContext::Return).map(|_| ()),
         JumpStatement::Return(None) if return_ty.id != sema.builtins.void => Err(Diagnosis::ReturnWithoutValue),
         _ => Ok(()),
     }

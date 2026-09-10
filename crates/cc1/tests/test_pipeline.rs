@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use cc1::context::Context;
 use cc1::pipeline::Pipeline;
-use cc1::semantic::{Diagnosis, DiagnosisNode, ExpectedTokens};
+use cc1::semantic::{Diagnosis, DiagnosisNode, ExpectedTokens, Sema};
 use libft::Span;
 
 static TAPPED: AtomicUsize = AtomicUsize::new(0);
@@ -107,4 +107,61 @@ fn tap_observes_the_context_without_stopping_it() {
     assert_eq!(TAPPED.load(Ordering::SeqCst), 2);
     assert_eq!(ctx.file_name, "mm");
     assert!(!stopped);
+}
+
+fn to_sema(ctx: Context) -> Sema {
+    Sema::new(ctx.target.clone())
+}
+
+fn to_unit(_: Sema) {}
+
+fn mark_sema(mut sema: Sema) -> Sema {
+    sema.diagnosis.clear();
+    sema
+}
+
+#[test]
+fn a_phase_change_keeps_the_failure_and_stop_state() {
+    let pipeline = Pipeline::default().pass(fail).checkpoint().then(to_sema);
+    assert!(pipeline.failed());
+    assert!(pipeline.stopped());
+    let pipeline = pipeline.pass(mark_sema).then(to_unit);
+    assert!(pipeline.failed());
+    assert!(pipeline.stopped());
+}
+
+#[test]
+fn a_phase_change_on_a_clean_pipeline_leaves_it_running() {
+    let pipeline = Pipeline::default()
+        .pass(mark)
+        .then(to_sema)
+        .pass(mark_sema)
+        .then(to_unit);
+    assert!(!pipeline.failed());
+    assert!(!pipeline.stopped());
+}
+
+#[test]
+fn a_run_is_skipped_once_the_pipeline_is_stopped() {
+    TAPPED.store(0, Ordering::SeqCst);
+    let pipeline = Pipeline::default()
+        .pass(fail)
+        .checkpoint()
+        .then(to_sema)
+        .then(to_unit)
+        .run(|| {
+            TAPPED.fetch_add(1, Ordering::SeqCst);
+        });
+    assert!(pipeline.stopped());
+    assert_eq!(TAPPED.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn a_run_on_a_clean_pipeline_executes() {
+    CHECKED.store(0, Ordering::SeqCst);
+    let pipeline = Pipeline::default().then(to_sema).then(to_unit).run(|| {
+        CHECKED.fetch_add(1, Ordering::SeqCst);
+    });
+    assert!(!pipeline.stopped());
+    assert_eq!(CHECKED.load(Ordering::SeqCst), 1);
 }

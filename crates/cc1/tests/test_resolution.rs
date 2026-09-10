@@ -424,10 +424,7 @@ fn a_function_definition_records_its_parameters_in_order() {
                 .iter()
                 .map(|&id| id.resolve().name.id.resolve().clone())
                 .collect();
-            (
-                def.sym.resolve().name.id.resolve().clone(),
-                parameters,
-            )
+            (def.sym.resolve().name.id.resolve().clone(), parameters)
         })
         .collect();
     assert_eq!(names, [("f".to_string(), vec!["a".to_string(), "b".to_string()])]);

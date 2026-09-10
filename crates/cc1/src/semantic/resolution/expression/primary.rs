@@ -2,7 +2,6 @@ use std::iter::zip;
 
 use crate::arena::{OptionPoisoned, ResolveWith};
 use crate::ast::{BinaryOp, ExpressionNode, MemberOp, Name, Tag};
-use crate::context::Context;
 use crate::semantic::ExpressionKind::{LValue, RValue};
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{
@@ -22,15 +21,15 @@ pub fn constant(sema: &mut Sema, e: &ExpressionNode) -> R {
         .ok_poisoned()
 }
 
-pub fn array_subscript(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
-    let (qty, _) = binary_op(sema, ctx, &BinaryOp::Add, e1, e2)?;
+pub fn array_subscript(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
+    let (qty, _) = binary_op(sema, &BinaryOp::Add, e1, e2)?;
     let ResolvedType::Pointer(inner) = qty.id.resolve_in(sema) else {
         return Err(Diagnosis::SubscriptNotArray);
     };
     Ok((*inner, LValue))
 }
 
-pub fn fn_call(sema: &mut Sema, ctx: &Context, fn_node: &ExpressionNode, args: &[ExpressionNode]) -> R {
+pub fn fn_call(sema: &mut Sema, fn_node: &ExpressionNode, args: &[ExpressionNode]) -> R {
     with_converted(sema, [fn_node], |sema, [re]| {
         let ty = re.casted_ty();
         let ResolvedType::Pointer(inner) = ty.id.resolve_in(sema) else {
@@ -56,7 +55,7 @@ pub fn fn_call(sema: &mut Sema, ctx: &Context, fn_node: &ExpressionNode, args: &
         let param_len = params.len();
         let mut rejected = false;
         for (n, (param_ty, arg_node)) in zip(params, args).enumerate() {
-            if let Err(err) = init(sema, ctx, param_ty, arg_node, AssignmentContext::Argument(n + 1)) {
+            if let Err(err) = init(sema, param_ty, arg_node, AssignmentContext::Argument(n + 1)) {
                 sema.add_diag(Diag::err((), err), &arg_node.span);
                 rejected = true;
             }
