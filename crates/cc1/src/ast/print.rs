@@ -14,7 +14,7 @@ use crate::ast::{
     ParameterDeclaration, Qualifier, SelectionStatementNode, Struct, StructDeclaration, StructMemberDeclarator,
     TranslationUnitNode, Type, TypeSpecifier, Union, Variant,
 };
-use crate::context::Context;
+use crate::context::{Context, ctx};
 use crate::semantic::{ExpressionKind, sema};
 use libft::{CYAN, GRAY, GREEN, RESET};
 
@@ -41,7 +41,7 @@ impl AstPrinter {
             lines: Vec::new(),
             open: Vec::new(),
         };
-        printer.visit_translation_unit(ctx, &ctx.ast);
+        printer.visit_translation_unit(&ctx.ast);
         printer.render(&mut w)
     }
 
@@ -141,7 +141,7 @@ impl AstPrinter {
 }
 
 impl Visitor for AstPrinter {
-    fn visit_translation_unit(&mut self, ctx: &Context, node: &TranslationUnitNode) {
+    fn visit_translation_unit(&mut self, node: &TranslationUnitNode) {
         let idx = self.lines.len();
         self.lines.push(Line {
             depth: 0,
@@ -150,175 +150,182 @@ impl Visitor for AstPrinter {
         });
         self.open.push(0);
         self.depth += 1;
-        walk_translation_unit(self, ctx, node);
+        walk_translation_unit(self, node);
         self.depth -= 1;
         self.lines[idx].children = self.open.pop().expect("root node");
     }
 
-    fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
+    fn visit_function_definition(&mut self, node: &FunctionDefinitionNode) {
+        let ctx = ctx();
         self.print_node(node, |printer| {
             for spec in &node.specifiers {
                 printer.print_specifier(ctx, spec);
                 printer.put(format_args!(" "));
             }
-            printer.visit_declarator(ctx, &node.declarator);
-            printer.visit_compound_statement(ctx, &node.body);
+            printer.visit_declarator(&node.declarator);
+            printer.visit_compound_statement(&node.body);
         });
     }
 
-    fn visit_declaration(&mut self, ctx: &Context, node: &DeclarationNode) {
+    fn visit_declaration(&mut self, node: &DeclarationNode) {
+        let ctx = ctx();
         self.print_node(node, |printer| {
             for spec in &node.specifiers {
                 printer.put(format_args!(" "));
                 printer.print_specifier(ctx, spec);
             }
-            walk_declaration(printer, ctx, node);
+            walk_declaration(printer, node);
         });
     }
 
-    fn visit_init_declarator(&mut self, ctx: &Context, node: &InitDeclaratorNode) {
+    fn visit_init_declarator(&mut self, node: &InitDeclaratorNode) {
         self.print_node(node, |printer| {
-            walk_init_declarator(printer, ctx, node);
+            walk_init_declarator(printer, node);
         });
     }
 
-    fn visit_declarator(&mut self, ctx: &Context, node: &DeclaratorNode) {
+    fn visit_declarator(&mut self, node: &DeclaratorNode) {
         self.print_node(node, |printer| {
             printer.put(format_args!("{} ", node.id.resolve()));
-            walk_declarator(printer, ctx, node);
+            walk_declarator(printer, node);
         });
     }
 
-    fn visit_initializer(&mut self, ctx: &Context, node: &InitializerNode) {
+    fn visit_initializer(&mut self, node: &InitializerNode) {
         self.print_node(node, |printer| {
-            walk_initializer(printer, ctx, node);
+            walk_initializer(printer, node);
         });
     }
 
-    fn visit_labeled_statement(&mut self, ctx: &Context, node: &LabeledStatementNode) {
+    fn visit_labeled_statement(&mut self, node: &LabeledStatementNode) {
         self.print_node(node, |printer| {
             printer.put(format_args!("{} ", node.inner));
-            walk_labeled_statement(printer, ctx, node);
+            walk_labeled_statement(printer, node);
         });
     }
 
-    fn visit_compound_statement(&mut self, ctx: &Context, node: &CompoundStatementNode) {
+    fn visit_compound_statement(&mut self, node: &CompoundStatementNode) {
         self.print_node(node, |printer| {
-            walk_compound_statement(printer, ctx, node);
+            walk_compound_statement(printer, node);
         });
     }
 
-    fn visit_expression_statement(&mut self, ctx: &Context, node: &ExpressionStatementNode) {
+    fn visit_expression_statement(&mut self, node: &ExpressionStatementNode) {
         self.print_node(node, |printer| {
-            walk_expression_statement(printer, ctx, node);
+            walk_expression_statement(printer, node);
         });
     }
 
-    fn visit_selection_statement(&mut self, ctx: &Context, node: &SelectionStatementNode) {
-        self.print_node(node, |printer| {
-            printer.put(format_args!("{} ", node.stmt));
-            walk_selection_statement(printer, ctx, node);
-        });
-    }
-
-    fn visit_iteration_statement(&mut self, ctx: &Context, node: &IterationStatementNode) {
+    fn visit_selection_statement(&mut self, node: &SelectionStatementNode) {
         self.print_node(node, |printer| {
             printer.put(format_args!("{} ", node.stmt));
-            walk_iteration_statement(printer, ctx, node);
+            walk_selection_statement(printer, node);
         });
     }
 
-    fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode) {
+    fn visit_iteration_statement(&mut self, node: &IterationStatementNode) {
         self.print_node(node, |printer| {
             printer.put(format_args!("{} ", node.stmt));
-            walk_jump_statement(printer, ctx, node);
+            walk_iteration_statement(printer, node);
         });
     }
 
-    fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
+    fn visit_jump_statement(&mut self, node: &JumpStatementNode) {
+        self.print_node(node, |printer| {
+            printer.put(format_args!("{} ", node.stmt));
+            walk_jump_statement(printer, node);
+        });
+    }
+
+    fn visit_expression(&mut self, node: &ExpressionNode) {
+        let ctx = ctx();
         self.print_node(node, |printer| {
             let expr = node.id.resolve();
             printer.put(format_args!("{} ", expr));
             printer.print_expression_type(ctx, node.id);
             if let Expression::Member(op, tag, ident) = expr {
-                printer.visit_expression(ctx, tag);
+                printer.visit_expression(tag);
                 printer.put(format_args!("{}", op.symbol()));
-                printer.visit_name(ctx, ident);
+                printer.visit_name(ident);
             } else {
-                walk_expression(printer, ctx, node);
+                walk_expression(printer, node);
             }
         });
     }
-    fn visit_type(&mut self, ctx: &Context, node: &Type) {
+    fn visit_type(&mut self, node: &Type) {
+        let ctx = ctx();
         self.print_node(node, |printer| {
             for spec in &node.specifiers {
                 printer.print_specifier(ctx, spec);
             }
-            printer.visit_declarator(ctx, &node.declarator);
+            printer.visit_declarator(&node.declarator);
         });
     }
 
-    fn visit_function_parameters(&mut self, ctx: &Context, node: &FunctionParametersNode) {
+    fn visit_function_parameters(&mut self, node: &FunctionParametersNode) {
+        let ctx = ctx();
         self.print_node(node, |printer| {
             if let FunctionParameters::OldStyle(names) = &node.param {
                 for name in names {
                     printer.print_name_node(ctx, name);
                 }
             } else {
-                walk_function_parameters(printer, ctx, node);
+                walk_function_parameters(printer, node);
             }
         });
     }
 
-    fn visit_parameter_declaration(&mut self, ctx: &Context, node: &ParameterDeclaration) {
+    fn visit_parameter_declaration(&mut self, node: &ParameterDeclaration) {
+        let ctx = ctx();
         self.print_node(node, |printer| {
             for spec in &node.specifiers {
                 printer.put(format_args!(" "));
                 printer.print_specifier(ctx, spec);
             }
-            printer.visit_declarator(ctx, &node.declarator);
+            printer.visit_declarator(&node.declarator);
         });
     }
 
-    fn visit_struct(&mut self, ctx: &Context, node: &Struct) {
-        self.print_node(node, |printer| walk_struct(printer, ctx, node));
+    fn visit_struct(&mut self, node: &Struct) {
+        self.print_node(node, |printer| walk_struct(printer, node));
     }
 
-    fn visit_union(&mut self, ctx: &Context, node: &Union) {
-        self.print_node(node, |printer| walk_union(printer, ctx, node));
+    fn visit_union(&mut self, node: &Union) {
+        self.print_node(node, |printer| walk_union(printer, node));
     }
 
-    fn visit_enum(&mut self, ctx: &Context, node: &Enum) {
-        self.print_node(node, |printer| walk_enum(printer, ctx, node));
+    fn visit_enum(&mut self, node: &Enum) {
+        self.print_node(node, |printer| walk_enum(printer, node));
     }
 
-    fn visit_variant(&mut self, ctx: &Context, node: &Variant) {
-        self.print_node(node, |printer| walk_variant(printer, ctx, node));
+    fn visit_variant(&mut self, node: &Variant) {
+        self.print_node(node, |printer| walk_variant(printer, node));
     }
 
-    fn visit_struct_declaration(&mut self, ctx: &Context, node: &StructDeclaration) {
+    fn visit_struct_declaration(&mut self, node: &StructDeclaration) {
+        let ctx = ctx();
         self.print_node(node, |printer| {
             for spec in &node.specifiers {
                 printer.put(format_args!(" "));
                 printer.print_specifier(ctx, spec);
             }
             for declarator in &node.struct_declarators {
-                printer.visit_struct_declarator(ctx, declarator);
+                printer.visit_struct_declarator(declarator);
             }
         });
     }
 
-    fn visit_struct_declarator(&mut self, ctx: &Context, node: &StructMemberDeclarator) {
+    fn visit_struct_declarator(&mut self, node: &StructMemberDeclarator) {
         self.print_node(node, |printer| {
-            walk_struct_declarator(printer, ctx, node);
+            walk_struct_declarator(printer, node);
         });
     }
 
-    fn visit_qualifier(&mut self, _ctx: &Context, qualifier: &Qualifier) {
+    fn visit_qualifier(&mut self, qualifier: &Qualifier) {
         self.put(format_args!(" {}", qualifier));
     }
 
-    fn visit_name(&mut self, ctx: &Context, node: &Name) {
+    fn visit_name(&mut self, node: &Name) {
         self.put(format_args!("{}", node.id.resolve()));
     }
 }

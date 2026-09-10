@@ -23,8 +23,8 @@ impl FactChecker<'_> {
 }
 
 impl Visitor for FactChecker<'_> {
-    fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
-        walk_expression(self, ctx, node);
+    fn visit_expression(&mut self, node: &ExpressionNode) {
+        walk_expression(self, node);
 
         let sema = self.sema;
         let id = node.id;
@@ -41,8 +41,8 @@ impl Visitor for FactChecker<'_> {
         }
     }
 
-    fn visit_statement(&mut self, ctx: &Context, node: &StatementNode) {
-        walk_statement(self, ctx, node);
+    fn visit_statement(&mut self, node: &StatementNode) {
+        walk_statement(self, node);
 
         let at = usize::from(node.id);
         let recorded = self.sema.stmts.get(node.id).is_some();
@@ -70,7 +70,7 @@ impl Unit {
             sema: self.sema,
             missing: Vec::new(),
         };
-        walk_translation_unit(&mut checker, self.ctx, &self.ctx.ast);
+        walk_translation_unit(&mut checker, &self.ctx.ast);
         checker.missing
     }
 }

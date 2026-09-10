@@ -48,7 +48,7 @@ impl Locals {
         self.map.clear();
         self.order.clear();
         self.seen.clear();
-        self.visit_compound_statement(ctx, &node.body);
+        self.visit_compound_statement(&node.body);
     }
 
     pub fn get(&self, sym_id: SymbolId) -> Local {
@@ -65,8 +65,8 @@ impl Locals {
 }
 
 impl Visitor for Locals {
-    fn visit_declarator(&mut self, ctx: &Context, node: &DeclaratorNode) {
-        walk_declarator(self, ctx, node);
+    fn visit_declarator(&mut self, node: &DeclaratorNode) {
+        walk_declarator(self, node);
         let sym_id = sema().declarations[&node.id];
         let sym = sym_id.resolve();
         if sym.duration != Duration::Automatic {

@@ -12,7 +12,7 @@ use crate::semantic::{ResolvedType, sema};
 pub fn generate() {
     let ctx = ctx();
     let mut generator = Generator::new(stdout());
-    generator.visit_translation_unit(ctx, &ctx.ast);
+    generator.visit_translation_unit(&ctx.ast);
 }
 
 #[derive(Debug)]
@@ -38,24 +38,27 @@ impl<W: Write> Generator<W> {
 }
 
 impl<W: Write> Visitor for Generator<W> {
-    fn visit_translation_unit(&mut self, ctx: &Context, node: &TranslationUnitNode) {
+    fn visit_translation_unit(&mut self, node: &TranslationUnitNode) {
+        let ctx = ctx();
         self.b.target(ctx.target.datalayout, ctx.target.triple);
         self.b.blank();
-        walk_translation_unit(self, ctx, node);
+        walk_translation_unit(self, node);
     }
 
-    fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
+    fn visit_function_definition(&mut self, node: &FunctionDefinitionNode) {
+        let ctx = ctx();
         let sym = sema().declarations[&node.declarator.id].resolve();
         let ty = sym.ty.unwrap().id.resolve();
         let ResolvedType::Function { ret, .. } = ty else { unreachable!() };
         let ret_ty = ret.id.resolve();
         self.b.define(ret_ty.llvm(ctx), sym.name.id.resolve());
         self.allocas(ctx, node);
-        self.visit_compound_statement(ctx, &node.body);
+        self.visit_compound_statement(&node.body);
         self.b.end_function();
     }
 
-    fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode) {
+    fn visit_jump_statement(&mut self, node: &JumpStatementNode) {
+        let ctx = ctx();
         match &node.stmt {
             JumpStatement::Return(Some(e)) => {
                 let ty = sema().expr_types[e.id].ty.llvm(ctx);
@@ -67,7 +70,8 @@ impl<W: Write> Visitor for Generator<W> {
         }
     }
 
-    fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
+    fn visit_expression(&mut self, node: &ExpressionNode) {
+        let ctx = ctx();
         self.fold_expression(ctx, node);
     }
 }

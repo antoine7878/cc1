@@ -60,7 +60,7 @@ fn single(
     if let Some(init) = string(resolver, ctx, ty, e) {
         return init;
     }
-    resolver.visit_expression(ctx, e);
+    resolver.visit_expression(e);
     if let Err(inner) = expression::init(resolver.sema, ctx, ty, e, AssignmentContext::Initialization) {
         resolver.add_diag(Diag::err((), inner), &e.span);
         return Initializer::Zero;
@@ -186,7 +186,7 @@ fn string(resolver: &mut SymbolResolver, ctx: &Context, ty: QualifiedType, e: &E
         return None;
     }
     let id = literal.id;
-    resolver.visit_expression(ctx, e);
+    resolver.visit_expression(e);
     if len.is_some_and(|len| len < literal.len(ctx)) {
         resolver.add_diag(Diag::err((), Diagnosis::ArrayInitTooLong), &e.span);
     }

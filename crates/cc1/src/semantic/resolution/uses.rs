@@ -9,14 +9,14 @@ struct UseMarker<'a> {
 }
 
 impl Visitor for UseMarker<'_> {
-    fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
+    fn visit_expression(&mut self, node: &ExpressionNode) {
         if matches!(
             node.id.resolve(),
             Expression::SizeofExpr(_) | Expression::SizeofType(_)
         ) {
             return;
         }
-        walk_expression(self, ctx, node);
+        walk_expression(self, node);
         if matches!(node.id.resolve(), Expression::Identifier(_))
             && let Some(sym_id) = self.sema.expr_bindings.get(node.id).copied()
         {
@@ -27,5 +27,5 @@ impl Visitor for UseMarker<'_> {
 
 pub fn mark_uses(sema: &mut Sema, ctx: &Context) {
     let mut marker = UseMarker { sema };
-    walk_translation_unit(&mut marker, ctx, &ctx.ast);
+    walk_translation_unit(&mut marker, &ctx.ast);
 }

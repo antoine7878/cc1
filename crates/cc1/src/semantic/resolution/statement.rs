@@ -19,7 +19,7 @@ pub fn resolve_labeled_statement(
     node: &LabeledStatementNode,
 ) {
     check_labeled_statement(resolver, ctx, id, node);
-    walk_labeled_statement(resolver, ctx, node);
+    walk_labeled_statement(resolver, node);
 }
 
 fn check_labeled_statement(resolver: &mut SymbolResolver, ctx: &Context, id: StatementId, node: &LabeledStatementNode) {
@@ -70,18 +70,18 @@ pub fn resolve_selection_statement(
 ) {
     match &node.stmt {
         SelectionStatement::If(condition, then, otherwise) => {
-            resolver.visit_expression(ctx, condition);
+            resolver.visit_expression(condition);
             check_selection_statement(resolver.sema, node);
-            resolver.visit_statement(ctx, then);
+            resolver.visit_statement(then);
             if let Some(otherwise) = otherwise {
-                resolver.visit_statement(ctx, otherwise);
+                resolver.visit_statement(otherwise);
             }
         }
         SelectionStatement::Switch(condition, body) => {
-            resolver.visit_expression(ctx, condition);
+            resolver.visit_expression(condition);
             let control = check_selection_statement(resolver.sema, node);
             resolver.enter_switch(id, control);
-            resolver.visit_statement(ctx, body);
+            resolver.visit_statement(body);
             resolver.leave_stmt();
         }
     }
@@ -117,7 +117,7 @@ pub fn resolve_iteration_statement(
     let body = loop_controls(resolver, ctx, node);
     check_iteration_statement(resolver.sema, node);
     resolver.enter_loop(id);
-    resolver.visit_statement(ctx, body);
+    resolver.visit_statement(body);
     resolver.leave_stmt();
 }
 
@@ -128,13 +128,13 @@ fn loop_controls<'n>(
 ) -> &'n StatementNode {
     match &node.stmt {
         IterationStatement::While(e, body) | IterationStatement::Do(body, e) => {
-            resolver.visit_expression(ctx, e);
+            resolver.visit_expression(e);
             body
         }
         IterationStatement::For(b) => {
             let (init, condition, step, body) = &**b;
             for e in [&init.expr, &condition.expr, step].into_iter().flatten() {
-                resolver.visit_expression(ctx, e);
+                resolver.visit_expression(e);
             }
             body
         }
@@ -194,7 +194,7 @@ fn check_for(
 
 pub fn resolve_jump_statement(resolver: &mut SymbolResolver, ctx: &Context, id: StatementId, node: &JumpStatementNode) {
     let return_ty = resolver.return_ty();
-    walk_jump_statement(resolver, ctx, node);
+    walk_jump_statement(resolver, node);
     check_jump_statement(resolver, ctx, id, node, return_ty);
 }
 
