@@ -9,7 +9,7 @@ define_arena!(
     ExpressionArena,
     ExpressionId,
     AstArenas,
-    arenas,
+    crate::context::ctx().arenas,
     expressions
 );
 

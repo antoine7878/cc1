@@ -99,7 +99,8 @@ macro_rules! recover {
             let name = stringify!($name);
             let unit = $crate::common::Unit::compile($src);
 
-            let mut got = unit.diagnosis().iter();
+            let diagnosis = unit.diagnosis();
+            let mut got = diagnosis.iter();
             $(
                 let next = got.next().map(|diag| diag.inner.clone());
                 assert!(

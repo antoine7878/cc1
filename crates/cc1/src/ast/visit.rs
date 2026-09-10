@@ -162,7 +162,7 @@ pub fn walk_init_declarator<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node:
 }
 
 pub fn walk_declarator<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &DeclaratorNode) {
-    match node.id.resolve(ctx) {
+    match node.id.resolve() {
         Declarator::Ident(name) => v.visit_name(ctx, name),
         Declarator::Abstract => {}
         Declarator::Pointer { qualifiers, inner } => {
@@ -196,7 +196,7 @@ pub fn walk_initializer<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &In
 }
 
 pub fn walk_statement<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &StatementNode) {
-    match node.id.resolve(ctx) {
+    match node.id.resolve() {
         Statement::Labeled(node) => v.visit_labeled_statement(ctx, node),
         Statement::Compound(node) => v.visit_compound_statement(ctx, node),
         Statement::Expression(node) => v.visit_expression_statement(ctx, node),
@@ -280,7 +280,7 @@ pub fn walk_jump_statement<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: 
 }
 
 pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &ExpressionNode) {
-    match node.id.resolve(ctx) {
+    match node.id.resolve() {
         Expression::Identifier(name) => v.visit_name(ctx, name),
         Expression::StringLiteral(literal) => v.visit_string_literal(ctx, literal),
         Expression::Constant(value) => v.visit_value(ctx, value),
@@ -368,7 +368,7 @@ pub fn walk_enum<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, node: &Enum) {
         v.visit_name(ctx, name);
     }
     for variant_id in &node.variants {
-        v.visit_variant(ctx, variant_id.resolve(ctx));
+        v.visit_variant(ctx, variant_id.resolve());
     }
 }
 
@@ -397,9 +397,9 @@ pub fn walk_specifiers<V: Visitor + ?Sized>(v: &mut V, ctx: &Context, specifiers
     for spec in specifiers {
         if let DeclarationSpecifier::Type(type_specifier) = spec {
             match type_specifier {
-                TypeSpecifier::Struct(id) => v.visit_struct(ctx, id.resolve(ctx)),
-                TypeSpecifier::Union(id) => v.visit_union(ctx, id.resolve(ctx)),
-                TypeSpecifier::Enum(id) => v.visit_enum(ctx, id.resolve(ctx)),
+                TypeSpecifier::Struct(id) => v.visit_struct(ctx, id.resolve()),
+                TypeSpecifier::Union(id) => v.visit_union(ctx, id.resolve()),
+                TypeSpecifier::Enum(id) => v.visit_enum(ctx, id.resolve()),
                 TypeSpecifier::TypedefName(name) => v.visit_name(ctx, name),
                 _ => {}
             }

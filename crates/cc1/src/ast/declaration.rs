@@ -8,7 +8,7 @@ define_arena!(
     DeclaratorArena,
     DeclaratorId,
     AstArenas,
-    arenas,
+    crate::context::ctx().arenas,
     declarators
 );
 
@@ -34,11 +34,11 @@ ast_node! {
 
 impl DeclaratorNode {
     pub fn ident(&self, ctx: &Context) -> Option<Name> {
-        self.id.resolve(ctx).ident(ctx)
+        self.id.resolve().ident(ctx)
     }
 
     pub fn is_abstract(&self, ctx: &Context) -> bool {
-        matches!(self.id.resolve(ctx), Declarator::Abstract)
+        matches!(self.id.resolve(), Declarator::Abstract)
     }
 }
 

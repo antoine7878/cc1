@@ -1,24 +1,22 @@
 use cc1::args::parse_args;
-// use cc1::ast::print::AstPrinter;
-use cc1::context::Context;
 use cc1::pipeline::Pipeline;
 use cc1::semantic::Analyzer;
-use cc1::{codegen, parser};
+use cc1::{codegen, parser, report};
 fn main() {
     Pipeline::default()
         .pass_group([parse_args])
         .pass_group([parser::parse_source])
+        .then(Analyzer::begin)
         .pass_group([
-            Analyzer::init,
             Analyzer::resolve_names,
             Analyzer::check_constants,
             Analyzer::mark_uses,
             Analyzer::finish_externals,
             Analyzer::finalize_layouts,
         ])
-        .checkpoint()
-        .pass_group([codegen::generate])
+        .then(Analyzer::end)
+        .run(codegen::generate)
         // .report(AstPrinter::print)
-        // .report(Context::dump_symbols)
-        .finally(Context::dump_diagnostics);
+        // .report(report::dump_symbols)
+        .finally(report::dump_diagnostics);
 }

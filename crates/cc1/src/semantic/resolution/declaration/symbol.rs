@@ -15,7 +15,7 @@ pub fn requires_complete_object(resolver: &SymbolResolver, ty: QualifiedType, st
     if ty.is_void(resolver.sema) {
         return true;
     }
-    let is_unsized_array = matches!(ty.id.resolve(resolver.sema), ResolvedType::Array { len: None, .. });
+    let is_unsized_array = matches!(ty.id.resolve_in(resolver.sema), ResolvedType::Array { len: None, .. });
     if is_init && is_unsized_array {
         return false;
     }
@@ -53,7 +53,7 @@ pub fn classify(
     declared_storage: Option<Storage>,
     span: &Span,
 ) -> (Storage, SymbolKind) {
-    let is_function = matches!(ty.id.resolve(resolver.sema), ResolvedType::Function { .. });
+    let is_function = matches!(ty.id.resolve_in(resolver.sema), ResolvedType::Function { .. });
     if let Some(declared_storage) = declared_storage
         && declared_storage != Storage::Typedef
         && is_function
@@ -112,9 +112,9 @@ pub fn resolve_initializer(
     ty: QualifiedType,
     node: &InitializerNode,
 ) {
-    let duration = sym_id.resolve(resolver.sema).duration;
+    let duration = sym_id.resolve_in(resolver.sema).duration;
     let init = initializer::resolve(resolver, ctx, ty, node, duration);
-    if let ResolvedType::Array { elem, len: None } = ty.id.resolve(resolver.sema)
+    if let ResolvedType::Array { elem, len: None } = ty.id.resolve_in(resolver.sema)
         && let Some(len) = init.len(ctx)
     {
         let id = resolver.sema.types.array(*elem, Some(len));
@@ -126,8 +126,8 @@ pub fn resolve_initializer(
 
 pub fn declares_tag(ctx: &Context, specifiers: &[DeclarationSpecifier]) -> bool {
     specifiers.iter().any(|specifier| match specifier {
-        DeclarationSpecifier::Type(TypeSpecifier::Struct(id)) => id.resolve(ctx).name.is_some(),
-        DeclarationSpecifier::Type(TypeSpecifier::Union(id)) => id.resolve(ctx).name.is_some(),
+        DeclarationSpecifier::Type(TypeSpecifier::Struct(id)) => id.resolve().name.is_some(),
+        DeclarationSpecifier::Type(TypeSpecifier::Union(id)) => id.resolve().name.is_some(),
         DeclarationSpecifier::Type(TypeSpecifier::Enum(_)) => true,
         _ => false,
     })

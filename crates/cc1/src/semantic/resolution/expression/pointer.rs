@@ -15,8 +15,8 @@ pub fn reconcile_pointers(
 ) -> Option<PointerMatch> {
     let l_ty = lhs.casted_ty();
     let r_ty = rhs.casted_ty();
-    let l = l_ty.id.resolve(sema);
-    let r = r_ty.id.resolve(sema);
+    let l = l_ty.id.resolve_in(sema);
+    let r = r_ty.id.resolve_in(sema);
     if l.is_pointer() && r_null {
         cast::convert(sema, rhs, l_ty.id, true);
         return Some(PointerMatch::Converted);

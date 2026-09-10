@@ -10,7 +10,7 @@ struct ConstChecker<'a> {
 impl Visitor for ConstChecker<'_> {
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
         walk_expression(self, ctx, node);
-        if matches!(node.id.resolve(ctx), Expression::ConstantExpression(_)) {
+        if matches!(node.id.resolve(), Expression::ConstantExpression(_)) {
             ice::eval_constant(self.sema, ctx, node);
         }
     }

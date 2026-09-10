@@ -1,3 +1,4 @@
+use crate::arena::ResolveWith;
 use crate::ast::{AstArenas, escape};
 use crate::ast_node;
 use crate::context::Context;
@@ -5,7 +6,7 @@ use crate::define_interner;
 use crate::semantic::{Diag, QualifiedType, Sema};
 use libft::Span;
 
-define_interner!(StringConstant, StringPool, StringConstId, AstArenas, arenas, strings);
+define_interner!(StringConstant, StringPool, StringConstId, AstArenas, crate::context::ctx().arenas, strings);
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct StringConstant {
@@ -21,7 +22,7 @@ ast_node! {
 
 impl StringLiteralNode {
     pub fn constant<'a>(&self, ctx: &'a Context) -> &'a StringConstant {
-        self.id.resolve(ctx)
+        self.id.resolve_in(&ctx.arenas)
     }
 
     pub fn is_wide(&self, ctx: &Context) -> bool {

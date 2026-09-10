@@ -28,12 +28,12 @@ pub fn base_type(
 
     let id = match types.as_slice() {
         [TypeSpecifier::Struct(t)] => {
-            let node = t.resolve(ctx);
+            let node = t.resolve();
             let tag = struct_or_union_tag(resolver, ctx, Tag::Struct, node.name, &node.fields, &node.span);
             resolver.sema.types.tag(tag)
         }
         [TypeSpecifier::Union(t)] => {
-            let node = t.resolve(ctx);
+            let node = t.resolve();
             let tag = struct_or_union_tag(resolver, ctx, Tag::Union, node.name, &node.fields, &node.span);
             resolver.sema.types.tag(tag)
         }
@@ -76,7 +76,7 @@ fn extract_declarator(
     inner_most: QualifiedType,
     inner_already_diagnosed: bool,
 ) -> (QualifiedType, DeclaratorNode, Option<DeclaredParams>) {
-    match declarator.id.resolve(ctx) {
+    match declarator.id.resolve() {
         Declarator::Pointer { qualifiers, inner } => {
             let (is_const, is_volatile) =
                 constrain::specifier::check_qualifier(qualifiers.iter().copied()).collect(resolver, &declarator.span);
@@ -107,11 +107,11 @@ fn extract_declarator(
             params,
         } => {
             let list = resolve_params(resolver, ctx, params);
-            constrain::ty::check_return_type(inner_most.id.resolve(resolver.sema), inner_most)
+            constrain::ty::check_return_type(inner_most.id.resolve_in(resolver.sema), inner_most)
                 .collect(resolver, &declarator.span);
             let id = resolver.sema.types.function(inner_most, list.types());
             let (ty, leaf, inner_list) = extract_declarator(resolver, ctx, inner, QualifiedType::plain(id), false);
-            match inner.id.resolve(ctx) {
+            match inner.id.resolve() {
                 Declarator::Ident(_) | Declarator::Abstract => (ty, leaf, Some(list)),
                 _ => (ty, leaf, inner_list),
             }
@@ -149,7 +149,7 @@ fn resolve_prototype(
         .filter_map(|param| resolve_parameter(resolver, ctx, param))
         .collect();
     for param in &params {
-        let is_void = matches!(param.ty.id.resolve(resolver.sema), ResolvedType::Void);
+        let is_void = matches!(param.ty.id.resolve_in(resolver.sema), ResolvedType::Void);
         let is_special_case = params.len() == 1 && param.name.is_some();
         constrain::parameter::check_void_parameter(is_void && !is_special_case).collect(resolver, &param.span);
     }

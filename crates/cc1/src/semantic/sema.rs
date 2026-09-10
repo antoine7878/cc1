@@ -1,10 +1,9 @@
+use std::cell::Cell;
 use std::collections::HashMap;
-use std::mem::take;
 
 use crate::arena::{HasTable, ResolveMutWith, ResolveWith, SideTable};
 use crate::ast::statement::StatementId;
 use crate::ast::{AstArenas, DeclaratorId, ExpressionId, StringId, Value};
-use crate::context::Context;
 use crate::semantic::{
     Builtins, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefArena, InitializerArena, Linkage,
     MemberRef, ResolvedExpression, ResolvedStatement, ResolvedTypeArena, ResolvedTypeId, Symbol, SymbolArena, SymbolId,
@@ -18,6 +17,20 @@ pub struct External {
     pub symbol: SymbolId,
     pub defined: Option<Span>,
     pub tentative: Option<Span>,
+}
+
+thread_local! {
+    static SEMA: Cell<Option<&'static Sema>> = const { Cell::new(None) };
+}
+
+pub fn install(sema: Sema) -> &'static Sema {
+    let sema = Box::leak(Box::new(sema));
+    SEMA.set(Some(sema));
+    sema
+}
+
+pub fn sema() -> &'static Sema {
+    SEMA.get().expect("Sema is not installed")
 }
 
 #[derive(Debug)]
@@ -110,7 +123,7 @@ impl Sema {
 
     pub fn linkage_of_name(&self, name: StringId) -> Option<Linkage> {
         let id = self.externals.get(&name)?.symbol;
-        Some(id.resolve(self).linkage)
+        Some(id.resolve_in(self).linkage)
     }
 
     pub fn register_external(&mut self, sym: Symbol, span: &Span, lexical: Option<SymbolId>) -> SymbolId {
@@ -137,20 +150,20 @@ impl Sema {
             return id;
         };
         let entry_symbol = entry.symbol;
-        let entry_linkage = entry_symbol.resolve(self).linkage;
+        let entry_linkage = entry_symbol.resolve_in(self).linkage;
 
         if entry_linkage != linkage {
             self.add_diag(Diag::err((), Diagnosis::ConflictingLinkage(name)), span);
         }
 
-        let old_ty = entry_symbol.resolve(self).ty;
+        let old_ty = entry_symbol.resolve_in(self).ty;
         if let Some((old_ty, new_ty)) = Option::zip(old_ty, new_ty)
             && let Some(merged) = old_ty.composite(self, &new_ty)
         {
             entry_symbol.resolve_mut(self).ty = Some(merged);
         }
 
-        let old_definition = entry_symbol.resolve(self).definition;
+        let old_definition = entry_symbol.resolve_in(self).definition;
         entry_symbol.resolve_mut(self).definition = promote_definition(old_definition, definition);
 
         let entry = self.externals.get_mut(&name.id).unwrap();
@@ -161,14 +174,6 @@ impl Sema {
         }
 
         entry_symbol
-    }
-
-    pub fn with_sema(mut ctx: Context, pass: impl FnOnce(&mut Sema, &Context)) -> Context {
-        let mut sema = take(&mut ctx.sema);
-        pass(&mut sema, &ctx);
-        ctx.diagnosis.append(&mut sema.diagnosis);
-        ctx.sema = sema;
-        ctx
     }
 }
 

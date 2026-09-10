@@ -6,7 +6,7 @@ use crate::ast::visit::walk_declarator;
 use crate::ast::{DeclaratorNode, FunctionDefinitionNode, StringId, Visitor};
 use crate::codegen::llvm::Builder;
 use crate::context::Context;
-use crate::semantic::{Duration, SymbolId};
+use crate::semantic::{Duration, SymbolId, sema};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Local {
@@ -28,7 +28,7 @@ pub struct LocalName<'a> {
 
 impl Display for LocalName<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let name = self.local.name.resolve(self.ctx);
+        let name = self.local.name.resolve();
         match self.local.dup {
             0 => write!(f, "%{name}"),
             dup => write!(f, "%{name}.{dup}"),
@@ -57,7 +57,7 @@ impl Locals {
 
     pub fn emit<W: Write>(&self, ctx: &Context, b: &mut Builder<W>) {
         for &sym_id in &self.order {
-            let qty = sym_id.resolve(ctx).ty.unwrap();
+            let qty = sym_id.resolve().ty.unwrap();
             let local = self.map[&sym_id];
             b.alloca(local.llvm(ctx), qty.llvm(ctx), qty.layout(ctx).unwrap().align);
         }
@@ -67,8 +67,8 @@ impl Locals {
 impl Visitor for Locals {
     fn visit_declarator(&mut self, ctx: &Context, node: &DeclaratorNode) {
         walk_declarator(self, ctx, node);
-        let sym_id = ctx.sema.declarations[&node.id];
-        let sym = sym_id.resolve(ctx);
+        let sym_id = sema().declarations[&node.id];
+        let sym = sym_id.resolve();
         if sym.duration != Duration::Automatic {
             return;
         }

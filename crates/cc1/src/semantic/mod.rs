@@ -17,4 +17,4 @@ pub use resolution::declaration;
 pub use resolution::finish_externals;
 pub use resolution::mark_uses;
 pub use resolution::scope::{ScopeKind, StatementScopes, SymbolScopes};
-pub use sema::Sema;
+pub use sema::{Sema, install, sema};

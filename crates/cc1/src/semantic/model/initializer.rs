@@ -13,7 +13,7 @@ use crate::semantic::{
     SymbolResolver, TagDefId, address, ice,
 };
 
-define_arena!(Initializer, InitializerArena, InitializerId, Sema, sema, inits);
+define_arena!(Initializer, InitializerArena, InitializerId, Sema, crate::semantic::sema(), inits);
 
 #[derive(Clone, Debug)]
 pub enum Initializer {
@@ -29,7 +29,7 @@ impl Initializer {
     pub fn len(&self, ctx: &Context) -> Option<usize> {
         match self {
             Initializer::List(values) => Some(values.len()),
-            Initializer::String(id) => Some(id.resolve(ctx).units.len() + 1),
+            Initializer::String(id) => Some(id.resolve().units.len() + 1),
             _ => None,
         }
     }
@@ -117,7 +117,7 @@ fn fill(
     constant: bool,
 ) -> Initializer {
     let mut values = Vec::new();
-    match ty.id.resolve(resolver.sema).clone() {
+    match ty.id.resolve_in(resolver.sema).clone() {
         ResolvedType::Array { elem, len } => {
             while len.is_none_or(|len| values.len() < len) && cursor.peek().is_some() {
                 values.push(walk(resolver, ctx, elem, cursor, constant));
@@ -173,13 +173,13 @@ fn walk(
 }
 
 fn string(resolver: &mut SymbolResolver, ctx: &Context, ty: QualifiedType, e: &ExpressionNode) -> Option<Initializer> {
-    let &ResolvedType::Array { elem, len } = ty.id.resolve(resolver.sema) else {
+    let &ResolvedType::Array { elem, len } = ty.id.resolve_in(resolver.sema) else {
         return None;
     };
-    if !elem.id.resolve(resolver.sema).is_char() {
+    if !elem.id.resolve_in(resolver.sema).is_char() {
         return None;
     }
-    let Expression::StringLiteral(literal) = e.id.resolve(ctx) else {
+    let Expression::StringLiteral(literal) = e.id.resolve() else {
         return None;
     };
     if literal.is_wide(ctx) {
@@ -200,7 +200,7 @@ fn excess(resolver: &mut SymbolResolver, cursor: &mut Cursor) {
 }
 
 fn is_aggregate(sema: &Sema, ty: QualifiedType) -> bool {
-    match ty.id.resolve(sema) {
+    match ty.id.resolve_in(sema) {
         ResolvedType::Array { .. } => true,
         ResolvedType::Tag(id) => matches!(sema.tags.get(*id).kind, Tag::Struct | Tag::Union),
         _ => false,
@@ -208,12 +208,12 @@ fn is_aggregate(sema: &Sema, ty: QualifiedType) -> bool {
 }
 
 fn member_types(sema: &Sema, id: TagDefId) -> Vec<QualifiedType> {
-    let tag = id.resolve(sema);
+    let tag = id.resolve_in(sema);
     let named = tag
         .members
         .iter()
         .filter_map(|member| member.sym)
-        .filter_map(|sym| sym.resolve(sema).ty);
+        .filter_map(|sym| sym.resolve_in(sema).ty);
     match tag.kind {
         Tag::Union => named.take(1).collect(),
         _ => named.collect(),

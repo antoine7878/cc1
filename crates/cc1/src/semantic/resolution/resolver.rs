@@ -136,7 +136,7 @@ impl SymbolResolver<'_> {
         span: &Span,
     ) -> Option<QualifiedType> {
         let sym_id = self.sym_scopes.lookup_ordinary(name.id)?;
-        let sym = sym_id.resolve(self.sema);
+        let sym = sym_id.resolve_in(self.sema);
         if sym.kind != SymbolKind::Typedef {
             return self.add_diag(Diag::err(None, Diagnosis::UndeclaredIdentifier(name)), span);
         }
@@ -155,7 +155,7 @@ impl SymbolResolver<'_> {
         let Some(name) = name else { return self.sema.tags.declare(kind, None) };
 
         if let Some(id) = self.sym_scopes.lookup_tag(name.id, is_definition) {
-            let def = id.resolve(self.sema);
+            let def = id.resolve_in(self.sema);
             if def.kind != kind || (is_definition && def.is_complete) {
                 self.add_diag(Diag::err((), Diagnosis::DuplicateDeclaration(def.kind(), name)), span)
             }
@@ -181,7 +181,7 @@ impl SymbolResolver<'_> {
 
     fn dedup(&mut self, sym: &Symbol, span: &Span) -> Option<SymbolId> {
         let old_id = self.sym_scopes.current(sym.name.id)?;
-        let old_symbol = old_id.resolve(self.sema);
+        let old_symbol = old_id.resolve_in(self.sema);
         if sym.kind != SymbolKind::Typedef
             && (self.sym_scopes.kind() == ScopeKind::File
                 || (sym.linkage != Linkage::None && old_symbol.linkage != Linkage::None))
@@ -252,7 +252,7 @@ impl Visitor for SymbolResolver<'_> {
         self.resolve_gotos(f);
         self.current_function = None;
 
-        let sym_id = header.id.resolve(self.sema).sym;
+        let sym_id = header.id.resolve_in(self.sema).sym;
         self.sema.declarations.insert(node.declarator.id, sym_id);
     }
 
@@ -271,7 +271,7 @@ impl Visitor for SymbolResolver<'_> {
     fn visit_init_declarator(&mut self, ctx: &Context, node: &InitDeclaratorNode) {
         let decl = &node.declarator;
         let Some(&sym) = self.sema.declarations.get(&decl.id) else { return };
-        let Some(ty) = sym.resolve(self.sema).ty else { return };
+        let Some(ty) = sym.resolve_in(self.sema).ty else { return };
         self.visit_declarator(ctx, &node.declarator);
         if let Some(init) = &node.initializer {
             declaration::resolve_initializer(self, ctx, sym, ty, init);
@@ -285,7 +285,7 @@ impl Visitor for SymbolResolver<'_> {
     }
 
     fn visit_statement(&mut self, ctx: &Context, node: &StatementNode) {
-        match node.id.resolve(ctx) {
+        match node.id.resolve() {
             Statement::Iteration(inner) => statement::resolve_iteration_statement(self, ctx, node.id, inner),
             Statement::Selection(inner) => statement::resolve_selection_statement(self, ctx, node.id, inner),
             Statement::Labeled(inner) => statement::resolve_labeled_statement(self, ctx, node.id, inner),

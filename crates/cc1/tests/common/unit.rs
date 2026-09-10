@@ -4,11 +4,11 @@ use std::process::{Command, Stdio};
 
 use cc1::ast::statement::StatementId;
 use cc1::ast::{Expression, ExpressionId, Name, StringConstant, Tag, Value};
-use cc1::context::Context;
+use cc1::context::{self, Context, install};
 use cc1::parser::parse_reader;
 use cc1::semantic::{
     AddressBase, Analyzer, Diagnosis, DiagnosisNode, ExpressionKind, Initializer, ParamTypes, QualifiedType,
-    ResolvedStatement, ResolvedType, SymbolKind,
+    ResolvedStatement, ResolvedType, Sema, SymbolKind, install as install_sema,
 };
 use cc1::target::{I386, Target};
 
@@ -65,7 +65,8 @@ fn preprocess(src: &str) -> String {
 }
 
 pub struct Unit {
-    pub ctx: Context,
+    pub ctx: &'static Context,
+    pub sema: &'static Sema,
     pub status: i32,
 }
 
@@ -83,7 +84,9 @@ impl Unit {
     pub fn parse(src: &str) -> Self {
         let src = preprocess(src);
         let (ctx, status) = parse_reader(new_ctx(), Cursor::new(src));
-        Self { ctx, status }
+        let ctx = install(ctx);
+        let sema = install_sema(Sema::new(ctx.target.clone()));
+        Self { ctx, sema, status }
     }
 
     pub fn compile(src: &str) -> Self {
@@ -93,8 +96,12 @@ impl Unit {
     pub fn compile_for(target: Target, src: &str) -> Self {
         let src = preprocess(src);
         let (ctx, status) = parse_reader(ctx_for(target), Cursor::new(src));
-        let ctx = Analyzer::analyze(ctx);
-        Self { ctx, status }
+        let sema = Analyzer::analyze(ctx);
+        Self {
+            ctx: context::ctx(),
+            sema,
+            status,
+        }
     }
 
     pub fn parsed(&self) -> bool {
@@ -105,23 +112,22 @@ impl Unit {
                 .any(|diag| matches!(diag.inner, Diagnosis::SyntaxError { .. }))
     }
 
-    pub fn diagnosis(&self) -> &[DiagnosisNode] {
-        &self.ctx.diagnosis
+    pub fn diagnosis(&self) -> Vec<DiagnosisNode> {
+        self.ctx.diagnosis.iter().chain(&self.sema.diagnosis).cloned().collect()
     }
 
     pub fn accepts(&self) -> bool {
-        self.parsed() && self.ctx.diagnosis.is_empty()
+        self.parsed() && self.diagnosis().is_empty()
     }
 
     pub fn variants(&self) -> Vec<(String, String)> {
-        self.ctx
-            .sema
+        self.sema
             .symbols
             .iter()
             .filter(|symbol| symbol.kind == SymbolKind::Variant)
             .map(|symbol| {
                 (
-                    symbol.name.id.resolve(&self.ctx).clone(),
+                    symbol.name.id.resolve().clone(),
                     symbol.value.map(|v| v.to_string()).unwrap_or_default(),
                 )
             })
@@ -134,7 +140,7 @@ impl Unit {
             .expressions
             .iter()
             .filter_map(|expression| match expression {
-                Expression::StringLiteral(literal) => Some(string_display(literal.constant(&self.ctx))),
+                Expression::StringLiteral(literal) => Some(string_display(literal.constant(self.ctx))),
                 _ => None,
             })
             .collect()
@@ -154,10 +160,10 @@ impl Unit {
     }
 
     pub fn const_values(&self) -> Vec<Option<Value>> {
-        (0..self.ctx.sema.expr_consts.len())
+        (0..self.sema.expr_consts.len())
             .map(ExpressionId::from)
-            .filter(|&id| self.ctx.sema.expr_consts.seen(id))
-            .map(|id| self.ctx.sema.expr_consts.get(id).copied())
+            .filter(|&id| self.sema.expr_consts.seen(id))
+            .map(|id| self.sema.expr_consts.get(id).copied())
             .collect()
     }
 
@@ -168,10 +174,10 @@ impl Unit {
     pub fn shapes(&self) -> Vec<crate::common::ty::Shape> {
         use crate::common::ty::Shape;
 
-        (0..self.ctx.sema.expr_types.len())
+        (0..self.sema.expr_types.len())
             .map(ExpressionId::from)
-            .filter(|&id| self.ctx.sema.expr_types.seen(id))
-            .map(|id| match self.ctx.sema.expr_types.get(id) {
+            .filter(|&id| self.sema.expr_types.seen(id))
+            .map(|id| match self.sema.expr_types.get(id) {
                 Some(resolved) => Shape {
                     ty: Some(self.ty_tree(resolved.ty)),
                     lvalue: matches!(resolved.kind, ExpressionKind::LValue),
@@ -188,7 +194,7 @@ impl Unit {
     }
 
     pub fn ty_tree(&self, qt: QualifiedType) -> Ty {
-        let base = match qt.id.resolve(&self.ctx) {
+        let base = match qt.id.resolve() {
             ResolvedType::Void => Ty::Void,
             ResolvedType::Char => Ty::Char,
             ResolvedType::SignedChar => Ty::SChar,
@@ -217,8 +223,8 @@ impl Unit {
                 }
             }
             ResolvedType::Tag(tag) => {
-                let def = tag.resolve(&self.ctx);
-                let name = def.name.map(|n| n.id.resolve(&self.ctx).clone());
+                let def = tag.resolve();
+                let name = def.name.map(|n| n.id.resolve().clone());
                 let complete = def.is_complete;
                 match def.kind {
                     Tag::Struct => Ty::Struct { tag: name, complete },
@@ -236,18 +242,17 @@ impl Unit {
     }
 
     pub fn symbol_ty(&self, name: &str) -> QualifiedType {
-        self.ctx
-            .sema
+        self.sema
             .symbols
             .iter()
-            .find(|symbol| symbol.name.id.resolve(&self.ctx).as_str() == name)
+            .find(|symbol| symbol.name.id.resolve().as_str() == name)
             .unwrap_or_else(|| panic!("no symbol `{name}` in the unit"))
             .ty
             .unwrap_or_else(|| panic!("symbol `{name}` has no type"))
     }
 
     pub fn prim(&self, name: &str) -> QualifiedType {
-        let b = &self.ctx.sema.builtins;
+        let b = &self.sema.builtins;
         let id = match name {
             "void" => b.void,
             "char" => b.char,
@@ -268,39 +273,39 @@ impl Unit {
     }
 
     pub fn bindings(&self) -> Vec<(String, Option<usize>)> {
-        (0..self.ctx.sema.expr_bindings.len())
+        (0..self.sema.expr_bindings.len())
             .map(ExpressionId::from)
-            .filter(|&id| self.ctx.sema.expr_bindings.seen(id))
+            .filter(|&id| self.sema.expr_bindings.seen(id))
             .map(|id| {
                 let name = match self.ctx.arenas.expressions.iter().nth(id.into()).unwrap() {
-                    Expression::Identifier(name) => name.id.resolve(&self.ctx).clone(),
+                    Expression::Identifier(name) => name.id.resolve().clone(),
                     other => format!("{other:?}"),
                 };
-                (name, self.ctx.sema.expr_bindings.get(id).copied().map(usize::from))
+                (name, self.sema.expr_bindings.get(id).copied().map(usize::from))
             })
             .collect()
     }
 
     pub fn member_refs(&self) -> Vec<(String, String, usize)> {
-        (0..self.ctx.sema.member_refs.len())
+        (0..self.sema.member_refs.len())
             .map(ExpressionId::from)
-            .filter(|&id| self.ctx.sema.member_refs.seen(id))
+            .filter(|&id| self.sema.member_refs.seen(id))
             .filter_map(|id| {
-                let reference = self.ctx.sema.member_refs.get(id).copied()?;
-                let sym = reference.member(&self.ctx.sema).sym?;
-                let member = self.ctx.sema.symbols.get(sym).name.id.resolve(&self.ctx).clone();
-                let tag = self.ctx.sema.tags.get(reference.tag).name;
-                let tag = tag.map_or_else(|| "<anonymous>".to_string(), |n| n.id.resolve(&self.ctx).clone());
+                let reference = self.sema.member_refs.get(id).copied()?;
+                let sym = reference.member(self.sema).sym?;
+                let member = self.sema.symbols.get(sym).name.id.resolve().clone();
+                let tag = self.sema.tags.get(reference.tag).name;
+                let tag = tag.map_or_else(|| "<anonymous>".to_string(), |n| n.id.resolve().clone());
                 Some((member, tag, reference.index))
             })
             .collect()
     }
 
     pub fn statements(&self) -> Vec<String> {
-        (0..self.ctx.sema.stmts.len())
+        (0..self.sema.stmts.len())
             .map(StatementId::from)
             .filter_map(|id| {
-                let fact = self.render_statement(self.ctx.sema.stmts.get(id)?);
+                let fact = self.render_statement(self.sema.stmts.get(id)?);
                 Some(format!("#{} {fact}", usize::from(id)))
             })
             .collect()
@@ -314,7 +319,7 @@ impl Unit {
                 cases,
                 default,
             } => {
-                let control = control.describe(&self.ctx.sema, &self.ctx);
+                let control = control.describe(self.sema, self.ctx);
                 let cases: Vec<String> = cases
                     .iter()
                     .map(|(value, id)| format!("{}->#{}", repr(Some(*value)), usize::from(*id)))
@@ -328,19 +333,18 @@ impl Unit {
             ResolvedStatement::Default(target) => format!("default->#{}", usize::from(*target)),
             ResolvedStatement::Break(target) => format!("break->#{}", usize::from(*target)),
             ResolvedStatement::Continue(target) => format!("continue->#{}", usize::from(*target)),
-            ResolvedStatement::Goto(name) => format!("goto {}", name.resolve(&self.ctx)),
-            ResolvedStatement::Label(name) => format!("label {}", name.resolve(&self.ctx)),
+            ResolvedStatement::Goto(name) => format!("goto {}", name.resolve()),
+            ResolvedStatement::Label(name) => format!("label {}", name.resolve()),
         }
     }
 
     pub fn labels(&self) -> Vec<(String, Vec<String>)> {
-        self.ctx
-            .sema
+        self.sema
             .functions
             .iter()
             .map(|def| {
-                let name = self.ctx.sema.symbols.get(def.sym).name.id.resolve(&self.ctx).clone();
-                let labels = def.labels.iter().map(|l| l.id.resolve(&self.ctx).clone()).collect();
+                let name = self.sema.symbols.get(def.sym).name.id.resolve().clone();
+                let labels = def.labels.iter().map(|l| l.id.resolve().clone()).collect();
                 (name, labels)
             })
             .collect()
@@ -350,7 +354,7 @@ impl Unit {
         match init {
             Initializer::Zero => "0".to_string(),
             Initializer::Value(value) => repr(Some(*value)),
-            Initializer::String(id) => string_quoted(id.resolve(&self.ctx)),
+            Initializer::String(id) => string_quoted(id.resolve()),
             Initializer::Expr(_) => "expr".to_string(),
             Initializer::List(items) => {
                 let rendered: Vec<String> = items.iter().map(|i| self.render_initializer(i)).collect();
@@ -358,8 +362,8 @@ impl Unit {
             }
             Initializer::Address(at) => {
                 let base = match at.base {
-                    AddressBase::Symbol(sym) => self.ctx.sema.symbols.get(sym).name.id.resolve(&self.ctx).clone(),
-                    AddressBase::String(id) => string_quoted(id.resolve(&self.ctx)),
+                    AddressBase::Symbol(sym) => self.sema.symbols.get(sym).name.id.resolve().clone(),
+                    AddressBase::String(id) => string_quoted(id.resolve()),
                     AddressBase::Absolute => "abs".to_string(),
                 };
                 match at.offset {
@@ -372,30 +376,28 @@ impl Unit {
     }
 
     pub fn initializers(&self) -> Vec<(String, String)> {
-        self.ctx
-            .sema
+        self.sema
             .symbols
             .iter()
             .filter_map(|symbol| {
                 let id = symbol.initializer?;
-                let name = symbol.name.id.resolve(&self.ctx).clone();
-                Some((name, self.render_initializer(self.ctx.sema.inits.get(id))))
+                let name = symbol.name.id.resolve().clone();
+                Some((name, self.render_initializer(self.sema.inits.get(id))))
             })
             .collect()
     }
 
     pub fn symbols(&self) -> Vec<(String, String, String)> {
-        self.ctx
-            .sema
+        self.sema
             .symbols
             .iter()
             .map(|symbol| {
                 (
-                    symbol.name.id.resolve(&self.ctx).clone(),
+                    symbol.name.id.resolve().clone(),
                     symbol.kind.to_string(),
                     symbol
                         .ty
-                        .map(|ty| ty.describe(&self.ctx.sema, &self.ctx).to_string())
+                        .map(|ty| ty.describe(self.sema, self.ctx).to_string())
                         .unwrap_or_default(),
                 )
             })
@@ -410,24 +412,22 @@ impl Unit {
     }
 
     pub fn uses(&self) -> Vec<(String, bool)> {
-        self.ctx
-            .sema
+        self.sema
             .symbols
             .iter()
             .filter(|symbol| matches!(symbol.kind, SymbolKind::Variable | SymbolKind::Function))
-            .map(|symbol| (symbol.name.id.resolve(&self.ctx).clone(), symbol.used))
+            .map(|symbol| (symbol.name.id.resolve().clone(), symbol.used))
             .collect()
     }
 
     pub fn placements(&self) -> Vec<(String, String, String, String)> {
-        self.ctx
-            .sema
+        self.sema
             .symbols
             .iter()
             .filter(|symbol| matches!(symbol.kind, SymbolKind::Variable | SymbolKind::Function))
             .map(|symbol| {
                 (
-                    symbol.name.id.resolve(&self.ctx).clone(),
+                    symbol.name.id.resolve().clone(),
                     symbol.linkage.to_string(),
                     symbol.duration.to_string(),
                     symbol.definition.to_string(),
@@ -438,17 +438,16 @@ impl Unit {
 
     pub fn tag_members(&self, tag: &str) -> Vec<(String, u32, u32)> {
         let def = self
-            .ctx
             .sema
             .tags
             .iter()
-            .find(|def| def.name.is_some_and(|name| name.id.resolve(&self.ctx).as_str() == tag))
+            .find(|def| def.name.is_some_and(|name| name.id.resolve().as_str() == tag))
             .unwrap_or_else(|| panic!("no tag `{tag}` in the unit"));
         def.members
             .iter()
             .filter_map(|m| {
                 let sym = m.sym?;
-                let name = self.ctx.sema.symbols.get(sym).name.id.resolve(&self.ctx).clone();
+                let name = self.sema.symbols.get(sym).name.id.resolve().clone();
                 Some((name, m.offset, m.bit_offset))
             })
             .collect()
@@ -467,7 +466,7 @@ impl Unit {
             .iter()
             .map(|diag| {
                 let mut buf = Vec::new();
-                let _ = diag.write(&mut buf, &self.ctx);
+                let _ = diag.write(&mut buf, self.ctx);
                 strip_ansi(&String::from_utf8_lossy(&buf)).trim_end().to_string()
             })
             .collect()
@@ -477,7 +476,7 @@ impl Unit {
         let mut out = String::new();
         for diag in self.diagnosis() {
             let mut buf = Vec::new();
-            let _ = diag.write(&mut buf, &self.ctx);
+            let _ = diag.write(&mut buf, self.ctx);
             out.push_str(&String::from_utf8_lossy(&buf));
         }
         out
@@ -811,7 +810,7 @@ fn diagnosis_name(diagnosis: &Diagnosis) -> Option<Name> {
 pub fn assert_unmentioned(name: &str, src: &str, unit: &Unit, forbidden: &[&str]) {
     for word in forbidden {
         for diag in unit.diagnosis() {
-            let mentioned = diagnosis_name(&diag.inner).map(|n| n.id.resolve(&unit.ctx).as_str() == *word);
+            let mentioned = diagnosis_name(&diag.inner).map(|n| n.id.resolve().as_str() == *word);
             assert!(
                 mentioned != Some(true),
                 "`{name}` cascading diagnosis mentions {word}:\n{src}\n{}",

@@ -11,7 +11,7 @@ impl ResolvedType {
 
 impl QualifiedType {
     pub fn llvm<'a>(&'a self, ctx: &'a Context) -> TyName<'a> {
-        self.id.resolve(ctx).llvm(ctx)
+        self.id.resolve().llvm(ctx)
     }
 }
 

@@ -3,7 +3,7 @@ use std::io::{self, Write, stderr};
 
 use crate::ast::{Name, StringId, UnaryOp, Value};
 use crate::context::Context;
-use crate::semantic::{QualifiedType, SymbolKind};
+use crate::semantic::{QualifiedType, SymbolKind, sema};
 use libft::{Severity, Span, render};
 
 #[derive(Clone, Debug)]
@@ -230,15 +230,15 @@ impl DiagnosisNode {
 
     #[rustfmt::skip]
     fn message(&self, ctx: &Context) -> String {
-        let sema = &ctx.sema;
+        let sema = sema();
         match &self.inner {
             Diagnosis::OutsideSwitch(s) =>format!("'{}' statement not in switch statement", s),
             Diagnosis::DuplicateCase(value) => format!("duplicate case value '{}'", value.to_u64()),
             Diagnosis::DuplicateDefault => "multiple default labels in one switch".to_string(),
             Diagnosis::BreakNotInLoop => "'break' statement not in loop or switch statement".to_string(),
             Diagnosis::ContinueNotInLoop => "'continue' statement not in loop statement".to_string(),
-            Diagnosis::DuplicateLabel(name) => format!("redefinition of label '{}'", name.id.resolve(ctx)),
-            Diagnosis::UndefinedLabel(name) => format!("use of undeclared label '{}'", name.id.resolve(ctx)),
+            Diagnosis::DuplicateLabel(name) => format!("redefinition of label '{}'", name.id.resolve()),
+            Diagnosis::UndefinedLabel(name) => format!("use of undeclared label '{}'", name.id.resolve()),
 
             Diagnosis::Poisoned => "Internal error".to_string(),
             Diagnosis::InvalidOperand => "invalid operand".to_string(),
@@ -246,10 +246,10 @@ impl DiagnosisNode {
             Diagnosis::SyntaxError { found, expected } => format!("syntax error, unexpected {}, expecting {expected}", token_label(found)),
 
             // 6.1.2.1
-            Diagnosis::DuplicateDeclaration(kind, name) => format!("duplicate declaration of {} `{}'", kind, name.id.resolve(ctx)),
+            Diagnosis::DuplicateDeclaration(kind, name) => format!("duplicate declaration of {} `{}'", kind, name.id.resolve()),
 
             // 6.1.2.2
-            Diagnosis::ConflictingLinkage(name) => format!("declaration of '{}' conflicts with the linkage of a previous declaration", name.id.resolve(ctx)),
+            Diagnosis::ConflictingLinkage(name) => format!("declaration of '{}' conflicts with the linkage of a previous declaration", name.id.resolve()),
 
             // 6.1.3.2
             Diagnosis::IntegerConstantTooLarge => "integer constant is too large for any integer type".to_string(),
@@ -267,7 +267,7 @@ impl DiagnosisNode {
             Diagnosis::ArithmeticOverflow => "integer overflow in constant expression".to_string(),
 
             // 6.3.1
-            Diagnosis::UndeclaredIdentifier(name) => format!("Use of undeclared identifier '{}'", name.id.resolve(ctx)),
+            Diagnosis::UndeclaredIdentifier(name) => format!("Use of undeclared identifier '{}'", name.id.resolve()),
 
             // 6.3.2.1
             Diagnosis::SubscriptNotArray => "subscripted value is not an array, pointer, or vector".to_string(),
@@ -284,7 +284,7 @@ impl DiagnosisNode {
             // 6.3.2.3
             Diagnosis::AccessNotStuctOrUnion(ty) => format!("member reference base type '{}' is not a structure or union", ty.describe(sema, ctx)),
             Diagnosis::AccessNotPointer(ty) => format!("member reference base type '{}' is not pointer", ty.describe(sema, ctx)),
-            Diagnosis::AccessNotMember(ty, name_id ) => format!("no member named '{}' in '{}'", name_id.resolve(ctx), ty.describe(sema, ctx)),
+            Diagnosis::AccessNotMember(ty, name_id ) => format!("no member named '{}' in '{}'", name_id.resolve(), ty.describe(sema, ctx)),
 
             // 6.3.2.4
             Diagnosis::BadPostIncDec(UnaryOp::PostInc | UnaryOp::PreInc, ty) => format!("cannot increment value of type '{}'", ty.describe(sema, ctx)),
@@ -336,7 +336,7 @@ impl DiagnosisNode {
             Diagnosis::AssignToRValue => "expression is not assignable".to_string(),
             Diagnosis::ConstAssignment(ty) => format!("cannot assign to variable with const-qualified type '{}'", ty.describe(sema, ctx)),
             Diagnosis::ConstMemberAssignment(ty) => format!("cannot assign to '{}' because it has a const-qualified member", ty.describe(sema, ctx)),
-            Diagnosis::AssignmentDiscardedQualifiers(to, from) => format!("assigning to '{}' from '{}' discards qualifiers", to.describe(&ctx.sema, ctx), from.describe(sema, ctx)),
+            Diagnosis::AssignmentDiscardedQualifiers(to, from) => format!("assigning to '{}' from '{}' discards qualifiers", to.describe(sema, ctx), from.describe(sema, ctx)),
             Diagnosis::AssignmentIncompatibleTypes(to, from) => format!("assignment to '{}' from incompatible pointer type '{}'", to.describe(sema, ctx), from.describe(sema, ctx)),
 
             // 6.4
@@ -357,14 +357,14 @@ impl DiagnosisNode {
             Diagnosis::TagWithoutMember(kind) => format!("{kind} has no named member"),
             Diagnosis::InvalidMemberType(ty) => format!("field has incomplete or function type '{}'", ty.describe(sema, ctx)),
             Diagnosis::NonIntBitFieldType => "Bit-field has non-integral type".to_string(),
-            Diagnosis::NegativeBitFieldWidth(Some(name), width) => format!("bit-field '{}' has negative width ({width})", name.id.resolve(ctx)),
+            Diagnosis::NegativeBitFieldWidth(Some(name), width) => format!("bit-field '{}' has negative width ({width})", name.id.resolve()),
             Diagnosis::NegativeBitFieldWidth(None, width) => format!("anonymous bit-field has negative width ({width})"),
-            Diagnosis::BitFieldWidthTooLarge(Some(name), width, bits) => format!("width of bit-field '{}' ({width} bits) exceeds the width of its type ({bits} bits)", name.id.resolve(ctx)),
+            Diagnosis::BitFieldWidthTooLarge(Some(name), width, bits) => format!("width of bit-field '{}' ({width} bits) exceeds the width of its type ({bits} bits)", name.id.resolve()),
             Diagnosis::BitFieldWidthTooLarge(None, width, bits) => format!("width of anonymous bit-field ({width} bits) exceeds the width of its type ({bits} bits)"),
-            Diagnosis::ZeroWidthNamedBitField(name) => format!("named bit-field '{}' has zero width", name.id.resolve(ctx)),
+            Diagnosis::ZeroWidthNamedBitField(name) => format!("named bit-field '{}' has zero width", name.id.resolve()),
 
             // 6.5.2.2
-            Diagnosis::ForwardEnumReference(Some(name)) => format!("ISO C forbids forward references to enum '{}'", name.id.resolve(ctx)),
+            Diagnosis::ForwardEnumReference(Some(name)) => format!("ISO C forbids forward references to enum '{}'", name.id.resolve()),
             Diagnosis::ForwardEnumReference(None) => "ISO C forbids forward references to 'enum' types".to_string(),
 
             Diagnosis::VariantBadValue => "Variant value should be in int range".to_string(),
@@ -407,7 +407,7 @@ impl DiagnosisNode {
 
             // 6.7
             Diagnosis::AutoRegisterExternal => "External declaration auto of register".to_string(),
-            Diagnosis::InternalNeverDefined(name) => format!("'{}' used but never defined", name.id.resolve(ctx)),
+            Diagnosis::InternalNeverDefined(name) => format!("'{}' used but never defined", name.id.resolve()),
             Diagnosis::TentativeNeverCompleted(ty) => format!("tentative definition has type '{}' that is never completed", ty.describe(sema, ctx)),
 
             // 6.7.1

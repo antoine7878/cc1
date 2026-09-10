@@ -6,13 +6,13 @@ use crate::ast::{
 };
 use crate::codegen::llvm::Builder;
 use crate::codegen::local::Locals;
-use crate::context::Context;
-use crate::semantic::ResolvedType;
+use crate::context::{Context, ctx};
+use crate::semantic::{ResolvedType, sema};
 
-pub fn generate(ctx: Context) -> Context {
+pub fn generate() {
+    let ctx = ctx();
     let mut generator = Generator::new(stdout());
-    generator.visit_translation_unit(&ctx, &ctx.ast);
-    ctx
+    generator.visit_translation_unit(ctx, &ctx.ast);
 }
 
 #[derive(Debug)]
@@ -45,11 +45,11 @@ impl<W: Write> Visitor for Generator<W> {
     }
 
     fn visit_function_definition(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
-        let sym = ctx.sema.declarations[&node.declarator.id].resolve(ctx);
-        let ty = sym.ty.unwrap().id.resolve(ctx);
+        let sym = sema().declarations[&node.declarator.id].resolve();
+        let ty = sym.ty.unwrap().id.resolve();
         let ResolvedType::Function { ret, .. } = ty else { unreachable!() };
-        let ret_ty = ret.id.resolve(ctx);
-        self.b.define(ret_ty.llvm(ctx), sym.name.id.resolve(ctx));
+        let ret_ty = ret.id.resolve();
+        self.b.define(ret_ty.llvm(ctx), sym.name.id.resolve());
         self.allocas(ctx, node);
         self.visit_compound_statement(ctx, &node.body);
         self.b.end_function();
@@ -58,7 +58,7 @@ impl<W: Write> Visitor for Generator<W> {
     fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode) {
         match &node.stmt {
             JumpStatement::Return(Some(e)) => {
-                let ty = ctx.sema.expr_types[e.id].ty.llvm(ctx);
+                let ty = sema().expr_types[e.id].ty.llvm(ctx);
                 let v = self.fold_expression(ctx, e);
                 self.b.ret(ty, v);
             }

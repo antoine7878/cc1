@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fs::read_to_string;
 
@@ -7,9 +7,23 @@ use crate::ast::{
     ValueNode,
 };
 use crate::parser::ParseState;
-use crate::semantic::{DiagnosisNode, Sema};
+use crate::semantic::DiagnosisNode;
 use crate::target::Target;
 use libft::{SourceMap, Span};
+
+thread_local! {
+    static CTX: Cell<Option<&'static Context>> = const { Cell::new(None) };
+}
+
+pub fn install(ctx: Context) -> &'static Context {
+    let ctx = Box::leak(Box::new(ctx));
+    CTX.set(Some(ctx));
+    ctx
+}
+
+pub fn ctx() -> &'static Context {
+    CTX.get().expect("Context is not installed")
+}
 
 #[derive(Debug)]
 pub struct Context {
@@ -19,7 +33,6 @@ pub struct Context {
     pub parse: ParseState,
     pub arenas: AstArenas,
     pub ast: TranslationUnitNode,
-    pub sema: Sema,
     source_cache: RefCell<HashMap<String, Option<Vec<String>>>>,
     one: ExpressionNode,
 }
@@ -40,7 +53,6 @@ impl Context {
         Self {
             one,
             file_name: String::default(),
-            sema: Sema::new(target.clone()),
             target,
             diagnosis: Vec::default(),
             parse: ParseState::default(),
@@ -55,7 +67,6 @@ impl Context {
     }
 
     pub fn set_target(&mut self, target: Target) {
-        self.sema = Sema::new(target.clone());
         self.target = target;
     }
 

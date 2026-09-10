@@ -30,7 +30,7 @@ pub fn fold(sema: &mut Sema, ctx: &Context, e: &ExpressionNode) -> Option<Place>
     if decays(sema, e) {
         return place(sema, ctx, e);
     }
-    match e.id.resolve(ctx) {
+    match e.id.resolve() {
         Expression::ConstantExpression(inner) => fold(sema, ctx, inner),
         Expression::StringLiteral(literal) => Some(Place::at(AddressBase::String(literal.id), 0)),
         Expression::Unary(UnaryOp::Addr, inner) => place(sema, ctx, inner),
@@ -45,7 +45,7 @@ pub fn fold(sema: &mut Sema, ctx: &Context, e: &ExpressionNode) -> Option<Place>
 }
 
 fn place(sema: &mut Sema, ctx: &Context, e: &ExpressionNode) -> Option<Place> {
-    match e.id.resolve(ctx) {
+    match e.id.resolve() {
         Expression::ConstantExpression(inner) => place(sema, ctx, inner),
         Expression::Identifier(_) => object(sema, e),
         Expression::StringLiteral(literal) => Some(Place::at(AddressBase::String(literal.id), 0)),
@@ -61,7 +61,7 @@ fn place(sema: &mut Sema, ctx: &Context, e: &ExpressionNode) -> Option<Place> {
 
 fn object(sema: &Sema, e: &ExpressionNode) -> Option<Place> {
     let sym_id = sema.expr_bindings.get(e.id).copied()?;
-    let sym = sym_id.resolve(sema);
+    let sym = sym_id.resolve_in(sema);
     let addressable = sym.duration == Duration::Static || sym.kind == SymbolKind::Function;
     addressable.then(|| Place::at(AddressBase::Symbol(sym_id), 0))
 }
@@ -69,7 +69,7 @@ fn object(sema: &Sema, e: &ExpressionNode) -> Option<Place> {
 fn decays(sema: &Sema, e: &ExpressionNode) -> bool {
     let Some(re) = sema.expr_types.get(e.id) else { return false };
     matches!(
-        re.ty.id.resolve(sema),
+        re.ty.id.resolve_in(sema),
         ResolvedType::Array { .. } | ResolvedType::Function { .. }
     )
 }
@@ -105,7 +105,7 @@ fn cast(sema: &mut Sema, ctx: &Context, node: &ExpressionNode, inner: &Expressio
 
 fn pointee_size(sema: &mut Sema, e: &ExpressionNode) -> Option<i64> {
     let ty = sema.expr_types.get(e.id)?.casted_ty();
-    let &ResolvedType::Pointer(inner) = ty.id.resolve(sema) else { return None };
+    let &ResolvedType::Pointer(inner) = ty.id.resolve_in(sema) else { return None };
     layout::of(sema, inner.id).map(|layout| i64::from(layout.size))
 }
 

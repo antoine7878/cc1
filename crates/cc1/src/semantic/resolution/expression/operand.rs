@@ -48,7 +48,7 @@ where
 /// the expression table instead of resolving the type name a second time.
 pub fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &ExpressionNode) -> bool {
     let mut node = node;
-    if let Expression::Cast(_, op) = node.id.resolve(ctx)
+    if let Expression::Cast(_, op) = node.id.resolve()
         && let Some(re) = sema.expr_types.get(node.id)
         && is_void_pointer(sema, re.ty)
     {
@@ -59,12 +59,12 @@ pub fn is_null_pointer_constant(sema: &mut Sema, ctx: &Context, node: &Expressio
 }
 
 fn is_void_pointer(sema: &Sema, qualif: QualifiedType) -> bool {
-    let ResolvedType::Pointer(inner) = qualif.id.resolve(sema) else { return false };
+    let ResolvedType::Pointer(inner) = qualif.id.resolve_in(sema) else { return false };
     inner.is_void(sema) && !qualif.is_const && !qualif.is_volatile && !inner.is_const && !inner.is_volatile
 }
 
 pub fn is_bit_field(sema: &Sema, sym: Option<SymbolId>) -> bool {
     let Some(id) = sym else { return false };
-    let sym = id.resolve(sema);
+    let sym = id.resolve_in(sema);
     sym.kind == SymbolKind::Member && sym.value.is_some()
 }

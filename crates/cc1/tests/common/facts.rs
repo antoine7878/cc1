@@ -1,6 +1,7 @@
 use cc1::ast::visit::{Visitor, walk_expression, walk_statement, walk_translation_unit};
 use cc1::ast::{Expression, ExpressionNode, Statement, StatementNode};
 use cc1::context::Context;
+use cc1::semantic::Sema;
 
 use crate::common::Unit;
 
@@ -9,6 +10,7 @@ use crate::common::Unit;
 /// that says the side tables are actually complete.
 struct FactChecker<'a> {
     ctx: &'a Context,
+    sema: &'a Sema,
     missing: Vec<String>,
 }
 
@@ -24,12 +26,12 @@ impl Visitor for FactChecker<'_> {
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
         walk_expression(self, ctx, node);
 
-        let sema = &self.ctx.sema;
+        let sema = self.sema;
         let id = node.id;
         let at = usize::from(id);
         self.require(sema.expr_types.get(id).is_some(), "type of expression", at);
 
-        match id.resolve(ctx) {
+        match id.resolve() {
             Expression::Identifier(_) => {
                 self.require(sema.expr_bindings.get(id).is_some(), "binding of identifier", at)
             }
@@ -43,8 +45,8 @@ impl Visitor for FactChecker<'_> {
         walk_statement(self, ctx, node);
 
         let at = usize::from(node.id);
-        let recorded = self.ctx.sema.stmts.get(node.id).is_some();
-        match node.id.resolve(ctx) {
+        let recorded = self.sema.stmts.get(node.id).is_some();
+        match node.id.resolve() {
             Statement::Iteration(_) => self.require(recorded, "loop facts", at),
             Statement::Labeled(_) => self.require(recorded, "label facts", at),
             Statement::Jump(inner) => match inner.stmt {
@@ -64,10 +66,11 @@ impl Unit {
     /// Every fact a code generator would need and not find, empty when the unit is complete.
     pub fn missing_facts(&self) -> Vec<String> {
         let mut checker = FactChecker {
-            ctx: &self.ctx,
+            ctx: self.ctx,
+            sema: self.sema,
             missing: Vec::new(),
         };
-        walk_translation_unit(&mut checker, &self.ctx, &self.ctx.ast);
+        walk_translation_unit(&mut checker, self.ctx, &self.ctx.ast);
         checker.missing
     }
 }

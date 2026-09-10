@@ -15,7 +15,7 @@ use crate::ast::{
     TranslationUnitNode, Type, TypeSpecifier, Union, Variant,
 };
 use crate::context::Context;
-use crate::semantic::ExpressionKind;
+use crate::semantic::{ExpressionKind, sema};
 use libft::{CYAN, GRAY, GREEN, RESET};
 
 pub struct AstPrinter {
@@ -73,13 +73,14 @@ impl AstPrinter {
 
     fn print_name_node(&mut self, ctx: &Context, name: &Name) {
         self.print_node(name, |printer| {
-            printer.put(format_args!("{}", name.id.resolve(ctx)));
+            printer.put(format_args!("{}", name.id.resolve()));
         });
     }
 
     fn print_expression_type(&mut self, ctx: &Context, id: ExpressionId) {
-        let Some(resolved) = ctx.sema.expr_types.get(id) else { return };
-        self.put(format_args!("{GREEN}'{}'{CYAN}", resolved.ty.describe(&ctx.sema, ctx)));
+        let sema = sema();
+        let Some(resolved) = sema.expr_types.get(id) else { return };
+        self.put(format_args!("{GREEN}'{}'{CYAN}", resolved.ty.describe(sema, ctx)));
         if matches!(resolved.kind, ExpressionKind::LValue) {
             self.put(format_args!(" lvalue"));
         }
@@ -87,7 +88,7 @@ impl AstPrinter {
             self.put(format_args!(
                 " {GRAY}{}{CYAN} {GREEN}'{}'{CYAN}",
                 cast.kind,
-                cast.to.describe(&ctx.sema, ctx)
+                cast.to.describe(sema, ctx)
             ));
         }
         self.put(format_args!(" "));
@@ -95,15 +96,15 @@ impl AstPrinter {
 
     fn print_specifier(&mut self, ctx: &Context, spec: &DeclarationSpecifier) {
         let tagged = |keyword: &str, name: Option<&Name>| match name {
-            Some(name) => format!("{keyword} {}", name.id.resolve(ctx)),
+            Some(name) => format!("{keyword} {}", name.id.resolve()),
             None => keyword.to_string(),
         };
         let s = match spec {
             DeclarationSpecifier::Type(t) => match t {
-                TypeSpecifier::Struct(id) => tagged("struct", id.resolve(ctx).name.as_ref()),
-                TypeSpecifier::Union(id) => tagged("union", id.resolve(ctx).name.as_ref()),
-                TypeSpecifier::Enum(id) => tagged("enum", id.resolve(ctx).name.as_ref()),
-                TypeSpecifier::TypedefName(name) => name.id.resolve(ctx).clone(),
+                TypeSpecifier::Struct(id) => tagged("struct", id.resolve().name.as_ref()),
+                TypeSpecifier::Union(id) => tagged("union", id.resolve().name.as_ref()),
+                TypeSpecifier::Enum(id) => tagged("enum", id.resolve().name.as_ref()),
+                TypeSpecifier::TypedefName(name) => name.id.resolve().clone(),
                 other => other.to_string(),
             },
             other => other.to_string(),
@@ -183,7 +184,7 @@ impl Visitor for AstPrinter {
 
     fn visit_declarator(&mut self, ctx: &Context, node: &DeclaratorNode) {
         self.print_node(node, |printer| {
-            printer.put(format_args!("{} ", node.id.resolve(ctx)));
+            printer.put(format_args!("{} ", node.id.resolve()));
             walk_declarator(printer, ctx, node);
         });
     }
@@ -236,7 +237,7 @@ impl Visitor for AstPrinter {
 
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
         self.print_node(node, |printer| {
-            let expr = node.id.resolve(ctx);
+            let expr = node.id.resolve();
             printer.put(format_args!("{} ", expr));
             printer.print_expression_type(ctx, node.id);
             if let Expression::Member(op, tag, ident) = expr {
@@ -318,6 +319,6 @@ impl Visitor for AstPrinter {
     }
 
     fn visit_name(&mut self, ctx: &Context, node: &Name) {
-        self.put(format_args!("{}", node.id.resolve(ctx)));
+        self.put(format_args!("{}", node.id.resolve()));
     }
 }

@@ -14,8 +14,8 @@ pub fn conditional(sema: &mut Sema, ctx: &Context, e1: &ExpressionNode, e2: &Exp
         }
         let l_ty = lhs.casted_ty();
         let r_ty = rhs.casted_ty();
-        let l = l_ty.id.resolve(sema);
-        let r = r_ty.id.resolve(sema);
+        let l = l_ty.id.resolve_in(sema);
+        let r = r_ty.id.resolve_in(sema);
         if l.is_arithmetic(sema) && r.is_arithmetic(sema) {
             return cast::usual_arithmetic(sema, lhs, rhs);
         }

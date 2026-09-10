@@ -401,7 +401,6 @@ fn a_prototype_and_its_definition_declare_one_function() {
 fn identical_function_types_share_one_interned_type() {
     let unit = accepted("int f(int a); int g(int b); int h(char c);");
     let types: Vec<_> = unit
-        .ctx
         .sema
         .symbols
         .iter()
@@ -416,7 +415,6 @@ fn identical_function_types_share_one_interned_type() {
 fn a_function_definition_records_its_parameters_in_order() {
     let unit = accepted("int f(int a, char b) { return a; }");
     let names: Vec<_> = unit
-        .ctx
         .sema
         .functions
         .iter()
@@ -424,10 +422,10 @@ fn a_function_definition_records_its_parameters_in_order() {
             let parameters: Vec<_> = def
                 .parameters
                 .iter()
-                .map(|&id| id.resolve(&unit.ctx).name.id.resolve(&unit.ctx).clone())
+                .map(|&id| id.resolve().name.id.resolve().clone())
                 .collect();
             (
-                def.sym.resolve(&unit.ctx).name.id.resolve(&unit.ctx).clone(),
+                def.sym.resolve().name.id.resolve().clone(),
                 parameters,
             )
         })
@@ -438,10 +436,10 @@ fn a_function_definition_records_its_parameters_in_order() {
 #[test]
 fn a_function_definition_records_its_return_type() {
     let unit = accepted("char *f(int a, char b) { return 0; }");
-    let def = unit.ctx.sema.functions.get(FunctionDefId::from(0));
+    let def = unit.sema.functions.get(FunctionDefId::from(0));
     assert_eq!(unit.ty_tree(def.return_ty), Ty::ptr(Ty::Char));
     assert_eq!(
-        unit.ty_tree(def.sym.resolve(&unit.ctx).ty.expect("function type")),
+        unit.ty_tree(def.sym.resolve().ty.expect("function type")),
         Ty::func(Ty::ptr(Ty::Char), [Ty::Int, Ty::Char])
     );
 }
@@ -449,11 +447,11 @@ fn a_function_definition_records_its_return_type() {
 #[test]
 fn an_old_style_definition_records_its_parameters_in_declarator_order() {
     let unit = accepted("int f(a, b) char b; { return a; }");
-    let def = unit.ctx.sema.functions.iter().next().expect("function definition");
+    let def = unit.sema.functions.iter().next().expect("function definition");
     let parameters: Vec<_> = def
         .parameters
         .iter()
-        .map(|&id| id.resolve(&unit.ctx).name.id.resolve(&unit.ctx).clone())
+        .map(|&id| id.resolve().name.id.resolve().clone())
         .collect();
     assert_eq!(parameters, ["a", "b"]);
 }

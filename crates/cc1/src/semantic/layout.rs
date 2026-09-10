@@ -14,7 +14,7 @@ pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Option<Layout> {
     if let Some(&layout) = sema.layouts.get(&qualified_type) {
         return Some(layout);
     }
-    let layout = match qualified_type.resolve(sema) {
+    let layout = match qualified_type.resolve_in(sema) {
         ResolvedType::Tag(id) => of_tag(sema, *id)?,
         ResolvedType::Array { elem, len } => {
             let len = *len;
@@ -34,7 +34,7 @@ pub fn finalize(sema: &mut Sema) {
 }
 
 pub fn of_tag(sema: &mut Sema, id: TagDefId) -> Option<Layout> {
-    let mut tag = id.resolve(sema).clone();
+    let mut tag = id.resolve_in(sema).clone();
     if !tag.is_complete {
         return None;
     }
@@ -51,7 +51,7 @@ fn member(sema: &mut Sema, mem: Member) -> Option<(Layout, Option<u64>)> {
     let width = mem.width.map(|width| width.max(0) as u64);
     match mem.sym {
         Some(id) => {
-            let ty = id.resolve(sema).ty?;
+            let ty = id.resolve_in(sema).ty?;
             Some((of(sema, ty.id)?, width))
         }
         None => Some((of(sema, sema.builtins.int)?, width)),

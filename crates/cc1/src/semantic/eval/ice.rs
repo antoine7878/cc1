@@ -38,9 +38,9 @@ pub fn try_fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode) -> Option
 }
 
 fn scalar_ty(sema: &Sema, qty: QualifiedType) -> ResolvedType {
-    let ty = qty.id.resolve(sema);
+    let ty = qty.id.resolve_in(sema);
     if let ResolvedType::Tag(id) = ty
-        && (*id).resolve(sema).kind == Tag::Enum
+        && (*id).resolve_in(sema).kind == Tag::Enum
     {
         return ResolvedType::Int;
     }
@@ -82,7 +82,7 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSi
     if let Some(value) = sema.expr_consts.get(expr.id) {
         return Ok(*value);
     }
-    match expr.id.resolve(ctx) {
+    match expr.id.resolve() {
         Expression::ConstantExpression(inner) => {
             integral_operands(sema, ctx, inner)?;
             fold(sema, ctx, inner, sink)
@@ -104,7 +104,7 @@ fn fold(sema: &mut Sema, ctx: &Context, expr: &ExpressionNode, sink: &mut DiagSi
 }
 
 fn integral_operands(sema: &Sema, ctx: &Context, expr: &ExpressionNode) -> Result<(), Diagnosis> {
-    let operands: Vec<&ExpressionNode> = match expr.id.resolve(ctx) {
+    let operands: Vec<&ExpressionNode> = match expr.id.resolve() {
         Expression::Cast(_, _) | Expression::SizeofExpr(_) | Expression::SizeofType(_) => return Ok(()),
         Expression::ConstantExpression(e) | Expression::Unary(_, e) => vec![e],
         Expression::Binary(_, e1, e2) => vec![e1, e2],
@@ -126,7 +126,7 @@ fn identifier(sema: &Sema, expr: &ExpressionNode) -> Result<Value, Diagnosis> {
         .get(expr.id)
         .copied()
         .ok_or(Diagnosis::NonConstantExpression)?;
-    let symbol = id.resolve(sema);
+    let symbol = id.resolve_in(sema);
     if symbol.kind != SymbolKind::Variant {
         return Err(Diagnosis::NonConstantExpression);
     }
@@ -275,7 +275,7 @@ fn cast(
         return Err(Diagnosis::NonIntegerConstantExpression);
     }
     let operand_ty = node_ty(sema, e)?;
-    if operand_ty.is_floating(sema) && !matches!(e.id.resolve(ctx), Expression::Constant(_)) {
+    if operand_ty.is_floating(sema) && !matches!(e.id.resolve(), Expression::Constant(_)) {
         return Err(Diagnosis::NonConstantExpression);
     }
     operand(sema, ctx, e, sink)

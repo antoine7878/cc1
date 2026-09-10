@@ -10,7 +10,7 @@ pub use store::Arena;
 
 pub trait ResolveWith<H> {
     type Output;
-    fn resolve(self, holder: &H) -> &Self::Output;
+    fn resolve_in(self, holder: &H) -> &Self::Output;
 }
 
 pub trait ResolveMutWith<H> {
@@ -20,13 +20,13 @@ pub trait ResolveMutWith<H> {
 
 #[macro_export]
 macro_rules! define_arena {
-    ($ty:ident, $arena:ident, $id:ident, $holder:ty, $ctx_field:ident, $($field:ident).+) => {
+    ($ty:ident, $arena:ident, $id:ident, $holder:ty, $global:expr, $($field:ident).+) => {
         pub type $id = $crate::arena::ArenaId<$ty>;
         pub type $arena = $crate::arena::Arena<$id, $ty>;
 
         impl $crate::arena::ResolveWith<$holder> for $id {
             type Output = $ty;
-            fn resolve(self, holder: &$holder) -> &$ty {
+            fn resolve_in(self, holder: &$holder) -> &$ty {
                 holder.$($field).+.get(self)
             }
         }
@@ -38,16 +38,9 @@ macro_rules! define_arena {
             }
         }
 
-        impl $crate::arena::ResolveWith<$crate::context::Context> for $id {
-            type Output = $ty;
-            fn resolve(self, ctx: &$crate::context::Context) -> &$ty {
-                ctx.$ctx_field.$($field).+.get(self)
-            }
-        }
-
         impl $id {
-            pub fn resolve<'a>(&self, ctx: &'a $crate::context::Context) -> &'a $ty {
-                $crate::arena::ResolveWith::<$crate::context::Context>::resolve(*self, ctx)
+            pub fn resolve(self) -> &'static $ty {
+                $global.$($field).+.get(self)
             }
         }
     };
@@ -55,27 +48,20 @@ macro_rules! define_arena {
 
 #[macro_export]
 macro_rules! define_interner {
-    ($ty:ident, $arena:ident, $id:ident, $holder:ty, $ctx_field:ident, $($field:ident).+) => {
+    ($ty:ident, $arena:ident, $id:ident, $holder:ty, $global:expr, $($field:ident).+) => {
         pub type $id = $crate::arena::ArenaId<$ty>;
         pub type $arena = $crate::arena::Interner<$id, $ty>;
 
         impl $crate::arena::ResolveWith<$holder> for $id {
             type Output = $ty;
-            fn resolve(self, holder: &$holder) -> &$ty {
+            fn resolve_in(self, holder: &$holder) -> &$ty {
                 holder.$($field).+.get(self)
             }
         }
 
-        impl $crate::arena::ResolveWith<$crate::context::Context> for $id {
-            type Output = $ty;
-            fn resolve(self, ctx: &$crate::context::Context) -> &$ty {
-                ctx.$ctx_field.$($field).+.get(self)
-            }
-        }
-
         impl $id {
-            pub fn resolve<'a>(&self, ctx: &'a $crate::context::Context) -> &'a $ty {
-                $crate::arena::ResolveWith::<$crate::context::Context>::resolve(*self, ctx)
+            pub fn resolve(self) -> &'static $ty {
+                $global.$($field).+.get(self)
             }
         }
     };

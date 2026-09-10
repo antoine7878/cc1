@@ -1,34 +1,80 @@
 use std::process::exit;
 
 use crate::context::Context;
-use crate::semantic::DiagnosisNode;
+use crate::semantic::{DiagnosisNode, Sema};
 
-#[derive(Default)]
-pub struct Pipeline {
-    ctx: Context,
+pub trait Errors {
+    fn error_count(&self) -> usize;
+}
+
+fn count(diagnosis: &[DiagnosisNode]) -> usize {
+    diagnosis.iter().filter(|d| d.is_error()).count()
+}
+
+impl Errors for Context {
+    fn error_count(&self) -> usize {
+        count(&self.diagnosis)
+    }
+}
+
+impl Errors for Sema {
+    fn error_count(&self) -> usize {
+        count(&self.diagnosis)
+    }
+}
+
+impl Errors for () {
+    fn error_count(&self) -> usize {
+        0
+    }
+}
+
+pub struct Pipeline<T> {
+    state: T,
     exit_code: i32,
     stopped: bool,
 }
 
-impl Pipeline {
-    pub fn pass(mut self, pass: fn(Context) -> Context) -> Self {
+impl Default for Pipeline<Context> {
+    fn default() -> Self {
+        Self::new(Context::default())
+    }
+}
+
+impl<T: Errors> Pipeline<T> {
+    pub fn new(state: T) -> Self {
+        Self {
+            state,
+            exit_code: 0,
+            stopped: false,
+        }
+    }
+
+    pub fn pass(mut self, pass: fn(T) -> T) -> Self {
         if self.stopped {
             return self;
         }
-        let watermark = self.ctx.diagnosis.len();
-        self.ctx = pass(self.ctx);
-        debug_assert!(self.ctx.diagnosis.len() >= watermark);
-        if self.ctx.diagnosis[watermark..].iter().any(DiagnosisNode::is_error) {
+        let watermark = self.state.error_count();
+        self.state = pass(self.state);
+        if self.state.error_count() > watermark {
             self.exit_code = 1;
         }
         self
     }
 
-    pub fn pass_group<const N: usize>(mut self, fns: [fn(Context) -> Context; N]) -> Self {
+    pub fn pass_group<const N: usize>(mut self, fns: [fn(T) -> T; N]) -> Self {
         for f in fns {
             self = self.pass(f);
         }
         self.checkpoint()
+    }
+
+    pub fn then<U: Errors>(self, f: fn(T) -> U) -> Pipeline<U> {
+        Pipeline {
+            state: f(self.state),
+            exit_code: self.exit_code,
+            stopped: self.stopped,
+        }
     }
 
     pub fn checkpoint(mut self) -> Self {
@@ -36,22 +82,17 @@ impl Pipeline {
         self
     }
 
-    pub fn report(self, obse: fn(&Context)) -> Self {
+    pub fn report(self, obse: fn(&T)) -> Self {
         if self.stopped {
             return self;
         }
-        obse(&self.ctx);
+        obse(&self.state);
         self
     }
 
-    pub fn finally(self, f: fn(&Context)) -> ! {
-        f(&self.ctx);
-        exit(self.exit_code)
-    }
-
-    pub fn finish(self) -> (Context, bool) {
+    pub fn finish(self) -> (T, bool) {
         let stopped = self.stopped;
-        (self.ctx, stopped)
+        (self.state, stopped)
     }
 
     pub fn stopped(&self) -> bool {
@@ -60,5 +101,19 @@ impl Pipeline {
 
     pub fn failed(&self) -> bool {
         self.exit_code > 0
+    }
+}
+
+impl Pipeline<()> {
+    pub fn run(self, f: fn()) -> Self {
+        if !self.stopped {
+            f();
+        }
+        self
+    }
+
+    pub fn finally(self, f: fn()) -> ! {
+        f();
+        exit(self.exit_code)
     }
 }

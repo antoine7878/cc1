@@ -8,7 +8,7 @@ use crate::define_interner;
 use crate::semantic::{ParamTypes, Sema, TagDefId};
 use crate::target::{Layout, Target};
 
-define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, Sema, sema, types);
+define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId, Sema, crate::semantic::sema(), types);
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum ResolvedType {
@@ -89,7 +89,7 @@ impl ResolvedType {
 
     pub fn is_integral(&self, sema: &Sema) -> bool {
         match self {
-            ResolvedType::Tag(id) => (*id).resolve(sema).kind == Tag::Enum,
+            ResolvedType::Tag(id) => (*id).resolve_in(sema).kind == Tag::Enum,
             _ => self.is_integer(),
         }
     }
@@ -211,7 +211,7 @@ impl QualifiedType {
     }
 
     pub fn is_char(&self, sema: &Sema) -> bool {
-        self.id.resolve(sema).is_char()
+        self.id.resolve_in(sema).is_char()
     }
 
     pub fn same_qualifiers_as(&self, other: &Self) -> bool {
@@ -229,8 +229,8 @@ impl QualifiedType {
         if self == other {
             return Some(*self);
         }
-        let l = self.id.resolve(sema).clone();
-        let r = other.id.resolve(sema).clone();
+        let l = self.id.resolve_in(sema).clone();
+        let r = other.id.resolve_in(sema).clone();
         match (l, r) {
             (ResolvedType::Array { elem: e1, len: l1 }, ResolvedType::Array { elem: e2, len: l2 }) => {
                 let elem = Self::composite(&e1, sema, &e2)?;
@@ -280,7 +280,7 @@ impl QualifiedType {
         if self.id == other.id {
             return true;
         }
-        match (self.id.resolve(sema), other.id.resolve(sema)) {
+        match (self.id.resolve_in(sema), other.id.resolve_in(sema)) {
             (ResolvedType::Function { ret: r1, params: p1 }, ResolvedType::Function { ret: r2, params: p2 }) => {
                 r1.is_compatible(sema, r2) && p1.is_compatible(sema, p2)
             }
@@ -289,7 +289,7 @@ impl QualifiedType {
             }
             (ResolvedType::Pointer(l), ResolvedType::Pointer(r)) => l.is_compatible(sema, r),
             (ResolvedType::Tag(id), ResolvedType::Int) | (ResolvedType::Int, ResolvedType::Tag(id)) => {
-                (*id).resolve(sema).kind == Tag::Enum
+                (*id).resolve_in(sema).kind == Tag::Enum
             }
             _ => false,
         }
@@ -300,47 +300,47 @@ impl QualifiedType {
     }
 
     pub fn is_void(&self, sema: &Sema) -> bool {
-        self.id.resolve(sema).is_void()
+        self.id.resolve_in(sema).is_void()
     }
 
     pub fn is_complete(&self, sema: &Sema) -> bool {
-        self.id.resolve(sema).is_complete(sema)
+        self.id.resolve_in(sema).is_complete(sema)
     }
 
     pub fn is_scalar(&self, sema: &Sema) -> bool {
-        self.id.resolve(sema).is_scalar(sema)
+        self.id.resolve_in(sema).is_scalar(sema)
     }
 
     pub fn is_pointer(&self, sema: &Sema) -> bool {
-        self.id.resolve(sema).is_pointer()
+        self.id.resolve_in(sema).is_pointer()
     }
 
     pub fn is_function(&self, sema: &Sema) -> bool {
-        self.id.resolve(sema).is_function()
+        self.id.resolve_in(sema).is_function()
     }
 
     pub fn is_object(&self, sema: &Sema) -> bool {
-        self.id.resolve(sema).is_object(sema)
+        self.id.resolve_in(sema).is_object(sema)
     }
 
     pub fn is_array(&self, sema: &Sema) -> bool {
-        self.id.resolve(sema).is_array()
+        self.id.resolve_in(sema).is_array()
     }
 
     pub fn is_arithmetic(&self, sema: &Sema) -> bool {
-        self.id.resolve(sema).is_arithmetic(sema)
+        self.id.resolve_in(sema).is_arithmetic(sema)
     }
 
     pub fn is_tag(&self, sema: &Sema) -> bool {
-        self.id.resolve(sema).is_tag()
+        self.id.resolve_in(sema).is_tag()
     }
 
     pub fn is_integral(&self, sema: &Sema) -> bool {
-        self.id.resolve(sema).is_integral(sema)
+        self.id.resolve_in(sema).is_integral(sema)
     }
 
     pub fn has_const_member(&self, sema: &Sema) -> bool {
-        match self.id.resolve(sema) {
+        match self.id.resolve_in(sema) {
             ResolvedType::Array { elem, .. } => elem.is_const || elem.has_const_member(sema),
             ResolvedType::Tag(id) => sema.tags.get(*id).members.iter().any(|member| {
                 member
@@ -353,15 +353,15 @@ impl QualifiedType {
     }
 
     pub fn is_floating(&self, sema: &Sema) -> bool {
-        self.id.resolve(sema).is_floating()
+        self.id.resolve_in(sema).is_floating()
     }
 
     pub fn is_integer(&self, sema: &Sema) -> bool {
-        self.id.resolve(sema).is_integer()
+        self.id.resolve_in(sema).is_integer()
     }
 
     pub fn layout(&self, ctx: &Context) -> Option<Layout> {
-        ctx.target.layout(self.id.resolve(ctx))
+        ctx.target.layout(self.id.resolve())
     }
 }
 
@@ -376,7 +376,7 @@ impl fmt::Display for TypeName<'_> {
         if ty.is_volatile {
             f.write_str("volatile ")?;
         }
-        match ty.id.resolve(sema) {
+        match ty.id.resolve_in(sema) {
             ResolvedType::Void => f.write_str("void"),
             ResolvedType::Char => f.write_str("char"),
             ResolvedType::SignedChar => f.write_str("signed char"),
@@ -391,7 +391,7 @@ impl fmt::Display for TypeName<'_> {
             ResolvedType::Double => f.write_str("double"),
             ResolvedType::LongDouble => f.write_str("long double"),
             ResolvedType::Pointer(inner) => {
-                match inner.id.resolve(sema) {
+                match inner.id.resolve_in(sema) {
                     ResolvedType::Function { .. } | ResolvedType::Array { .. } => {
                         write!(f, "({})", inner.describe(sema, ctx))?
                     }
@@ -400,13 +400,13 @@ impl fmt::Display for TypeName<'_> {
                 f.write_str(" *")
             }
             &ResolvedType::Tag(id) => {
-                let def = id.resolve(sema);
-                let name = def.name.map_or("<anonymous>", |n| n.id.resolve(ctx).as_str());
+                let def = id.resolve_in(sema);
+                let name = def.name.map_or("<anonymous>", |n| n.id.resolve().as_str());
                 write!(f, "{} {}", def.kind(), name)
             }
             ResolvedType::Array { elem, len } => {
                 let mut base = elem;
-                while let ResolvedType::Array { elem: inner, .. } = base.id.resolve(sema) {
+                while let ResolvedType::Array { elem: inner, .. } = base.id.resolve_in(sema) {
                     base = inner;
                 }
                 write!(f, "{}", base.describe(sema, ctx))?;
@@ -417,7 +417,7 @@ impl fmt::Display for TypeName<'_> {
                         write!(f, "{len}")?;
                     }
                     f.write_str("]")?;
-                    let ResolvedType::Array { elem: inner, len: size } = elem.id.resolve(sema) else { break };
+                    let ResolvedType::Array { elem: inner, len: size } = elem.id.resolve_in(sema) else { break };
                     (elem, len) = (inner, size);
                 }
                 Ok(())

@@ -1,4 +1,3 @@
-use crate::arena::ResolveWith;
 use crate::ast::{BinaryOp, Expression, ExpressionNode, UnaryOp};
 use crate::context::Context;
 use crate::semantic::ExpressionKind::{LValue, RValue};
@@ -21,7 +20,7 @@ pub fn resolve_expression(resolver: &mut SymbolResolver, ctx: &Context, node: &E
 
 fn type_of(resolver: &mut SymbolResolver, ctx: &Context, node: &ExpressionNode) -> R {
     let sema = &mut *resolver.sema;
-    match node.id.resolve(ctx) {
+    match node.id.resolve() {
         Expression::Identifier(_) => identifier(sema, node),
         Expression::Constant(value) => Ok((value.ty(sema), RValue)),
         Expression::StringLiteral(value) => Ok((value.ty(sema, ctx), LValue)),

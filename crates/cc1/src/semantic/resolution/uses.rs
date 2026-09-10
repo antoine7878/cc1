@@ -11,13 +11,13 @@ struct UseMarker<'a> {
 impl Visitor for UseMarker<'_> {
     fn visit_expression(&mut self, ctx: &Context, node: &ExpressionNode) {
         if matches!(
-            node.id.resolve(ctx),
+            node.id.resolve(),
             Expression::SizeofExpr(_) | Expression::SizeofType(_)
         ) {
             return;
         }
         walk_expression(self, ctx, node);
-        if matches!(node.id.resolve(ctx), Expression::Identifier(_))
+        if matches!(node.id.resolve(), Expression::Identifier(_))
             && let Some(sym_id) = self.sema.expr_bindings.get(node.id).copied()
         {
             sym_id.resolve_mut(self.sema).used = true;

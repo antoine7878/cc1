@@ -11,7 +11,7 @@ use crate::semantic::{
 pub fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> R {
     with_converted(sema, [e], |sema, [re]| {
         constrain::expression::check_assignable(sema, re.kind, re.ty).into_result()?;
-        let non_object_pointee = match re.ty.id.resolve(sema) {
+        let non_object_pointee = match re.ty.id.resolve_in(sema) {
             ResolvedType::Pointer(inner) if !inner.is_object(sema) => Some((*inner, inner.is_function(sema))),
             _ => None,
         };
@@ -36,7 +36,7 @@ pub fn address(sema: &mut Sema, e: &ExpressionNode) -> R {
 }
 
 fn address_type(sema: &mut Sema, re: &mut ResolvedExpression, sym: Option<SymbolId>) -> R {
-    let is_register = sym.is_some_and(|id| id.resolve(sema).storage == Some(Storage::Register));
+    let is_register = sym.is_some_and(|id| id.resolve_in(sema).storage == Some(Storage::Register));
     constrain::expression::check_address_of(
         re.kind,
         re.casted_ty().is_function(sema),
@@ -52,7 +52,7 @@ fn address_type(sema: &mut Sema, re: &mut ResolvedExpression, sym: Option<Symbol
 
 pub fn indirection(sema: &mut Sema, e: &ExpressionNode) -> R {
     with_converted(sema, [e], |sema, [re]| {
-        let ResolvedType::Pointer(inner) = re.casted_ty().id.resolve(sema) else {
+        let ResolvedType::Pointer(inner) = re.casted_ty().id.resolve_in(sema) else {
             return Err(Diagnosis::IndirectionNotPointer(re.ty));
         };
         if inner.is_void(sema) {
@@ -93,9 +93,9 @@ pub fn cast(
     let (qualif, _) = declaration::declared_type(resolver, ctx, base, &ty_node.declarator).ok_poisoned()?;
     let is_null = is_null_pointer_constant(resolver.sema, ctx, operand);
     with_converted(resolver.sema, [operand], |sema, [re]| {
-        let ty = qualif.id.resolve(sema);
+        let ty = qualif.id.resolve_in(sema);
         if !ty.is_void() {
-            let from = re.casted_ty().id.resolve(sema);
+            let from = re.casted_ty().id.resolve_in(sema);
             if !ty.is_scalar(sema) {
                 return Err(Diagnosis::CastToNonScalar);
             }

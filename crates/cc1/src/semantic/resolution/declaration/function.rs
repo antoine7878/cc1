@@ -65,7 +65,7 @@ pub fn define_function(
         }
         _ => rty,
     };
-    let &ResolvedType::Function { ret: return_ty, .. } = ty.id.resolve(resolver.sema) else {
+    let &ResolvedType::Function { ret: return_ty, .. } = ty.id.resolve_in(resolver.sema) else {
         unreachable!()
     };
     let is_defined_return = return_ty.is_void(resolver.sema) || return_ty.is_complete(resolver.sema);
@@ -85,15 +85,15 @@ pub fn define_function(
 }
 
 fn param_types(sema: &Sema, sym: SymbolId) -> Option<ParamTypes> {
-    let ty = sym.resolve(sema).ty?;
-    match ty.id.resolve(sema) {
+    let ty = sym.resolve_in(sema).ty?;
+    match ty.id.resolve_in(sema) {
         ResolvedType::Function { params, .. } => Some(params.clone()),
         _ => None,
     }
 }
 
 fn with_param_types(sema: &mut Sema, ty: QualifiedType, params: ParamTypes) -> QualifiedType {
-    let ret = match ty.id.resolve(sema) {
+    let ret = match ty.id.resolve_in(sema) {
         ResolvedType::Function { ret, .. } => *ret,
         _ => return ty,
     };
@@ -113,7 +113,7 @@ fn check_identifier_list(
     {
         return;
     }
-    let identifiers: Vec<QualifiedType> = parameters.iter().filter_map(|sym| (*sym).resolve(sema).ty).collect();
+    let identifiers: Vec<QualifiedType> = parameters.iter().filter_map(|sym| (*sym).resolve_in(sema).ty).collect();
     if identifiers.len() != parameters.len() || declared.is_compatible_with_identifiers(sema, &identifiers) {
         return;
     }
@@ -140,7 +140,7 @@ fn param_prototype(
         return Vec::new();
     }
     if let [only] = params {
-        let is_void = matches!(only.ty.id.resolve(resolver.sema), ResolvedType::Void);
+        let is_void = matches!(only.ty.id.resolve_in(resolver.sema), ResolvedType::Void);
         constrain::parameter::check_void_parameter(is_void).collect(resolver, &only.span);
     }
     for param in params {
@@ -182,7 +182,7 @@ fn param_old_style(
                     .iter()
                     .map(|decl| {
                         add_parameter_declarator(resolver, ctx, specifiers, &decl.declarator, span)
-                            .map(|sym_id| sym_id.resolve(resolver.sema).name.id)
+                            .map(|sym_id| sym_id.resolve_in(resolver.sema).name.id)
                     })
                     .collect::<Vec<_>>()
             },
