@@ -140,7 +140,7 @@ impl Unit {
             .expressions
             .iter()
             .filter_map(|expression| match expression {
-                Expression::StringLiteral(literal) => Some(string_display(literal.constant(self.ctx))),
+                Expression::StringLiteral(literal) => Some(string_display(literal.constant())),
                 _ => None,
             })
             .collect()

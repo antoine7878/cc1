@@ -4,7 +4,6 @@ use std::slice::Iter;
 use crate::ast;
 use crate::ast::visit::Visitor;
 use crate::ast::{Expression, ExpressionId, ExpressionNode, InitializerNode, StringConstId, Tag, Value};
-use crate::context::ctx;
 use crate::define_arena;
 use crate::semantic::resolution::expression;
 use crate::semantic::{
@@ -151,12 +150,12 @@ fn string(resolver: &mut SymbolResolver, ty: QualifiedType, e: &ExpressionNode) 
     let Expression::StringLiteral(literal) = e.id.resolve() else {
         return None;
     };
-    if literal.is_wide(ctx()) {
+    if literal.is_wide() {
         return None;
     }
     let id = literal.id;
     resolver.visit_expression(e);
-    if len.is_some_and(|len| len < literal.len(ctx())) {
+    if len.is_some_and(|len| len < literal.len()) {
         resolver.add_diag(Diag::err((), Diagnosis::ArrayInitTooLong), &e.span);
     }
     Some(Initializer::String(id))

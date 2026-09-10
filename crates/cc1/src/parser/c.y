@@ -15,7 +15,7 @@ use crate::parser::yyerror;
 use crate::semantic::{Diagnosis, DiagnosisNode};
 
 fn concat_string_literals(ctx: &mut Context, lhs: StringLiteralNode, rhs: StringLiteralNode, span: Span) -> StringLiteralNode {
-    if lhs.is_wide(ctx) != rhs.is_wide(ctx) {
+    if lhs.id.resolve_in(&ctx.arenas).is_wide != rhs.id.resolve_in(&ctx.arenas).is_wide {
         ctx.diagnosis.push(DiagnosisNode::new(Diagnosis::MixedWideStringConcat, span));
     }
     ctx.arenas.strings.concat(lhs, rhs, span)

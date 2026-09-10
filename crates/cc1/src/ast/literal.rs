@@ -1,6 +1,5 @@
 use crate::ast::escape;
 use crate::ast_node;
-use crate::context::{Context, ctx};
 use crate::define_interner;
 use crate::semantic::{Diag, QualifiedType, Sema};
 use libft::Span;
@@ -20,20 +19,20 @@ ast_node! {
 }
 
 impl StringLiteralNode {
-    pub fn constant<'a>(&self, ctx: &'a Context) -> &'a StringConstant {
-        self.id.resolve_in(&ctx.arenas)
+    pub fn constant(&self) -> &'static StringConstant {
+        self.id.resolve()
     }
 
-    pub fn is_wide(&self, ctx: &Context) -> bool {
-        self.constant(ctx).is_wide
+    pub fn is_wide(&self) -> bool {
+        self.constant().is_wide
     }
 
-    pub fn len(&self, ctx: &Context) -> usize {
-        self.constant(ctx).units.len()
+    pub fn len(&self) -> usize {
+        self.constant().units.len()
     }
 
     pub fn ty(&self, sema: &mut Sema) -> QualifiedType {
-        let constant = self.constant(ctx());
+        let constant = self.constant();
         let (is_wide, len) = (constant.is_wide, constant.units.len());
         let base_id = if is_wide { sema.builtins.int } else { sema.builtins.char };
         let base = QualifiedType::plain(base_id);
