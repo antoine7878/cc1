@@ -1,4 +1,6 @@
 void f1(void) {
-	int *a;
-	a + 2;
+	unsigned int ur;
+	int a;
+	ur + ur;
+	a + a;
 }

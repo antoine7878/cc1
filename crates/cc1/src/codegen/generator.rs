@@ -6,9 +6,9 @@ use crate::ast::{
     ExpressionNode, FunctionDefinitionNode, JumpStatement, JumpStatementNode, TranslationUnitNode, Visitor,
 };
 use crate::codegen::AllocaCollector;
+use crate::codegen::llvm::Builder;
 use crate::context::Context;
 use crate::semantic::{ResolvedType, SymbolId};
-use crate::{emit, emitln};
 
 pub fn generate(ctx: Context) -> Context {
     let mut generator = Generator::new(stdout());
@@ -18,28 +18,22 @@ pub fn generate(ctx: Context) -> Context {
 
 #[derive(Debug)]
 pub struct Generator<W: Write> {
-    pub w: W,
+    pub b: Builder<W>,
     pub locals: HashMap<SymbolId, usize>,
-    counter: usize,
 }
 
 impl<W: Write> Generator<W> {
     fn new(w: W) -> Self {
         Self {
-            w,
+            b: Builder::new(w),
             locals: HashMap::new(),
-            counter: 0,
         }
     }
 
-    pub fn next_id(&mut self) -> usize {
-        self.counter += 1;
-        self.counter
-    }
     fn allocas(&mut self, ctx: &Context, node: &FunctionDefinitionNode) {
         self.locals.clear();
         AllocaCollector::run(&mut self.locals, ctx, node);
-        self.counter = self.locals.len();
+        self.b.reset(self.locals.len());
         let mut it: Vec<(SymbolId, usize)> = self
             .locals
             .iter()
@@ -49,26 +43,19 @@ impl<W: Write> Generator<W> {
         for (sym_id, alloc_id) in it {
             self.alloca(ctx, sym_id, alloc_id);
         }
-        emitln!(self);
+        self.b.blank();
     }
 
     fn alloca(&mut self, ctx: &Context, sym_id: SymbolId, id: usize) {
         let qty = sym_id.resolve(ctx).ty.unwrap();
-        emitln!(
-            self,
-            "  %{} = alloca {}, algin {}",
-            id,
-            qty.llvm(ctx),
-            qty.layout(ctx).unwrap().align
-        );
+        self.b.alloca(id, qty.llvm(ctx), qty.layout(ctx).unwrap().align);
     }
 }
 
 impl<W: Write> Visitor for Generator<W> {
     fn visit_translation_unit(&mut self, ctx: &Context, node: &TranslationUnitNode) {
-        emitln!(self, r#"target datalayout = "{}""#, ctx.target.datalayout);
-        emitln!(self, r#"target triple = "{}""#, ctx.target.triple);
-        emitln!(self);
+        self.b.target(ctx.target.datalayout, ctx.target.triple);
+        self.b.blank();
         walk_translation_unit(self, ctx, node);
     }
 
@@ -77,10 +64,10 @@ impl<W: Write> Visitor for Generator<W> {
         let ty = sym.ty.unwrap().id.resolve(ctx);
         let ResolvedType::Function { ret, .. } = ty else { unreachable!() };
         let ret_ty = ret.id.resolve(ctx);
-        emitln!(self, "define {} @{}() {{", ret_ty.llvm(ctx), sym.name.id.resolve(ctx));
+        self.b.define(ret_ty.llvm(ctx), sym.name.id.resolve(ctx));
         self.allocas(ctx, node);
         self.visit_compound_statement(ctx, &node.body);
-        emitln!(self, "}}");
+        self.b.end_function();
     }
 
     fn visit_jump_statement(&mut self, ctx: &Context, node: &JumpStatementNode) {
@@ -88,9 +75,9 @@ impl<W: Write> Visitor for Generator<W> {
             JumpStatement::Return(Some(e)) => {
                 let ty = ctx.sema.expr_types[e.id].ty.llvm(ctx);
                 let v = self.fold_expression(ctx, e);
-                emitln!(self, "  ret {ty} {v}");
+                self.b.ret(ty, v);
             }
-            JumpStatement::Return(None) => emit!(self, "  ret void"),
+            JumpStatement::Return(None) => self.b.ret_void(),
             _ => todo!(),
         }
     }

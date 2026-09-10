@@ -1,26 +1,9 @@
-use std::fmt;
 use std::io::Write;
 
-use crate::ast::{BinaryOp, Expression, ExpressionNode, Value};
+use crate::ast::{BinaryOp, Expression, ExpressionNode};
 use crate::codegen::Generator;
+use crate::codegen::llvm::{LLVMValue, Op};
 use crate::context::Context;
-use crate::emitln;
-
-#[derive(Debug)]
-pub enum LLVMValue {
-    SSA(usize),
-    Literal(Value),
-    // Global(NameId),
-}
-
-impl fmt::Display for LLVMValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            LLVMValue::SSA(id) => write!(f, "%{id}"),
-            LLVMValue::Literal(value) => write!(f, "{value}"),
-        }
-    }
-}
 
 impl<W: Write> Generator<W> {
     pub fn fold_expression(&mut self, ctx: &Context, node: &ExpressionNode) -> LLVMValue {
@@ -36,12 +19,9 @@ impl<W: Write> Generator<W> {
         let re = &ctx.sema.expr_types[node.id];
         let qty = re.casted_ty();
         let sym_id = ctx.sema.expr_bindings[node.id];
-        let r = self.next_id();
-        let ty = qty.llvm(ctx);
         let slot = self.locals[&sym_id];
         let align = qty.layout(ctx).unwrap().align;
-        emitln!(self, "  %{r} = load {ty}, ptr %{slot}, align {align}");
-        LLVMValue::SSA(r)
+        self.b.load(qty.llvm(ctx), slot, align)
     }
 
     fn binary(
@@ -55,22 +35,19 @@ impl<W: Write> Generator<W> {
         let re = &ctx.sema.expr_types[node.id];
         let f = re.ty.is_floating(&ctx.sema);
         let op = match (op, f) {
-            (BinaryOp::Add, false) => "add nsw",
-            (BinaryOp::Sub, false) => "sub nsw",
-            (BinaryOp::Mul, false) => "mul nsw",
-            (BinaryOp::Div, false) => "sdiv",
-            (BinaryOp::Mod, false) => "srem",
+            (BinaryOp::Add, false) => Op::Add,
+            (BinaryOp::Sub, false) => Op::Sub,
+            (BinaryOp::Mul, false) => Op::Mul,
+            (BinaryOp::Div, false) => Op::SDiv,
+            (BinaryOp::Mod, false) => Op::SRem,
 
-            (BinaryOp::Add, true) => "fadd",
-            (BinaryOp::Sub, true) => "fsub",
+            (BinaryOp::Add, true) => Op::FAdd,
+            (BinaryOp::Sub, true) => Op::FSub,
             _ => todo!(),
         };
         let v1 = self.fold_expression(ctx, e1);
         let v2 = self.fold_expression(ctx, e2);
         let qty = re.casted_ty();
-        let r = self.next_id();
-        let ty = qty.llvm(ctx);
-        emitln!(self, "  %{r} = {op} {ty} {v1}, {v2}");
-        LLVMValue::SSA(r)
+        self.b.binop(op, qty.llvm(ctx), v1, v2)
     }
 }
