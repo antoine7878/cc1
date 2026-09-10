@@ -80,7 +80,7 @@ impl AstPrinter {
     fn print_expression_type(&mut self, id: ExpressionId) {
         let sema = sema();
         let Some(resolved) = sema.expr_types.get(id) else { return };
-        self.put(format_args!("{GREEN}'{}'{CYAN}", resolved.ty.describe(sema)));
+        self.put(format_args!("{GREEN}'{}'{CYAN}", resolved.ty.describe()));
         if matches!(resolved.kind, ExpressionKind::LValue) {
             self.put(format_args!(" lvalue"));
         }
@@ -88,7 +88,7 @@ impl AstPrinter {
             self.put(format_args!(
                 " {GRAY}{}{CYAN} {GREEN}'{}'{CYAN}",
                 cast.kind,
-                cast.to.describe(sema)
+                cast.to.describe()
             ));
         }
         self.put(format_args!(" "));

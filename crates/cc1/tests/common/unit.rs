@@ -319,7 +319,7 @@ impl Unit {
                 cases,
                 default,
             } => {
-                let control = control.describe(self.sema);
+                let control = control.describe();
                 let cases: Vec<String> = cases
                     .iter()
                     .map(|(value, id)| format!("{}->#{}", repr(Some(*value)), usize::from(*id)))
@@ -395,10 +395,7 @@ impl Unit {
                 (
                     symbol.name.id.resolve().clone(),
                     symbol.kind.to_string(),
-                    symbol
-                        .ty
-                        .map(|ty| ty.describe(self.sema).to_string())
-                        .unwrap_or_default(),
+                    symbol.ty.map(|ty| ty.describe().to_string()).unwrap_or_default(),
                 )
             })
             .collect()

@@ -294,8 +294,8 @@ impl QualifiedType {
         }
     }
 
-    pub fn describe<'a>(&'a self, sema: &'a Sema) -> TypeName<'a> {
-        TypeName(self, sema)
+    pub fn describe(&self) -> TypeName<'_> {
+        TypeName(self)
     }
 
     pub fn is_void(&self, sema: &Sema) -> bool {
@@ -364,18 +364,18 @@ impl QualifiedType {
     }
 }
 
-pub struct TypeName<'a>(&'a QualifiedType, &'a Sema);
+pub struct TypeName<'a>(&'a QualifiedType);
 
 impl fmt::Display for TypeName<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let TypeName(ty, sema) = *self;
+        let TypeName(ty) = *self;
         if ty.is_const {
             f.write_str("const ")?;
         }
         if ty.is_volatile {
             f.write_str("volatile ")?;
         }
-        match ty.id.resolve_in(sema) {
+        match ty.id.resolve() {
             ResolvedType::Void => f.write_str("void"),
             ResolvedType::Char => f.write_str("char"),
             ResolvedType::SignedChar => f.write_str("signed char"),
@@ -390,25 +390,23 @@ impl fmt::Display for TypeName<'_> {
             ResolvedType::Double => f.write_str("double"),
             ResolvedType::LongDouble => f.write_str("long double"),
             ResolvedType::Pointer(inner) => {
-                match inner.id.resolve_in(sema) {
-                    ResolvedType::Function { .. } | ResolvedType::Array { .. } => {
-                        write!(f, "({})", inner.describe(sema))?
-                    }
-                    _ => write!(f, "{}", inner.describe(sema))?,
+                match inner.id.resolve() {
+                    ResolvedType::Function { .. } | ResolvedType::Array { .. } => write!(f, "({})", inner.describe())?,
+                    _ => write!(f, "{}", inner.describe())?,
                 }
                 f.write_str(" *")
             }
             &ResolvedType::Tag(id) => {
-                let def = id.resolve_in(sema);
+                let def = id.resolve();
                 let name = def.name.map_or("<anonymous>", |n| n.id.resolve().as_str());
                 write!(f, "{} {}", def.kind(), name)
             }
             ResolvedType::Array { elem, len } => {
                 let mut base = elem;
-                while let ResolvedType::Array { elem: inner, .. } = base.id.resolve_in(sema) {
+                while let ResolvedType::Array { elem: inner, .. } = base.id.resolve() {
                     base = inner;
                 }
-                write!(f, "{}", base.describe(sema))?;
+                write!(f, "{}", base.describe())?;
                 let (mut elem, mut len) = (elem, len);
                 loop {
                     f.write_str("[")?;
@@ -416,13 +414,13 @@ impl fmt::Display for TypeName<'_> {
                         write!(f, "{len}")?;
                     }
                     f.write_str("]")?;
-                    let ResolvedType::Array { elem: inner, len: size } = elem.id.resolve_in(sema) else { break };
+                    let ResolvedType::Array { elem: inner, len: size } = elem.id.resolve() else { break };
                     (elem, len) = (inner, size);
                 }
                 Ok(())
             }
             ResolvedType::Function { ret, params } => {
-                write!(f, "{}(", ret.describe(sema))?;
+                write!(f, "{}(", ret.describe())?;
                 if let ParamTypes::Prototype { params, is_variadic } = params {
                     if params.is_empty() {
                         f.write_str("void")?;
@@ -431,7 +429,7 @@ impl fmt::Display for TypeName<'_> {
                             if i > 0 {
                                 f.write_str(", ")?;
                             }
-                            write!(f, "{}", param.describe(sema))?;
+                            write!(f, "{}", param.describe())?;
                         }
                     }
                     if *is_variadic {
