@@ -4,7 +4,6 @@ use std::iter::zip;
 use crate::ast::Tag;
 use crate::context::ctx;
 use crate::define_interner;
-use crate::semantic::resolution::expression::R;
 use crate::semantic::{ParamTypes, Sema, TagDefId};
 use crate::target::{Layout, Target};
 
