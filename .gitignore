@@ -1,4 +1,42 @@
 crates/*/src/parser/lex.rs
 crates/*/src/parser/yacc.rs
 tarpaulin-report.*
+
+# Other
+samples/
+.cache
+
+# C
 *.o
+a.out
+
+# Javascript
+node_module
+
+# Python
+__pycache__
+.venv/
+
+# Rust
+obj/
+_build/
+target/
+
+#OCaml
+_opam/
+*.cmi
+*.cmo
+*.cmx 
+*.d
+_d/
+
+# Macos
+.DS_Store
+*.dSYM
+
+# Latex
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+.claude/worktrees
