@@ -11,7 +11,7 @@ LEX_RS =  crates/cc1/src/parser/lex.rs
 YACC_RS = crates/cc1/src/parser/yacc.rs
 
 all: $(LEX_RS) $(YACC_RS)
-	cargo build -p ccp -p cc1 -p fcc
+	cargo build -p cpp -p cc1 -p fcc
 
 $(FT_LEX) $(FT_YACC):
 	cargo build --release -p ft_lex -p ft_yacc

@@ -76,7 +76,13 @@ impl Args {
     }
 
     fn help() -> ! {
-        println!("usage: ccp [-o output] input");
+        println!("usage: cpp [-D name[=value]] [-I directory] [-o outfile] [-U name] input");
+        println!();
+        println!("  -D name[=val] define a preprocessor macro (default value 1)");
+        println!("  -U name       undefine a preprocessor macro");
+        println!("  -I directory  add a directory to the #include search path");
+        println!("  -o outfile    write output to outfile (default: standard output)");
+        println!("  -h            print this help and exit");
         exit(0)
     }
 }

@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ccp"
+name = "cpp"
 version = "0.1.0"
 dependencies = [
  "libft",
@@ -21,7 +21,7 @@ name = "fcc"
 version = "0.1.0"
 dependencies = [
  "cc1",
- "ccp",
+ "cpp",
  "libft",
 ]
 

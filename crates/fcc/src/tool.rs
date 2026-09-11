@@ -3,7 +3,7 @@ use std::path::Path;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tool {
-    Ccp,
+    Cpp,
     Clang,
     Cc1,
     Llc,
@@ -13,7 +13,7 @@ pub enum Tool {
 impl Tool {
     pub fn name(self) -> &'static str {
         match self {
-            Tool::Ccp => "ccp",
+            Tool::Cpp => "cpp",
             Tool::Clang => "clang",
             Tool::Cc1 => "cc1",
             Tool::Llc => "llc",
@@ -23,7 +23,7 @@ impl Tool {
 
     pub fn path(self) -> &'static Path {
         let s = match self {
-            Tool::Ccp => "./target/debug/ccp",
+            Tool::Cpp => "./target/debug/cpp",
             Tool::Cc1 => "./target/debug/cc1",
             Tool::Llc => "llc",
             Tool::As => "as",
@@ -36,7 +36,7 @@ impl Tool {
 impl fmt::Display for Tool {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
-            Tool::Ccp => "ccp",
+            Tool::Cpp => "cpp",
             Tool::Cc1 => "cc1",
             Tool::Llc => "llc",
             Tool::As => "As",

@@ -57,7 +57,7 @@ fn drive(args: &Args, step: &Step) -> Result<(), String> {
     let input = str_of(&step.input)?;
     let output = str_of(&step.output)?;
     match step.stage {
-        Stage::Preprocess => spawn(Tool::Ccp, &cpp_argv(args, input, output), None),
+        Stage::Preprocess => spawn(Tool::Cpp, &cpp_argv(args, input, output), None),
         Stage::Compile => spawn(Tool::Cc1, &cc1_argv(args, input), Some(output)),
         Stage::Lower => spawn(Tool::Llc, &llc_argv(args, input, output), None),
         Stage::Assemble => spawn(Tool::As, &as_argv(args, input, output), None),

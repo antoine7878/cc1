@@ -1,5 +1,5 @@
 [package]
-name = "ccp"
+name = "cpp"
 version.workspace = true
 edition.workspace = true
 

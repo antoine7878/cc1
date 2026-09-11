@@ -6,4 +6,4 @@ edition.workspace = true
 [dependencies]
 libft.workspace = true
 cc1.workspace = true
-ccp.workspace = true
+cpp.workspace = true
