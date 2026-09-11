@@ -128,8 +128,23 @@ impl Args {
     }
 
     fn help() -> ! {
-        println!("usage: fcc [-cEsS] [-D name[=value]] [-I directory] [-L directory]");
-        println!("           [-l library] [-O optlevel] [-o outfile] [-U name] file...");
+        println!("usage: fcc [-ceEsS] [-D name[=value]] [-I directory] [-L directory]");
+        println!("           [-l library] [-m 32|64] [-O level] [-o outfile] [-U name] file...");
+        println!();
+        println!("  -c            stop after assembling; write an object file (.o)");
+        println!("  -e            stop after compiling; write LLVM IR (.ll)");
+        println!("  -E            stop after preprocessing; write to standard output");
+        println!("  -S            stop after lowering; write assembly (.s)");
+        println!("  -s            strip symbols from the linked executable");
+        println!("  -D name[=val] define a preprocessor macro (default value 1)");
+        println!("  -U name       undefine a preprocessor macro");
+        println!("  -I directory  add a directory to the #include search path");
+        println!("  -L directory  add a directory to the library search path");
+        println!("  -l library    link against lib<library>");
+        println!("  -m 32|64      target architecture (default 64)");
+        println!("  -O level      optimization level passed to llc");
+        println!("  -o outfile    write output to outfile (not with -c/-e/-E/-S and several inputs)");
+        println!("  -h            print this help and exit");
         exit(0)
     }
 }
