@@ -11,7 +11,11 @@ use crate::context::ctx;
 use crate::semantic::{ResolvedType, sema};
 
 pub fn generate() {
-    let mut generator = Generator::new(stdout());
+    generate_to(stdout());
+}
+
+pub fn generate_to<W: Write>(w: W) {
+    let mut generator = Generator::new(w);
     generator.visit_translation_unit(&ctx().ast);
 }
 

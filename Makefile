@@ -36,8 +36,7 @@ test: all
 otest: all
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
 	cargo run --bin fcc -- -e ./rscs/hello.c  -o ./rscs/hello.ll
-	chmod 777 ./rscs/hello.ll
-	./rscs/hello.ll
+	opt -passes=verify -S ./rscs/hello.ll
 
 ftest: all
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
