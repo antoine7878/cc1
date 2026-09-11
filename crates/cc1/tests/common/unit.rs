@@ -3,6 +3,7 @@ use std::process::{Command, Stdio};
 
 use cc1::ast::statement::StatementId;
 use cc1::ast::{ConstValue, Expression, ExpressionId, Name, StringConstant, Tag};
+use cc1::codegen::generate_to;
 use cc1::context::{self, Context, install};
 use cc1::parser::parse_reader;
 use cc1::semantic::{
@@ -167,6 +168,7 @@ impl Unit {
 
     pub fn ty_tree(&self, qt: QualifiedType) -> Ty {
         let base = match qt.id.resolve() {
+            ResolvedType::Bool => unimplemented!(),
             ResolvedType::Void => Ty::Void,
             ResolvedType::Char => Ty::Char,
             ResolvedType::SignedChar => Ty::SChar,
@@ -423,6 +425,12 @@ impl Unit {
                 strip_ansi(&String::from_utf8_lossy(&buf)).trim_end().to_string()
             })
             .collect()
+    }
+
+    pub fn ir(&self) -> String {
+        let mut buf = Vec::new();
+        generate_to(&mut buf);
+        String::from_utf8(buf).expect("ir is utf-8")
     }
 
     pub fn render(&self) -> String {

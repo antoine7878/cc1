@@ -16,6 +16,7 @@ mod test_operator;
 mod test_parsing;
 mod test_pipeline;
 mod test_resolution;
+mod test_run;
 mod test_scope;
 mod test_semantic;
 mod test_side_table;

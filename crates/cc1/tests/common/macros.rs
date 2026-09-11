@@ -52,6 +52,20 @@ macro_rules! value {
 }
 
 #[macro_export]
+macro_rules! exits {
+    ($name:ident, $src:expr, $expected:expr) => {
+        test_case!($name, {
+            $crate::common::run_exit(stringify!($name), $src, $expected);
+        });
+    };
+    (ignore $reason:literal, $name:ident, $src:expr, $expected:expr) => {
+        test_case!(ignore $reason, $name, {
+            $crate::common::run_exit(stringify!($name), $src, $expected);
+        });
+    };
+}
+
+#[macro_export]
 macro_rules! stmts {
     ($name:ident, $src:expr, $expected:expr) => {
         test_case!($name, {
