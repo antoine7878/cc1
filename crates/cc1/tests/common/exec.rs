@@ -1,6 +1,8 @@
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
+use cc1::ast::JumpStatement::Continue;
+
 use crate::common::Unit;
 
 const CONTAINER: &str = "linux-amd64-cont";
@@ -16,9 +18,8 @@ fn i386_shell(script: &str, stdin: &str) -> Output {
         c.args(["-c", script]);
         c
     } else {
-        let container = std::env::var("CC1_CONTAINER").unwrap_or_else(|_| CONTAINER.to_string());
         let mut c = Command::new("docker");
-        c.args(["exec", "-i", &container, "sh", "-c", script]);
+        c.args(["exec", "-i", CONTAINER, "sh", "-c", script]);
         c
     };
 
@@ -34,9 +35,8 @@ fn i386_shell(script: &str, stdin: &str) -> Output {
 }
 
 fn build_and_run(compile: &str, input: &str) -> Output {
-    let script = format!(
-        "d=$(mktemp -d) && cat > $d/in && {compile} -o $d/bin $d/in && $d/bin; s=$?; rm -rf $d; exit $s"
-    );
+    let script =
+        format!("d=$(mktemp -d) && cat > $d/in && {compile} -o $d/bin $d/in && $d/bin; s=$?; rm -rf $d; exit $s");
     i386_shell(&script, input)
 }
 
