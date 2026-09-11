@@ -27,20 +27,11 @@ fn f80_parses_decimal_constants() {
 
 #[test]
 fn f80_keeps_the_bits_a_double_would_lose() {
-    assert_eq!(
-        format!("{:X}", F80::from("9007199254740993")),
-        "0xK40348000000000000400"
-    );
-    assert_eq!(
-        format!("{:X}", F80::from("18446744073709551615")),
-        "0xK403EFFFFFFFFFFFFFFFF"
-    );
+    assert_eq!(format!("{:X}", F80::from("9007199254740993")), "0xK40348000000000000400");
+    assert_eq!(format!("{:X}", F80::from("18446744073709551615")), "0xK403EFFFFFFFFFFFFFFFF");
     assert_eq!(i64::from(F80::from("9007199254740993")), 9007199254740993);
     assert_ne!(F80::from("1.0") + F80::from("1e-19"), F80::from("1.0"));
-    assert_eq!(
-        format!("{:X}", F80::from("1.0") + F80::from("1e-19")),
-        "0xK3FFF8000000000000001"
-    );
+    assert_eq!(format!("{:X}", F80::from("1.0") + F80::from("1e-19")), "0xK3FFF8000000000000001");
 }
 
 #[test]
@@ -201,38 +192,23 @@ fn f80_cancels_exactly() {
     assert!(!(x - x).is_negative());
     let stepped = F80::from("1.0") + F80::from("1e-19");
     assert_eq!(format!("{:X}", stepped - F80::from("1.0")), "0xK3FC08000000000000000");
-    assert_eq!(
-        format!("{:X}", F80::from("1.0") - F80::from("1e-30")),
-        "0xK3FFF8000000000000000"
-    );
+    assert_eq!(format!("{:X}", F80::from("1.0") - F80::from("1e-30")), "0xK3FFF8000000000000000");
 }
 
 #[test]
 fn f80_rounds_a_carry_out_into_the_next_exponent() {
-    assert_eq!(
-        format!("{:X}", F80::from("18446744073709551615.5")),
-        "0xK403F8000000000000000"
-    );
+    assert_eq!(format!("{:X}", F80::from("18446744073709551615.5")), "0xK403F8000000000000000");
     assert_eq!(
         format!("{:X}", F80::from("18446744073709551615.5")),
         format!("{:X}", F80::from("18446744073709551616"))
     );
-    assert_eq!(
-        format!("{:X}", F80::from(u64::MAX) + F80::from("0.5")),
-        "0xK403F8000000000000000"
-    );
+    assert_eq!(format!("{:X}", F80::from(u64::MAX) + F80::from("0.5")), "0xK403F8000000000000000");
 }
 
 #[test]
 fn f80_rounds_across_the_denormal_boundary() {
-    assert_eq!(
-        format!("{:X}", F80::from("336210314311209350617154782902e-4961")),
-        "0xK00018000000000000000"
-    );
-    assert_eq!(
-        format!("{:X}", F80::from("336210314311209350598928785243e-4961")),
-        "0xK00007FFFFFFFFFFFFFFF"
-    );
+    assert_eq!(format!("{:X}", F80::from("336210314311209350617154782902e-4961")), "0xK00018000000000000000");
+    assert_eq!(format!("{:X}", F80::from("336210314311209350598928785243e-4961")), "0xK00007FFFFFFFFFFFFFFF");
 }
 
 #[test]
@@ -285,10 +261,7 @@ fn f80_converts_specials_to_and_from_f64() {
     assert!(F80::from(f64::NEG_INFINITY).is_infinite());
     assert!(F80::from(f64::NEG_INFINITY).is_negative());
     assert!(F80::from(-0.0f64).is_zero());
-    assert_eq!(
-        format!("{:X}", F80::from(f64::MIN_POSITIVE / 2.0)),
-        "0xK3C008000000000000000"
-    );
+    assert_eq!(format!("{:X}", F80::from(f64::MIN_POSITIVE / 2.0)), "0xK3C008000000000000000");
 
     let (one, zero) = (F80::from("1.0"), F80::from("0.0"));
     assert!(f64::from(zero / zero).is_nan());

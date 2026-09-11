@@ -46,10 +46,7 @@ impl LexParser {
     }
 
     fn error(&self, msg: &str) -> Result<(), LexError> {
-        Err(LexError::InputFile(format!(
-            "{}:{} {}",
-            self.current_file, self.line_no, msg
-        )))
+        Err(LexError::InputFile(format!("{}:{} {}", self.current_file, self.line_no, msg)))
     }
 
     fn open_file(&mut self, path: &str) -> Result<BufReader<Box<dyn Read>>, LexError> {
@@ -97,12 +94,7 @@ impl LexParser {
         let nfa_state_count = nfa.nodes.len();
         let dfa = Dfa::from(nfa);
         let table_dfa = TableDfa::new(dfa, compress);
-        let a = self
-            .code_fragments
-            .iter()
-            .cloned()
-            .map(|v| String::from_utf8(v).unwrap())
-            .collect();
+        let a = self.code_fragments.iter().cloned().map(|v| String::from_utf8(v).unwrap()).collect();
 
         Ok(Lex {
             nfa_state_count,
@@ -237,12 +229,8 @@ impl LexParser {
             self.next_state(LexParserState::Auxiliary);
             return Ok(());
         }
-        let (nfa, depth, in_comment) = Rule::parse(
-            line.into(),
-            &self.definition.substitutions,
-            &self.start_conditions,
-            &mut self.code_fragments,
-        )?;
+        let (nfa, depth, in_comment) =
+            Rule::parse(line.into(), &self.definition.substitutions, &self.start_conditions, &mut self.code_fragments)?;
         if depth != 0 {
             self.next_state(LexParserState::ActionBlock(depth, in_comment));
         }

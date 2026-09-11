@@ -19,12 +19,7 @@ mod test {
             .unwrap()
             .wait_with_output()
             .unwrap();
-        let out = child
-            .stdout
-            .iter()
-            .chain(child.stderr.iter())
-            .cloned()
-            .collect::<Vec<_>>();
+        let out = child.stdout.iter().chain(child.stderr.iter()).cloned().collect::<Vec<_>>();
         println!("{}", String::from_utf8_lossy(&out));
         assert!(child.status.success());
         out
@@ -58,11 +53,7 @@ mod test {
 
     #[test]
     fn basic_rs() {
-        test_lex(
-            "./test/basic_r.l",
-            "salutbonjoursalut\nsalut\naurevoir\n",
-            b"SALUTbonjourSALUT\nSALUT\naurevoir\n",
-        );
+        test_lex("./test/basic_r.l", "salutbonjoursalut\nsalut\naurevoir\n", b"SALUTbonjourSALUT\nSALUT\naurevoir\n");
     }
 
     #[test]
@@ -86,16 +77,8 @@ mod test {
 
     #[test]
     fn condition_rs() {
-        test_lex(
-            "./test/condition_1_r.l",
-            "salutbonjoursalut\nsalut\naurevoir\n",
-            b"salutSALUT\nSALUT\naurevoir\n",
-        );
-        test_lex(
-            "./test/condition_2_r.l",
-            "salutbonjoursalut\nsalut\naurevoir\n",
-            b"salut\n\n\n",
-        );
+        test_lex("./test/condition_1_r.l", "salutbonjoursalut\nsalut\naurevoir\n", b"salutSALUT\nSALUT\naurevoir\n");
+        test_lex("./test/condition_2_r.l", "salutbonjoursalut\nsalut\naurevoir\n", b"salut\n\n\n");
     }
 
     #[test]
@@ -139,11 +122,7 @@ mod test {
 
     #[test]
     fn number_rs() {
-        test_lex(
-            "./test/number_r.l",
-            "1+23*456",
-            b"Number: 1\nOperator: +\nNumber: 23\nOperator: *\nNumber: 456\n",
-        );
+        test_lex("./test/number_r.l", "1+23*456", b"Number: 1\nOperator: +\nNumber: 23\nOperator: *\nNumber: 456\n");
     }
 
     #[test]
@@ -166,10 +145,6 @@ mod test {
 
     #[test]
     fn multi_rs() {
-        test_lex_multi(
-            &["./test/1_r.l", "./test/2_r.l", "./test/3_r.l"],
-            "salut\n",
-            b"COUCOU\n",
-        );
+        test_lex_multi(&["./test/1_r.l", "./test/2_r.l", "./test/3_r.l"], "salut\n", b"COUCOU\n");
     }
 }

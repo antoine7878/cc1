@@ -20,11 +20,6 @@ impl ResolvedExpression {
     }
 
     pub fn new(ty: QualifiedType, kind: ExpressionKind) -> Self {
-        Self {
-            ty,
-            kind,
-            casts: Vec::new(),
-            result_cast: None,
-        }
+        Self { ty, kind, casts: Vec::new(), result_cast: None }
     }
 }

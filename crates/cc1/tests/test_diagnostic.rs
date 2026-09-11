@@ -14,11 +14,7 @@ reports!(
     ["<test>:3:10: error: Use of undeclared identifier 'y'"]
 );
 
-reports!(
-    report_duplicate_declaration,
-    "int x; char x;",
-    ["<test>:1:13: error: duplicate declaration of variable `x'"]
-);
+reports!(report_duplicate_declaration, "int x; char x;", ["<test>:1:13: error: duplicate declaration of variable `x'"]);
 
 reports!(
     report_duplicate_declaration_across_lines,
@@ -26,11 +22,7 @@ reports!(
     ["<test>:2:6: error: duplicate declaration of variable `x'"]
 );
 
-reports!(
-    report_non_constant_expression,
-    "int x; enum E { A = x };",
-    ["<test>:1:21: error: Non constant expression"]
-);
+reports!(report_non_constant_expression, "int x; enum E { A = x };", ["<test>:1:21: error: Non constant expression"]);
 
 reports!(
     report_non_integer_constant_expression,
@@ -89,11 +81,7 @@ reports!(
     ]
 );
 
-reports!(
-    report_named_void_parameter,
-    "void f(void x) { }",
-    ["<test>:1:8: error: Parameter shall not have void type"]
-);
+reports!(report_named_void_parameter, "void f(void x) { }", ["<test>:1:8: error: Parameter shall not have void type"]);
 
 reports!(
     report_parameter_storage_class,
@@ -130,11 +118,7 @@ fn an_accepted_unit_reports_nothing() {
 fn a_syntax_error_is_reported_by_the_parser() {
     let unit = Unit::compile("int f(void) { return; ; }; }");
     assert!(!unit.parsed());
-    assert!(
-        unit.messages().iter().any(|message| message.contains("syntax error")),
-        "{:?}",
-        unit.messages()
-    );
+    assert!(unit.messages().iter().any(|message| message.contains("syntax error")), "{:?}", unit.messages());
 }
 
 #[test]
@@ -153,11 +137,7 @@ fn a_report_names_the_file_and_position() {
     assert!(message.starts_with("<test>:1:16: "), "{message}");
 }
 
-reports!(
-    report_empty_declaration,
-    "int ;",
-    ["<test>:1:1: error: Declaration declares nothing"]
-);
+reports!(report_empty_declaration, "int ;", ["<test>:1:1: error: Declaration declares nothing"]);
 
 reports!(
     report_syntax_error_lists_expected_tokens,
@@ -189,28 +169,18 @@ reports!(
     ["<test>:1:24: error: syntax error, unexpected end of file, expecting ';' or '}'"]
 );
 
-reports!(
-    report_syntax_error_without_expected_tokens,
-    "int x = ;",
-    ["<test>:1:9: error: syntax error, unexpected ';'"]
-);
+reports!(report_syntax_error_without_expected_tokens, "int x = ;", ["<test>:1:9: error: syntax error, unexpected ';'"]);
 
 reports!(
     report_struct_without_member,
     "struct s { int; };",
-    [
-        "<test>:1:12: error: Declaration declares nothing",
-        "<test>:1:1: error: struct has no named member"
-    ]
+    ["<test>:1:12: error: Declaration declares nothing", "<test>:1:1: error: struct has no named member"]
 );
 
 reports!(
     report_union_without_member,
     "union u { int; };",
-    [
-        "<test>:1:11: error: Declaration declares nothing",
-        "<test>:1:1: error: union has no named member"
-    ]
+    ["<test>:1:11: error: Declaration declares nothing", "<test>:1:1: error: union has no named member"]
 );
 
 reports!(
@@ -275,23 +245,11 @@ reports!(
     ["<test>:1:16: error: invalid operands to binary expression ('double' and 'int')"]
 );
 
-reports!(
-    report_remainder_by_zero,
-    "enum E { A = 1 % 0 };",
-    ["<test>:1:14: error: remainder by zero is undefined"]
-);
+reports!(report_remainder_by_zero, "enum E { A = 1 % 0 };", ["<test>:1:14: error: remainder by zero is undefined"]);
 
-reports!(
-    report_division_by_zero,
-    "enum E { A = 1 / 0 };",
-    ["<test>:1:14: error: division by zero is undefined"]
-);
+reports!(report_division_by_zero, "enum E { A = 1 / 0 };", ["<test>:1:14: error: division by zero is undefined"]);
 
-reports!(
-    report_shift_count_negative,
-    "enum E { A = 1 << -1 };",
-    ["<test>:1:19: warning: shift count is negative"]
-);
+reports!(report_shift_count_negative, "enum E { A = 1 << -1 };", ["<test>:1:19: warning: shift count is negative"]);
 
 reports!(
     report_member_of_an_incomplete_structure,
@@ -323,11 +281,7 @@ reports!(
     ["<test>:1:14: error: overflow in constant expression"]
 );
 
-reports!(
-    report_external_register,
-    "register int x;",
-    ["<test>:1:1: error: External declaration auto of register"]
-);
+reports!(report_external_register, "register int x;", ["<test>:1:1: error: External declaration auto of register"]);
 
 reports!(
     report_block_function_not_extern,

@@ -15,10 +15,7 @@ pub fn identifier(sema: &mut Sema, node: &ExpressionNode) -> R {
 }
 
 pub fn constant(sema: &mut Sema, e: &ExpressionNode) -> R {
-    sema.expr_types
-        .get(e.id)
-        .map(|re| (re.casted_ty(), re.kind))
-        .ok_poisoned()
+    sema.expr_types.get(e.id).map(|re| (re.casted_ty(), re.kind)).ok_poisoned()
 }
 
 pub fn array_subscript(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode) -> R {
@@ -106,11 +103,7 @@ pub fn member(sema: &mut Sema, node: &ExpressionNode, op: MemberOp, e: &Expressi
         sema.member_refs.set(node.id, Some(MemberRef { tag: tag_id, index }));
         let sym = sym_id.resolve_with(sema);
         let ty = sym.ty.ok_or(Diagnosis::Poisoned)?;
-        let qty = QualifiedType::new(
-            ty.id,
-            ty.is_const || tag_qty.is_const,
-            ty.is_volatile || tag_qty.is_volatile,
-        );
+        let qty = QualifiedType::new(ty.id, ty.is_const || tag_qty.is_const, ty.is_volatile || tag_qty.is_volatile);
         Ok((qty, kind))
     })
 }

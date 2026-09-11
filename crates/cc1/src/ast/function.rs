@@ -1,6 +1,7 @@
+use libft::Span;
+
 use crate::ast::{DeclarationSpecifier, DeclaratorNode, Name, TypeSpecifier};
 use crate::ast_node;
-use libft::Span;
 
 ast_node! {
     pub struct FunctionParametersNode {
@@ -25,39 +26,25 @@ ast_node! {
 
 impl ParameterDeclaration {
     pub fn is_abstract_void(&self) -> bool {
-        matches!(
-            self.specifiers.as_slice(),
-            [DeclarationSpecifier::Type(TypeSpecifier::Void)]
-        ) && self.declarator.is_abstract()
+        matches!(self.specifiers.as_slice(), [DeclarationSpecifier::Type(TypeSpecifier::Void)])
+            && self.declarator.is_abstract()
     }
 }
 
 impl FunctionParametersNode {
     pub fn empty(span: Span) -> FunctionParametersNode {
-        FunctionParametersNode {
-            span,
-            param: FunctionParameters::Empty,
-        }
+        FunctionParametersNode { span, param: FunctionParameters::Empty }
     }
 
     pub fn old_style(names: Vec<Name>, span: Span) -> FunctionParametersNode {
-        FunctionParametersNode {
-            span,
-            param: FunctionParameters::OldStyle(names),
-        }
+        FunctionParametersNode { span, param: FunctionParameters::OldStyle(names) }
     }
 
     pub fn param_style(params: Vec<ParameterDeclaration>, span: Span) -> FunctionParametersNode {
-        FunctionParametersNode {
-            span,
-            param: FunctionParameters::ParameterTypeList(params),
-        }
+        FunctionParametersNode { span, param: FunctionParameters::ParameterTypeList(params) }
     }
 
     pub fn variadic(params: Vec<ParameterDeclaration>, span: Span) -> FunctionParametersNode {
-        FunctionParametersNode {
-            span,
-            param: FunctionParameters::Variadic(params),
-        }
+        FunctionParametersNode { span, param: FunctionParameters::Variadic(params) }
     }
 }

@@ -81,11 +81,7 @@ constant!(literal_octal, "010", "Int(8)");
 constant!(literal_octal_max, "017777777777", "Int(2147483647)");
 constant!(literal_hexadecimal, "0x10", "Int(16)");
 constant!(literal_hexadecimal_upper, "0XFF", "Int(255)");
-constant!(
-    literal_hexadecimal_above_int_max,
-    "0x80000000",
-    "UnsignedInt(2147483648)"
-);
+constant!(literal_hexadecimal_above_int_max, "0x80000000", "UnsignedInt(2147483648)");
 constant!(literal_octal_above_int_max, "020000000000", "UnsignedInt(2147483648)");
 too_large!(literal_above_unsigned_int_max, "0x100000000", "UnsignedLong(0)");
 too_large!(literal_above_long_max, "0xffffffffffffffff", "UnsignedLong(4294967295)");
@@ -127,204 +123,72 @@ constant!(literal_char_multi_is_packed, "'ab'", "Int(24930)");
 constant!(literal_wide_char, "L'a'", "Int(97)");
 constant!(literal_wide_char_is_not_sign_extended, "L'\\xff'", "Int(255)");
 
-fold!(
-    add_int,
-    binary(
-        &ResolvedType::Int,
-        BinaryOp::Add,
-        ConstValue::Int(1),
-        ConstValue::Int(2)
-    ),
-    "Int(3)"
-);
+fold!(add_int, binary(&ResolvedType::Int, BinaryOp::Add, ConstValue::Int(1), ConstValue::Int(2)), "Int(3)");
 fold_overflow!(
     add_wraps,
-    binary(
-        &ResolvedType::Int,
-        BinaryOp::Add,
-        ConstValue::Int(i32::MAX),
-        ConstValue::Int(1)
-    ),
+    binary(&ResolvedType::Int, BinaryOp::Add, ConstValue::Int(i32::MAX), ConstValue::Int(1)),
     "Int(-2147483648)"
 );
 fold!(
     sub_unsigned_wraps,
-    binary(
-        &ResolvedType::UnsignedInt,
-        BinaryOp::Sub,
-        ConstValue::UnsignedInt(1),
-        ConstValue::UnsignedInt(2)
-    ),
+    binary(&ResolvedType::UnsignedInt, BinaryOp::Sub, ConstValue::UnsignedInt(1), ConstValue::UnsignedInt(2)),
     "UnsignedInt(4294967295)"
 );
 fold_overflow!(
     mul_wraps,
-    binary(
-        &ResolvedType::Int,
-        BinaryOp::Mul,
-        ConstValue::Int(65536),
-        ConstValue::Int(65536)
-    ),
+    binary(&ResolvedType::Int, BinaryOp::Mul, ConstValue::Int(65536), ConstValue::Int(65536)),
     "Int(0)"
 );
-fold!(
-    div_int,
-    binary(
-        &ResolvedType::Int,
-        BinaryOp::Div,
-        ConstValue::Int(7),
-        ConstValue::Int(2)
-    ),
-    "Int(3)"
-);
+fold!(div_int, binary(&ResolvedType::Int, BinaryOp::Div, ConstValue::Int(7), ConstValue::Int(2)), "Int(3)");
 fold!(
     div_negative_truncates_toward_zero,
-    binary(
-        &ResolvedType::Int,
-        BinaryOp::Div,
-        ConstValue::Int(-7),
-        ConstValue::Int(2)
-    ),
+    binary(&ResolvedType::Int, BinaryOp::Div, ConstValue::Int(-7), ConstValue::Int(2)),
     "Int(-3)"
 );
-fold!(
-    rem_int,
-    binary(
-        &ResolvedType::Int,
-        BinaryOp::Mod,
-        ConstValue::Int(7),
-        ConstValue::Int(2)
-    ),
-    "Int(1)"
-);
+fold!(rem_int, binary(&ResolvedType::Int, BinaryOp::Mod, ConstValue::Int(7), ConstValue::Int(2)), "Int(1)");
 fold!(
     rem_keeps_sign_of_dividend,
-    binary(
-        &ResolvedType::Int,
-        BinaryOp::Mod,
-        ConstValue::Int(-7),
-        ConstValue::Int(2)
-    ),
+    binary(&ResolvedType::Int, BinaryOp::Mod, ConstValue::Int(-7), ConstValue::Int(2)),
     "Int(-1)"
 );
 
-fold!(
-    bitand_int,
-    binary(
-        &ResolvedType::Int,
-        BinaryOp::BitAnd,
-        ConstValue::Int(6),
-        ConstValue::Int(3)
-    ),
-    "Int(2)"
-);
-fold!(
-    bitor_int,
-    binary(
-        &ResolvedType::Int,
-        BinaryOp::BitOr,
-        ConstValue::Int(6),
-        ConstValue::Int(3)
-    ),
-    "Int(7)"
-);
-fold!(
-    bitxor_int,
-    binary(
-        &ResolvedType::Int,
-        BinaryOp::BitXor,
-        ConstValue::Int(6),
-        ConstValue::Int(3)
-    ),
-    "Int(5)"
-);
-fold!(
-    shift_left,
-    binary(
-        &ResolvedType::Int,
-        BinaryOp::Left,
-        ConstValue::Int(1),
-        ConstValue::Int(4)
-    ),
-    "Int(16)"
-);
+fold!(bitand_int, binary(&ResolvedType::Int, BinaryOp::BitAnd, ConstValue::Int(6), ConstValue::Int(3)), "Int(2)");
+fold!(bitor_int, binary(&ResolvedType::Int, BinaryOp::BitOr, ConstValue::Int(6), ConstValue::Int(3)), "Int(7)");
+fold!(bitxor_int, binary(&ResolvedType::Int, BinaryOp::BitXor, ConstValue::Int(6), ConstValue::Int(3)), "Int(5)");
+fold!(shift_left, binary(&ResolvedType::Int, BinaryOp::Left, ConstValue::Int(1), ConstValue::Int(4)), "Int(16)");
 fold!(
     shift_left_into_sign_bit,
-    binary(
-        &ResolvedType::Int,
-        BinaryOp::Left,
-        ConstValue::Int(1),
-        ConstValue::Int(31)
-    ),
+    binary(&ResolvedType::Int, BinaryOp::Left, ConstValue::Int(1), ConstValue::Int(31)),
     "Int(-2147483648)"
 );
 fold!(
     shift_right_is_arithmetic,
-    binary(
-        &ResolvedType::Int,
-        BinaryOp::Right,
-        ConstValue::Int(-8),
-        ConstValue::Int(1)
-    ),
+    binary(&ResolvedType::Int, BinaryOp::Right, ConstValue::Int(-8), ConstValue::Int(1)),
     "Int(-4)"
 );
 fold!(
     shift_right_unsigned_is_logical,
-    binary(
-        &ResolvedType::UnsignedInt,
-        BinaryOp::Right,
-        ConstValue::UnsignedInt(2147483648),
-        ConstValue::Int(31)
-    ),
+    binary(&ResolvedType::UnsignedInt, BinaryOp::Right, ConstValue::UnsignedInt(2147483648), ConstValue::Int(31)),
     "UnsignedInt(1)"
 );
 fold!(
     shift_keeps_left_operand_type,
-    binary(
-        &ResolvedType::Long,
-        BinaryOp::Left,
-        ConstValue::Long(1),
-        ConstValue::Int(1)
-    ),
+    binary(&ResolvedType::Long, BinaryOp::Left, ConstValue::Long(1), ConstValue::Int(1)),
     "Long(2)"
 );
 
-fold!(
-    neg_int,
-    unary(&ResolvedType::Int, UnaryOp::Minus, ConstValue::Int(1)),
-    "Int(-1)"
-);
-fold_overflow!(
-    neg_wraps,
-    unary(&ResolvedType::Int, UnaryOp::Minus, ConstValue::Int(i32::MIN)),
-    "Int(-2147483648)"
-);
-fold!(
-    neg_double,
-    unary(&ResolvedType::Double, UnaryOp::Minus, ConstValue::Double(1.5)),
-    "Double(-1.5)"
-);
-fold!(
-    bitnot_int,
-    unary(&ResolvedType::Int, UnaryOp::BitNot, ConstValue::Int(0)),
-    "Int(-1)"
-);
+fold!(neg_int, unary(&ResolvedType::Int, UnaryOp::Minus, ConstValue::Int(1)), "Int(-1)");
+fold_overflow!(neg_wraps, unary(&ResolvedType::Int, UnaryOp::Minus, ConstValue::Int(i32::MIN)), "Int(-2147483648)");
+fold!(neg_double, unary(&ResolvedType::Double, UnaryOp::Minus, ConstValue::Double(1.5)), "Double(-1.5)");
+fold!(bitnot_int, unary(&ResolvedType::Int, UnaryOp::BitNot, ConstValue::Int(0)), "Int(-1)");
 fold!(
     bitnot_unsigned,
     unary(&ResolvedType::UnsignedInt, UnaryOp::BitNot, ConstValue::UnsignedInt(0)),
     "UnsignedInt(4294967295)"
 );
 
-fold!(
-    convert_to_int,
-    convert(&ResolvedType::Int, ConstValue::Long(300)),
-    "Int(300)"
-);
-fold!(
-    convert_to_int_wraps,
-    convert(&ResolvedType::Int, ConstValue::Long(4294967297)),
-    "Int(1)"
-);
+fold!(convert_to_int, convert(&ResolvedType::Int, ConstValue::Long(300)), "Int(300)");
+fold!(convert_to_int_wraps, convert(&ResolvedType::Int, ConstValue::Long(4294967297)), "Int(1)");
 fold!(
     convert_to_unsigned_long_is_32_bits_on_i386,
     convert(&ResolvedType::UnsignedLong, ConstValue::Int(-1)),
@@ -335,24 +199,13 @@ fold!(
     convert(&ResolvedType::Long, ConstValue::UnsignedLong(4294967296)),
     "Long(0)"
 );
-fold!(
-    convert_to_double,
-    convert(&ResolvedType::Double, ConstValue::Int(3)),
-    "Double(3.0)"
-);
-fold!(
-    convert_from_double_truncates,
-    convert(&ResolvedType::Int, ConstValue::Double(3.9)),
-    "Int(3)"
-);
+fold!(convert_to_double, convert(&ResolvedType::Double, ConstValue::Int(3)), "Double(3.0)");
+fold!(convert_from_double_truncates, convert(&ResolvedType::Int, ConstValue::Double(3.9)), "Int(3)");
 
 #[test]
 fn a_wider_target_keeps_the_whole_value() {
     let fold = Fold::new(&X86_64);
-    assert_eq!(
-        repr(fold.convert(&ResolvedType::Long, ConstValue::UnsignedLong(4294967296))),
-        "Long(4294967296)"
-    );
+    assert_eq!(repr(fold.convert(&ResolvedType::Long, ConstValue::UnsignedLong(4294967296))), "Long(4294967296)");
     assert_eq!(
         repr(fold.convert(&ResolvedType::UnsignedLong, ConstValue::Int(-1))),
         "UnsignedLong(18446744073709551615)"
@@ -363,12 +216,7 @@ fn a_wider_target_keeps_the_whole_value() {
 fn unsigned_int_and_long_meet_at_long_on_x86_64() {
     let fold = Fold::new(&X86_64);
     assert_eq!(
-        repr(fold.binary(
-            &ResolvedType::Long,
-            BinaryOp::Add,
-            ConstValue::UnsignedInt(1),
-            ConstValue::Long(-1)
-        )),
+        repr(fold.binary(&ResolvedType::Long, BinaryOp::Add, ConstValue::UnsignedInt(1), ConstValue::Long(-1))),
         "Long(0)"
     );
 }
@@ -379,14 +227,8 @@ fn truncate_carries_the_value_at_full_width() {
     assert_eq!(repr(ConstValue::Int(200).truncate(8, false)), "Long(200)");
     assert_eq!(repr(ConstValue::Int(-1).truncate(16, false)), "Long(65535)");
     assert_eq!(repr(ConstValue::Int(5).truncate(64, true)), "Long(5)");
-    assert_eq!(
-        repr(ConstValue::Int(-1).truncate(64, false)),
-        "UnsignedLong(18446744073709551615)"
-    );
-    assert_eq!(
-        repr(ConstValue::Int(-1).truncate(0, false)),
-        "UnsignedLong(18446744073709551615)"
-    );
+    assert_eq!(repr(ConstValue::Int(-1).truncate(64, false)), "UnsignedLong(18446744073709551615)");
+    assert_eq!(repr(ConstValue::Int(-1).truncate(0, false)), "UnsignedLong(18446744073709551615)");
 }
 
 #[test]
@@ -438,47 +280,20 @@ fn to_i64_and_to_u64_reinterpret() {
 #[test]
 fn equality_compares_same_type_operands() {
     let fold = Fold::new(&I386);
-    assert!(matches!(
-        fold.compare(ConstValue::Int(1), ConstValue::Int(1)),
-        Some(Ordering::Equal)
-    ));
-    assert!(matches!(
-        fold.compare(ConstValue::Double(1.0), ConstValue::Double(1.0)),
-        Some(Ordering::Equal)
-    ));
-    assert!(matches!(
-        fold.compare(ConstValue::Int(1), ConstValue::Int(2)),
-        Some(Ordering::Less | Ordering::Greater)
-    ));
+    assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(1)), Some(Ordering::Equal)));
+    assert!(matches!(fold.compare(ConstValue::Double(1.0), ConstValue::Double(1.0)), Some(Ordering::Equal)));
+    assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(2)), Some(Ordering::Less | Ordering::Greater)));
 }
 
 #[test]
 fn ordering_compares_same_type_operands() {
     let fold = Fold::new(&I386);
-    assert!(matches!(
-        fold.compare(ConstValue::Int(1), ConstValue::Int(2)),
-        Some(Ordering::Less)
-    ));
-    assert!(matches!(
-        fold.compare(ConstValue::Double(1.0), ConstValue::Double(1.5)),
-        Some(Ordering::Less)
-    ));
-    assert!(matches!(
-        fold.compare(ConstValue::UnsignedInt(1), ConstValue::UnsignedInt(0)),
-        Some(Ordering::Greater)
-    ));
-    assert!(matches!(
-        fold.compare(ConstValue::Long(-1), ConstValue::Long(0)),
-        Some(Ordering::Less)
-    ));
-    assert!(matches!(
-        fold.compare(ConstValue::Int(2), ConstValue::Int(2)),
-        Some(Ordering::Less | Ordering::Equal)
-    ));
-    assert!(matches!(
-        fold.compare(ConstValue::Int(2), ConstValue::Int(2)),
-        Some(Ordering::Greater | Ordering::Equal)
-    ));
+    assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(2)), Some(Ordering::Less)));
+    assert!(matches!(fold.compare(ConstValue::Double(1.0), ConstValue::Double(1.5)), Some(Ordering::Less)));
+    assert!(matches!(fold.compare(ConstValue::UnsignedInt(1), ConstValue::UnsignedInt(0)), Some(Ordering::Greater)));
+    assert!(matches!(fold.compare(ConstValue::Long(-1), ConstValue::Long(0)), Some(Ordering::Less)));
+    assert!(matches!(fold.compare(ConstValue::Int(2), ConstValue::Int(2)), Some(Ordering::Less | Ordering::Equal)));
+    assert!(matches!(fold.compare(ConstValue::Int(2), ConstValue::Int(2)), Some(Ordering::Greater | Ordering::Equal)));
 }
 
 #[test]
@@ -506,32 +321,17 @@ fn every_operator_folds_in_sequence() {
 
 fold!(
     unsigned_div,
-    binary(
-        &ResolvedType::UnsignedInt,
-        BinaryOp::Div,
-        ConstValue::UnsignedInt(7),
-        ConstValue::UnsignedInt(2)
-    ),
+    binary(&ResolvedType::UnsignedInt, BinaryOp::Div, ConstValue::UnsignedInt(7), ConstValue::UnsignedInt(2)),
     "UnsignedInt(3)"
 );
 fold!(
     unsigned_rem,
-    binary(
-        &ResolvedType::UnsignedInt,
-        BinaryOp::Mod,
-        ConstValue::UnsignedInt(7),
-        ConstValue::UnsignedInt(2)
-    ),
+    binary(&ResolvedType::UnsignedInt, BinaryOp::Mod, ConstValue::UnsignedInt(7), ConstValue::UnsignedInt(2)),
     "UnsignedInt(1)"
 );
 fold!(
     unsigned_mul_wraps_without_a_diagnosis,
-    binary(
-        &ResolvedType::UnsignedInt,
-        BinaryOp::Mul,
-        ConstValue::UnsignedInt(65536),
-        ConstValue::UnsignedInt(65536)
-    ),
+    binary(&ResolvedType::UnsignedInt, BinaryOp::Mul, ConstValue::UnsignedInt(65536), ConstValue::UnsignedInt(65536)),
     "UnsignedInt(0)"
 );
 fold!(
@@ -546,58 +346,33 @@ fold!(
 );
 fold!(
     unsigned_long_sub_wraps,
-    binary(
-        &ResolvedType::UnsignedLong,
-        BinaryOp::Sub,
-        ConstValue::UnsignedLong(0),
-        ConstValue::UnsignedLong(1)
-    ),
+    binary(&ResolvedType::UnsignedLong, BinaryOp::Sub, ConstValue::UnsignedLong(0), ConstValue::UnsignedLong(1)),
     "UnsignedLong(4294967295)"
 );
 
 // 6.2.1.5 the width of the result is the target's: long is 32 bits on i386.
 fold_overflow!(
     long_add_wraps_at_the_width_of_the_target,
-    binary(
-        &ResolvedType::Long,
-        BinaryOp::Add,
-        ConstValue::Long(2147483647),
-        ConstValue::Long(1)
-    ),
+    binary(&ResolvedType::Long, BinaryOp::Add, ConstValue::Long(2147483647), ConstValue::Long(1)),
     "Long(-2147483648)"
 );
 
 #[test]
 fn the_same_addition_fits_a_64_bit_long() {
     let fold = Fold::new(&X86_64);
-    let folded = fold.binary(
-        &ResolvedType::Long,
-        BinaryOp::Add,
-        ConstValue::Long(2147483647),
-        ConstValue::Long(1),
-    );
+    let folded = fold.binary(&ResolvedType::Long, BinaryOp::Add, ConstValue::Long(2147483647), ConstValue::Long(1));
     assert_eq!(repr(folded.res), "Long(2147483648)");
     assert!(folded.diagnosis.is_none(), "{:?}", folded.diagnosis);
 }
 
 fold!(
     double_sub,
-    binary(
-        &ResolvedType::Double,
-        BinaryOp::Sub,
-        ConstValue::Double(1.5),
-        ConstValue::Double(0.25)
-    ),
+    binary(&ResolvedType::Double, BinaryOp::Sub, ConstValue::Double(1.5), ConstValue::Double(0.25)),
     "Double(1.25)"
 );
 fold!(
     double_mul,
-    binary(
-        &ResolvedType::Double,
-        BinaryOp::Mul,
-        ConstValue::Double(1.5),
-        ConstValue::Double(2.0)
-    ),
+    binary(&ResolvedType::Double, BinaryOp::Mul, ConstValue::Double(1.5), ConstValue::Double(2.0)),
     "Double(3.0)"
 );
 fold!(
@@ -613,12 +388,7 @@ fold!(
 // 6.2.1.4 a float result carries only the precision of a float: 16777216 + 1 is not representable.
 fold!(
     float_arithmetic_rounds_to_float_precision,
-    binary(
-        &ResolvedType::Float,
-        BinaryOp::Add,
-        ConstValue::Float(16777216.0),
-        ConstValue::Float(1.0)
-    ),
+    binary(&ResolvedType::Float, BinaryOp::Add, ConstValue::Float(16777216.0), ConstValue::Float(1.0)),
     "Float(16777216.0)"
 );
 
@@ -627,44 +397,24 @@ fold!(
     unary(&ResolvedType::UnsignedInt, UnaryOp::Minus, ConstValue::UnsignedInt(1)),
     "UnsignedInt(4294967295)"
 );
-fold!(
-    neg_long,
-    unary(&ResolvedType::Long, UnaryOp::Minus, ConstValue::Long(-1)),
-    "Long(1)"
-);
+fold!(neg_long, unary(&ResolvedType::Long, UnaryOp::Minus, ConstValue::Long(-1)), "Long(1)");
 // The negation of a floating zero is a negative zero.
 fold!(
     neg_floating_zero_keeps_its_sign,
     unary(&ResolvedType::Double, UnaryOp::Minus, ConstValue::Double(0.0)),
     "Double(-0.0)"
 );
-fold!(
-    bitnot_long,
-    unary(&ResolvedType::Long, UnaryOp::BitNot, ConstValue::Long(0)),
-    "Long(-1)"
-);
+fold!(bitnot_long, unary(&ResolvedType::Long, UnaryOp::BitNot, ConstValue::Long(0)), "Long(-1)");
 
-fold!(
-    convert_to_a_narrow_integer_type,
-    convert(&ResolvedType::Char, ConstValue::Int(300)),
-    "Int(44)"
-);
+fold!(convert_to_a_narrow_integer_type, convert(&ResolvedType::Char, ConstValue::Int(300)), "Int(44)");
 fold!(
     convert_to_unsigned_int_wraps,
     convert(&ResolvedType::UnsignedInt, ConstValue::Int(-1)),
     "UnsignedInt(4294967295)"
 );
-fold!(
-    convert_to_long_double,
-    convert(&ResolvedType::LongDouble, ConstValue::Int(3)),
-    "LongDouble(3.0)"
-);
+fold!(convert_to_long_double, convert(&ResolvedType::LongDouble, ConstValue::Int(3)), "LongDouble(3.0)");
 // 6.2.1.4 a value converted to float takes the nearest representable value.
-fold!(
-    convert_to_float_rounds,
-    convert(&ResolvedType::Float, ConstValue::Double(16777217.0)),
-    "Float(16777216.0)"
-);
+fold!(convert_to_float_rounds, convert(&ResolvedType::Float, ConstValue::Double(16777217.0)), "Float(16777216.0)");
 
 #[test]
 fn convert_rejects_a_type_that_holds_no_value() {
@@ -696,42 +446,22 @@ fn only_additive_and_multiplicative_results_report_an_overflow() {
 
 fold!(
     unsigned_int_shift_left,
-    binary(
-        &ResolvedType::UnsignedInt,
-        BinaryOp::Left,
-        ConstValue::UnsignedInt(1),
-        ConstValue::Int(31)
-    ),
+    binary(&ResolvedType::UnsignedInt, BinaryOp::Left, ConstValue::UnsignedInt(1), ConstValue::Int(31)),
     "UnsignedInt(2147483648)"
 );
 fold!(
     unsigned_long_shift_left,
-    binary(
-        &ResolvedType::UnsignedLong,
-        BinaryOp::Left,
-        ConstValue::UnsignedLong(1),
-        ConstValue::Int(4)
-    ),
+    binary(&ResolvedType::UnsignedLong, BinaryOp::Left, ConstValue::UnsignedLong(1), ConstValue::Int(4)),
     "UnsignedLong(16)"
 );
 fold!(
     long_shift_right_is_arithmetic,
-    binary(
-        &ResolvedType::Long,
-        BinaryOp::Right,
-        ConstValue::Long(-8),
-        ConstValue::Int(1)
-    ),
+    binary(&ResolvedType::Long, BinaryOp::Right, ConstValue::Long(-8), ConstValue::Int(1)),
     "Long(-4)"
 );
 fold!(
     unsigned_long_shift_right_is_logical,
-    binary(
-        &ResolvedType::UnsignedLong,
-        BinaryOp::Right,
-        ConstValue::UnsignedLong(2147483648),
-        ConstValue::Int(31)
-    ),
+    binary(&ResolvedType::UnsignedLong, BinaryOp::Right, ConstValue::UnsignedLong(2147483648), ConstValue::Int(31)),
     "UnsignedLong(1)"
 );
 
@@ -740,24 +470,14 @@ fold!(
 // gcc: `enum E { A = 1L << 31 };` is accepted on i386, where 1L << 31 is -2147483648.
 fold!(
     a_shift_narrows_to_the_width_of_its_type,
-    binary(
-        &ResolvedType::Long,
-        BinaryOp::Left,
-        ConstValue::Long(1),
-        ConstValue::Int(31)
-    ),
+    binary(&ResolvedType::Long, BinaryOp::Left, ConstValue::Long(1), ConstValue::Int(31)),
     "Long(-2147483648)"
 );
 
 #[test]
 fn the_same_shift_keeps_its_value_in_a_64_bit_long() {
     let fold = Fold::new(&X86_64);
-    let shifted = fold.binary(
-        &ResolvedType::Long,
-        BinaryOp::Left,
-        ConstValue::Long(1),
-        ConstValue::Int(31),
-    );
+    let shifted = fold.binary(&ResolvedType::Long, BinaryOp::Left, ConstValue::Long(1), ConstValue::Int(31));
     assert_eq!(repr(shifted.res), "Long(2147483648)");
 }
 
@@ -765,94 +485,47 @@ fn the_same_shift_keeps_its_value_in_a_64_bit_long() {
 // at the width the target gives that type.
 fold!(
     bitnot_unsigned_long,
-    unary(
-        &ResolvedType::UnsignedLong,
-        UnaryOp::BitNot,
-        ConstValue::UnsignedLong(0)
-    ),
+    unary(&ResolvedType::UnsignedLong, UnaryOp::BitNot, ConstValue::UnsignedLong(0)),
     "UnsignedLong(4294967295)"
 );
 
 #[test]
 fn the_same_complement_fills_a_64_bit_unsigned_long() {
     let fold = Fold::new(&X86_64);
-    let value = fold.unary(
-        &ResolvedType::UnsignedLong,
-        UnaryOp::BitNot,
-        ConstValue::UnsignedLong(0),
-    );
+    let value = fold.unary(&ResolvedType::UnsignedLong, UnaryOp::BitNot, ConstValue::UnsignedLong(0));
     assert_eq!(repr(value.res), "UnsignedLong(18446744073709551615)");
 }
 
 fold!(
     double_div,
-    binary(
-        &ResolvedType::Double,
-        BinaryOp::Div,
-        ConstValue::Double(3.0),
-        ConstValue::Double(2.0)
-    ),
+    binary(&ResolvedType::Double, BinaryOp::Div, ConstValue::Double(3.0), ConstValue::Double(2.0)),
     "Double(1.5)"
 );
 fold!(
     unsigned_add_wraps,
-    binary(
-        &ResolvedType::UnsignedInt,
-        BinaryOp::Add,
-        ConstValue::UnsignedInt(4294967295),
-        ConstValue::UnsignedInt(1)
-    ),
+    binary(&ResolvedType::UnsignedInt, BinaryOp::Add, ConstValue::UnsignedInt(4294967295), ConstValue::UnsignedInt(1)),
     "UnsignedInt(0)"
 );
 fold!(
     unsigned_bitxor,
-    binary(
-        &ResolvedType::UnsignedInt,
-        BinaryOp::BitXor,
-        ConstValue::UnsignedInt(6),
-        ConstValue::UnsignedInt(3)
-    ),
+    binary(&ResolvedType::UnsignedInt, BinaryOp::BitXor, ConstValue::UnsignedInt(6), ConstValue::UnsignedInt(3)),
     "UnsignedInt(5)"
 );
 
-fold!(
-    convert_an_unsigned_int_to_double,
-    convert(&ResolvedType::Double, ConstValue::UnsignedInt(1)),
-    "Double(1.0)"
-);
-fold!(
-    convert_a_long_to_double,
-    convert(&ResolvedType::Double, ConstValue::Long(2)),
-    "Double(2.0)"
-);
-fold!(
-    convert_an_unsigned_long_to_double,
-    convert(&ResolvedType::Double, ConstValue::UnsignedLong(3)),
-    "Double(3.0)"
-);
+fold!(convert_an_unsigned_int_to_double, convert(&ResolvedType::Double, ConstValue::UnsignedInt(1)), "Double(1.0)");
+fold!(convert_a_long_to_double, convert(&ResolvedType::Double, ConstValue::Long(2)), "Double(2.0)");
+fold!(convert_an_unsigned_long_to_double, convert(&ResolvedType::Double, ConstValue::UnsignedLong(3)), "Double(3.0)");
 
 #[test]
 fn compare_orders_every_representation() {
     let fold = Fold::new(&I386);
+    assert_eq!(fold.compare(ConstValue::UnsignedLong(1), ConstValue::UnsignedLong(2)), Some(Ordering::Less));
+    assert_eq!(fold.compare(ConstValue::Float(1.0), ConstValue::Float(2.0)), Some(Ordering::Less));
     assert_eq!(
-        fold.compare(ConstValue::UnsignedLong(1), ConstValue::UnsignedLong(2)),
-        Some(Ordering::Less)
-    );
-    assert_eq!(
-        fold.compare(ConstValue::Float(1.0), ConstValue::Float(2.0)),
-        Some(Ordering::Less)
-    );
-    assert_eq!(
-        fold.compare(
-            ConstValue::LongDouble(F80::from(2.0)),
-            ConstValue::LongDouble(F80::from(2.0))
-        ),
+        fold.compare(ConstValue::LongDouble(F80::from(2.0)), ConstValue::LongDouble(F80::from(2.0))),
         Some(Ordering::Equal)
     );
-    assert_eq!(
-        fold.compare(ConstValue::Double(f64::NAN), ConstValue::Double(1.0)),
-        None
-    );
+    assert_eq!(fold.compare(ConstValue::Double(f64::NAN), ConstValue::Double(1.0)), None);
 }
 
 // 6.3.7 The right operand of a shift shall be nonnegative: the check reaches every representation
@@ -937,35 +610,21 @@ fn converting_to_long_double_rounds_to_the_target_format() {
         Some(ConstValue::LongDouble(F80::from(0.1)))
     );
     assert_eq!(
-        Fold::new(&ARM64_DARWIN)
-            .unary(&ResolvedType::LongDouble, UnaryOp::Minus, ConstValue::Double(1.5))
-            .res,
+        Fold::new(&ARM64_DARWIN).unary(&ResolvedType::LongDouble, UnaryOp::Minus, ConstValue::Double(1.5)).res,
         ConstValue::LongDouble(F80::from(-1.5))
     );
 }
 
 #[test]
 fn long_double_literals_round_to_the_target_format() {
-    assert_eq!(
-        ConstValue::parse("0.1l", &ARM64_DARWIN).res,
-        ConstValue::LongDouble(F80::from(0.1))
-    );
-    assert_ne!(
-        ConstValue::parse("0.1l", &X86_64).res,
-        ConstValue::LongDouble(F80::from(0.1))
-    );
-    assert_eq!(
-        ConstValue::parse("0.1l", &X86_64).res,
-        ConstValue::LongDouble(F80::from("0.1"))
-    );
+    assert_eq!(ConstValue::parse("0.1l", &ARM64_DARWIN).res, ConstValue::LongDouble(F80::from(0.1)));
+    assert_ne!(ConstValue::parse("0.1l", &X86_64).res, ConstValue::LongDouble(F80::from(0.1)));
+    assert_eq!(ConstValue::parse("0.1l", &X86_64).res, ConstValue::LongDouble(F80::from("0.1")));
 }
 
 #[test]
 fn an_exact_long_double_literal_is_the_same_on_every_target() {
     for target in [&I386, &X86_64, &ARM64_DARWIN] {
-        assert_eq!(
-            ConstValue::parse("1.5l", target).res,
-            ConstValue::LongDouble(F80::from(1.5))
-        );
+        assert_eq!(ConstValue::parse("1.5l", target).res, ConstValue::LongDouble(F80::from(1.5)));
     }
 }

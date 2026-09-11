@@ -1,6 +1,8 @@
 use std::fmt::Display;
 use std::io::{self, Write, stdout};
 
+use libft::{CYAN, GRAY, GREEN, RESET};
+
 use crate::ast::visit::{
     Visitor, walk_compound_statement, walk_declaration, walk_declarator, walk_enum, walk_expression,
     walk_expression_statement, walk_function_parameters, walk_init_declarator, walk_initializer,
@@ -16,7 +18,6 @@ use crate::ast::{
 };
 use crate::context::ctx;
 use crate::semantic::{ExpressionKind, sema};
-use libft::{CYAN, GRAY, GREEN, RESET};
 
 pub struct AstPrinter {
     depth: usize,
@@ -36,11 +37,7 @@ impl AstPrinter {
     }
 
     pub fn write_ast<W: Write>(mut w: W) -> io::Result<()> {
-        let mut printer = Self {
-            depth: 0,
-            lines: Vec::new(),
-            open: Vec::new(),
-        };
+        let mut printer = Self { depth: 0, lines: Vec::new(), open: Vec::new() };
         printer.visit_translation_unit(&ctx().ast);
         printer.render(&mut w)
     }
@@ -56,11 +53,7 @@ impl AstPrinter {
         F: FnOnce(&mut Self),
     {
         let idx = self.lines.len();
-        self.lines.push(Line {
-            depth: self.depth,
-            text: format!("{node} {CYAN}"),
-            children: 0,
-        });
+        self.lines.push(Line { depth: self.depth, text: format!("{node} {CYAN}"), children: 0 });
         if let Some(siblings) = self.open.last_mut() {
             *siblings += 1;
         }
@@ -85,11 +78,7 @@ impl AstPrinter {
             self.put(format_args!(" lvalue"));
         }
         for cast in &resolved.casts {
-            self.put(format_args!(
-                " {GRAY}{}{CYAN} {GREEN}'{}'{CYAN}",
-                cast.kind,
-                cast.to
-            ));
+            self.put(format_args!(" {GRAY}{}{CYAN} {GREEN}'{}'{CYAN}", cast.kind, cast.to));
         }
         self.put(format_args!(" "));
     }
@@ -143,11 +132,7 @@ impl AstPrinter {
 impl Visitor for AstPrinter {
     fn visit_translation_unit(&mut self, node: &TranslationUnitNode) {
         let idx = self.lines.len();
-        self.lines.push(Line {
-            depth: 0,
-            text: format!("{node}"),
-            children: 0,
-        });
+        self.lines.push(Line { depth: 0, text: format!("{node}"), children: 0 });
         self.open.push(0);
         self.depth += 1;
         walk_translation_unit(self, node);

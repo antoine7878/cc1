@@ -52,11 +52,7 @@ pub fn render<W: Write, S: SourceMap, D: Display>(
     };
     let path = path.to_string();
 
-    writeln!(
-        w,
-        "{path}:{line_no}:{}: {color}{severity}:{RESET} {msg}",
-        span.start.col,
-    )?;
+    writeln!(w, "{path}:{line_no}:{}: {color}{severity}:{RESET} {msg}", span.start.col,)?;
 
     let Some(line) = src.source_line(&path, line_no) else { return Ok(()) };
     let line = line.replace('\t', " ");

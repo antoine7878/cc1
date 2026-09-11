@@ -1,9 +1,9 @@
 use std::fmt;
 
+use libft::{BLUE, RESET, Span};
+
 use crate::ast::Node;
 use crate::define_interner;
-use libft::Span;
-use libft::{BLUE, RESET};
 
 define_interner!(String, StringArena, StringId);
 

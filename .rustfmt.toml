@@ -1,4 +1,11 @@
 max_width = 120
-# use_small_heuristics=Max
-single_line_if_else_max_width = 100
-single_line_let_else_max_width = 100
+single_line_if_else_max_width = 110
+single_line_let_else_max_width = 110
+
+
+style_edition = "2024"
+use_small_heuristics = "Max"
+merge_derives = false
+# group_imports = "StdExternalCrate"
+# imports_granularity = "Module"
+use_field_init_shorthand = true

@@ -66,10 +66,7 @@ fn object(sema: &Sema, e: &ExpressionNode) -> Option<Place> {
 
 fn decays(sema: &Sema, e: &ExpressionNode) -> bool {
     let Some(re) = sema.expr_types.get(e.id) else { return false };
-    matches!(
-        re.ty.id.resolve_with(sema),
-        ResolvedType::Array { .. } | ResolvedType::Function { .. }
-    )
+    matches!(re.ty.id.resolve_with(sema), ResolvedType::Array { .. } | ResolvedType::Function { .. })
 }
 
 fn member(sema: &mut Sema, node: &ExpressionNode, base: &ExpressionNode, op: MemberOp) -> Option<Place> {

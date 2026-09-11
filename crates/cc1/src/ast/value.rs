@@ -1,11 +1,10 @@
 use std::cmp::Ordering;
 use std::fmt;
 
+use crate::ast::{BinaryOp, F80, UnaryOp, escape};
 use crate::ast_node;
 use crate::semantic::{Diag, Diagnosis, QualifiedType, ResolvedType, Sema};
 use crate::target::{FloatFormat, Target};
-
-use crate::ast::{BinaryOp, F80, UnaryOp, escape};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ConstValue {
@@ -173,12 +172,8 @@ impl ConstValue {
     fn integer_type(value: u64, candidates: &[ResolvedType], target: &Target) -> Diag<Self> {
         let fitting = candidates.iter().find(|ty| target.fits(value, ty));
         let diagnosis = fitting.is_none().then_some(Diagnosis::IntegerConstantTooLarge);
-        let ty = fitting
-            .or_else(|| candidates.last())
-            .expect("a non empty candidate list");
-        let value = target
-            .cast(ty, ConstValue::UnsignedLong(value))
-            .expect("an integer type");
+        let ty = fitting.or_else(|| candidates.last()).expect("a non empty candidate list");
+        let value = target.cast(ty, ConstValue::UnsignedLong(value)).expect("an integer type");
         Diag::new(value, diagnosis)
     }
 
@@ -299,10 +294,7 @@ impl ConstValue {
     }
 
     pub fn is_floating(self) -> bool {
-        matches!(
-            self,
-            ConstValue::Float(_) | ConstValue::Double(_) | ConstValue::LongDouble(_)
-        )
+        matches!(self, ConstValue::Float(_) | ConstValue::Double(_) | ConstValue::LongDouble(_))
     }
 
     pub fn is_true(self) -> bool {
@@ -404,8 +396,7 @@ impl<'a> Fold<'a> {
             BitXor => a ^ b,
             _ => unreachable!(),
         };
-        self.convert(ty, ConstValue::UnsignedLong(r as u64))
-            .expect("an integer type")
+        self.convert(ty, ConstValue::UnsignedLong(r as u64)).expect("an integer type")
     }
 
     fn signed(&self, ty: &ResolvedType, op: BinaryOp, lhs: ConstValue, rhs: ConstValue) -> Diag<ConstValue> {

@@ -31,12 +31,7 @@ impl StatementScopes {
     }
 
     pub fn push_switch(&mut self, stmt: StatementId, control: QualifiedType) {
-        self.0.push(StatementScope::Switch {
-            stmt,
-            control,
-            cases: Vec::new(),
-            default: None,
-        })
+        self.0.push(StatementScope::Switch { stmt, control, cases: Vec::new(), default: None })
     }
 
     pub fn pop(&mut self) -> Option<(StatementId, ResolvedStatement)> {
@@ -88,29 +83,16 @@ impl StatementScopes {
     }
 
     fn nearest_switch(&mut self) -> Option<&mut StatementScope> {
-        self.0
-            .iter_mut()
-            .rev()
-            .find(|scope| matches!(scope, StatementScope::Switch { .. }))
+        self.0.iter_mut().rev().find(|scope| matches!(scope, StatementScope::Switch { .. }))
     }
 }
 
 impl From<StatementScope> for (StatementId, ResolvedStatement) {
     fn from(value: StatementScope) -> Self {
         match value {
-            StatementScope::Switch {
-                stmt,
-                control,
-                cases,
-                default,
-            } => (
-                stmt,
-                ResolvedStatement::Switch {
-                    control,
-                    cases,
-                    default,
-                },
-            ),
+            StatementScope::Switch { stmt, control, cases, default } => {
+                (stmt, ResolvedStatement::Switch { control, cases, default })
+            }
             StatementScope::Loop(stmt) => (stmt, ResolvedStatement::Loop(stmt)),
         }
     }

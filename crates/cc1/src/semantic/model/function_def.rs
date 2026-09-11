@@ -1,10 +1,11 @@
 use std::iter::zip;
 
+use libft::Span;
+
 use crate::ast::{Name, Storage};
 use crate::define_arena;
 use crate::semantic::model::cast::default_argument_promotions;
 use crate::semantic::{ExpressionKind, QualifiedType, ResolvedExpression, Sema, SymbolId};
-use libft::Span;
 
 define_arena!(FunctionDef, FunctionDefArena, FunctionDefId);
 
@@ -18,12 +19,7 @@ pub struct FunctionDef {
 
 impl FunctionDefArena {
     pub fn declare(&mut self, sym: SymbolId, return_ty: QualifiedType) -> FunctionDefId {
-        self.alloc(FunctionDef {
-            sym,
-            return_ty,
-            parameters: Vec::new(),
-            labels: Vec::new(),
-        })
+        self.alloc(FunctionDef { sym, return_ty, parameters: Vec::new(), labels: Vec::new() })
     }
 
     pub fn complete(&mut self, id: FunctionDefId, parameters: Vec<SymbolId>) {
@@ -34,10 +30,7 @@ impl FunctionDefArena {
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum ParamTypes {
     Unspecified,
-    Prototype {
-        params: Vec<QualifiedType>,
-        is_variadic: bool,
-    },
+    Prototype { params: Vec<QualifiedType>, is_variadic: bool },
 }
 
 #[rustfmt::skip]

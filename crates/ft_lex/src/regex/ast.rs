@@ -1,5 +1,6 @@
 use crate::error::LexError;
-use crate::regex::{Token::*, Tokenizer};
+use crate::regex::Token::*;
+use crate::regex::Tokenizer;
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Ast {
@@ -13,11 +14,7 @@ impl TryFrom<&mut Tokenizer> for Ast {
 
     fn try_from(tokenizer: &mut Tokenizer) -> Result<Self, Self::Error> {
         if tokenizer.peek().is_none() {
-            return Ok(Self {
-                expression: Expression::Empty,
-                start_anchor: false,
-                end_anchor: false,
-            });
+            return Ok(Self { expression: Expression::Empty, start_anchor: false, end_anchor: false });
         }
         let start_anchor = tokenizer.is_start_anchor();
         if start_anchor {
@@ -42,11 +39,7 @@ impl TryFrom<&mut Tokenizer> for Ast {
             None => (),
         };
 
-        Ok(Self {
-            expression,
-            start_anchor,
-            end_anchor,
-        })
+        Ok(Self { expression, start_anchor, end_anchor })
     }
 }
 
@@ -373,11 +366,7 @@ mod test {
     fn quotes() {
         test_ok(
             r#""a""#,
-            Ast {
-                start_anchor: false,
-                end_anchor: false,
-                expression: Expression::Atom(Atom::Literal(b'a')),
-            },
+            Ast { start_anchor: false, end_anchor: false, expression: Expression::Atom(Atom::Literal(b'a')) },
         )
     }
 
@@ -459,11 +448,7 @@ mod test {
                 end_anchor: false,
                 expression: Expression::Atom(Atom::Bracket(BracketExpr {
                     negated: false,
-                    items: vec![
-                        BracketItem::Byte(b'a'),
-                        BracketItem::Byte(b'b'),
-                        BracketItem::Byte(b'c'),
-                    ],
+                    items: vec![BracketItem::Byte(b'a'), BracketItem::Byte(b'b'), BracketItem::Byte(b'c')],
                 })),
             },
         );
@@ -512,11 +497,7 @@ mod test {
                 end_anchor: false,
                 expression: Expression::Atom(Atom::Bracket(BracketExpr {
                     negated: true,
-                    items: vec![
-                        BracketItem::Byte(b'a'),
-                        BracketItem::Byte(b'b'),
-                        BracketItem::Byte(b'c'),
-                    ],
+                    items: vec![BracketItem::Byte(b'a'), BracketItem::Byte(b'b'), BracketItem::Byte(b'c')],
                 })),
             },
         );

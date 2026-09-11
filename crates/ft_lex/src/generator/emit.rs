@@ -4,12 +4,7 @@ use crate::front::Lex;
 use crate::regex::FragmentId;
 
 pub fn dump_tables(lex: &Lex) -> String {
-    lex.table_dfa
-        .tables()
-        .iter()
-        .map(|&(name, table)| table_to_rust(name, table))
-        .collect::<Vec<_>>()
-        .join("\n")
+    lex.table_dfa.tables().iter().map(|&(name, table)| table_to_rust(name, table)).collect::<Vec<_>>().join("\n")
         + &format!("\nconst YY_CLASS_COUNT: usize = {};\n", lex.table_dfa.class_count)
 }
 
@@ -31,11 +26,7 @@ pub fn dump_tokens(tokens: &[String]) -> String {
         #[derive(Debug, Clone, PartialEq)]
         pub enum YYToken {"
         .to_string();
-    ret += &tokens
-        .iter()
-        .map(|tok| format!("{},\n", tok))
-        .collect::<Vec<_>>()
-        .join("");
+    ret += &tokens.iter().map(|tok| format!("{},\n", tok)).collect::<Vec<_>>().join("");
     ret += "yyeof\n}\n\n";
     ret
 }
@@ -64,18 +55,9 @@ fn action_to_rust(id: FragmentId, fragment: &str) -> String {
 }
 
 fn start_condition_defines(start_conditions: &[String]) -> String {
-    start_conditions
-        .iter()
-        .enumerate()
-        .map(|(i, k)| define(k, &i))
-        .collect::<Vec<_>>()
-        .join("\n")
+    start_conditions.iter().enumerate().map(|(i, k)| define(k, &i)).collect::<Vec<_>>().join("\n")
 }
 
 fn define<N: Display, V: Display>(name: &N, value: &V) -> String {
-    format!(
-        "#[allow(unused)]\nconst {}: usize = {};",
-        name.to_string().to_uppercase(),
-        value
-    )
+    format!("#[allow(unused)]\nconst {}: usize = {};", name.to_string().to_uppercase(), value)
 }

@@ -38,12 +38,7 @@ impl Rule {
             }
         }
 
-        let nfa = Nfa::new(
-            regex_ast,
-            parsed_condition_index,
-            code_fragments.len(),
-            code_fragments.len() + 1,
-        );
+        let nfa = Nfa::new(regex_ast, parsed_condition_index, code_fragments.len(), code_fragments.len() + 1);
 
         // Parse Code fragment
         let (depth, in_comment) = Self::parse_fragment(&code_fragment, 0, false)?;
@@ -107,10 +102,7 @@ impl Rule {
         };
         let (states, rest) = line[1..].split_at(closing_caret);
         let tmp_binding = Vec::from(&rest[1..]);
-        let states = states
-            .split(|&b| b == b',')
-            .map(|s| String::from(String::from_utf8_lossy(s)))
-            .collect::<Vec<_>>();
+        let states = states.split(|&b| b == b',').map(|s| String::from(String::from_utf8_lossy(s))).collect::<Vec<_>>();
         *line = tmp_binding;
         Ok(states)
     }
@@ -135,9 +127,8 @@ impl Rule {
                 (b'/', Some(b'*')) => in_comment = true,
                 (b'{', _) => curly_depth += 1,
                 (b'}', _) => {
-                    curly_depth = curly_depth
-                        .checked_sub(1)
-                        .ok_or_else(|| LexError::InputFile("{ not opened".to_string()))?;
+                    curly_depth =
+                        curly_depth.checked_sub(1).ok_or_else(|| LexError::InputFile("{ not opened".to_string()))?;
                 }
                 _ => (),
             }

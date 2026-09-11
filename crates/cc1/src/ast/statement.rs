@@ -1,6 +1,7 @@
+use libft::Span;
+
 use crate::ast::{DeclarationNode, ExpressionNode, Name};
 use crate::{ast_node, define_arena};
-use libft::Span;
 
 define_arena!(Statement, StatementArena, StatementId);
 
@@ -68,14 +69,7 @@ ast_node! {
 pub enum IterationStatement {
     While(ExpressionNode, StatementNode),
     Do(StatementNode, ExpressionNode),
-    For(
-        Box<(
-            ExpressionStatementNode,
-            ExpressionStatementNode,
-            Option<ExpressionNode>,
-            StatementNode,
-        )>,
-    ),
+    For(Box<(ExpressionStatementNode, ExpressionStatementNode, Option<ExpressionNode>, StatementNode)>),
 }
 
 ast_node! {

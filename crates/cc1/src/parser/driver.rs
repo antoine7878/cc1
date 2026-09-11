@@ -21,9 +21,6 @@ pub fn parse_reader<R: Read>(ctx: Context, reader: R) -> (Context, i32) {
 pub fn yyerror<D: Display, R: Read>(_msg: D, yacc: &mut Yacc<R>) {
     let span = yacc.lexer.span;
     let found = yacc.yy_lookahead_name();
-    let inner = Diagnosis::SyntaxError {
-        found,
-        expected: ExpectedTokens::new(found, &yacc.yy_expected()),
-    };
+    let inner = Diagnosis::SyntaxError { found, expected: ExpectedTokens::new(found, &yacc.yy_expected()) };
     yacc.lexer.ctx.diagnosis.push(DiagnosisNode::new(inner, span));
 }

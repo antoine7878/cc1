@@ -22,10 +22,7 @@ pub struct SideTable<Id: ArenaKey, Val> {
 
 impl<Id: ArenaKey, Val> Default for SideTable<Id, Val> {
     fn default() -> Self {
-        Self {
-            slots: Vec::new(),
-            marker: PhantomData,
-        }
+        Self { slots: Vec::new(), marker: PhantomData }
     }
 }
 
@@ -147,11 +144,7 @@ impl<'h, H: HasTable<Id, Val>, Id: ArenaKey, Val, const N: usize> Loan<'h, H, Id
             }
             return None;
         }
-        Some(Self {
-            holder,
-            ids,
-            values: Some(taken.map(Option::unwrap)),
-        })
+        Some(Self { holder, ids, values: Some(taken.map(Option::unwrap)) })
     }
 
     pub fn parts(&mut self) -> (&mut H, &mut [Val; N]) {

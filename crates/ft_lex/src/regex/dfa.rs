@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
 
-use crate::regex::{Automaton, ConditionId, Nfa, State, StateId, Transition};
 use libft::BitSet;
+
+use crate::regex::{Automaton, ConditionId, Nfa, State, StateId, Transition};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Dfa {
@@ -35,11 +36,7 @@ impl From<Nfa> for Dfa {
     fn from(nfa: Nfa) -> Self {
         let nfa_node_count = nfa.nodes.len();
         let action_count = nfa.action_len();
-        let mut dfa = Dfa {
-            nodes: vec![State::new(action_count)],
-            action_len: nfa.action_len(),
-            ..Default::default()
-        };
+        let mut dfa = Dfa { nodes: vec![State::new(action_count)], action_len: nfa.action_len(), ..Default::default() };
         let mut subset_to_id: BTreeMap<BitSet, StateId> = BTreeMap::from([(BitSet::with_capacity(nfa_node_count), 0)]);
         let mut id_to_subset: Vec<BitSet> = vec![BitSet::with_capacity(nfa_node_count)];
         let mut queue: VecDeque<StateId> = VecDeque::new();
@@ -62,11 +59,7 @@ impl From<Nfa> for Dfa {
 
             let id = dfa.nodes.len();
 
-            dfa.nodes.push(State {
-                transitions: Vec::new(),
-                accept_fragments,
-                trailing_tags,
-            });
+            dfa.nodes.push(State { transitions: Vec::new(), accept_fragments, trailing_tags });
             subset_to_id.insert(subset.clone(), id);
             id_to_subset.push(subset.clone());
             queue.push_back(id);
@@ -91,16 +84,10 @@ impl From<Nfa> for Dfa {
                 }
                 let next_subset = nfa.epsilon_closure(moved);
                 let next_id = ensure_subset(next_subset, &mut dfa, &mut subset_to_id, &mut id_to_subset, &mut queue);
-                dest_to_letters
-                    .entry(next_id)
-                    .or_insert(BitSet::with_capacity(256))
-                    .insert(b);
+                dest_to_letters.entry(next_id).or_insert(BitSet::with_capacity(256)).insert(b);
             }
 
-            dfa.nodes[cur_id].transitions = dest_to_letters
-                .into_iter()
-                .map(|(to, on)| Transition { on, to })
-                .collect();
+            dfa.nodes[cur_id].transitions = dest_to_letters.into_iter().map(|(to, on)| Transition { on, to }).collect();
         }
 
         dfa
@@ -186,11 +173,7 @@ mod test {
                 condition_to_start: BTreeMap::from([(0, 1)]),
                 nodes: vec![
                     state(vec![], vec![], 1),
-                    state(
-                        vec![Transition::with_on(2, (0x00..=0xFF).filter(|&x| x != 10))],
-                        vec![],
-                        1,
-                    ),
+                    state(vec![Transition::with_on(2, (0x00..=0xFF).filter(|&x| x != 10))], vec![], 1),
                     state(vec![], vec![0], 1),
                 ],
             },
@@ -204,11 +187,7 @@ mod test {
             Dfa {
                 action_len: 1,
                 condition_to_start: BTreeMap::from([(0, 1)]),
-                nodes: vec![
-                    state(vec![], vec![], 1),
-                    state(vec![on(b"a", 2)], vec![], 1),
-                    state(vec![], vec![0], 1),
-                ],
+                nodes: vec![state(vec![], vec![], 1), state(vec![on(b"a", 2)], vec![], 1), state(vec![], vec![0], 1)],
             },
         );
     }
@@ -270,11 +249,7 @@ mod test {
             Dfa {
                 action_len: 1,
                 condition_to_start: BTreeMap::from([(0, 1)]),
-                nodes: vec![
-                    state(vec![], vec![], 1),
-                    state(vec![on(b"a", 2)], vec![0], 1),
-                    state(vec![], vec![0], 1),
-                ],
+                nodes: vec![state(vec![], vec![], 1), state(vec![on(b"a", 2)], vec![0], 1), state(vec![], vec![0], 1)],
             },
         );
     }
@@ -357,11 +332,7 @@ mod test {
             Dfa {
                 action_len: 1,
                 condition_to_start: BTreeMap::from([(0, 1)]),
-                nodes: vec![
-                    state(vec![], vec![], 1),
-                    state(vec![on(b"a", 2)], vec![], 1),
-                    state(vec![], vec![0], 1),
-                ],
+                nodes: vec![state(vec![], vec![], 1), state(vec![on(b"a", 2)], vec![], 1), state(vec![], vec![0], 1)],
             },
         );
     }
@@ -391,11 +362,7 @@ mod test {
             Dfa {
                 action_len: 1,
                 condition_to_start: BTreeMap::from([(0, 1)]),
-                nodes: vec![
-                    state(vec![], vec![], 1),
-                    state(vec![on(b"a", 2)], vec![], 1),
-                    state(vec![], vec![0], 1),
-                ],
+                nodes: vec![state(vec![], vec![], 1), state(vec![on(b"a", 2)], vec![], 1), state(vec![], vec![0], 1)],
             },
         );
     }
@@ -409,14 +376,7 @@ mod test {
                 condition_to_start: BTreeMap::from([(0, 1)]),
                 nodes: vec![
                     state(vec![], vec![], 1),
-                    state(
-                        vec![Transition {
-                            on: letters(b"abcdefghijklmnopqrstuvwxyz"),
-                            to: 2,
-                        }],
-                        vec![],
-                        1,
-                    ),
+                    state(vec![Transition { on: letters(b"abcdefghijklmnopqrstuvwxyz"), to: 2 }], vec![], 1),
                     state(vec![], vec![0], 1),
                 ],
             },
@@ -432,14 +392,7 @@ mod test {
                 condition_to_start: BTreeMap::from([(0, 1)]),
                 nodes: vec![
                     state(vec![], vec![], 1),
-                    state(
-                        vec![Transition {
-                            on: letters(b"ab"),
-                            to: 2,
-                        }],
-                        vec![],
-                        1,
-                    ),
+                    state(vec![Transition { on: letters(b"ab"), to: 2 }], vec![], 1),
                     state(vec![], vec![0], 1),
                 ],
             },
@@ -455,14 +408,7 @@ mod test {
                 condition_to_start: BTreeMap::from([(0, 1)]),
                 nodes: vec![
                     state(vec![], vec![], 1),
-                    state(
-                        vec![Transition {
-                            on: letters(b"0123456789"),
-                            to: 2,
-                        }],
-                        vec![],
-                        1,
-                    ),
+                    state(vec![Transition { on: letters(b"0123456789"), to: 2 }], vec![], 1),
                     state(vec![], vec![0], 1),
                 ],
             },

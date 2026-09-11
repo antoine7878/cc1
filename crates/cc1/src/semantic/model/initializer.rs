@@ -1,15 +1,14 @@
 use std::iter::Peekable;
 use std::slice::Iter;
 
-use crate::ast;
 use crate::ast::visit::Visitor;
 use crate::ast::{ConstValue, Expression, ExpressionId, ExpressionNode, InitializerNode, StringConstId, Tag};
-use crate::define_arena;
 use crate::semantic::resolution::expression;
 use crate::semantic::{
     AssignmentContext, Diag, DiagCollector, Diagnosis, Duration, Place, QualifiedType, ResolvedType, Sema,
     SymbolResolver, TagDefId, address, ice,
 };
+use crate::{ast, define_arena};
 
 define_arena!(Initializer, InitializerArena, InitializerId);
 
@@ -177,11 +176,7 @@ fn is_aggregate(sema: &Sema, ty: QualifiedType) -> bool {
 
 fn member_types(sema: &Sema, id: TagDefId) -> Vec<QualifiedType> {
     let tag = id.resolve_with(sema);
-    let named = tag
-        .members
-        .iter()
-        .filter_map(|member| member.sym)
-        .filter_map(|sym| sym.resolve_with(sema).ty);
+    let named = tag.members.iter().filter_map(|member| member.sym).filter_map(|sym| sym.resolve_with(sema).ty);
     match tag.kind {
         Tag::Union => named.take(1).collect(),
         _ => named.collect(),

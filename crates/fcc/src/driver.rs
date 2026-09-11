@@ -102,11 +102,7 @@ fn link_argv(args: &Args, items: &[String]) -> Vec<String> {
     }
     argv.extend(items.iter().cloned());
     argv.push("-o".to_string());
-    argv.push(
-        output_of("", Stage::Link, args.outfile.as_deref())
-            .display()
-            .to_string(),
-    );
+    argv.push(output_of("", Stage::Link, args.outfile.as_deref()).display().to_string());
     argv
 }
 
@@ -117,8 +113,7 @@ fn strings(argv: &[&str]) -> Vec<String> {
 }
 
 fn str_of(path: &Path) -> Result<&str, String> {
-    path.to_str()
-        .ok_or_else(|| format!("fcc: non-utf8 path {}", path.display()))
+    path.to_str().ok_or_else(|| format!("fcc: non-utf8 path {}", path.display()))
 }
 
 fn spawn(tool: Tool, argv: &[String], redirect: Option<&str>) -> Result<(), String> {

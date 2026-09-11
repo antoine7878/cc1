@@ -5,12 +5,7 @@ macro_rules! op {
         #[test]
         fn $name() {
             let unit = Unit::parse($src);
-            assert!(
-                unit.parsed(),
-                "cc1 failed to parse `{}`:\n{}",
-                stringify!($name),
-                $src
-            );
+            assert!(unit.parsed(), "cc1 failed to parse `{}`:\n{}", stringify!($name), $src);
             let expressions = unit.expressions();
             assert!(
                 expressions.iter().any(|e| e == $label),
@@ -66,28 +61,12 @@ op!(bit_and_assign, "void f(int a, int b) { a &= b; }", "BitAndAssign");
 op!(bit_xor_assign, "void f(int a, int b) { a ^= b; }", "BitXorAssign");
 op!(bit_or_assign, "void f(int a, int b) { a |= b; }", "BitOrAssign");
 
-op!(
-    dot,
-    "struct S { int x; }; void f(struct S s) { int a; a = s.x; }",
-    "Dot access"
-);
-op!(
-    arrow,
-    "struct S { int x; }; void f(struct S *s) { int a; a = s->x; }",
-    "Ptr access"
-);
+op!(dot, "struct S { int x; }; void f(struct S s) { int a; a = s.x; }", "Dot access");
+op!(arrow, "struct S { int x; }; void f(struct S *s) { int a; a = s->x; }", "Ptr access");
 
 op!(array_access, "void f(int a[]) { int b; b = a[0]; }", "Array access");
-op!(
-    ternary,
-    "void f(int a, int b, int c) { int d; d = a ? b : c; }",
-    "Ternary"
-);
-op!(
-    function_call,
-    "int g(int x); void f(void) { int a; a = g(1); }",
-    "Fn call"
-);
+op!(ternary, "void f(int a, int b, int c) { int d; d = a ? b : c; }", "Ternary");
+op!(function_call, "int g(int x); void f(void) { int a; a = g(1); }", "Fn call");
 op!(sizeof_expr, "void f(int a) { int s; s = sizeof(a); }", "Sizeof");
 op!(sizeof_type, "void f(void) { int s; s = sizeof(int); }", "Sizeof");
 op!(cast, "void f(double d) { int a; a = (int)d; }", "Cast");

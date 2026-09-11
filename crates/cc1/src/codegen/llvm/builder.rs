@@ -1,7 +1,8 @@
-use crate::ast::StringConstant;
-use crate::codegen::llvm::{LlvmType, LlvmValue};
 use std::fmt::{self, Display};
 use std::io::Write;
+
+use crate::ast::StringConstant;
+use crate::codegen::llvm::{LlvmType, LlvmValue};
 
 #[derive(Debug)]
 pub struct Builder<W: Write> {
@@ -13,12 +14,7 @@ pub struct Builder<W: Write> {
 
 impl<W: Write> Builder<W> {
     pub fn new(w: W) -> Self {
-        Self {
-            w,
-            counter: 0,
-            str_counter: 0,
-            current_block: LlvmValue::SSA(0),
-        }
+        Self { w, counter: 0, str_counter: 0, current_block: LlvmValue::SSA(0) }
     }
 
     pub fn reset(&mut self, counter: usize) {
@@ -122,9 +118,7 @@ impl<W: Write> Builder<W> {
     pub fn string_literal(&mut self, len: usize, ty: LlvmType, str: &StringConstant, align: u32) -> LlvmValue {
         let s = self.fresh_string();
 
-        self.line(format_args!(
-            r#"{s} = private unnamed_addr constant [{len} x {ty}] c"{str}\00", align {align}"#,
-        ));
+        self.line(format_args!(r#"{s} = private unnamed_addr constant [{len} x {ty}] c"{str}\00", align {align}"#,));
         s
     }
 }

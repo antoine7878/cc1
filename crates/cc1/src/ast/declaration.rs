@@ -1,6 +1,7 @@
+use libft::Span;
+
 use crate::ast::{DeclarationSpecifier, ExpressionNode, FunctionParametersNode, Name, Qualifier};
 use crate::{ast_node, define_arena};
-use libft::Span;
 
 define_arena!(Declarator, DeclaratorArena, DeclaratorId);
 
@@ -38,18 +39,9 @@ impl DeclaratorNode {
 pub enum Declarator {
     Ident(Name),
     Abstract,
-    Pointer {
-        qualifiers: Vec<Qualifier>,
-        inner: DeclaratorNode,
-    },
-    Array {
-        declarator: DeclaratorNode,
-        size: Option<ExpressionNode>,
-    },
-    Function {
-        declarator: DeclaratorNode,
-        params: FunctionParametersNode,
-    },
+    Pointer { qualifiers: Vec<Qualifier>, inner: DeclaratorNode },
+    Array { declarator: DeclaratorNode, size: Option<ExpressionNode> },
+    Function { declarator: DeclaratorNode, params: FunctionParametersNode },
 }
 
 impl Declarator {
@@ -78,10 +70,7 @@ pub enum Initializer {
 
 impl DeclaratorArena {
     fn add(&mut self, id: Declarator, span: Span) -> DeclaratorNode {
-        DeclaratorNode {
-            id: self.alloc(id),
-            span,
-        }
+        DeclaratorNode { id: self.alloc(id), span }
     }
 
     pub fn abstract_declarator(&mut self, span: Span) -> DeclaratorNode {

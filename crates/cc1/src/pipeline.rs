@@ -43,11 +43,7 @@ impl Default for Pipeline<Context> {
 
 impl<T: Errors> Pipeline<T> {
     pub fn new(state: T) -> Self {
-        Self {
-            state,
-            exit_code: 0,
-            stopped: false,
-        }
+        Self { state, exit_code: 0, stopped: false }
     }
 
     pub fn pass(mut self, pass: fn(T) -> T) -> Self {
@@ -70,11 +66,7 @@ impl<T: Errors> Pipeline<T> {
     }
 
     pub fn then<U: Errors>(self, f: fn(T) -> U) -> Pipeline<U> {
-        Pipeline {
-            state: f(self.state),
-            exit_code: self.exit_code,
-            stopped: self.stopped,
-        }
+        Pipeline { state: f(self.state), exit_code: self.exit_code, stopped: self.stopped }
     }
 
     pub fn checkpoint(mut self) -> Self {

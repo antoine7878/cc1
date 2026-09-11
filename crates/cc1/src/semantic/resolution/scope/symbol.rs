@@ -20,11 +20,7 @@ pub struct SymbolScope {
 
 impl SymbolScope {
     fn new(kind: ScopeKind) -> Self {
-        Self {
-            tags: HashMap::new(),
-            ordinaries: HashMap::new(),
-            kind,
-        }
+        Self { tags: HashMap::new(), ordinaries: HashMap::new(), kind }
     }
 }
 

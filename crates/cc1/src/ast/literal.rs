@@ -1,10 +1,10 @@
 use std::fmt;
 
-use crate::ast::escape;
-use crate::ast_node;
-use crate::define_interner;
-use crate::semantic::{Diag, QualifiedType, Sema};
 use libft::Span;
+
+use crate::ast::escape;
+use crate::semantic::{Diag, QualifiedType, Sema};
+use crate::{ast_node, define_interner};
 
 define_interner!(StringConstant, StringPool, StringConstId);
 
@@ -65,10 +65,7 @@ impl StringPool {
         let tail = self.get(rhs.id).clone();
         let mut units = head.units;
         units.extend(tail.units);
-        let id = self.alloc(StringConstant {
-            units,
-            is_wide: head.is_wide || tail.is_wide,
-        });
+        let id = self.alloc(StringConstant { units, is_wide: head.is_wide || tail.is_wide });
         StringLiteralNode::new(id, span)
     }
 }

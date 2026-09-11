@@ -1,7 +1,6 @@
-use std::fmt;
 use std::process::exit;
 use std::str::Chars;
-use std::vec;
+use std::{fmt, vec};
 
 use libft::{ArgError, ArgParser, argv};
 
@@ -24,15 +23,7 @@ pub struct Args {
 
 impl Default for Args {
     fn default() -> Self {
-        Self {
-            i: vec![],
-            o: None,
-            c: false,
-            n: false,
-            v: false,
-            t: false,
-            argv: argv(),
-        }
+        Self { i: vec![], o: None, c: false, n: false, v: false, t: false, argv: argv() }
     }
 }
 

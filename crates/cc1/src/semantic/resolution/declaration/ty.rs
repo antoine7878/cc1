@@ -1,3 +1,5 @@
+use libft::Span;
+
 use crate::ast::{
     DeclarationSpecifier, Declarator, DeclaratorNode, ExpressionNode, FunctionParameters, FunctionParametersNode,
     ParameterDeclaration, Tag, TypeSpecifier,
@@ -6,7 +8,6 @@ use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     DeclaredParams, Diag, DiagCollector, Diagnosis, ParamInfo, QualifiedType, ResolvedType, SymbolResolver, constrain,
 };
-use libft::Span;
 
 pub fn base_type(
     resolver: &mut SymbolResolver,
@@ -77,10 +78,7 @@ fn extract_declarator(
             let id = resolver.sema.types.pointer(inner_most);
             extract_declarator(resolver, inner, QualifiedType::new(id, is_const, is_volatile), false)
         }
-        Declarator::Array {
-            declarator: inner,
-            size,
-        } => {
+        Declarator::Array { declarator: inner, size } => {
             if !inner_already_diagnosed {
                 constrain::ty::check_element_type(inner_most.is_object(resolver.sema), inner_most)
                     .collect(resolver, &declarator.span);
@@ -90,10 +88,7 @@ fn extract_declarator(
             let id = resolver.sema.types.array(inner_most, len);
             extract_declarator(resolver, inner, QualifiedType::plain(id), this_level_erred)
         }
-        Declarator::Function {
-            declarator: inner,
-            params,
-        } => {
+        Declarator::Function { declarator: inner, params } => {
             let list = resolve_params(resolver, params);
             constrain::ty::check_return_type(inner_most.id.resolve_with(resolver.sema), inner_most)
                 .collect(resolver, &declarator.span);
@@ -126,15 +121,9 @@ fn resolve_prototype(
         && !is_variadic
         && only.is_abstract_void()
     {
-        return DeclaredParams::Prototype {
-            params: Vec::new(),
-            is_variadic,
-        };
+        return DeclaredParams::Prototype { params: Vec::new(), is_variadic };
     }
-    let params: Vec<ParamInfo> = params
-        .iter()
-        .filter_map(|param| resolve_parameter(resolver, param))
-        .collect();
+    let params: Vec<ParamInfo> = params.iter().filter_map(|param| resolve_parameter(resolver, param)).collect();
     for param in &params {
         let is_void = matches!(param.ty.id.resolve_with(resolver.sema), ResolvedType::Void);
         let is_special_case = params.len() == 1 && param.name.is_some();
@@ -152,12 +141,7 @@ fn resolve_parameter(resolver: &mut SymbolResolver, param: &ParameterDeclaration
     if let Some(storage) = storage {
         constrain::parameter::param_storage_only_register(storage).collect(resolver, span);
     }
-    Some(ParamInfo {
-        name: decl.ident(),
-        ty,
-        storage,
-        span: *span,
-    })
+    Some(ParamInfo { name: decl.ident(), ty, storage, span: *span })
 }
 
 /// 6.5.4.2 The expression delimited by [ and ] (which specifies the size of an array) shall be an

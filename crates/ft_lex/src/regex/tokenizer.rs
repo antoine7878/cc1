@@ -2,7 +2,8 @@ use std::fmt::{self, Debug};
 
 use libft::simple_escape;
 
-use crate::{error::LexError, utils::byte_label};
+use crate::error::LexError;
+use crate::utils::byte_label;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Token {
@@ -175,13 +176,7 @@ impl From<&str> for Tokenizer {
 
 impl From<Vec<u8>> for Tokenizer {
     fn from(line: Vec<u8>) -> Self {
-        Self {
-            bytes: line,
-            i: 0,
-            stash: None,
-            in_quotes: false,
-            in_brackets: false,
-        }
+        Self { bytes: line, i: 0, stash: None, in_quotes: false, in_brackets: false }
     }
 }
 

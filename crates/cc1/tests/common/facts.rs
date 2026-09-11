@@ -63,10 +63,7 @@ impl Visitor for FactChecker<'_> {
 impl Unit {
     /// Every fact a code generator would need and not find, empty when the unit is complete.
     pub fn missing_facts(&self) -> Vec<String> {
-        let mut checker = FactChecker {
-            sema: self.sema,
-            missing: Vec::new(),
-        };
+        let mut checker = FactChecker { sema: self.sema, missing: Vec::new() };
         walk_translation_unit(&mut checker, &self.ctx.ast);
         checker.missing
     }
@@ -76,14 +73,6 @@ pub fn run_facts(name: &str, src: &str) {
     let unit = Unit::compile(src);
 
     assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
-    assert!(
-        unit.diagnosis().is_empty(),
-        "`{name}` unexpected diagnosis:\n{src}\n{}",
-        unit.render()
-    );
-    assert_eq!(
-        unit.missing_facts(),
-        Vec::<String>::new(),
-        "`{name}` is missing facts a code generator needs:\n{src}"
-    );
+    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", unit.render());
+    assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{src}");
 }

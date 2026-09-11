@@ -8,11 +8,7 @@ pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>>
         _ => None,
     });
     let ret = storages.next().cloned();
-    if storages.next().is_some() {
-        Diag::err(ret, Diagnosis::MultipleStorageSpecifiers)
-    } else {
-        Diag::ok(ret)
-    }
+    if storages.next().is_some() { Diag::err(ret, Diagnosis::MultipleStorageSpecifiers) } else { Diag::ok(ret) }
 }
 
 pub fn get_qualifier(specifiers: &[DeclarationSpecifier]) -> Diag<(bool, bool)> {
@@ -86,10 +82,7 @@ pub fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
 }
 
 pub fn check_external_specifiers(specifiers: &[DeclarationSpecifier]) -> Diag<()> {
-    if specifiers
-        .iter()
-        .any(|s| matches!(s, DeclarationSpecifier::Storage(Storage::Auto | Storage::Register)))
-    {
+    if specifiers.iter().any(|s| matches!(s, DeclarationSpecifier::Storage(Storage::Auto | Storage::Register))) {
         return Diag::err((), Diagnosis::AutoRegisterExternal);
     }
     Diag::ok(())

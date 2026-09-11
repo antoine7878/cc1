@@ -1,20 +1,8 @@
-uses!(
-    use_plain_read,
-    "int x; int f(void) { return x; }",
-    &[("x", true), ("f", false)]
-);
+uses!(use_plain_read, "int x; int f(void) { return x; }", &[("x", true), ("f", false)]);
 
-uses!(
-    use_sizeof_ident_not_used,
-    "int x; int f(void) { return sizeof x; }",
-    &[("x", false), ("f", false)]
-);
+uses!(use_sizeof_ident_not_used, "int x; int f(void) { return sizeof x; }", &[("x", false), ("f", false)]);
 
-uses!(
-    use_sizeof_expr_not_used,
-    "int x; int f(void) { return sizeof(x + 1); }",
-    &[("x", false), ("f", false)]
-);
+uses!(use_sizeof_expr_not_used, "int x; int f(void) { return sizeof(x + 1); }", &[("x", false), ("f", false)]);
 
 uses!(
     use_sizeof_operand_precedence,
@@ -22,17 +10,9 @@ uses!(
     &[("x", false), ("y", true), ("f", false)]
 );
 
-uses!(
-    use_function_call,
-    "int f(void); int g(void) { return f(); }",
-    &[("f", true), ("g", false)]
-);
+uses!(use_function_call, "int f(void); int g(void) { return f(); }", &[("f", true), ("g", false)]);
 
-uses!(
-    use_address_of,
-    "int x; int *p; void f(void) { p = &x; }",
-    &[("x", true), ("p", true), ("f", false)]
-);
+uses!(use_address_of, "int x; int *p; void f(void) { p = &x; }", &[("x", true), ("p", true), ("f", false)]);
 
 uses!(
     use_member_access_marks_struct_var,

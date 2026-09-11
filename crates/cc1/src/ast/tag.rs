@@ -1,6 +1,7 @@
+use libft::Span;
+
 use crate::ast::{DeclarationSpecifier, DeclaratorNode, ExpressionNode, Name};
 use crate::{ast_node, define_arena};
-use libft::Span;
 
 define_arena!(Struct, StructArena, StructId);
 define_arena!(Union, UnionArena, UnionId);

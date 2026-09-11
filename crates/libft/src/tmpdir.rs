@@ -21,10 +21,7 @@ impl TmpDir {
             let path = base.join(format!("{}-{}-{}", prefix, id(), count));
             match create_dir(&path) {
                 Ok(()) => {
-                    return Self {
-                        path,
-                        keep: var_os("FT_KEEP_TMP").is_some(),
-                    };
+                    return Self { path, keep: var_os("FT_KEEP_TMP").is_some() };
                 }
                 Err(e) if e.kind() == ErrorKind::AlreadyExists => continue,
                 Err(e) => panic!("cannot create {}: {e}", path.display()),

@@ -23,11 +23,7 @@ pub fn plan(input: &str, last: Stage, requested: Option<&str>, tmp: &Path, id: u
             true => output_of(input, last, requested),
             false => tmp.join(temp_name(input, stage, id)),
         };
-        steps.push(Step {
-            stage,
-            input: current,
-            output: output.clone(),
-        });
+        steps.push(Step { stage, input: current, output: output.clone() });
         current = output;
     }
     Ok(steps)
@@ -38,9 +34,6 @@ pub fn object_of(steps: &[Step]) -> Option<&Path> {
 }
 
 fn temp_name(input: &str, stage: Stage, id: usize) -> String {
-    let stem = Path::new(base_name(input))
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("x");
+    let stem = Path::new(base_name(input)).file_stem().and_then(|s| s.to_str()).unwrap_or("x");
     format!("{id}-{stem}.{}", stage.extension())
 }

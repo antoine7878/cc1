@@ -80,10 +80,7 @@ impl ResolvedType {
     }
 
     pub fn is_char(&self) -> bool {
-        matches!(
-            self,
-            ResolvedType::Char | ResolvedType::UnsignedChar | ResolvedType::SignedChar
-        )
+        matches!(self, ResolvedType::Char | ResolvedType::UnsignedChar | ResolvedType::SignedChar)
     }
 
     pub fn is_integral(&self, sema: &Sema) -> bool {
@@ -109,10 +106,7 @@ impl ResolvedType {
     }
 
     pub fn is_floating(&self) -> bool {
-        matches!(
-            self,
-            ResolvedType::Float | ResolvedType::Double | ResolvedType::LongDouble
-        )
+        matches!(self, ResolvedType::Float | ResolvedType::Double | ResolvedType::LongDouble)
     }
 
     pub fn is_signed(&self) -> bool {
@@ -231,11 +225,7 @@ impl ResolvedTypeArena {
 
 impl QualifiedType {
     pub fn new(id: ResolvedTypeId, is_const: bool, is_volatile: bool) -> Self {
-        QualifiedType {
-            id,
-            is_const,
-            is_volatile,
-        }
+        QualifiedType { id, is_const, is_volatile }
     }
 
     pub fn plain(id: ResolvedTypeId) -> Self {
@@ -280,18 +270,14 @@ impl QualifiedType {
                     (ParamTypes::Unspecified, ParamTypes::Unspecified) => ParamTypes::Unspecified,
                     (p @ ParamTypes::Prototype { .. }, ParamTypes::Unspecified)
                     | (ParamTypes::Unspecified, p @ ParamTypes::Prototype { .. }) => p,
-                    (
+                    (ParamTypes::Prototype { params: p1, is_variadic }, ParamTypes::Prototype { params: p2, .. }) => {
                         ParamTypes::Prototype {
-                            params: p1,
+                            params: zip(&p1, &p2)
+                                .map(|(t1, t2)| QualifiedType::composite(t1, sema, t2))
+                                .collect::<Option<Vec<_>>>()?,
                             is_variadic,
-                        },
-                        ParamTypes::Prototype { params: p2, .. },
-                    ) => ParamTypes::Prototype {
-                        params: zip(&p1, &p2)
-                            .map(|(t1, t2)| QualifiedType::composite(t1, sema, t2))
-                            .collect::<Option<Vec<_>>>()?,
-                        is_variadic,
-                    },
+                        }
+                    }
                 };
                 let ty = sema.types.function(ret, params);
                 Some(QualifiedType::new(ty, self.is_const, self.is_volatile))

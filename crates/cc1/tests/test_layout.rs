@@ -16,12 +16,7 @@ size!(size_char_then_short, "struct S { char a; short b; };", "struct S", 4);
 
 size!(size_char_then_int, "struct S { char a; int b; };", "struct S", 8);
 
-size!(
-    size_char_char_then_int,
-    "struct S { char a; char b; int c; };",
-    "struct S",
-    8
-);
+size!(size_char_char_then_int, "struct S { char a; char b; int c; };", "struct S", 8);
 
 size!(size_short_then_int, "struct S { short a; int b; };", "struct S", 8);
 
@@ -37,19 +32,9 @@ size!(size_double_then_char, "struct S { double a; char b; };", "struct S", 12);
 
 size!(size_pointer_then_char, "struct S { int *p; char c; };", "struct S", 8);
 
-size!(
-    size_char_int_char,
-    "struct S { char a; int b; char c; };",
-    "struct S",
-    12
-);
+size!(size_char_int_char, "struct S { char a; int b; char c; };", "struct S", 12);
 
-size!(
-    size_long_double_then_char,
-    "struct S { long double a; char b; };",
-    "struct S",
-    16
-);
+size!(size_long_double_then_char, "struct S { long double a; char b; };", "struct S", 16);
 
 size!(size_union_char_int, "union U { char a; int b; };", "union U", 4);
 
@@ -57,12 +42,7 @@ size!(size_union_char_double, "union U { char a; double b; };", "union U", 8);
 
 size!(size_union_single_char, "union U { char a; };", "union U", 1);
 
-size!(
-    size_union_padded_to_alignment,
-    "union U { char a[7]; short b; };",
-    "union U",
-    8
-);
+size!(size_union_padded_to_alignment, "union U { char a[7]; short b; };", "union U", 8);
 
 size!(size_union_of_bitfield, "union U { int a:3; char b; };", "union U", 4);
 
@@ -70,72 +50,27 @@ size!(size_array_of_char, "struct S { char a[3]; };", "struct S", 3);
 size!(size_array_then_int, "struct S { char a[3]; int b; };", "struct S", 8);
 size!(size_array_of_int, "struct S { int a[4]; };", "struct S", 16);
 
-size!(
-    size_nested_struct,
-    "struct I { char a; int b; }; struct S { char x; struct I i; };",
-    "struct S",
-    12
-);
+size!(size_nested_struct, "struct I { char a; int b; }; struct S { char x; struct I i; };", "struct S", 12);
 
-size!(
-    size_nested_struct_of_chars,
-    "struct I { char a; char b; }; struct S { struct I i; char c; };",
-    "struct S",
-    3
-);
+size!(size_nested_struct_of_chars, "struct I { char a; char b; }; struct S { struct I i; char c; };", "struct S", 3);
 
-size!(
-    size_nested_union,
-    "union U { char a; int b; }; struct S { char x; union U u; };",
-    "struct S",
-    8
-);
+size!(size_nested_union, "union U { char a; int b; }; struct S { char x; union U u; };", "struct S", 8);
 
 size!(size_enum, "enum E { A };", "enum E", 4);
 
-size!(
-    size_struct_of_enum,
-    "enum E { A }; struct S { char c; enum E e; };",
-    "struct S",
-    8
-);
+size!(size_struct_of_enum, "enum E { A }; struct S { char c; enum E e; };", "struct S", 8);
 
-size!(
-    size_char_then_double_array,
-    "struct S { char c; double a[2]; };",
-    "struct S",
-    20
-);
+size!(size_char_then_double_array, "struct S { char c; double a[2]; };", "struct S", 20);
 
-size!(
-    size_double_array_then_char,
-    "struct S { double a[3]; char c; };",
-    "struct S",
-    28
-);
+size!(size_double_array_then_char, "struct S { double a[3]; char c; };", "struct S", 28);
 
 size!(size_bitfield_single, "struct S { int a:3; };", "struct S", 4);
 
-size!(
-    size_bitfields_share_a_unit,
-    "struct S { int a:3; int b:2; };",
-    "struct S",
-    4
-);
+size!(size_bitfields_share_a_unit, "struct S { int a:3; int b:2; };", "struct S", 4);
 
-size!(
-    size_bitfield_does_not_straddle,
-    "struct S { int a:3; int b:30; };",
-    "struct S",
-    8
-);
+size!(size_bitfield_does_not_straddle, "struct S { int a:3; int b:30; };", "struct S", 8);
 
-size!(
-    size_bitfield_fills_a_unit,
-    "struct S { int a:32; int b:1; };",
-    "struct S",
-    8
-);
+size!(size_bitfield_fills_a_unit, "struct S { int a:32; int b:1; };", "struct S", 8);
 
 size!(size_char_then_bitfield, "struct S { char c; int a:1; };", "struct S", 4);
 
@@ -150,82 +85,27 @@ macro_rules! unnamed_size {
     };
 }
 
-unnamed_size!(
-    size_unnamed_bitfield_shares_a_unit,
-    "struct S { int a:3; int :2; int b:4; };",
-    "struct S",
-    4
-);
+unnamed_size!(size_unnamed_bitfield_shares_a_unit, "struct S { int a:3; int :2; int b:4; };", "struct S", 4);
 
-unnamed_size!(
-    size_unnamed_bitfield_opens_a_unit,
-    "struct S { int a:3; int :30; int b:4; };",
-    "struct S",
-    12
-);
+unnamed_size!(size_unnamed_bitfield_opens_a_unit, "struct S { int a:3; int :30; int b:4; };", "struct S", 12);
 
-unnamed_size!(
-    size_zero_width_bitfield_closes_the_unit,
-    "struct S { int a:1; int :0; int b:1; };",
-    "struct S",
-    8
-);
+unnamed_size!(size_zero_width_bitfield_closes_the_unit, "struct S { int a:1; int :0; int b:1; };", "struct S", 8);
 
-unnamed_size!(
-    size_unnamed_bitfield_alone_in_a_unit,
-    "struct S { char a; int :17; };",
-    "struct S",
-    4
-);
+unnamed_size!(size_unnamed_bitfield_alone_in_a_unit, "struct S { char a; int :17; };", "struct S", 4);
 
-unnamed_size!(
-    size_unnamed_bitfield_keeps_alignment,
-    "struct S { char a; int :1; char b; };",
-    "struct S",
-    3
-);
+unnamed_size!(size_unnamed_bitfield_keeps_alignment, "struct S { char a; int :1; char b; };", "struct S", 3);
 
-unnamed_size!(
-    size_zero_width_bitfield_keeps_alignment,
-    "struct S { char a; int :0; char b; };",
-    "struct S",
-    5
-);
+unnamed_size!(size_zero_width_bitfield_keeps_alignment, "struct S { char a; int :0; char b; };", "struct S", 5);
 
-unnamed_size!(
-    size_union_unnamed_bitfield,
-    "union U { char a; int :17; };",
-    "union U",
-    3
-);
+unnamed_size!(size_union_unnamed_bitfield, "union U { char a; int :17; };", "union U", 3);
 
-unnamed_size!(
-    size_union_zero_width_bitfield,
-    "union U { char a; int :0; };",
-    "union U",
-    1
-);
+unnamed_size!(size_union_zero_width_bitfield, "union U { char a; int :0; };", "union U", 1);
 
-offsets!(
-    offset_plain_with_padding,
-    "struct S { char a; int b; };",
-    "S",
-    &[("a", 0, 0), ("b", 4, 0)]
-);
+offsets!(offset_plain_with_padding, "struct S { char a; int b; };", "S", &[("a", 0, 0), ("b", 4, 0)]);
 
-offsets!(
-    offset_double_alignment,
-    "struct S { char a; double d; };",
-    "S",
-    &[("a", 0, 0), ("d", 4, 0)]
-);
+offsets!(offset_double_alignment, "struct S { char a; double d; };", "S", &[("a", 0, 0), ("d", 4, 0)]);
 
-offsets!(
-    offset_array_member,
-    "struct S { char a; int arr[3]; };",
-    "S",
-    &[("a", 0, 0), ("arr", 4, 0)]
-);
+offsets!(offset_array_member, "struct S { char a; int arr[3]; };", "S", &[("a", 0, 0), ("arr", 4, 0)]);
 
 offsets!(
     offset_nested_struct_member,
@@ -234,26 +114,11 @@ offsets!(
     &[("a", 0, 0), ("in", 4, 0)]
 );
 
-offsets!(
-    offset_union_all_zero,
-    "union U { char a; int b; double d; };",
-    "U",
-    &[("a", 0, 0), ("b", 0, 0), ("d", 0, 0)]
-);
+offsets!(offset_union_all_zero, "union U { char a; int b; double d; };", "U", &[("a", 0, 0), ("b", 0, 0), ("d", 0, 0)]);
 
-offsets!(
-    offset_bitfields_sharing_a_unit,
-    "struct S { int a:3; int b:4; };",
-    "S",
-    &[("a", 0, 0), ("b", 0, 3)]
-);
+offsets!(offset_bitfields_sharing_a_unit, "struct S { int a:3; int b:4; };", "S", &[("a", 0, 0), ("b", 0, 3)]);
 
-offsets!(
-    offset_bitfield_opens_a_new_unit,
-    "struct S { int a:20; int b:20; };",
-    "S",
-    &[("a", 0, 0), ("b", 4, 0)]
-);
+offsets!(offset_bitfield_opens_a_new_unit, "struct S { int a:20; int b:20; };", "S", &[("a", 0, 0), ("b", 4, 0)]);
 
 offsets!(
     offset_unnamed_bitfield_between_named,
@@ -262,19 +127,9 @@ offsets!(
     &[("a", 0, 0), ("b", 0, 5)]
 );
 
-offsets!(
-    offset_zero_width_bitfield,
-    "struct S { int a:1; int :0; int b:1; };",
-    "S",
-    &[("a", 0, 0), ("b", 4, 0)]
-);
+offsets!(offset_zero_width_bitfield, "struct S { int a:1; int :0; int b:1; };", "S", &[("a", 0, 0), ("b", 4, 0)]);
 
-offsets!(
-    offset_bitfield_after_char,
-    "struct S { char a; int b:3; };",
-    "S",
-    &[("a", 0, 0), ("b", 0, 8)]
-);
+offsets!(offset_bitfield_after_char, "struct S { char a; int b:3; };", "S", &[("a", 0, 0), ("b", 0, 8)]);
 
 offsets!(
     offset_of_a_tag_reached_only_through_a_pointer,

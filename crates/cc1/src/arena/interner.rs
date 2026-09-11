@@ -13,10 +13,7 @@ pub struct Interner<Id: ArenaKey, Val> {
 
 impl<Id: ArenaKey, Val> Default for Interner<Id, Val> {
     fn default() -> Self {
-        Self {
-            arena: Arena::default(),
-            canonical: HashMap::new(),
-        }
+        Self { arena: Arena::default(), canonical: HashMap::new() }
     }
 }
 

@@ -15,27 +15,15 @@ pub struct F80 {
 
 impl F80 {
     pub const fn zero(sign: bool) -> Self {
-        Self {
-            sign,
-            exponent: 0,
-            mantissa: 0,
-        }
+        Self { sign, exponent: 0, mantissa: 0 }
     }
 
     pub const fn infinity(sign: bool) -> Self {
-        Self {
-            sign,
-            exponent: SPECIAL as u16,
-            mantissa: INTEGER_BIT,
-        }
+        Self { sign, exponent: SPECIAL as u16, mantissa: INTEGER_BIT }
     }
 
     pub const fn nan() -> Self {
-        Self {
-            sign: false,
-            exponent: SPECIAL as u16,
-            mantissa: INTEGER_BIT | 1 << 62,
-        }
+        Self { sign: false, exponent: SPECIAL as u16, mantissa: INTEGER_BIT | 1 << 62 }
     }
 
     pub fn is_nan(self) -> bool {
@@ -164,11 +152,7 @@ fn round_pack(sign: bool, mut mantissa: u128, mut exp: i32, mut sticky: bool) ->
     if biased >= SPECIAL {
         return F80::infinity(sign);
     }
-    F80 {
-        sign,
-        exponent: biased as u16,
-        mantissa: mantissa as u64,
-    }
+    F80 { sign, exponent: biased as u16, mantissa: mantissa as u64 }
 }
 
 impl From<&str> for F80 {
@@ -333,10 +317,7 @@ impl Neg for F80 {
     type Output = Self;
 
     fn neg(self) -> Self {
-        Self {
-            sign: !self.sign,
-            ..self
-        }
+        Self { sign: !self.sign, ..self }
     }
 }
 
@@ -525,9 +506,7 @@ impl Big {
     }
 
     fn bit(&self, index: u32) -> bool {
-        self.0
-            .get((index / 32) as usize)
-            .is_some_and(|limb| limb >> (index % 32) & 1 == 1)
+        self.0.get((index / 32) as usize).is_some_and(|limb| limb >> (index % 32) & 1 == 1)
     }
 
     fn set_bit(&mut self, index: u32) {
@@ -577,21 +556,13 @@ impl From<u32> for Big {
 
 impl From<&Big> for u128 {
     fn from(value: &Big) -> Self {
-        value
-            .0
-            .iter()
-            .take(4)
-            .enumerate()
-            .fold(0, |packed, (i, limb)| packed | u128::from(*limb) << (32 * i))
+        value.0.iter().take(4).enumerate().fold(0, |packed, (i, limb)| packed | u128::from(*limb) << (32 * i))
     }
 }
 
 impl Ord for Big {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.0
-            .len()
-            .cmp(&other.0.len())
-            .then_with(|| self.0.iter().rev().cmp(other.0.iter().rev()))
+        self.0.len().cmp(&other.0.len()).then_with(|| self.0.iter().rev().cmp(other.0.iter().rev()))
     }
 }
 

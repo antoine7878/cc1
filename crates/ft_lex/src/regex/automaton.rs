@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::regex::Graph;
 use libft::BitSet;
+
+use crate::regex::Graph;
 
 pub type StateId = usize;
 pub type FragmentId = usize;
@@ -17,10 +18,7 @@ pub struct Transition {
 
 impl Transition {
     pub fn new(to: StateId) -> Self {
-        Self {
-            to,
-            on: BitSet::with_capacity(256),
-        }
+        Self { to, on: BitSet::with_capacity(256) }
     }
 
     pub fn with_on<T>(to: StateId, on: T) -> Self
@@ -50,10 +48,7 @@ impl State {
     }
 
     pub fn next_state(&self, on_byte: Letter) -> Option<StateId> {
-        self.transitions
-            .iter()
-            .find(|&tr| tr.on.get(on_byte as usize))
-            .map(|tr| tr.to)
+        self.transitions.iter().find(|&tr| tr.on.get(on_byte as usize)).map(|tr| tr.to)
     }
 }
 
@@ -108,9 +103,7 @@ pub trait Automaton {
             current = next;
         }
 
-        current
-            .ones()
-            .any(|state| !self.nodes()[state].accept_fragments.is_clear())
+        current.ones().any(|state| !self.nodes()[state].accept_fragments.is_clear())
     }
 
     fn move_on_byte(&self, states: &BitSet, byte: u8, mut out: BitSet) -> BitSet {

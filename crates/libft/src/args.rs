@@ -1,7 +1,5 @@
-use std::env;
-use std::fmt;
 use std::str::Chars;
-use std::vec;
+use std::{env, fmt, vec};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArgError {
@@ -31,11 +29,7 @@ impl fmt::Display for ArgError {
 }
 
 pub fn argv() -> vec::IntoIter<String> {
-    env::args_os()
-        .skip(1)
-        .map(|arg| arg.to_string_lossy().into_owned())
-        .collect::<Vec<_>>()
-        .into_iter()
+    env::args_os().skip(1).map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>().into_iter()
 }
 
 pub trait ArgParser: Sized {

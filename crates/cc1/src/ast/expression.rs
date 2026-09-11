@@ -1,8 +1,9 @@
+use libft::Span;
+
 use crate::ast::{
-    BinaryOp, DeclarationSpecifier, DeclaratorNode, MemberOp, Name, StringLiteralNode, UnaryOp, ConstValueNode,
+    BinaryOp, ConstValueNode, DeclarationSpecifier, DeclaratorNode, MemberOp, Name, StringLiteralNode, UnaryOp,
 };
 use crate::{ast_node, define_arena};
-use libft::Span;
 
 define_arena!(Expression, ExpressionArena, ExpressionId);
 
@@ -69,10 +70,7 @@ impl ExpressionArena {
         args: Option<ExpressionNode>,
         span: Span,
     ) -> ExpressionNode {
-        ExpressionNode::new(
-            self.alloc(Expression::FunctionCall(function, self.get_args(args))),
-            span,
-        )
+        ExpressionNode::new(self.alloc(Expression::FunctionCall(function, self.get_args(args))), span)
     }
 
     pub fn sizeof_expr(&mut self, node_node: ExpressionNode, span: Span) -> ExpressionNode {

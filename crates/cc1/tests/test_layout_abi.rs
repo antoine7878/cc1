@@ -2,24 +2,14 @@
 // container from docker.mk. The host gcc targets mach-o arm and disagrees on
 // long double and bit-field packing, so it cannot be used as the oracle here.
 
-size!(
-    abi_size_0,
-    "struct S { double m0; unsigned short m1[1]; signed char m2; };",
-    "struct S",
-    12
-);
+size!(abi_size_0, "struct S { double m0; unsigned short m1[1]; signed char m2; };", "struct S", 12);
 bits!(
     abi_bits_0,
     "struct S { double m0; unsigned short m1[1]; signed char m2; };",
     "S",
     &[("m0", 0), ("m1", 64), ("m2", 80)]
 );
-size!(
-    abi_size_1,
-    "struct S { int m0 : 13; signed int m1 : 27; unsigned int m2; long double m3; };",
-    "struct S",
-    24
-);
+size!(abi_size_1, "struct S { int m0 : 13; signed int m1 : 27; unsigned int m2; long double m3; };", "struct S", 24);
 bits!(
     abi_bits_1,
     "struct S { int m0 : 13; signed int m1 : 27; unsigned int m2; long double m3; };",
@@ -38,30 +28,10 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 32), ("m2", 64), ("m3", 96), ("m4", 128)]
 );
-size!(
-    abi_size_3,
-    "union I3_0 { int f0; int * f1; char * f2; }; struct S { unsigned char m0; };",
-    "struct S",
-    1
-);
-bits!(
-    abi_bits_3,
-    "union I3_0 { int f0; int * f1; char * f2; }; struct S { unsigned char m0; };",
-    "S",
-    &[("m0", 0)]
-);
-size!(
-    abi_size_4,
-    "struct S { unsigned int : 11; long m1[3]; double m2[3]; };",
-    "struct S",
-    40
-);
-bits!(
-    abi_bits_4,
-    "struct S { unsigned int : 11; long m1[3]; double m2[3]; };",
-    "S",
-    &[("m1", 32), ("m2", 128)]
-);
+size!(abi_size_3, "union I3_0 { int f0; int * f1; char * f2; }; struct S { unsigned char m0; };", "struct S", 1);
+bits!(abi_bits_3, "union I3_0 { int f0; int * f1; char * f2; }; struct S { unsigned char m0; };", "S", &[("m0", 0)]);
+size!(abi_size_4, "struct S { unsigned int : 11; long m1[3]; double m2[3]; };", "struct S", 40);
+bits!(abi_bits_4, "struct S { unsigned int : 11; long m1[3]; double m2[3]; };", "S", &[("m1", 32), ("m2", 128)]);
 size!(
     abi_size_5,
     "union I5_0 { unsigned char f0; }; struct S { int : 16; double m1; char * m2; unsigned short m3; };",
@@ -87,18 +57,8 @@ bits!(
     &[("m0", 0), ("m1", 16), ("m2", 32), ("m3", 64)]
 );
 size!(abi_size_7, "union S { unsigned long m0; char m1; };", "union S", 4);
-bits!(
-    abi_bits_7,
-    "union S { unsigned long m0; char m1; };",
-    "S",
-    &[("m0", 0), ("m1", 0)]
-);
-size!(
-    abi_size_8,
-    "struct S { unsigned int m0; signed int : 13; char m2; char m3; char * m4; };",
-    "struct S",
-    12
-);
+bits!(abi_bits_7, "union S { unsigned long m0; char m1; };", "S", &[("m0", 0), ("m1", 0)]);
+size!(abi_size_8, "struct S { unsigned int m0; signed int : 13; char m2; char m3; char * m4; };", "struct S", 12);
 bits!(
     abi_bits_8,
     "struct S { unsigned int m0; signed int : 13; char m2; char m3; char * m4; };",
@@ -129,40 +89,20 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 64), ("m2", 96), ("m3", 112)]
 );
-size!(
-    abi_size_11,
-    "struct S { float m0[1]; signed int m1 : 2; char * m2; };",
-    "struct S",
-    12
-);
+size!(abi_size_11, "struct S { float m0[1]; signed int m1 : 2; char * m2; };", "struct S", 12);
 bits!(
     abi_bits_11,
     "struct S { float m0[1]; signed int m1 : 2; char * m2; };",
     "S",
     &[("m0", 0), ("m1", 32), ("m2", 64)]
 );
-size!(
-    abi_size_12,
-    "union I12_0 { unsigned short f0; }; struct S { int : 0; int m9; };",
-    "struct S",
-    4
-);
-bits!(
-    abi_bits_12,
-    "union I12_0 { unsigned short f0; }; struct S { int : 0; int m9; };",
-    "S",
-    &[("m9", 0)]
-);
+size!(abi_size_12, "union I12_0 { unsigned short f0; }; struct S { int : 0; int m9; };", "struct S", 4);
+bits!(abi_bits_12, "union I12_0 { unsigned short f0; }; struct S { int : 0; int m9; };", "S", &[("m9", 0)]);
 size!(abi_size_13, "union S { signed int : 12; int m9; };", "union S", 4);
 bits!(abi_bits_13, "union S { signed int : 12; int m9; };", "S", &[("m9", 0)]);
 size!(abi_size_14, "struct S { unsigned long m0[4]; };", "struct S", 16);
 bits!(abi_bits_14, "struct S { unsigned long m0[4]; };", "S", &[("m0", 0)]);
-size!(
-    abi_size_15,
-    "struct I15_0 { short f0; }; union S { struct I15_0 m0; void * m1; };",
-    "union S",
-    4
-);
+size!(abi_size_15, "struct I15_0 { short f0; }; union S { struct I15_0 m0; void * m1; };", "union S", 4);
 bits!(
     abi_bits_15,
     "struct I15_0 { short f0; }; union S { struct I15_0 m0; void * m1; };",
@@ -181,18 +121,8 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 16), ("m2", 32)]
 );
-size!(
-    abi_size_17,
-    "struct I17_0 { unsigned long f0; float f1; }; struct S { double m0; };",
-    "struct S",
-    8
-);
-bits!(
-    abi_bits_17,
-    "struct I17_0 { unsigned long f0; float f1; }; struct S { double m0; };",
-    "S",
-    &[("m0", 0)]
-);
+size!(abi_size_17, "struct I17_0 { unsigned long f0; float f1; }; struct S { double m0; };", "struct S", 8);
+bits!(abi_bits_17, "struct I17_0 { unsigned long f0; float f1; }; struct S { double m0; };", "S", &[("m0", 0)]);
 size!(
     abi_size_18,
     "union I18_0 { short f0; float f1; }; struct S { int m0 : 15; signed int : 16; union I18_0 m2; };",
@@ -205,12 +135,7 @@ bits!(
     "S",
     &[("m0", 0), ("m2", 32)]
 );
-size!(
-    abi_size_19,
-    "struct S { unsigned char m0; double m1; long m2; int m3; int m4 : 10; };",
-    "struct S",
-    24
-);
+size!(abi_size_19, "struct S { unsigned char m0; double m1; long m2; int m3; int m4 : 10; };", "struct S", 24);
 bits!(
     abi_bits_19,
     "struct S { unsigned char m0; double m1; long m2; int m3; int m4 : 10; };",
@@ -241,12 +166,7 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 0), ("m2", 0), ("m3", 0), ("m4", 0), ("m5", 0)]
 );
-size!(
-    abi_size_22,
-    "struct I22_0 { short f0; float f1; }; struct S { int m0 : 5; short m1; };",
-    "struct S",
-    4
-);
+size!(abi_size_22, "struct I22_0 { short f0; float f1; }; struct S { int m0 : 5; short m1; };", "struct S", 4);
 bits!(
     abi_bits_22,
     "struct I22_0 { short f0; float f1; }; struct S { int m0 : 5; short m1; };",
@@ -265,18 +185,8 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 0), ("m3", 0), ("m4", 0)]
 );
-size!(
-    abi_size_24,
-    "union S { unsigned int : 3; char * m1; signed char m2[3]; };",
-    "union S",
-    4
-);
-bits!(
-    abi_bits_24,
-    "union S { unsigned int : 3; char * m1; signed char m2[3]; };",
-    "S",
-    &[("m1", 0), ("m2", 0)]
-);
+size!(abi_size_24, "union S { unsigned int : 3; char * m1; signed char m2[3]; };", "union S", 4);
+bits!(abi_bits_24, "union S { unsigned int : 3; char * m1; signed char m2[3]; };", "S", &[("m1", 0), ("m2", 0)]);
 size!(
     abi_size_25,
     "struct S { unsigned int m0[1]; unsigned int m1 : 11; signed char m2[1]; double m3[1]; };",
@@ -325,24 +235,9 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 8), ("m2", 32)]
 );
-size!(
-    abi_size_29,
-    "union S { unsigned char m0[4]; signed int : 14; int m2 : 4; };",
-    "union S",
-    4
-);
-bits!(
-    abi_bits_29,
-    "union S { unsigned char m0[4]; signed int : 14; int m2 : 4; };",
-    "S",
-    &[("m0", 0), ("m2", 0)]
-);
-size!(
-    abi_size_30,
-    "struct S { int m0; double m1[1]; int m2 : 5; char * m3; float m4; };",
-    "struct S",
-    24
-);
+size!(abi_size_29, "union S { unsigned char m0[4]; signed int : 14; int m2 : 4; };", "union S", 4);
+bits!(abi_bits_29, "union S { unsigned char m0[4]; signed int : 14; int m2 : 4; };", "S", &[("m0", 0), ("m2", 0)]);
+size!(abi_size_30, "struct S { int m0; double m1[1]; int m2 : 5; char * m3; float m4; };", "struct S", 24);
 bits!(
     abi_bits_30,
     "struct S { int m0; double m1[1]; int m2 : 5; char * m3; float m4; };",
@@ -439,18 +334,8 @@ bits!(
     "S",
     &[("m1", 0), ("m2", 96)]
 );
-size!(
-    abi_size_41,
-    "struct I41_0 { void * f0; }; struct S { int : 6; int m9; };",
-    "struct S",
-    8
-);
-bits!(
-    abi_bits_41,
-    "struct I41_0 { void * f0; }; struct S { int : 6; int m9; };",
-    "S",
-    &[("m9", 32)]
-);
+size!(abi_size_41, "struct I41_0 { void * f0; }; struct S { int : 6; int m9; };", "struct S", 8);
+bits!(abi_bits_41, "struct I41_0 { void * f0; }; struct S { int : 6; int m9; };", "S", &[("m9", 32)]);
 size!(abi_size_42, "struct S { unsigned char m0; };", "struct S", 1);
 bits!(abi_bits_42, "struct S { unsigned char m0; };", "S", &[("m0", 0)]);
 size!(abi_size_43, "union S { double m0; };", "union S", 8);
@@ -479,12 +364,7 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 0), ("m2", 0), ("m3", 0)]
 );
-size!(
-    abi_size_46,
-    "struct S { int m0[2]; long double m1[2]; unsigned short m2; };",
-    "struct S",
-    36
-);
+size!(abi_size_46, "struct S { int m0[2]; long double m1[2]; unsigned short m2; };", "struct S", 36);
 bits!(
     abi_bits_46,
     "struct S { int m0[2]; long double m1[2]; unsigned short m2; };",
@@ -551,18 +431,8 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 0), ("m2", 0), ("m3", 0)]
 );
-size!(
-    abi_size_52,
-    "union I52_0 { int f0; int * f1; }; struct S { double m0; };",
-    "struct S",
-    8
-);
-bits!(
-    abi_bits_52,
-    "union I52_0 { int f0; int * f1; }; struct S { double m0; };",
-    "S",
-    &[("m0", 0)]
-);
+size!(abi_size_52, "union I52_0 { int f0; int * f1; }; struct S { double m0; };", "struct S", 8);
+bits!(abi_bits_52, "union I52_0 { int f0; int * f1; }; struct S { double m0; };", "S", &[("m0", 0)]);
 size!(
     abi_size_53,
     "struct I53_0 { unsigned char f0; char * f1; unsigned int f2; }; struct S { unsigned int m0 : 29; signed char m1; unsigned int m2 : 27; int : 0; char * m4; struct I53_0 m5; };",
@@ -600,18 +470,8 @@ bits!(
     &[("m0", 0), ("m1", 16), ("m2", 32), ("m3", 64)]
 );
 size!(abi_size_56, "struct S { unsigned int : 16; int m9; };", "struct S", 8);
-bits!(
-    abi_bits_56,
-    "struct S { unsigned int : 16; int m9; };",
-    "S",
-    &[("m9", 32)]
-);
-size!(
-    abi_size_57,
-    "union S { long m0[3]; char m1; unsigned int m2 : 30; double m3; };",
-    "union S",
-    12
-);
+bits!(abi_bits_56, "struct S { unsigned int : 16; int m9; };", "S", &[("m9", 32)]);
+size!(abi_size_57, "union S { long m0[3]; char m1; unsigned int m2 : 30; double m3; };", "union S", 12);
 bits!(
     abi_bits_57,
     "union S { long m0[3]; char m1; unsigned int m2 : 30; double m3; };",
@@ -632,30 +492,15 @@ bits!(
 );
 size!(abi_size_59, "struct S { unsigned int m0 : 21; };", "struct S", 4);
 bits!(abi_bits_59, "struct S { unsigned int m0 : 21; };", "S", &[("m0", 0)]);
-size!(
-    abi_size_60,
-    "struct S { char * m0; signed int m1 : 13; long double m2; unsigned int : 7; };",
-    "struct S",
-    24
-);
+size!(abi_size_60, "struct S { char * m0; signed int m1 : 13; long double m2; unsigned int : 7; };", "struct S", 24);
 bits!(
     abi_bits_60,
     "struct S { char * m0; signed int m1 : 13; long double m2; unsigned int : 7; };",
     "S",
     &[("m0", 0), ("m1", 32), ("m2", 64)]
 );
-size!(
-    abi_size_61,
-    "struct S { signed int : 13; int m1 : 17; int m2 : 20; };",
-    "struct S",
-    8
-);
-bits!(
-    abi_bits_61,
-    "struct S { signed int : 13; int m1 : 17; int m2 : 20; };",
-    "S",
-    &[("m1", 13), ("m2", 32)]
-);
+size!(abi_size_61, "struct S { signed int : 13; int m1 : 17; int m2 : 20; };", "struct S", 8);
+bits!(abi_bits_61, "struct S { signed int : 13; int m1 : 17; int m2 : 20; };", "S", &[("m1", 13), ("m2", 32)]);
 size!(
     abi_size_62,
     "union I62_0 { long double f0; long double f1; }; struct S { void * m0; signed int m1 : 29; };",
@@ -668,12 +513,7 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 32)]
 );
-size!(
-    abi_size_63,
-    "union S { signed char m0; float m1; unsigned int m2 : 28; int m3; };",
-    "union S",
-    4
-);
+size!(abi_size_63, "union S { signed char m0; float m1; unsigned int m2 : 28; int m3; };", "union S", 4);
 bits!(
     abi_bits_63,
     "union S { signed char m0; float m1; unsigned int m2 : 28; int m3; };",
@@ -730,12 +570,7 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 0), ("m2", 0), ("m3", 0)]
 );
-size!(
-    abi_size_69,
-    "struct S { unsigned int m0 : 28; double m1[3]; int m2 : 18; };",
-    "struct S",
-    32
-);
+size!(abi_size_69, "struct S { unsigned int m0 : 28; double m1[3]; int m2 : 18; };", "struct S", 32);
 bits!(
     abi_bits_69,
     "struct S { unsigned int m0 : 28; double m1[3]; int m2 : 18; };",
@@ -766,18 +601,8 @@ bits!(
     "S",
     &[("m0", 0), ("m2", 32), ("m3", 64)]
 );
-size!(
-    abi_size_72,
-    "struct S { long m0; float m1; unsigned int m2 : 18; };",
-    "struct S",
-    12
-);
-bits!(
-    abi_bits_72,
-    "struct S { long m0; float m1; unsigned int m2 : 18; };",
-    "S",
-    &[("m0", 0), ("m1", 32), ("m2", 64)]
-);
+size!(abi_size_72, "struct S { long m0; float m1; unsigned int m2 : 18; };", "struct S", 12);
+bits!(abi_bits_72, "struct S { long m0; float m1; unsigned int m2 : 18; };", "S", &[("m0", 0), ("m1", 32), ("m2", 64)]);
 size!(
     abi_size_73,
     "union I73_0 { void * f0; float f1; }; struct S { union I73_0 m0; signed int m1 : 24; signed int m2 : 9; int : 15; };",
@@ -790,18 +615,8 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 32), ("m2", 64)]
 );
-size!(
-    abi_size_74,
-    "struct S { int m0 : 3; char m1[2]; signed int : 7; };",
-    "struct S",
-    4
-);
-bits!(
-    abi_bits_74,
-    "struct S { int m0 : 3; char m1[2]; signed int : 7; };",
-    "S",
-    &[("m0", 0), ("m1", 8)]
-);
+size!(abi_size_74, "struct S { int m0 : 3; char m1[2]; signed int : 7; };", "struct S", 4);
+bits!(abi_bits_74, "struct S { int m0 : 3; char m1[2]; signed int : 7; };", "S", &[("m0", 0), ("m1", 8)]);
 size!(
     abi_size_75,
     "union I75_0 { long double f0; }; struct S { union I75_0 m0; char m1[1]; union I75_0 m2; };",
@@ -864,12 +679,7 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 0), ("m2", 0), ("m3", 0), ("m4", 0)]
 );
-size!(
-    abi_size_81,
-    "struct S { long double m0[4]; char * m1[3]; int m2 : 4; };",
-    "struct S",
-    64
-);
+size!(abi_size_81, "struct S { long double m0[4]; char * m1[3]; int m2 : 4; };", "struct S", 64);
 bits!(
     abi_bits_81,
     "struct S { long double m0[4]; char * m1[3]; int m2 : 4; };",
@@ -889,12 +699,7 @@ bits!(
     &[("m0", 0), ("m1", 16), ("m2", 32), ("m3", 64)]
 );
 size!(abi_size_83, "struct S { unsigned int : 11; int m9; };", "struct S", 8);
-bits!(
-    abi_bits_83,
-    "struct S { unsigned int : 11; int m9; };",
-    "S",
-    &[("m9", 32)]
-);
+bits!(abi_bits_83, "struct S { unsigned int : 11; int m9; };", "S", &[("m9", 32)]);
 size!(
     abi_size_84,
     "union I84_0 { float f0; short f1; }; struct S { short m0[3]; int : 2; int : 12; float m3[1]; signed char m4; signed char m5; };",
@@ -919,30 +724,10 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 96), ("m2", 128), ("m3", 160)]
 );
-size!(
-    abi_size_86,
-    "struct I86_0 { long double f0; }; struct S { unsigned int : 13; int m9; };",
-    "struct S",
-    8
-);
-bits!(
-    abi_bits_86,
-    "struct I86_0 { long double f0; }; struct S { unsigned int : 13; int m9; };",
-    "S",
-    &[("m9", 32)]
-);
-size!(
-    abi_size_87,
-    "union I87_0 { double f0; }; union S { union I87_0 m0; };",
-    "union S",
-    8
-);
-bits!(
-    abi_bits_87,
-    "union I87_0 { double f0; }; union S { union I87_0 m0; };",
-    "S",
-    &[("m0", 0)]
-);
+size!(abi_size_86, "struct I86_0 { long double f0; }; struct S { unsigned int : 13; int m9; };", "struct S", 8);
+bits!(abi_bits_86, "struct I86_0 { long double f0; }; struct S { unsigned int : 13; int m9; };", "S", &[("m9", 32)]);
+size!(abi_size_87, "union I87_0 { double f0; }; union S { union I87_0 m0; };", "union S", 8);
+bits!(abi_bits_87, "union I87_0 { double f0; }; union S { union I87_0 m0; };", "S", &[("m0", 0)]);
 size!(
     abi_size_88,
     "union I88_0 { unsigned short f0; signed char f1; }; union S { unsigned short m0[4]; int : 5; int : 6; unsigned short m3[1]; unsigned long m4[3]; };",
@@ -1005,12 +790,7 @@ bits!(
     "S",
     &[("m0", 0), ("m2", 32), ("m3", 40), ("m4", 64), ("m5", 160)]
 );
-size!(
-    abi_size_94,
-    "union S { char m0; int m1; signed int : 2; void * m3; unsigned int m4 : 5; };",
-    "union S",
-    4
-);
+size!(abi_size_94, "union S { char m0; int m1; signed int : 2; void * m3; unsigned int m4 : 5; };", "union S", 4);
 bits!(
     abi_bits_94,
     "union S { char m0; int m1; signed int : 2; void * m3; unsigned int m4 : 5; };",
@@ -1041,42 +821,12 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 0), ("m2", 0), ("m4", 0), ("m5", 0)]
 );
-size!(
-    abi_size_97,
-    "struct S { int m0 : 23; unsigned short m1; signed int : 3; };",
-    "struct S",
-    8
-);
-bits!(
-    abi_bits_97,
-    "struct S { int m0 : 23; unsigned short m1; signed int : 3; };",
-    "S",
-    &[("m0", 0), ("m1", 32)]
-);
-size!(
-    abi_size_98,
-    "struct I98_0 { void * f0; }; struct S { int : 0; char * m1; };",
-    "struct S",
-    4
-);
-bits!(
-    abi_bits_98,
-    "struct I98_0 { void * f0; }; struct S { int : 0; char * m1; };",
-    "S",
-    &[("m1", 0)]
-);
-size!(
-    abi_size_99,
-    "struct I99_0 { int * f0; short f1; }; struct S { char m0[3]; };",
-    "struct S",
-    3
-);
-bits!(
-    abi_bits_99,
-    "struct I99_0 { int * f0; short f1; }; struct S { char m0[3]; };",
-    "S",
-    &[("m0", 0)]
-);
+size!(abi_size_97, "struct S { int m0 : 23; unsigned short m1; signed int : 3; };", "struct S", 8);
+bits!(abi_bits_97, "struct S { int m0 : 23; unsigned short m1; signed int : 3; };", "S", &[("m0", 0), ("m1", 32)]);
+size!(abi_size_98, "struct I98_0 { void * f0; }; struct S { int : 0; char * m1; };", "struct S", 4);
+bits!(abi_bits_98, "struct I98_0 { void * f0; }; struct S { int : 0; char * m1; };", "S", &[("m1", 0)]);
+size!(abi_size_99, "struct I99_0 { int * f0; short f1; }; struct S { char m0[3]; };", "struct S", 3);
+bits!(abi_bits_99, "struct I99_0 { int * f0; short f1; }; struct S { char m0[3]; };", "S", &[("m0", 0)]);
 size!(
     abi_size_100,
     "struct I100_0 { int f0; unsigned int f1; unsigned int f2; }; union S { double m0; float m1; char m2; unsigned int m3 : 18; };",
@@ -1090,30 +840,10 @@ bits!(
     &[("m0", 0), ("m1", 0), ("m2", 0), ("m3", 0)]
 );
 size!(abi_size_101, "struct S { long m0; float m1[1]; };", "struct S", 8);
-bits!(
-    abi_bits_101,
-    "struct S { long m0; float m1[1]; };",
-    "S",
-    &[("m0", 0), ("m1", 32)]
-);
-size!(
-    abi_size_102,
-    "struct S { unsigned int : 11; int : 2; unsigned short m2; int : 0; };",
-    "struct S",
-    4
-);
-bits!(
-    abi_bits_102,
-    "struct S { unsigned int : 11; int : 2; unsigned short m2; int : 0; };",
-    "S",
-    &[("m2", 16)]
-);
-size!(
-    abi_size_103,
-    "struct S { float m0; signed char m1[4]; int * m2; int : 14; unsigned int : 4; };",
-    "struct S",
-    16
-);
+bits!(abi_bits_101, "struct S { long m0; float m1[1]; };", "S", &[("m0", 0), ("m1", 32)]);
+size!(abi_size_102, "struct S { unsigned int : 11; int : 2; unsigned short m2; int : 0; };", "struct S", 4);
+bits!(abi_bits_102, "struct S { unsigned int : 11; int : 2; unsigned short m2; int : 0; };", "S", &[("m2", 16)]);
+size!(abi_size_103, "struct S { float m0; signed char m1[4]; int * m2; int : 14; unsigned int : 4; };", "struct S", 16);
 bits!(
     abi_bits_103,
     "struct S { float m0; signed char m1[4]; int * m2; int : 14; unsigned int : 4; };",
@@ -1145,12 +875,7 @@ bits!(
     &[("m0", 0), ("m1", 32), ("m2", 64), ("m3", 96), ("m4", 128)]
 );
 size!(abi_size_106, "union S { int m0; long double m1; };", "union S", 12);
-bits!(
-    abi_bits_106,
-    "union S { int m0; long double m1; };",
-    "S",
-    &[("m0", 0), ("m1", 0)]
-);
+bits!(abi_bits_106, "union S { int m0; long double m1; };", "S", &[("m0", 0), ("m1", 0)]);
 size!(
     abi_size_107,
     "struct I107_0 { int f0; void * f1; }; struct S { unsigned int : 6; unsigned long m1; double m2; unsigned int m3 : 18; unsigned long m4; };",
@@ -1199,26 +924,11 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 32), ("m2", 40), ("m3", 64), ("m4", 128)]
 );
-size!(
-    abi_size_111,
-    "struct S { int : 0; unsigned int m1 : 6; int : 3; };",
-    "struct S",
-    4
-);
-bits!(
-    abi_bits_111,
-    "struct S { int : 0; unsigned int m1 : 6; int : 3; };",
-    "S",
-    &[("m1", 0)]
-);
+size!(abi_size_111, "struct S { int : 0; unsigned int m1 : 6; int : 3; };", "struct S", 4);
+bits!(abi_bits_111, "struct S { int : 0; unsigned int m1 : 6; int : 3; };", "S", &[("m1", 0)]);
 size!(abi_size_112, "struct S { int m0; };", "struct S", 4);
 bits!(abi_bits_112, "struct S { int m0; };", "S", &[("m0", 0)]);
-size!(
-    abi_size_113,
-    "struct S { unsigned int m0; unsigned int m1; unsigned int : 10; int m3 : 19; };",
-    "struct S",
-    12
-);
+size!(abi_size_113, "struct S { unsigned int m0; unsigned int m1; unsigned int : 10; int m3 : 19; };", "struct S", 12);
 bits!(
     abi_bits_113,
     "struct S { unsigned int m0; unsigned int m1; unsigned int : 10; int m3 : 19; };",
@@ -1249,42 +959,12 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 32), ("m2", 64), ("m3", 96)]
 );
-size!(
-    abi_size_116,
-    "struct I116_0 { long double f0; }; union S { int * m0; int m1; };",
-    "union S",
-    4
-);
-bits!(
-    abi_bits_116,
-    "struct I116_0 { long double f0; }; union S { int * m0; int m1; };",
-    "S",
-    &[("m0", 0), ("m1", 0)]
-);
-size!(
-    abi_size_117,
-    "union S { int m0; float m1; signed int : 14; };",
-    "union S",
-    4
-);
-bits!(
-    abi_bits_117,
-    "union S { int m0; float m1; signed int : 14; };",
-    "S",
-    &[("m0", 0), ("m1", 0)]
-);
-size!(
-    abi_size_118,
-    "struct S { char m0[4]; unsigned int m1; };",
-    "struct S",
-    8
-);
-bits!(
-    abi_bits_118,
-    "struct S { char m0[4]; unsigned int m1; };",
-    "S",
-    &[("m0", 0), ("m1", 32)]
-);
+size!(abi_size_116, "struct I116_0 { long double f0; }; union S { int * m0; int m1; };", "union S", 4);
+bits!(abi_bits_116, "struct I116_0 { long double f0; }; union S { int * m0; int m1; };", "S", &[("m0", 0), ("m1", 0)]);
+size!(abi_size_117, "union S { int m0; float m1; signed int : 14; };", "union S", 4);
+bits!(abi_bits_117, "union S { int m0; float m1; signed int : 14; };", "S", &[("m0", 0), ("m1", 0)]);
+size!(abi_size_118, "struct S { char m0[4]; unsigned int m1; };", "struct S", 8);
+bits!(abi_bits_118, "struct S { char m0[4]; unsigned int m1; };", "S", &[("m0", 0), ("m1", 32)]);
 size!(
     abi_size_119,
     "union I119_0 { unsigned int f0; int f1; unsigned long f2; }; struct S { signed char m0; long double m1; unsigned int m2; int : 0; union I119_0 m4; unsigned int m5; };",
@@ -1309,36 +989,16 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 8), ("m2", 16)]
 );
-size!(
-    abi_size_121,
-    "union I121_0 { short f0; signed char f1; }; struct S { void * m0; int m1; };",
-    "struct S",
-    8
-);
+size!(abi_size_121, "union I121_0 { short f0; signed char f1; }; struct S { void * m0; int m1; };", "struct S", 8);
 bits!(
     abi_bits_121,
     "union I121_0 { short f0; signed char f1; }; struct S { void * m0; int m1; };",
     "S",
     &[("m0", 0), ("m1", 32)]
 );
-size!(
-    abi_size_122,
-    "struct S { unsigned int : 14; unsigned int m1; signed int : 13; };",
-    "struct S",
-    12
-);
-bits!(
-    abi_bits_122,
-    "struct S { unsigned int : 14; unsigned int m1; signed int : 13; };",
-    "S",
-    &[("m1", 32)]
-);
-size!(
-    abi_size_123,
-    "struct S { void * m0; char m1; short m2; unsigned int m3 : 25; int : 4; };",
-    "struct S",
-    12
-);
+size!(abi_size_122, "struct S { unsigned int : 14; unsigned int m1; signed int : 13; };", "struct S", 12);
+bits!(abi_bits_122, "struct S { unsigned int : 14; unsigned int m1; signed int : 13; };", "S", &[("m1", 32)]);
+size!(abi_size_123, "struct S { void * m0; char m1; short m2; unsigned int m3 : 25; int : 4; };", "struct S", 12);
 bits!(
     abi_bits_123,
     "struct S { void * m0; char m1; short m2; unsigned int m3 : 25; int : 4; };",
@@ -1371,61 +1031,16 @@ bits!(
     "S",
     &[("m0", 0), ("m1", 9)]
 );
-size!(
-    abi_size_127,
-    "struct I127_0 { char f0; char f1; }; struct S { int m0 : 27; };",
-    "struct S",
-    4
-);
-bits!(
-    abi_bits_127,
-    "struct I127_0 { char f0; char f1; }; struct S { int m0 : 27; };",
-    "S",
-    &[("m0", 0)]
-);
-size!(
-    abi_size_128,
-    "struct S { unsigned short m0; int : 6; unsigned long m2; };",
-    "struct S",
-    8
-);
-bits!(
-    abi_bits_128,
-    "struct S { unsigned short m0; int : 6; unsigned long m2; };",
-    "S",
-    &[("m0", 0), ("m2", 32)]
-);
+size!(abi_size_127, "struct I127_0 { char f0; char f1; }; struct S { int m0 : 27; };", "struct S", 4);
+bits!(abi_bits_127, "struct I127_0 { char f0; char f1; }; struct S { int m0 : 27; };", "S", &[("m0", 0)]);
+size!(abi_size_128, "struct S { unsigned short m0; int : 6; unsigned long m2; };", "struct S", 8);
+bits!(abi_bits_128, "struct S { unsigned short m0; int : 6; unsigned long m2; };", "S", &[("m0", 0), ("m2", 32)]);
 size!(abi_size_129, "union S { void * m0[4]; short m1; };", "union S", 16);
-bits!(
-    abi_bits_129,
-    "union S { void * m0[4]; short m1; };",
-    "S",
-    &[("m0", 0), ("m1", 0)]
-);
-size!(
-    abi_size_130,
-    "struct S { unsigned int m0; int m1 : 25; int : 0; };",
-    "struct S",
-    8
-);
-bits!(
-    abi_bits_130,
-    "struct S { unsigned int m0; int m1 : 25; int : 0; };",
-    "S",
-    &[("m0", 0), ("m1", 32)]
-);
-size!(
-    abi_size_131,
-    "struct S { int : 6; int : 0; unsigned int m2 : 18; };",
-    "struct S",
-    8
-);
-bits!(
-    abi_bits_131,
-    "struct S { int : 6; int : 0; unsigned int m2 : 18; };",
-    "S",
-    &[("m2", 32)]
-);
+bits!(abi_bits_129, "union S { void * m0[4]; short m1; };", "S", &[("m0", 0), ("m1", 0)]);
+size!(abi_size_130, "struct S { unsigned int m0; int m1 : 25; int : 0; };", "struct S", 8);
+bits!(abi_bits_130, "struct S { unsigned int m0; int m1 : 25; int : 0; };", "S", &[("m0", 0), ("m1", 32)]);
+size!(abi_size_131, "struct S { int : 6; int : 0; unsigned int m2 : 18; };", "struct S", 8);
+bits!(abi_bits_131, "struct S { int : 6; int : 0; unsigned int m2 : 18; };", "S", &[("m2", 32)]);
 size!(
     abi_size_132,
     "union I132_0 { void * f0; }; struct S { union I132_0 m0; int : 2; unsigned int m2 : 16; int * m3; short m4; int m5; };",
@@ -1452,30 +1067,10 @@ bits!(
 );
 size!(abi_size_134, "struct S { int : 0; int m9; };", "struct S", 4);
 bits!(abi_bits_134, "struct S { int : 0; int m9; };", "S", &[("m9", 0)]);
-size!(
-    abi_size_135,
-    "struct I135_0 { short f0; }; struct S { short m0; };",
-    "struct S",
-    2
-);
-bits!(
-    abi_bits_135,
-    "struct I135_0 { short f0; }; struct S { short m0; };",
-    "S",
-    &[("m0", 0)]
-);
-size!(
-    abi_size_136,
-    "struct S { signed int : 6; float m1; int m2 : 31; };",
-    "struct S",
-    12
-);
-bits!(
-    abi_bits_136,
-    "struct S { signed int : 6; float m1; int m2 : 31; };",
-    "S",
-    &[("m1", 32), ("m2", 64)]
-);
+size!(abi_size_135, "struct I135_0 { short f0; }; struct S { short m0; };", "struct S", 2);
+bits!(abi_bits_135, "struct I135_0 { short f0; }; struct S { short m0; };", "S", &[("m0", 0)]);
+size!(abi_size_136, "struct S { signed int : 6; float m1; int m2 : 31; };", "struct S", 12);
+bits!(abi_bits_136, "struct S { signed int : 6; float m1; int m2 : 31; };", "S", &[("m1", 32), ("m2", 64)]);
 size!(
     abi_size_137,
     "union I137_0 { int * f0; char f1; unsigned int f2; }; union S { signed char m0[4]; };",

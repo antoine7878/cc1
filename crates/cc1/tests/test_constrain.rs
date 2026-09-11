@@ -1,9 +1,8 @@
 use cc1::ast::declaration::DeclaratorId;
 use cc1::ast::{
-    ConstValue, DeclarationSpecifier, InitDeclaratorNode, Initializer, InitializerNode, Name, Qualifier, Storage,
-    StringId, TypeSpecifier,
+    ConstValue, DeclarationSpecifier, DeclaratorNode, InitDeclaratorNode, Initializer, InitializerNode, Name, Node,
+    Qualifier, Storage, StringId, TypeSpecifier,
 };
-use cc1::ast::{DeclaratorNode, Node};
 use cc1::semantic::constrain::parameter::{check_complete_parameter, is_valid_old_style, param_storage_only_register};
 use cc1::semantic::constrain::specifier::{
     basic_type, check_external_specifiers, check_function_storage, check_qualifier, extern_function_only,
@@ -40,55 +39,30 @@ fn no_storage_specifier_is_not_an_error() {
 
 #[test]
 fn one_storage_specifier_is_returned() {
-    let diag = get_storage(&[
-        DeclarationSpecifier::Storage(Storage::Static),
-        DeclarationSpecifier::Type(TypeSpecifier::Int),
-    ]);
+    let diag =
+        get_storage(&[DeclarationSpecifier::Storage(Storage::Static), DeclarationSpecifier::Type(TypeSpecifier::Int)]);
     assert_eq!(diag.res, Some(Storage::Static));
     assert_eq!(reported(&diag), "None");
 }
 
 #[test]
 fn two_storage_specifiers_are_rejected() {
-    let diag = get_storage(&[
-        DeclarationSpecifier::Storage(Storage::Static),
-        DeclarationSpecifier::Storage(Storage::Extern),
-    ]);
+    let diag =
+        get_storage(&[DeclarationSpecifier::Storage(Storage::Static), DeclarationSpecifier::Storage(Storage::Extern)]);
     assert_eq!(diag.res, Some(Storage::Static));
     assert_eq!(reported(&diag), "MultipleStorageSpecifiers");
 }
 
 #[test]
 fn a_function_declared_in_a_block_must_be_extern() {
-    assert_eq!(
-        reported(&extern_function_only(ScopeKind::Block, Storage::Extern)),
-        "None"
-    );
-    assert_eq!(
-        reported(&extern_function_only(ScopeKind::Block, Storage::Static)),
-        "BlockScopeNotExtern"
-    );
-    assert_eq!(
-        reported(&extern_function_only(ScopeKind::Block, Storage::Auto)),
-        "BlockScopeNotExtern"
-    );
-    assert_eq!(
-        reported(&extern_function_only(ScopeKind::Function, Storage::Auto)),
-        "BlockScopeNotExtern"
-    );
-    assert_eq!(
-        reported(&extern_function_only(ScopeKind::Function, Storage::Extern)),
-        "None"
-    );
-    assert_eq!(
-        reported(&extern_function_only(ScopeKind::File, Storage::Static)),
-        "None"
-    );
+    assert_eq!(reported(&extern_function_only(ScopeKind::Block, Storage::Extern)), "None");
+    assert_eq!(reported(&extern_function_only(ScopeKind::Block, Storage::Static)), "BlockScopeNotExtern");
+    assert_eq!(reported(&extern_function_only(ScopeKind::Block, Storage::Auto)), "BlockScopeNotExtern");
+    assert_eq!(reported(&extern_function_only(ScopeKind::Function, Storage::Auto)), "BlockScopeNotExtern");
+    assert_eq!(reported(&extern_function_only(ScopeKind::Function, Storage::Extern)), "None");
+    assert_eq!(reported(&extern_function_only(ScopeKind::File, Storage::Static)), "None");
     assert_eq!(reported(&extern_function_only(ScopeKind::File, Storage::Auto)), "None");
-    assert_eq!(
-        reported(&extern_function_only(ScopeKind::Prototype, Storage::Auto)),
-        "None"
-    );
+    assert_eq!(reported(&extern_function_only(ScopeKind::Prototype, Storage::Auto)), "None");
 }
 
 #[test]
@@ -102,14 +76,8 @@ fn no_qualifier_leaves_the_type_unqualified() {
 fn each_qualifier_is_reported_once() {
     assert_eq!(check_qualifier([Qualifier::Const]).res, (true, false));
     assert_eq!(check_qualifier([Qualifier::Volatile]).res, (false, true));
-    assert_eq!(
-        check_qualifier([Qualifier::Const, Qualifier::Volatile]).res,
-        (true, true)
-    );
-    assert_eq!(
-        reported(&check_qualifier([Qualifier::Const, Qualifier::Volatile])),
-        "None"
-    );
+    assert_eq!(check_qualifier([Qualifier::Const, Qualifier::Volatile]).res, (true, true));
+    assert_eq!(reported(&check_qualifier([Qualifier::Const, Qualifier::Volatile])), "None");
 }
 
 #[test]
@@ -117,10 +85,7 @@ fn a_repeated_qualifier_is_rejected() {
     let diag = check_qualifier([Qualifier::Const, Qualifier::Const]);
     assert_eq!(diag.res, (true, false));
     assert_eq!(reported(&diag), "DuplicateTypeQualifiers");
-    assert_eq!(
-        reported(&check_qualifier([Qualifier::Volatile, Qualifier::Volatile])),
-        "DuplicateTypeQualifiers"
-    );
+    assert_eq!(reported(&check_qualifier([Qualifier::Volatile, Qualifier::Volatile])), "DuplicateTypeQualifiers");
 }
 
 #[test]
@@ -213,35 +178,16 @@ fn an_anonymous_bit_field_may_have_zero_width() {
 #[test]
 fn auto_and_register_are_rejected_at_file_scope() {
     assert_eq!(
-        reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(
-            Storage::Auto
-        )])),
+        reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(Storage::Auto)])),
         "AutoRegisterExternal"
     );
     assert_eq!(
-        reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(
-            Storage::Register
-        )])),
+        reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(Storage::Register)])),
         "AutoRegisterExternal"
     );
-    assert_eq!(
-        reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(
-            Storage::Static
-        )])),
-        "None"
-    );
-    assert_eq!(
-        reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(
-            Storage::Extern
-        )])),
-        "None"
-    );
-    assert_eq!(
-        reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(
-            Storage::Typedef
-        )])),
-        "None"
-    );
+    assert_eq!(reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(Storage::Static)])), "None");
+    assert_eq!(reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(Storage::Extern)])), "None");
+    assert_eq!(reported(&check_external_specifiers(&[DeclarationSpecifier::Storage(Storage::Typedef)])), "None");
     assert_eq!(reported(&check_external_specifiers(&[])), "None");
 }
 
@@ -250,14 +196,8 @@ fn a_function_definition_is_static_or_extern() {
     assert_eq!(reported(&check_function_storage(Storage::Static)), "None");
     assert_eq!(reported(&check_function_storage(Storage::Extern)), "None");
     assert_eq!(reported(&check_function_storage(Storage::Auto)), "FunctionAutoExtern");
-    assert_eq!(
-        reported(&check_function_storage(Storage::Register)),
-        "FunctionAutoExtern"
-    );
-    assert_eq!(
-        reported(&check_function_storage(Storage::Typedef)),
-        "FunctionAutoExtern"
-    );
+    assert_eq!(reported(&check_function_storage(Storage::Register)), "FunctionAutoExtern");
+    assert_eq!(reported(&check_function_storage(Storage::Typedef)), "FunctionAutoExtern");
 }
 
 #[test]
@@ -269,10 +209,7 @@ fn an_old_style_parameter_declaration_is_register_or_nothing() {
     let diag = param_storage_only_register(Storage::Static);
     assert_eq!(diag.res, None);
     assert_eq!(reported(&diag), "ParameterNotRegister");
-    assert_eq!(
-        reported(&param_storage_only_register(Storage::Auto)),
-        "ParameterNotRegister"
-    );
+    assert_eq!(reported(&param_storage_only_register(Storage::Auto)), "ParameterNotRegister");
 }
 
 #[test]
@@ -358,11 +295,7 @@ fn equivalent_spellings_resolve_to_the_same_type() {
 #[test]
 fn a_repeated_specifier_is_rejected() {
     use TypeSpecifier as T;
-    for types in [
-        vec![T::Long, T::Long],
-        vec![T::Int, T::Int],
-        vec![T::Signed, T::Int, T::Signed],
-    ] {
+    for types in [vec![T::Long, T::Long], vec![T::Int, T::Int], vec![T::Signed, T::Int, T::Signed]] {
         let diag = resolve(&types);
         assert_eq!(diag.res, None);
         assert_eq!(reported(&diag), "InvalidTypeSpecifier");
@@ -372,11 +305,7 @@ fn a_repeated_specifier_is_rejected() {
 #[test]
 fn an_unlisted_combination_is_rejected() {
     use TypeSpecifier as T;
-    for types in [
-        vec![T::Signed, T::Unsigned],
-        vec![T::Short, T::Long],
-        vec![T::Long, T::Long, T::Int],
-    ] {
+    for types in [vec![T::Signed, T::Unsigned], vec![T::Short, T::Long], vec![T::Long, T::Long, T::Int]] {
         assert_eq!(reported(&resolve(&types)), "InvalidTypeSpecifier");
     }
 }
@@ -384,14 +313,8 @@ fn an_unlisted_combination_is_rejected() {
 #[test]
 fn a_tag_or_typedef_name_is_not_a_basic_type() {
     let name = Name::new(StringId::from(0usize), Span::default());
-    assert_eq!(
-        reported(&resolve(&[TypeSpecifier::TypedefName(name)])),
-        "InvalidTypeSpecifier"
-    );
-    assert_eq!(
-        reported(&resolve(&[TypeSpecifier::Int, TypeSpecifier::TypedefName(name)])),
-        "InvalidTypeSpecifier"
-    );
+    assert_eq!(reported(&resolve(&[TypeSpecifier::TypedefName(name)])), "InvalidTypeSpecifier");
+    assert_eq!(reported(&resolve(&[TypeSpecifier::Int, TypeSpecifier::TypedefName(name)])), "InvalidTypeSpecifier");
 }
 
 fn init_declarator(initializer: Option<InitializerNode>) -> InitDeclaratorNode {
@@ -406,10 +329,7 @@ fn initializer() -> InitializerNode {
 #[test]
 fn a_tentative_definition_has_no_initializer() {
     assert!(is_tentative_definition(&init_declarator(None), Some(Storage::Static)));
-    assert!(!is_tentative_definition(
-        &init_declarator(Some(initializer())),
-        Some(Storage::Static)
-    ));
+    assert!(!is_tentative_definition(&init_declarator(Some(initializer())), Some(Storage::Static)));
 }
 
 #[test]
@@ -417,10 +337,7 @@ fn a_tentative_definition_is_static_or_unqualified() {
     assert!(is_tentative_definition(&init_declarator(None), None));
     assert!(!is_tentative_definition(&init_declarator(Some(initializer())), None));
     assert!(!is_tentative_definition(&init_declarator(None), Some(Storage::Extern)));
-    assert!(!is_tentative_definition(
-        &init_declarator(Some(initializer())),
-        Some(Storage::Extern)
-    ));
+    assert!(!is_tentative_definition(&init_declarator(Some(initializer())), Some(Storage::Extern)));
     assert_eq!(init_declarator(None).span(), Span::default());
 }
 
@@ -428,10 +345,7 @@ fn a_tentative_definition_is_static_or_unqualified() {
 fn a_tentative_definition_is_not_typedef_auto_or_register() {
     assert!(!is_tentative_definition(&init_declarator(None), Some(Storage::Typedef)));
     assert!(!is_tentative_definition(&init_declarator(None), Some(Storage::Auto)));
-    assert!(!is_tentative_definition(
-        &init_declarator(None),
-        Some(Storage::Register)
-    ));
+    assert!(!is_tentative_definition(&init_declarator(None), Some(Storage::Register)));
 }
 
 fn int_type() -> QualifiedType {

@@ -3,12 +3,11 @@ use std::process::exit;
 use std::str::Chars;
 use std::vec;
 
-use libft::{ArgError, ArgParser, argv};
+use libft::{ArgError, ArgParser, Span, argv};
 
 use crate::context::Context;
 use crate::semantic::{Diagnosis, DiagnosisNode};
 use crate::target::{ARM64_DARWIN, I386, Target, X86_64};
-use libft::Span;
 
 #[derive(Debug)]
 pub struct Args {
@@ -42,12 +41,7 @@ impl ArgParser for Args {
 
 impl Default for Args {
     fn default() -> Self {
-        Self {
-            infiles: Vec::default(),
-            target: X86_64,
-            outfile: None,
-            argv: argv(),
-        }
+        Self { infiles: Vec::default(), target: X86_64, outfile: None, argv: argv() }
     }
 }
 
@@ -90,10 +84,9 @@ pub fn parse_args(mut ctx: Context) -> Context {
             ctx.set_target(args.target);
             ctx.set_file_name(args.infiles.swap_remove(0));
         }
-        Err(error) => ctx.diagnosis.push(DiagnosisNode::new(
-            Diagnosis::BadArguments(error.to_string()),
-            Span::default(),
-        )),
+        Err(error) => {
+            ctx.diagnosis.push(DiagnosisNode::new(Diagnosis::BadArguments(error.to_string()), Span::default()))
+        }
     }
     ctx
 }

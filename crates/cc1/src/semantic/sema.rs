@@ -1,6 +1,8 @@
 use std::cell::Cell;
 use std::collections::HashMap;
 
+use libft::Span;
+
 use crate::arena::{Global, Has, HasMut, HasTable, Owned, SideTable};
 use crate::ast::statement::StatementId;
 use crate::ast::{AstArenas, ConstValue, DeclaratorId, ExpressionId, StringId};
@@ -10,7 +12,6 @@ use crate::semantic::{
     ResolvedType, ResolvedTypeArena, ResolvedTypeId, Symbol, SymbolArena, SymbolId, TagDef, TagDefArena, TagDefId,
 };
 use crate::target::{Layout, Target};
-use libft::Span;
 
 #[derive(Debug, Clone)]
 pub struct External {
@@ -219,14 +220,7 @@ impl Sema {
                 Definition::Tentative => (None, Some(*span)),
                 Definition::Declaration => (None, None),
             };
-            self.externals.insert(
-                name.id,
-                External {
-                    symbol: id,
-                    defined,
-                    tentative,
-                },
-            );
+            self.externals.insert(name.id, External { symbol: id, defined, tentative });
             return id;
         };
         let entry_symbol = entry.symbol;

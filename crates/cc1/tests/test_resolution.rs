@@ -1,5 +1,6 @@
-use crate::common::{Ty, Unit, accepted, folded};
 use cc1::semantic::{Diagnosis, FunctionDefId, SymbolKind};
+
+use crate::common::{Ty, Unit, accepted, folded};
 
 macro_rules! renders {
     ($name:ident, $src:expr, $symbol:expr, $expected:expr) => {
@@ -18,21 +19,9 @@ folds!(fold_parentheses, "enum E { A = (1 + 2) * 3 };", ["Int(9)"]);
 folds!(fold_division, "enum E { A = 7 / 2 };", ["Int(3)"]);
 folds!(fold_remainder, "enum E { A = 7 % 2 };", ["Int(1)"]);
 folds!(fold_shift, "enum E { A = 1 << 4 };", ["Int(16)"]);
-folds!(
-    fold_bitwise,
-    "enum E { A = 6 & 3, B = 6 | 3, C = 6 ^ 3 };",
-    ["Int(2)", "Int(7)", "Int(5)"]
-);
-folds!(
-    fold_unary,
-    "enum E { A = -3, B = +3, C = ~0, D = !5 };",
-    ["Int(-3)", "Int(3)", "Int(-1)", "Int(0)"]
-);
-folds!(
-    fold_relational,
-    "enum E { A = 1 < 2, B = 1 == 2 };",
-    ["Int(1)", "Int(0)"]
-);
+folds!(fold_bitwise, "enum E { A = 6 & 3, B = 6 | 3, C = 6 ^ 3 };", ["Int(2)", "Int(7)", "Int(5)"]);
+folds!(fold_unary, "enum E { A = -3, B = +3, C = ~0, D = !5 };", ["Int(-3)", "Int(3)", "Int(-1)", "Int(0)"]);
+folds!(fold_relational, "enum E { A = 1 < 2, B = 1 == 2 };", ["Int(1)", "Int(0)"]);
 folds!(
     fold_every_relational_operator,
     "enum E { A = 1 > 2, B = 1 <= 2, C = 2 >= 2, D = 1 != 2 };",
@@ -49,41 +38,17 @@ folds!(
     "enum E { A = 7u / 2u, B = 7u % 2u, C = 6u & 3u };",
     ["UnsignedInt(3)", "UnsignedInt(1)", "UnsignedInt(2)"]
 );
-folds!(
-    fold_long_operands,
-    "enum E { A = 1L + 2L, B = -1L };",
-    ["Long(3)", "Long(-1)"]
-);
-folds!(
-    fold_ternary,
-    "enum E { A = 1 ? 2 : 3, B = 0 ? 2 : 3 };",
-    ["Int(2)", "Int(3)"]
-);
+folds!(fold_long_operands, "enum E { A = 1L + 2L, B = -1L };", ["Long(3)", "Long(-1)"]);
+folds!(fold_ternary, "enum E { A = 1 ? 2 : 3, B = 0 ? 2 : 3 };", ["Int(2)", "Int(3)"]);
 // 6.3.15: the second and third operands undergo the usual arithmetic conversions, so the
 // result carries the common type even though only one branch's value is picked.
-folds!(
-    fold_ternary_converts_to_common_type,
-    "enum E { A = 1 ? 2 : 3u };",
-    ["UnsignedInt(2)"]
-);
+folds!(fold_ternary_converts_to_common_type, "enum E { A = 1 ? 2 : 3u };", ["UnsignedInt(2)"]);
 folds!(fold_character_constant, "enum E { A = 'a' };", ["Int(97)"]);
-folds!(
-    fold_overflow_wraps,
-    "enum E { A = 2147483647 + 1 };",
-    ["Int(-2147483648)"]
-);
-folds!(
-    fold_variant_reference,
-    "enum E { A = 1, B = A + 1 };",
-    ["Int(1)", "Int(2)"]
-);
+folds!(fold_overflow_wraps, "enum E { A = 2147483647 + 1 };", ["Int(-2147483648)"]);
+folds!(fold_variant_reference, "enum E { A = 1, B = A + 1 };", ["Int(1)", "Int(2)"]);
 // `sizeof` is folded to a constant at typing time (so nested uses see it too), which is why
 // both the `sizeof` node and the constant-expression node wrapping it appear here.
-folds!(
-    fold_sizeof_type,
-    "enum E { A = sizeof(int) };",
-    ["UnsignedInt(4)", "UnsignedInt(4)"]
-);
+folds!(fold_sizeof_type, "enum E { A = sizeof(int) };", ["UnsignedInt(4)", "UnsignedInt(4)"]);
 folds!(
     fold_sizeof_struct,
     "struct S { char a; int b; }; enum E { A = sizeof(struct S) };",
@@ -93,29 +58,15 @@ folds!(fold_cast_narrows, "enum E { A = (char)300 };", ["Int(44)"]);
 folds!(fold_cast_to_unsigned, "enum E { A = (unsigned char)-1 };", ["Int(255)"]);
 folds!(fold_bit_field_width, "struct S { int a : 2 + 1; };", ["Int(3)"]);
 folds!(fold_array_size, "int a[2 + 3];", ["Int(5)"]);
-folds!(
-    fold_logical_short_circuits,
-    "enum E { A = 1 || 1 / 0, B = 0 && 1 / 0 };",
-    ["Int(1)", "Int(0)"]
-);
+folds!(fold_logical_short_circuits, "enum E { A = 1 || 1 / 0, B = 0 && 1 / 0 };", ["Int(1)", "Int(0)"]);
 folds!(fold_cast_of_a_floating_constant, "enum E { A = (int)1.5 };", ["Int(1)"]);
 // gcc: `1L << 31` is -2147483648 on i386, where a long is 32 bits, so it fits an enum variant.
-folds!(
-    fold_long_shift_narrows_to_the_target_width,
-    "enum E { A = 1L << 31 };",
-    ["Long(-2147483648)"]
-);
+folds!(fold_long_shift_narrows_to_the_target_width, "enum E { A = 1L << 31 };", ["Long(-2147483648)"]);
 
 #[test]
 fn fold_sizeof_of_a_pointer_type() {
-    assert_eq!(
-        folded("enum E { A = sizeof(char *) };"),
-        ["UnsignedInt(4)", "UnsignedInt(4)"]
-    );
-    assert_eq!(
-        folded("enum E { A = sizeof(int *) };"),
-        ["UnsignedInt(4)", "UnsignedInt(4)"]
-    );
+    assert_eq!(folded("enum E { A = sizeof(char *) };"), ["UnsignedInt(4)", "UnsignedInt(4)"]);
+    assert_eq!(folded("enum E { A = sizeof(int *) };"), ["UnsignedInt(4)", "UnsignedInt(4)"]);
 }
 
 #[test]
@@ -198,74 +149,24 @@ tree!(describe_double, "double x;", "x", Ty::Double);
 tree!(describe_long_double, "long double x;", "x", Ty::LDouble);
 tree!(describe_const, "const int x;", "x", Ty::konst(Ty::Int));
 tree!(describe_volatile, "volatile int x;", "x", Ty::vol(Ty::Int));
-tree!(
-    describe_const_volatile,
-    "const volatile int x;",
-    "x",
-    Ty::konst(Ty::vol(Ty::Int))
-);
+tree!(describe_const_volatile, "const volatile int x;", "x", Ty::konst(Ty::vol(Ty::Int)));
 tree!(describe_pointer, "char *p;", "p", Ty::ptr(Ty::Char));
 tree!(describe_pointer_to_pointer, "int **p;", "p", Ty::ptr(Ty::ptr(Ty::Int)));
-tree!(
-    describe_pointer_to_const,
-    "const int *p;",
-    "p",
-    Ty::ptr(Ty::konst(Ty::Int))
-);
-tree!(
-    describe_const_pointer,
-    "int *const p;",
-    "p",
-    Ty::konst(Ty::ptr(Ty::Int))
-);
+tree!(describe_pointer_to_const, "const int *p;", "p", Ty::ptr(Ty::konst(Ty::Int)));
+tree!(describe_const_pointer, "int *const p;", "p", Ty::konst(Ty::ptr(Ty::Int)));
 tree!(describe_struct, "struct S { int a; } s;", "s", Ty::strukt("S"));
 tree!(describe_union, "union U { int a; } u;", "u", Ty::union("U"));
 tree!(describe_enum, "enum E { A } e;", "e", Ty::enom("E"));
-tree!(
-    describe_incomplete_struct,
-    "struct S; struct S *p;",
-    "p",
-    Ty::ptr(Ty::strukt_incomplete("S"))
-);
+tree!(describe_incomplete_struct, "struct S; struct S *p;", "p", Ty::ptr(Ty::strukt_incomplete("S")));
 tree!(describe_typedef_target, "typedef unsigned int T;", "T", Ty::UInt);
-tree!(
-    describe_through_typedef,
-    "typedef char *S; S s;",
-    "s",
-    Ty::ptr(Ty::Char)
-);
-tree!(
-    describe_qualified_typedef,
-    "typedef int T; const T x;",
-    "x",
-    Ty::konst(Ty::Int)
-);
+tree!(describe_through_typedef, "typedef char *S; S s;", "s", Ty::ptr(Ty::Char));
+tree!(describe_qualified_typedef, "typedef int T; const T x;", "x", Ty::konst(Ty::Int));
 tree!(describe_member, "struct S { double a; };", "a", Ty::Double);
-tree!(
-    describe_anonymous_struct_typedef,
-    "typedef struct { int a; } T; T x;",
-    "x",
-    Ty::anon_struct()
-);
+tree!(describe_anonymous_struct_typedef, "typedef struct { int a; } T; T x;", "x", Ty::anon_struct());
 tree!(describe_parameter, "void f(char *s) { }", "s", Ty::ptr(Ty::Char));
-tree!(
-    describe_function_returns,
-    "long f(void) { return 0; }",
-    "f",
-    Ty::func0(Ty::Long)
-);
-tree!(
-    describe_function_returning_pointer,
-    "int *f(void) { return 0; }",
-    "f",
-    Ty::func0(Ty::ptr(Ty::Int))
-);
-tree!(
-    describe_function_without_prototype,
-    "int f() { return 0; }",
-    "f",
-    Ty::noproto(Ty::Int)
-);
+tree!(describe_function_returns, "long f(void) { return 0; }", "f", Ty::func0(Ty::Long));
+tree!(describe_function_returning_pointer, "int *f(void) { return 0; }", "f", Ty::func0(Ty::ptr(Ty::Int)));
+tree!(describe_function_without_prototype, "int f() { return 0; }", "f", Ty::noproto(Ty::Int));
 tree!(
     describe_function_parameters,
     "void f(int a, char *s) { }",
@@ -278,111 +179,36 @@ tree!(
     "f",
     Ty::func_variadic(Ty::Int, [Ty::ptr(Ty::Char)])
 );
-tree!(
-    describe_pointer_to_function,
-    "int (*p)(void);",
-    "p",
-    Ty::ptr(Ty::func0(Ty::Int))
-);
-tree!(
-    describe_array_of_pointer_to_function,
-    "int (*p[3])(void);",
-    "p",
-    Ty::arr(Ty::ptr(Ty::func0(Ty::Int)), 3)
-);
+tree!(describe_pointer_to_function, "int (*p)(void);", "p", Ty::ptr(Ty::func0(Ty::Int)));
+tree!(describe_array_of_pointer_to_function, "int (*p[3])(void);", "p", Ty::arr(Ty::ptr(Ty::func0(Ty::Int)), 3));
 tree!(describe_array, "int a[3];", "a", Ty::arr(Ty::Int, 3));
-tree!(
-    describe_array_of_array,
-    "int a[3][5];",
-    "a",
-    Ty::arr(Ty::arr(Ty::Int, 5), 3)
-);
-tree!(
-    describe_array_of_array_of_array,
-    "int a[3][5][7];",
-    "a",
-    Ty::arr(Ty::arr(Ty::arr(Ty::Int, 7), 5), 3)
-);
+tree!(describe_array_of_array, "int a[3][5];", "a", Ty::arr(Ty::arr(Ty::Int, 5), 3));
+tree!(describe_array_of_array_of_array, "int a[3][5][7];", "a", Ty::arr(Ty::arr(Ty::arr(Ty::Int, 7), 5), 3));
 tree!(describe_incomplete_array, "extern int a[];", "a", Ty::flex(Ty::Int));
-tree!(
-    describe_incomplete_array_of_array,
-    "extern int a[][5];",
-    "a",
-    Ty::flex(Ty::arr(Ty::Int, 5))
-);
+tree!(describe_incomplete_array_of_array, "extern int a[][5];", "a", Ty::flex(Ty::arr(Ty::Int, 5)));
 tree!(describe_tentative_array_completed, "int a[];", "a", Ty::arr(Ty::Int, 1));
-tree!(
-    describe_tentative_array_of_array_completed,
-    "int a[][5];",
-    "a",
-    Ty::arr(Ty::arr(Ty::Int, 5), 1)
-);
-tree!(
-    describe_array_of_pointer,
-    "int *a[3];",
-    "a",
-    Ty::arr(Ty::ptr(Ty::Int), 3)
-);
-tree!(
-    describe_pointer_to_array,
-    "int (*p)[3];",
-    "p",
-    Ty::ptr(Ty::arr(Ty::Int, 3))
-);
-tree!(
-    describe_pointer_to_array_of_array,
-    "int (*p)[3][5];",
-    "p",
-    Ty::ptr(Ty::arr(Ty::arr(Ty::Int, 5), 3))
-);
+tree!(describe_tentative_array_of_array_completed, "int a[][5];", "a", Ty::arr(Ty::arr(Ty::Int, 5), 1));
+tree!(describe_array_of_pointer, "int *a[3];", "a", Ty::arr(Ty::ptr(Ty::Int), 3));
+tree!(describe_pointer_to_array, "int (*p)[3];", "p", Ty::ptr(Ty::arr(Ty::Int, 3)));
+tree!(describe_pointer_to_array_of_array, "int (*p)[3][5];", "p", Ty::ptr(Ty::arr(Ty::arr(Ty::Int, 5), 3)));
 tree!(describe_array_parameter, "void f(int a[3]) { }", "a", Ty::ptr(Ty::Int));
-tree!(
-    describe_function_parameter,
-    "void f(int g(void)) { }",
-    "g",
-    Ty::ptr(Ty::func0(Ty::Int))
-);
+tree!(describe_function_parameter, "void f(int g(void)) { }", "g", Ty::ptr(Ty::func0(Ty::Int)));
 tree!(
     describe_adjusted_parameter_types,
     "void f(int a[3], int g(void)) { }",
     "f",
     Ty::func(Ty::Void, [Ty::ptr(Ty::Int), Ty::ptr(Ty::func0(Ty::Int))])
 );
-tree!(
-    describe_old_style_array_parameter,
-    "int f(a) int a[3]; { return 0; }",
-    "a",
-    Ty::ptr(Ty::Int)
-);
-tree!(
-    describe_qualified_parameter,
-    "void f(const int a) { }",
-    "a",
-    Ty::konst(Ty::Int)
-);
-tree!(
-    describe_unqualified_parameter_type,
-    "void f(const int a) { }",
-    "f",
-    Ty::func(Ty::Void, [Ty::Int])
-);
-tree!(
-    describe_old_style_function,
-    "int f(a, b) int a; char b; { return a; }",
-    "f",
-    Ty::noproto(Ty::Int)
-);
+tree!(describe_old_style_array_parameter, "int f(a) int a[3]; { return 0; }", "a", Ty::ptr(Ty::Int));
+tree!(describe_qualified_parameter, "void f(const int a) { }", "a", Ty::konst(Ty::Int));
+tree!(describe_unqualified_parameter_type, "void f(const int a) { }", "f", Ty::func(Ty::Void, [Ty::Int]));
+tree!(describe_old_style_function, "int f(a, b) int a; char b; { return a; }", "f", Ty::noproto(Ty::Int));
 
 renders!(render_int, "int x;", "x", "int");
 renders!(render_const_int, "const int x;", "x", "const int");
 renders!(render_pointer, "char *p;", "p", "char *");
 renders!(render_array, "int a[3];", "a", "int[3]");
-renders!(
-    render_function_type,
-    "void f(int a, char *s) { }",
-    "f",
-    "void(int, char *)"
-);
+renders!(render_function_type, "void f(int a, char *s) { }", "f", "void(int, char *)");
 
 #[test]
 fn a_prototype_and_its_definition_declare_one_function() {
@@ -419,11 +245,7 @@ fn a_function_definition_records_its_parameters_in_order() {
         .functions
         .iter()
         .map(|def| {
-            let parameters: Vec<_> = def
-                .parameters
-                .iter()
-                .map(|&id| id.resolve().name.id.resolve().clone())
-                .collect();
+            let parameters: Vec<_> = def.parameters.iter().map(|&id| id.resolve().name.id.resolve().clone()).collect();
             (def.sym.resolve().name.id.resolve().clone(), parameters)
         })
         .collect();
@@ -445,11 +267,7 @@ fn a_function_definition_records_its_return_type() {
 fn an_old_style_definition_records_its_parameters_in_declarator_order() {
     let unit = accepted("int f(a, b) char b; { return a; }");
     let def = unit.sema.functions.iter().next().expect("function definition");
-    let parameters: Vec<_> = def
-        .parameters
-        .iter()
-        .map(|&id| id.resolve().name.id.resolve().clone())
-        .collect();
+    let parameters: Vec<_> = def.parameters.iter().map(|&id| id.resolve().name.id.resolve().clone()).collect();
     assert_eq!(parameters, ["a", "b"]);
 }
 
@@ -472,46 +290,21 @@ fn symbols_are_recorded_in_declaration_order_with_their_kind() {
 
 // ---- 6.4 a failed constant expression names why it failed ----------------
 
-recover!(
-    array_size_is_not_constant,
-    "int x; int a[x];",
-    [Diagnosis::NonConstantExpression],
-    &[]
-);
+recover!(array_size_is_not_constant, "int x; int a[x];", [Diagnosis::NonConstantExpression], &[]);
 
 // 6.5.4.2 The expression delimited by [ and ] (which specifies the size of an array) shall be an
 // integral constant expression that has a value greater than zero.
 // gcc: `int a[-1];` is "declared as an array with a negative size", `int a[0];` is rejected under
 // -pedantic-errors as a zero-length array extension.
-recover!(
-    array_size_is_negative,
-    "int a[-1];",
-    [Diagnosis::NegativeArraySize],
-    &[]
-);
+recover!(array_size_is_negative, "int a[-1];", [Diagnosis::NegativeArraySize], &[]);
 
-recover!(
-    array_size_folds_to_a_negative_value,
-    "int a[1 - 2];",
-    [Diagnosis::NegativeArraySize],
-    &[]
-);
+recover!(array_size_folds_to_a_negative_value, "int a[1 - 2];", [Diagnosis::NegativeArraySize], &[]);
 
 recover!(array_size_is_zero, "int a[0];", [Diagnosis::ZeroArraySize], &[]);
 
-recover!(
-    a_member_array_size_is_zero,
-    "struct S { int a[0]; };",
-    [Diagnosis::ZeroArraySize],
-    &[]
-);
+recover!(a_member_array_size_is_zero, "struct S { int a[0]; };", [Diagnosis::ZeroArraySize], &[]);
 
-recover!(
-    an_inner_array_size_is_zero,
-    "int a[1][0];",
-    [Diagnosis::ZeroArraySize],
-    &[]
-);
+recover!(an_inner_array_size_is_zero, "int a[1][0];", [Diagnosis::ZeroArraySize], &[]);
 
 // An abstract declarator carries the same constraint; the size it could not take leaves the array
 // incomplete, which is what the sizeof then reports.
@@ -531,22 +324,14 @@ recover!(
     &[]
 );
 
-recover!(
-    array_size_is_not_an_integer,
-    "int a[1.5];",
-    [Diagnosis::NonIntArraySize],
-    &[]
-);
+recover!(array_size_is_not_an_integer, "int a[1.5];", [Diagnosis::NonIntArraySize], &[]);
 
 // 6.4 An integral constant expression shall only have operands that are integer, enumeration
 // or character constants, sizeof expressions, and floating constants that are the immediate
 // operands of casts.
 reject!(ice_floating_operand_of_a_comparison, "char t[3.5 == 7.0/2 ? 1 : -1];");
 reject!(ice_floating_operand_of_a_negation, "char t[-(1.5) == 0 ? 1 : -1];");
-reject!(
-    ice_floating_arm_of_a_conditional,
-    "char t[(1 ? 2.0 : 3) == 2 ? 1 : -1];"
-);
+reject!(ice_floating_arm_of_a_conditional, "char t[(1 ? 2.0 : 3) == 2 ? 1 : -1];");
 reject!(ice_floating_operand_of_an_addition, "char t[1.5 + 1 == 2 ? 1 : -1];");
 accept!(ice_floating_constant_under_a_cast, "char t[(int)3.5 == 3 ? 1 : -1];");
 accept!(ice_floating_operand_of_sizeof, "char t[sizeof(1.5) == 8 ? 1 : -1];");
@@ -554,31 +339,16 @@ accept!(ice_all_integer_operands, "char t[1 + 2 == 3 ? 1 : -1];");
 
 // 6.5.6 A typedef name may not be redeclared in the same scope, even identically.
 reject!(typedef_redefined_at_file_scope, "typedef int T; typedef int T;");
-reject!(
-    typedef_redefined_in_a_block,
-    "void f(void){ typedef int T; typedef int T; }"
-);
+reject!(typedef_redefined_in_a_block, "void f(void){ typedef int T; typedef int T; }");
 reject!(typedef_redefined_as_an_object, "typedef int T; int T;");
 reject!(object_redeclared_as_a_typedef, "int T; typedef int T;");
-accept!(
-    typedef_shadowed_in_an_inner_scope,
-    "typedef int T; void f(void){ typedef char T; }"
-);
+accept!(typedef_shadowed_in_an_inner_scope, "typedef int T; void f(void){ typedef char T; }");
 
 // 6.5.7 A block scope declaration of an identifier with linkage shall have no initializer.
-reject!(
-    block_scope_extern_with_an_initializer,
-    "void f(void){ extern int x = 1; }"
-);
+reject!(block_scope_extern_with_an_initializer, "void f(void){ extern int x = 1; }");
 accept!(file_scope_extern_with_an_initializer, "extern int x = 1;");
-accept!(
-    block_scope_static_with_an_initializer,
-    "void f(void){ static int x = 1; }"
-);
-accept!(
-    block_scope_extern_without_an_initializer,
-    "void f(void){ extern int x; }"
-);
+accept!(block_scope_static_with_an_initializer, "void f(void){ static int x = 1; }");
+accept!(block_scope_extern_without_an_initializer, "void f(void){ extern int x; }");
 
 // 6.4 A constant expression shall not contain assignment, increment, decrement,
 // function-call, or comma operators, except when they are contained within the operand of a
@@ -596,26 +366,11 @@ recover!(
     &[]
 );
 
-recover!(
-    sizeof_of_void,
-    "enum E { A = sizeof(void) };",
-    [Diagnosis::SizeofVoid],
-    &[]
-);
+recover!(sizeof_of_void, "enum E { A = sizeof(void) };", [Diagnosis::SizeofVoid], &[]);
 
-recover!(
-    a_division_by_zero_is_not_constant,
-    "enum E { A = 1 / 0 };",
-    [Diagnosis::DivisionByZero],
-    &[]
-);
+recover!(a_division_by_zero_is_not_constant, "enum E { A = 1 / 0 };", [Diagnosis::DivisionByZero], &[]);
 
-recover!(
-    a_modulo_by_zero_is_not_constant,
-    "enum E { A = 1 % 0 };",
-    [Diagnosis::ModuloByZero],
-    &[]
-);
+recover!(a_modulo_by_zero_is_not_constant, "enum E { A = 1 % 0 };", [Diagnosis::ModuloByZero], &[]);
 
 // 6.3.5 The result shall be representable in the type of the operands.
 recover!(
@@ -627,33 +382,13 @@ recover!(
 
 // 6.4 A constant expression shall not contain assignment, increment, decrement, function-call,
 // or comma operators, except when they are contained within the operand of a sizeof operator.
-recover!(
-    an_assignment_is_not_constant,
-    "int x; enum E { A = (x = 1) };",
-    [Diagnosis::NonConstantExpression],
-    &[]
-);
+recover!(an_assignment_is_not_constant, "int x; enum E { A = (x = 1) };", [Diagnosis::NonConstantExpression], &[]);
 
-recover!(
-    a_comma_operator_is_not_constant,
-    "enum E { A = (1, 2) };",
-    [Diagnosis::NonConstantExpression],
-    &[]
-);
+recover!(a_comma_operator_is_not_constant, "enum E { A = (1, 2) };", [Diagnosis::NonConstantExpression], &[]);
 
-recover!(
-    a_function_call_is_not_constant,
-    "int f(void); enum E { A = f() };",
-    [Diagnosis::NonConstantExpression],
-    &[]
-);
+recover!(a_function_call_is_not_constant, "int f(void); enum E { A = f() };", [Diagnosis::NonConstantExpression], &[]);
 
-recover!(
-    a_subscript_is_not_constant,
-    "int a[2]; enum E { A = a[0] };",
-    [Diagnosis::NonConstantExpression],
-    &[]
-);
+recover!(a_subscript_is_not_constant, "int a[2]; enum E { A = a[0] };", [Diagnosis::NonConstantExpression], &[]);
 
 recover!(
     a_string_literal_subscript_is_not_constant,
@@ -679,34 +414,14 @@ recover!(
 );
 
 // 6.4 A constant expression shall not contain increment or decrement operators.
-recover!(
-    an_increment_is_not_constant,
-    "int x; enum E { A = ++x };",
-    [Diagnosis::NonConstantExpression],
-    &[]
-);
+recover!(an_increment_is_not_constant, "int x; enum E { A = ++x };", [Diagnosis::NonConstantExpression], &[]);
 
-recover!(
-    a_decrement_is_not_constant,
-    "int x; enum E { A = x-- };",
-    [Diagnosis::NonConstantExpression],
-    &[]
-);
+recover!(a_decrement_is_not_constant, "int x; enum E { A = x-- };", [Diagnosis::NonConstantExpression], &[]);
 
 // 6.4 An integral constant expression shall have integral type: an address is not one.
-recover!(
-    an_address_is_not_an_integral_constant,
-    "int x; enum E { A = &x };",
-    [Diagnosis::NonConstantExpression],
-    &[]
-);
+recover!(an_address_is_not_an_integral_constant, "int x; enum E { A = &x };", [Diagnosis::NonConstantExpression], &[]);
 
-recover!(
-    an_indirection_is_not_constant,
-    "int *p; enum E { A = *p };",
-    [Diagnosis::NonConstantExpression],
-    &[]
-);
+recover!(an_indirection_is_not_constant, "int *p; enum E { A = *p };", [Diagnosis::NonConstantExpression], &[]);
 
 recover!(
     sizeof_of_a_bit_field,
@@ -760,76 +475,40 @@ member_refs!(
 
 // A cast type name is resolved once, when the cast expression itself is typed. Reading it back
 // from the expression table keeps a tag defined there from being declared a second time.
-accept!(
-    tag_defined_in_a_compared_cast_is_declared_once,
-    "int f(void *q) { return q == (struct S { int a; } *) 0; }"
-);
+accept!(tag_defined_in_a_compared_cast_is_declared_once, "int f(void *q) { return q == (struct S { int a; } *) 0; }");
 
-accept!(
-    enum_defined_in_a_compared_cast_is_declared_once,
-    "int f(void *q) { return q == (enum E { A } *) 0; }"
-);
+accept!(enum_defined_in_a_compared_cast_is_declared_once, "int f(void *q) { return q == (enum E { A } *) 0; }");
 
-accept!(
-    a_void_pointer_cast_of_zero_stays_a_null_pointer_constant,
-    "int f(int *p) { return p == (void *) 0; }"
-);
+accept!(a_void_pointer_cast_of_zero_stays_a_null_pointer_constant, "int f(int *p) { return p == (void *) 0; }");
 
-reject!(
-    a_non_void_pointer_cast_of_zero_is_not_a_null_pointer_constant,
-    "int f(int *p) { return p == (char *) 0; }"
-);
+reject!(a_non_void_pointer_cast_of_zero_is_not_a_null_pointer_constant, "int f(int *p) { return p == (char *) 0; }");
 
 // 6.2.2.1 A struct or union with a const-qualified member, at any depth, is not a modifiable
 // lvalue, so it may not be assigned to even when the object itself is unqualified.
-reject!(
-    const_member_blocks_struct_assignment,
-    "struct S { const int x; }; void f(struct S a, struct S b){ a = b; }"
-);
+reject!(const_member_blocks_struct_assignment, "struct S { const int x; }; void f(struct S a, struct S b){ a = b; }");
 reject!(
     const_member_blocks_assignment_through_a_nested_struct,
     "struct I { const int x; }; struct S { struct I i; }; void f(struct S a, struct S b){ a = b; }"
 );
-reject!(
-    const_member_blocks_union_assignment,
-    "union U { const int x; }; void f(union U a, union U b){ a = b; }"
-);
-reject!(
-    const_member_blocks_assignment_of_a_local,
-    "struct S { const int x; }; void f(void){ struct S a, b; a = b; }"
-);
+reject!(const_member_blocks_union_assignment, "union U { const int x; }; void f(union U a, union U b){ a = b; }");
+reject!(const_member_blocks_assignment_of_a_local, "struct S { const int x; }; void f(void){ struct S a, b; a = b; }");
 reject!(
     const_array_member_blocks_struct_assignment,
     "struct S { const int a[2]; }; void f(struct S x, struct S y){ x = y; }"
 );
-accept!(
-    unqualified_member_is_assignable,
-    "struct S { const int x; int y; }; void f(struct S a){ a.y = 1; }"
-);
-accept!(
-    struct_without_const_members_is_assignable,
-    "struct S { int x; }; void f(struct S a, struct S b){ a = b; }"
-);
+accept!(unqualified_member_is_assignable, "struct S { const int x; int y; }; void f(struct S a){ a.y = 1; }");
+accept!(struct_without_const_members_is_assignable, "struct S { int x; }; void f(struct S a, struct S b){ a = b; }");
 
 // 6.7 Constraints: if an identifier with internal linkage is used in an expression, other than
 // as part of the operand of sizeof, there shall be exactly one external definition for it.
-reject!(
-    internal_linkage_used_but_never_defined,
-    "static void g(void); void f(void){ g(); }"
-);
-accept!(
-    internal_linkage_used_only_inside_sizeof,
-    "static int g(void); void f(void){ sizeof(g()); }"
-);
+reject!(internal_linkage_used_but_never_defined, "static void g(void); void f(void){ g(); }");
+accept!(internal_linkage_used_only_inside_sizeof, "static int g(void); void f(void){ sizeof(g()); }");
 accept!(
     internal_linkage_used_only_inside_unparenthesised_sizeof,
     "static int g(void); void f(void){ int x = sizeof g(); }"
 );
 accept!(internal_linkage_declared_but_unused, "static void g(void);");
-accept!(
-    internal_linkage_tentative_definition,
-    "static int x; void f(void){ x = 1; }"
-);
+accept!(internal_linkage_tentative_definition, "static int x; void f(void){ x = 1; }");
 
 // 6.3.7 An out-of-range shift count is undefined behaviour, not a constraint violation, so the
 // shift is diagnosed but still resolves to the promoted type of its left operand.

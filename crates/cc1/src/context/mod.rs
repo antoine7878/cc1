@@ -2,6 +2,8 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fs::read_to_string;
 
+use libft::{SourceMap, Span};
+
 use crate::ast::{
     AstArenas, ConstValue, ConstValueNode, ExpressionNode, Name, StringId, StructDeclaration, Tag, TranslationUnitNode,
     TypeSpecifier,
@@ -9,7 +11,6 @@ use crate::ast::{
 use crate::parser::ParseState;
 use crate::semantic::DiagnosisNode;
 use crate::target::Target;
-use libft::{SourceMap, Span};
 
 thread_local! {
     static CTX: Cell<Option<&'static Context>> = const { Cell::new(None) };
@@ -45,10 +46,7 @@ impl Default for Context {
 impl Context {
     pub fn with_target(target: Target) -> Self {
         let mut arenas = AstArenas::default();
-        let value_node = ConstValueNode {
-            span: Span::default(),
-            value: ConstValue::Int(1),
-        };
+        let value_node = ConstValueNode { span: Span::default(), value: ConstValue::Int(1) };
         let one = arenas.expressions.constant(value_node, Span::default());
         Self {
             one,
@@ -97,11 +95,9 @@ impl SourceMap for Context {
 
     fn source_line(&self, path: &str, line_no: usize) -> Option<String> {
         let mut cache = self.source_cache.borrow_mut();
-        let lines = cache.entry(path.to_string()).or_insert_with(|| {
-            read_to_string(path)
-                .ok()
-                .map(|text| text.lines().map(str::to_string).collect())
-        });
+        let lines = cache
+            .entry(path.to_string())
+            .or_insert_with(|| read_to_string(path).ok().map(|text| text.lines().map(str::to_string).collect()));
         lines.as_ref()?.get(line_no.checked_sub(1)?).cloned()
     }
 }

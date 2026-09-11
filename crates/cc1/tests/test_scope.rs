@@ -201,14 +201,8 @@ fn a_case_binds_to_the_enclosing_switch_across_a_loop() {
 fn a_case_outside_a_switch_is_rejected() {
     let mut scopes = StatementScopes::default();
     scopes.push_loop(stmt(1));
-    assert!(matches!(
-        scopes.record_case(ConstValue::Int(0), stmt(2)),
-        Err(Diagnosis::OutsideSwitch("case"))
-    ));
-    assert!(matches!(
-        scopes.record_default(stmt(3)),
-        Err(Diagnosis::OutsideSwitch("default"))
-    ));
+    assert!(matches!(scopes.record_case(ConstValue::Int(0), stmt(2)), Err(Diagnosis::OutsideSwitch("case"))));
+    assert!(matches!(scopes.record_default(stmt(3)), Err(Diagnosis::OutsideSwitch("default"))));
 }
 
 #[test]
@@ -234,10 +228,7 @@ fn a_nested_switch_owns_its_own_cases() {
 fn a_switch_has_at_most_one_default() {
     let mut scopes = switch_scope();
     assert_eq!(scopes.record_default(stmt(1)).ok(), Some(stmt(0)));
-    assert!(matches!(
-        scopes.record_default(stmt(2)),
-        Err(Diagnosis::DuplicateDefault)
-    ));
+    assert!(matches!(scopes.record_default(stmt(2)), Err(Diagnosis::DuplicateDefault)));
 }
 
 #[test]
@@ -254,15 +245,7 @@ fn leaving_a_switch_carries_its_cases_out() {
     let mut scopes = switch_scope();
     scopes.record_case(ConstValue::Int(7), stmt(1)).unwrap();
     scopes.record_default(stmt(2)).unwrap();
-    let Some((
-        id,
-        ResolvedStatement::Switch {
-            control,
-            cases,
-            default,
-        },
-    )) = scopes.pop()
-    else {
+    let Some((id, ResolvedStatement::Switch { control, cases, default })) = scopes.pop() else {
         panic!("a switch statement")
     };
     assert_eq!(id, stmt(0));

@@ -1,6 +1,7 @@
 use std::fmt::{self};
 use std::hash::{Hash, Hasher};
-use std::{iter::zip, ops::Index};
+use std::iter::zip;
+use std::ops::Index;
 
 type C = u64;
 
@@ -21,10 +22,7 @@ impl BitSet {
     const CHK_SIZE: usize = C::BITS as usize;
     pub fn with_capacity(capacity: usize) -> Self {
         let chunks = capacity.div_ceil(Self::CHK_SIZE).max(1);
-        Self {
-            data: vec![C::MIN; chunks],
-            capacity,
-        }
+        Self { data: vec![C::MIN; chunks], capacity }
     }
 
     pub fn from<T: IntoIterator<Item = usize>>(capacity: usize, it: T) -> Self {

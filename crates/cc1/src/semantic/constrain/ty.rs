@@ -77,8 +77,5 @@ pub fn check_bit_width(
 }
 
 pub fn extract_function_declarator(params: Option<DeclaredParams>) -> Diag<Option<DeclaredParams>> {
-    params.map_or_else(
-        || Diag::err(None, Diagnosis::NotFunctionTypeDeclarator),
-        |params| Diag::ok(Some(params)),
-    )
+    params.map_or_else(|| Diag::err(None, Diagnosis::NotFunctionTypeDeclarator), |params| Diag::ok(Some(params)))
 }

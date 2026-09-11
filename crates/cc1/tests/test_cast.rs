@@ -30,11 +30,7 @@ fn convert(
 ) -> (ResolvedTypeId, Vec<CastKind>, Vec<CastKind>) {
     let (mut lhs, mut rhs) = (rvalue(lhs), rvalue(rhs));
     let _ = usual_arithmetic(sema, &mut lhs, &mut rhs);
-    assert_eq!(
-        lhs.casted_ty().id,
-        rhs.casted_ty().id,
-        "the usual arithmetic conversions must yield a common type"
-    );
+    assert_eq!(lhs.casted_ty().id, rhs.casted_ty().id, "the usual arithmetic conversions must yield a common type");
     (lhs.casted_ty().id, kinds(&lhs), kinds(&rhs))
 }
 

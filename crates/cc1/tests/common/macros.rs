@@ -293,21 +293,9 @@ macro_rules! reports {
 macro_rules! constant {
     ($name:ident, $src:expr, $expected:expr) => {
         test_case!($name, {
-            let cc1::semantic::Diag {
-                res: value,
-                diagnosis,
-            } = cc1::ast::ConstValue::parse($src, &cc1::target::I386);
-            assert_eq!(
-                $crate::common::repr(Some(value)),
-                $expected,
-                "Value::parse({:?})",
-                $src
-            );
-            assert!(
-                diagnosis.is_none(),
-                "ConstValue::parse({:?}) reported {diagnosis:?}",
-                $src
-            );
+            let cc1::semantic::Diag { res: value, diagnosis } = cc1::ast::ConstValue::parse($src, &cc1::target::I386);
+            assert_eq!($crate::common::repr(Some(value)), $expected, "Value::parse({:?})", $src);
+            assert!(diagnosis.is_none(), "ConstValue::parse({:?}) reported {diagnosis:?}", $src);
         });
     };
 }
@@ -316,16 +304,8 @@ macro_rules! constant {
 macro_rules! too_large {
     ($name:ident, $src:expr, $expected:expr) => {
         test_case!($name, {
-            let cc1::semantic::Diag {
-                res: value,
-                diagnosis,
-            } = cc1::ast::ConstValue::parse($src, &cc1::target::I386);
-            assert_eq!(
-                $crate::common::repr(Some(value)),
-                $expected,
-                "ConstValue::parse({:?})",
-                $src
-            );
+            let cc1::semantic::Diag { res: value, diagnosis } = cc1::ast::ConstValue::parse($src, &cc1::target::I386);
+            assert_eq!($crate::common::repr(Some(value)), $expected, "ConstValue::parse({:?})", $src);
             assert!(
                 matches!(diagnosis, Some(cc1::semantic::Diagnosis::IntegerConstantTooLarge)),
                 "ConstValue::parse({:?}) reported {diagnosis:?}",

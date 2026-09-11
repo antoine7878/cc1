@@ -15,10 +15,7 @@ fn mark(mut ctx: Context) -> Context {
 
 fn fail(mut ctx: Context) -> Context {
     ctx.diagnosis.push(DiagnosisNode::new(
-        Diagnosis::SyntaxError {
-            found: "';'",
-            expected: ExpectedTokens::new("';'", &[]),
-        },
+        Diagnosis::SyntaxError { found: "';'", expected: ExpectedTokens::new("';'", &[]) },
         Span::default(),
     ));
     ctx
@@ -89,13 +86,8 @@ fn a_pass_that_reports_nothing_leaves_the_pipeline_running() {
 #[test]
 fn a_report_runs_after_an_error_until_a_check_stops_the_pipeline() {
     CHECKED.store(0, Ordering::SeqCst);
-    let (_, stopped) = Pipeline::default()
-        .pass(mark)
-        .pass(fail)
-        .report(tap_checked)
-        .checkpoint()
-        .report(tap_checked)
-        .finish();
+    let (_, stopped) =
+        Pipeline::default().pass(mark).pass(fail).report(tap_checked).checkpoint().report(tap_checked).finish();
     assert_eq!(CHECKED.load(Ordering::SeqCst), 2);
     assert!(stopped);
 }
@@ -132,11 +124,7 @@ fn a_phase_change_keeps_the_failure_and_stop_state() {
 
 #[test]
 fn a_phase_change_on_a_clean_pipeline_leaves_it_running() {
-    let pipeline = Pipeline::default()
-        .pass(mark)
-        .then(to_sema)
-        .pass(mark_sema)
-        .then(to_unit);
+    let pipeline = Pipeline::default().pass(mark).then(to_sema).pass(mark_sema).then(to_unit);
     assert!(!pipeline.failed());
     assert!(!pipeline.stopped());
 }
@@ -144,14 +132,9 @@ fn a_phase_change_on_a_clean_pipeline_leaves_it_running() {
 #[test]
 fn a_run_is_skipped_once_the_pipeline_is_stopped() {
     TAPPED.store(0, Ordering::SeqCst);
-    let pipeline = Pipeline::default()
-        .pass(fail)
-        .checkpoint()
-        .then(to_sema)
-        .then(to_unit)
-        .run(|| {
-            TAPPED.fetch_add(1, Ordering::SeqCst);
-        });
+    let pipeline = Pipeline::default().pass(fail).checkpoint().then(to_sema).then(to_unit).run(|| {
+        TAPPED.fetch_add(1, Ordering::SeqCst);
+    });
     assert!(pipeline.stopped());
     assert_eq!(TAPPED.load(Ordering::SeqCst), 0);
 }

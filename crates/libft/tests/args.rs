@@ -50,10 +50,7 @@ impl ArgParser for Mock {
 
 impl Mock {
     fn new<I: IntoIterator<Item = String>>(argv: I) -> Self {
-        Self {
-            state: State::default(),
-            argv: argv.into_iter().collect::<Vec<_>>().into_iter(),
-        }
+        Self { state: State::default(), argv: argv.into_iter().collect::<Vec<_>>().into_iter() }
     }
 
     fn run(args: &[&str]) -> (Result<(), ArgError>, State, usize) {
@@ -218,18 +215,9 @@ fn walk_stops_at_the_first_error() {
 fn error_messages_mention_the_option() {
     assert_eq!(ArgError::MissingValue('o').to_string(), "Option -o is missing a value");
     assert_eq!(ArgError::UnknownOption('z').to_string(), "Unknown option -z");
-    assert_eq!(
-        ArgError::UnknownLongOption("--long".into()).to_string(),
-        "Unknown option --long"
-    );
-    assert_eq!(
-        ArgError::WrongValue('n', "x".into()).to_string(),
-        "x is not a value of option -n "
-    );
-    assert_eq!(
-        ArgError::BadArgumentCount(2, 1).to_string(),
-        "Bad argument count, got 2, expected 1"
-    );
+    assert_eq!(ArgError::UnknownLongOption("--long".into()).to_string(), "Unknown option --long");
+    assert_eq!(ArgError::WrongValue('n', "x".into()).to_string(), "x is not a value of option -n ");
+    assert_eq!(ArgError::BadArgumentCount(2, 1).to_string(), "Bad argument count, got 2, expected 1");
     assert_eq!(ArgError::NotAfile("a.c".into()).to_string(), "a.c is not a file");
     assert_eq!(ArgError::Process("boom".into()).to_string(), "boom");
 }
@@ -416,10 +404,7 @@ fn fuzz_keeps_structural_invariants() {
             assert!(argv.contains(positional), "invented {positional:?} from {argv:?}");
         }
         // an argument is used at most once
-        assert!(
-            state.positionals.len() <= argv.len(),
-            "duplicated arguments in {argv:?}"
-        );
+        assert!(state.positionals.len() <= argv.len(), "duplicated arguments in {argv:?}");
         match result {
             // a successful walk drains argv
             Ok(()) => assert_eq!(left, 0, "{argv:?} left {left} arguments"),

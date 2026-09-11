@@ -46,13 +46,6 @@ pub struct TableSizeDirectives {
 
 impl Default for TableSizeDirectives {
     fn default() -> Self {
-        Self {
-            p: 2500,
-            n: 500,
-            a: 2000,
-            e: 1000,
-            k: 1000,
-            o: 3000,
-        }
+        Self { p: 2500, n: 500, a: 2000, e: 1000, k: 1000, o: 3000 }
     }
 }

@@ -119,9 +119,7 @@ impl Args {
             entry_stage(path).map_err(ArgError::Process)?;
         }
         if self.outfile.is_some() && self.last != Stage::Link && self.sources() > 1 {
-            return Err(ArgError::Process(
-                "cannot specify -o with -c, -E or -S and multiple input files".to_string(),
-            ));
+            return Err(ArgError::Process("cannot specify -o with -c, -E or -S and multiple input files".to_string()));
         }
         if let Some(path) = self.paths().find(|p| !Path::new(p).is_file()).cloned() {
             return Err(ArgError::NotAfile(path));

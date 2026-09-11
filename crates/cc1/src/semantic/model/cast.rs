@@ -1,12 +1,13 @@
 use std::fmt;
 
+use libft::Span;
+
 use crate::ast::{self};
 use crate::semantic::ExpressionKind::RValue;
 use crate::semantic::{
     Diag, DiagCollector, Diagnosis, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId,
     Sema,
 };
-use libft::Span;
 
 #[derive(Clone, Copy, Debug)]
 pub struct ImplicitCast {
@@ -172,10 +173,7 @@ pub fn usual_arithmetic(
 }
 
 fn is_object_or_incomplete(sema: &Sema, ty: ResolvedTypeId) -> bool {
-    !matches!(
-        ty.resolve_with(sema),
-        ResolvedType::Function { .. } | ResolvedType::Void
-    )
+    !matches!(ty.resolve_with(sema), ResolvedType::Function { .. } | ResolvedType::Void)
 }
 
 fn can_assign_pointer(sema: &Sema, lp: QualifiedType, rp: QualifiedType) -> bool {

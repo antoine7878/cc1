@@ -1,7 +1,8 @@
-use crate::common::{Unit, repr};
 use cc1::ast::{ConstValue, F80};
 use cc1::semantic::{QualifiedType, ResolvedType, ResolvedTypeId, TagDefId};
 use cc1::target::{ARM64_DARWIN, FloatFormat, I386, Target, X86_64};
+
+use crate::common::{Unit, repr};
 
 fn layout(target: &Target, ty: &ResolvedType) -> Option<(u32, u32)> {
     target.layout(ty).map(|l| (l.size, l.align))
@@ -12,10 +13,7 @@ fn pointer_to_int() -> ResolvedType {
 }
 
 fn array_of_int() -> ResolvedType {
-    ResolvedType::Array {
-        elem: QualifiedType::new(ResolvedTypeId::from(0usize), false, false),
-        len: Some(4),
-    }
+    ResolvedType::Array { elem: QualifiedType::new(ResolvedTypeId::from(0usize), false, false), len: Some(4) }
 }
 
 fn tag() -> ResolvedType {
@@ -165,27 +163,12 @@ fn truncate_is_defined_for_integer_types_only() {
 
 #[test]
 fn cast_narrows_and_retypes() {
-    assert_eq!(
-        repr(I386.cast(&ResolvedType::Int, ConstValue::Long(4294967297))),
-        "Int(1)"
-    );
+    assert_eq!(repr(I386.cast(&ResolvedType::Int, ConstValue::Long(4294967297))), "Int(1)");
     assert_eq!(repr(I386.cast(&ResolvedType::Char, ConstValue::Int(321))), "Int(65)");
-    assert_eq!(
-        repr(I386.cast(&ResolvedType::UnsignedChar, ConstValue::Int(-1))),
-        "Int(255)"
-    );
-    assert_eq!(
-        repr(I386.cast(&ResolvedType::UnsignedInt, ConstValue::Int(-1))),
-        "UnsignedInt(4294967295)"
-    );
-    assert_eq!(
-        repr(I386.cast(&ResolvedType::Long, ConstValue::UnsignedLong(4294967295))),
-        "Long(-1)"
-    );
-    assert_eq!(
-        repr(X86_64.cast(&ResolvedType::Long, ConstValue::UnsignedLong(4294967295))),
-        "Long(4294967295)"
-    );
+    assert_eq!(repr(I386.cast(&ResolvedType::UnsignedChar, ConstValue::Int(-1))), "Int(255)");
+    assert_eq!(repr(I386.cast(&ResolvedType::UnsignedInt, ConstValue::Int(-1))), "UnsignedInt(4294967295)");
+    assert_eq!(repr(I386.cast(&ResolvedType::Long, ConstValue::UnsignedLong(4294967295))), "Long(-1)");
+    assert_eq!(repr(X86_64.cast(&ResolvedType::Long, ConstValue::UnsignedLong(4294967295))), "Long(4294967295)");
     assert_eq!(
         repr(X86_64.cast(&ResolvedType::UnsignedLong, ConstValue::Int(-1))),
         "UnsignedLong(18446744073709551615)"
@@ -225,11 +208,7 @@ fn probe(target: Target, ty: &str) -> String {
     let name = target.name;
     let unit = Unit::compile_for(target, &format!("enum probe {{ PROBE = sizeof({ty}) }};"));
     assert!(unit.accepts(), "sizeof({ty}) on {name}:\n{}", unit.render());
-    unit.variants()
-        .into_iter()
-        .find(|(name, _)| name == "PROBE")
-        .expect("the probe variant")
-        .1
+    unit.variants().into_iter().find(|(name, _)| name == "PROBE").expect("the probe variant").1
 }
 
 #[test]
@@ -293,10 +272,7 @@ fn each_target_carries_its_module_header() {
     assert_eq!(ARM64_DARWIN.triple, "arm64-apple-macosx26.0.0");
     assert!(I386.datalayout.starts_with("e-m:e-p:32:32-"));
     assert!(X86_64.datalayout.contains("f80:128"));
-    assert_eq!(
-        ARM64_DARWIN.datalayout,
-        "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32"
-    );
+    assert_eq!(ARM64_DARWIN.datalayout, "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32");
 }
 
 #[test]

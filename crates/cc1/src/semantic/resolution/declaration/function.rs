@@ -1,10 +1,11 @@
+use libft::Span;
+
 use crate::ast::{DeclarationNode, DeclarationSpecifier, DeclaratorNode, FunctionDefinitionNode, Name, Storage};
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     DeclaredParams, Definition, Diag, DiagCollector, Diagnosis, FunctionDefId, ParamInfo, ParamTypes, QualifiedType,
     ResolvedType, Sema, Symbol, SymbolId, SymbolKind, SymbolResolver, constrain,
 };
-use libft::Span;
 
 #[derive(Debug, Clone)]
 pub struct FunctionHeader {
@@ -54,9 +55,7 @@ pub fn define_function(resolver: &mut SymbolResolver, node: &FunctionDefinitionN
         }
         _ => rty,
     };
-    let &ResolvedType::Function { ret: return_ty, .. } = ty.id.resolve_with(resolver.sema) else {
-        unreachable!()
-    };
+    let &ResolvedType::Function { ret: return_ty, .. } = ty.id.resolve_with(resolver.sema) else { unreachable!() };
     let is_defined_return = return_ty.is_void(resolver.sema) || return_ty.is_complete(resolver.sema);
     constrain::ty::check_definition_return(is_defined_return, return_ty).collect(resolver, decl_span);
     let prior = resolver.sema.linkage_of_name(name.id);
@@ -66,11 +65,7 @@ pub fn define_function(resolver: &mut SymbolResolver, node: &FunctionDefinitionN
     sym.definition = Definition::Definition;
     let sym = resolver.declare(sym, decl_span);
     let declared = (previous == Some(sym)).then_some(declared).flatten();
-    Some(FunctionHeader {
-        id: resolver.sema.functions.declare(sym, return_ty),
-        params,
-        declared,
-    })
+    Some(FunctionHeader { id: resolver.sema.functions.declare(sym, return_ty), params, declared })
 }
 
 fn param_types(sema: &Sema, sym: SymbolId) -> Option<ParamTypes> {
@@ -102,17 +97,11 @@ fn check_identifier_list(
     {
         return;
     }
-    let identifiers: Vec<QualifiedType> = parameters
-        .iter()
-        .filter_map(|sym| (*sym).resolve_with(sema).ty)
-        .collect();
+    let identifiers: Vec<QualifiedType> = parameters.iter().filter_map(|sym| (*sym).resolve_with(sema).ty).collect();
     if identifiers.len() != parameters.len() || declared.is_compatible_with_identifiers(sema, &identifiers) {
         return;
     }
-    sema.add_diag(
-        Diag::err((), Diagnosis::DuplicateDeclaration(SymbolKind::Function, name)),
-        span,
-    );
+    sema.add_diag(Diag::err((), Diagnosis::DuplicateDeclaration(SymbolKind::Function, name)), span);
 }
 
 fn param_empty(sema: &mut Sema, lst: &[DeclarationNode], span: &Span) -> Vec<SymbolId> {
@@ -142,10 +131,7 @@ fn param_prototype(
         constrain::parameter::check_complete_parameter(param.ty.is_complete(resolver.sema), param.ty)
             .collect(resolver, &param.span);
     }
-    params
-        .iter()
-        .filter_map(|param| add_parameter(resolver, param))
-        .collect()
+    params.iter().filter_map(|param| add_parameter(resolver, param)).collect()
 }
 
 fn add_parameter(resolver: &mut SymbolResolver, param: &ParamInfo) -> Option<SymbolId> {
@@ -163,21 +149,15 @@ fn param_old_style(
 ) -> Vec<SymbolId> {
     let declarations: Vec<_> = lst
         .iter()
-        .flat_map(
-            |DeclarationNode {
-                 span,
-                 specifiers,
-                 init_declarators,
-             }| {
-                init_declarators
-                    .iter()
-                    .map(|decl| {
-                        add_parameter_declarator(resolver, specifiers, &decl.declarator, span)
-                            .map(|sym_id| sym_id.resolve_with(resolver.sema).name.id)
-                    })
-                    .collect::<Vec<_>>()
-            },
-        )
+        .flat_map(|DeclarationNode { span, specifiers, init_declarators }| {
+            init_declarators
+                .iter()
+                .map(|decl| {
+                    add_parameter_declarator(resolver, specifiers, &decl.declarator, span)
+                        .map(|sym_id| sym_id.resolve_with(resolver.sema).name.id)
+                })
+                .collect::<Vec<_>>()
+        })
         .collect();
 
     let names_id: Vec<_> = names.iter().map(|n| n.id).collect();
@@ -194,10 +174,7 @@ fn param_old_style(
         .for_each(|sym| {
             let _ = resolver.declare(sym, &Span::default());
         });
-    names
-        .iter()
-        .filter_map(|name| resolver.lookup_ordinary(name.id))
-        .collect()
+    names.iter().filter_map(|name| resolver.lookup_ordinary(name.id)).collect()
 }
 
 fn add_parameter_declarator(

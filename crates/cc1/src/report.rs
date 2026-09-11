@@ -1,6 +1,7 @@
+use libft::print_table;
+
 use crate::context::ctx;
 use crate::semantic::sema;
-use libft::print_table;
 
 pub fn dump_symbols() {
     let sema = sema();
@@ -26,20 +27,7 @@ pub fn dump_symbols() {
         })
         .collect();
 
-    print_table(
-        &[
-            "KIND",
-            "NAME",
-            "STORAGE",
-            "LINKAGE",
-            "DURATION",
-            "DEFINITION",
-            "VALUE",
-            "TYPE",
-            "USED",
-        ],
-        &rows,
-    );
+    print_table(&["KIND", "NAME", "STORAGE", "LINKAGE", "DURATION", "DEFINITION", "VALUE", "TYPE", "USED"], &rows);
 }
 
 pub fn dump_diagnostics() {

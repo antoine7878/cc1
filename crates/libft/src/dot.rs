@@ -32,12 +32,7 @@ impl Dot {
     }
 
     pub fn edge(&mut self, from: usize, to: usize, label: &str) {
-        self.dot.push_str(&format!(
-            "    {} -> {} [label=\"{}\"];\n",
-            from,
-            to,
-            Self::escape(label),
-        ));
+        self.dot.push_str(&format!("    {} -> {} [label=\"{}\"];\n", from, to, Self::escape(label),));
     }
 
     pub fn finish(&mut self) {
@@ -51,9 +46,7 @@ impl Dot {
         let file_dot = format!("{file}.dot");
         let file_svg = format!("{file}.svg");
         fs::write(file_dot.as_str(), &self.dot)?;
-        let _status = Command::new("dot")
-            .args(["-Tsvg", file_dot.as_str(), "-o", file_svg.as_str()])
-            .status()?;
+        let _status = Command::new("dot").args(["-Tsvg", file_dot.as_str(), "-o", file_svg.as_str()]).status()?;
         Ok(())
     }
 }

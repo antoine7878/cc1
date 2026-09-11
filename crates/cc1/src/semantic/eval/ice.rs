@@ -51,15 +51,9 @@ fn node_ty(sema: &Sema, expr: &ExpressionNode) -> Result<QualifiedType, Diagnosi
 
 fn operand(sema: &mut Sema, e: &ExpressionNode, sink: &mut DiagSink) -> Result<ConstValue, Diagnosis> {
     let value = fold(sema, e, sink)?;
-    let casted = sema
-        .expr_types
-        .get(e.id)
-        .map(|re| re.casted_ty())
-        .ok_or(Diagnosis::Poisoned)?;
+    let casted = sema.expr_types.get(e.id).map(|re| re.casted_ty()).ok_or(Diagnosis::Poisoned)?;
     let ty = scalar_ty(sema, casted);
-    Fold::new(&sema.target)
-        .convert(&ty, value)
-        .ok_or(Diagnosis::NonIntegerConstantExpression)
+    Fold::new(&sema.target).convert(&ty, value).ok_or(Diagnosis::NonIntegerConstantExpression)
 }
 
 fn divisor(sema: &Sema, ty: &ResolvedType, lhs: ConstValue, rhs: ConstValue, op: BinaryOp) -> Result<(), Diagnosis> {
@@ -119,19 +113,12 @@ fn integral_operands(sema: &Sema, expr: &ExpressionNode) -> Result<(), Diagnosis
 }
 
 fn identifier(sema: &Sema, expr: &ExpressionNode) -> Result<ConstValue, Diagnosis> {
-    let id = sema
-        .expr_bindings
-        .get(expr.id)
-        .copied()
-        .ok_or(Diagnosis::NonConstantExpression)?;
+    let id = sema.expr_bindings.get(expr.id).copied().ok_or(Diagnosis::NonConstantExpression)?;
     let symbol = id.resolve_with(sema);
     if symbol.kind != SymbolKind::Variant {
         return Err(Diagnosis::NonConstantExpression);
     }
-    symbol
-        .value
-        .map(ConstValue::Int)
-        .ok_or(Diagnosis::NonConstantExpression)
+    symbol.value.map(ConstValue::Int).ok_or(Diagnosis::NonConstantExpression)
 }
 
 fn unary_op(

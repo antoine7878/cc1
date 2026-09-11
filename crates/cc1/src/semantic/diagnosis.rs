@@ -1,10 +1,11 @@
 use std::fmt::{self, Display};
 use std::io::{self, Write, stderr};
 
+use libft::{Severity, Span, render};
+
 use crate::ast::{ConstValue, Name, StringId, UnaryOp};
 use crate::context::ctx;
 use crate::semantic::{QualifiedType, SymbolKind};
-use libft::{Severity, Span, render};
 
 #[derive(Clone, Debug)]
 pub enum Diagnosis {
@@ -19,10 +20,7 @@ pub enum Diagnosis {
     BadArguments(String),
     Poisoned,
     InvalidOperand,
-    SyntaxError {
-        found: &'static str,
-        expected: ExpectedTokens,
-    },
+    SyntaxError { found: &'static str, expected: ExpectedTokens },
 
     // 6.1.2.1
     DuplicateDeclaration(SymbolKind, Name),
@@ -502,10 +500,7 @@ impl ExpectedTokens {
     fn from_slice(names: &[&'static str]) -> Self {
         let mut buf = [""; MAX_EXPECTED];
         buf[..names.len()].copy_from_slice(names);
-        Self {
-            names: buf,
-            len: names.len(),
-        }
+        Self { names: buf, len: names.len() }
     }
 
     pub fn is_empty(&self) -> bool {

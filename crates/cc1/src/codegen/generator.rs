@@ -24,11 +24,7 @@ pub struct Generator<W: Write> {
 
 impl<W: Write> Generator<W> {
     fn new(w: W) -> Self {
-        Self {
-            b: Builder::new(w),
-            locals: Locals::default(),
-            globals: Globals::default(),
-        }
+        Self { b: Builder::new(w), locals: Locals::default(), globals: Globals::default() }
     }
 
     fn allocas(&mut self, node: &FunctionDefinitionNode) {

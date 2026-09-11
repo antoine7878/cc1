@@ -22,21 +22,11 @@ pub struct Member {
 
 impl Member {
     pub fn symbol(sym: SymbolId, width: Option<i32>) -> Self {
-        Self {
-            sym: Some(sym),
-            width,
-            offset: 0,
-            bit_offset: 0,
-        }
+        Self { sym: Some(sym), width, offset: 0, bit_offset: 0 }
     }
 
     pub fn bitfield(width: i32) -> Self {
-        Self {
-            sym: None,
-            width: Some(width),
-            offset: 0,
-            bit_offset: 0,
-        }
+        Self { sym: None, width: Some(width), offset: 0, bit_offset: 0 }
     }
 }
 
@@ -81,12 +71,7 @@ impl TagDef {
 
 impl TagDefArena {
     pub fn declare(&mut self, kind: Tag, name: Option<Name>) -> TagDefId {
-        self.alloc(TagDef {
-            kind,
-            name,
-            members: Vec::new(),
-            is_complete: false,
-        })
+        self.alloc(TagDef { kind, name, members: Vec::new(), is_complete: false })
     }
 
     pub fn complete(&mut self, id: TagDefId, members: Vec<Member>) {

@@ -1,5 +1,6 @@
-use crate::regex::Dfa;
 use libft::BitSet;
+
+use crate::regex::Dfa;
 
 #[derive(Debug, Default, Clone)]
 pub struct TableDfa {
@@ -21,10 +22,7 @@ pub struct TableDfa {
 
 impl TableDfa {
     pub fn new(dfa: Dfa, compress: bool) -> Self {
-        let mut tables = Self {
-            state_count: dfa.nodes.len(),
-            ..Default::default()
-        };
+        let mut tables = Self { state_count: dfa.nodes.len(), ..Default::default() };
         tables.yy_char_eq = tables.build_char_eq(&dfa, compress);
         tables.yy_base = tables.build_base(&dfa);
         tables.transition_count = tables.yy_base.len();
@@ -59,11 +57,7 @@ impl TableDfa {
             };
             chars.remove(b);
             for b2 in chars.clone().ones() {
-                if dfa
-                    .nodes
-                    .iter()
-                    .all(|n| n.next_state(b as u8) == n.next_state(b2 as u8))
-                {
+                if dfa.nodes.iter().all(|n| n.next_state(b as u8) == n.next_state(b2 as u8)) {
                     class.push(b2 as isize);
                 }
             }
@@ -93,10 +87,7 @@ impl TableDfa {
     }
 
     fn build_trailing(&self, dfa: &Dfa) -> Vec<isize> {
-        dfa.nodes
-            .iter()
-            .map(|state| state.trailing_tags.ones().next().map(|c| c as isize).unwrap_or(-1))
-            .collect()
+        dfa.nodes.iter().map(|state| state.trailing_tags.ones().next().map(|c| c as isize).unwrap_or(-1)).collect()
     }
 
     fn build_accept(&self, dfa: &Dfa) -> Vec<isize> {

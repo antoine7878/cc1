@@ -3,12 +3,7 @@ use std::process::Command;
 use crate::args::Args;
 
 fn run_cmd(cmd: &str, args: &[String]) {
-    Command::new(cmd)
-        .args(args)
-        .spawn()
-        .unwrap()
-        .wait_with_output()
-        .unwrap();
+    Command::new(cmd).args(args).spawn().unwrap().wait_with_output().unwrap();
 }
 
 pub fn run(args: &Args) -> Result<(), String> {

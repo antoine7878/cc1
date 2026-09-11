@@ -3,10 +3,8 @@ use std::fmt;
 
 use libft::BitSet;
 
-use crate::regex::{
-    Ast, Atom, Automaton, ConditionId, Expression, FragmentId, State, StateId, Transition,
-    ast::{BracketExpr, BracketItem, PosixClass},
-};
+use crate::regex::ast::{BracketExpr, BracketItem, PosixClass};
+use crate::regex::{Ast, Atom, Automaton, ConditionId, Expression, FragmentId, State, StateId, Transition};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Nfa {
@@ -80,12 +78,7 @@ impl Nfa {
 
 impl Nfa {
     pub fn new(ast: Ast, start_conditions: Vec<ConditionId>, code_fragment: FragmentId, actions_len: usize) -> Self {
-        let mut nfa = Self {
-            start_anchor: ast.start_anchor,
-            code_fragment,
-            actions_len,
-            ..Default::default()
-        };
+        let mut nfa = Self { start_anchor: ast.start_anchor, code_fragment, actions_len, ..Default::default() };
         nfa.start = nfa.new_state();
         let mut end = nfa.parse_expression(nfa.start, &ast.expression);
         if ast.end_anchor {
@@ -219,11 +212,9 @@ impl Nfa {
             PosixClass::Print => Vec::from_iter(b'\x20'..=b'\x7E'),
             PosixClass::Upper => Vec::from_iter(b'A'..=b'Z'),
             PosixClass::Xdigit => Vec::from_iter([b'a'..=b'f', b'A'..=b'F', b'0'..=b'9'].into_iter().flatten()),
-            PosixClass::Word => Vec::from_iter(
-                [b'a'..=b'z', b'A'..=b'Z', b'0'..=b'9', b'_'..=b'_']
-                    .into_iter()
-                    .flatten(),
-            ),
+            PosixClass::Word => {
+                Vec::from_iter([b'a'..=b'z', b'A'..=b'Z', b'0'..=b'9', b'_'..=b'_'].into_iter().flatten())
+            }
             PosixClass::Cntrl => Vec::from_iter([b'\x00'..=b'\x1F', b'\x7F'..=b'\x7F'].into_iter().flatten()),
             PosixClass::Space => Vec::from(b" \t\n\r\x0B\x0C"),
             PosixClass::Punct => Vec::from(b"!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"),
@@ -243,16 +234,11 @@ impl Nfa {
     }
 
     pub fn merge(nfas: Vec<Self>, inclusive_start_count: usize, exclusive_start_count: usize) -> Self {
-        let mut ret = Self {
-            actions_len: nfas.len(),
-            ..Default::default()
-        };
+        let mut ret = Self { actions_len: nfas.len(), ..Default::default() };
         let total_count = inclusive_start_count + exclusive_start_count;
 
         // Create a state for every start conditions
-        ret.condition_to_start = (0..total_count)
-            .map(|s| (s, ret.new_state()))
-            .collect::<BTreeMap<_, _>>();
+        ret.condition_to_start = (0..total_count).map(|s| (s, ret.new_state())).collect::<BTreeMap<_, _>>();
 
         // Connect each nfa to its start conditions
         let mut offset: StateId = ret.nodes.len();
@@ -360,10 +346,7 @@ mod test {
             ".",
             Nfa {
                 condition_to_start: BTreeMap::from([(0, 0)]),
-                nodes: vec![
-                    state(vec![Transition { on: dot, to: 1 }], vec![], 1),
-                    state(vec![], vec![0], 1),
-                ],
+                nodes: vec![state(vec![Transition { on: dot, to: 1 }], vec![], 1), state(vec![], vec![0], 1)],
                 ..Default::default()
             },
         );

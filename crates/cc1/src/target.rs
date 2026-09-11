@@ -1,7 +1,5 @@
-use crate::{
-    ast::{ConstValue, F80},
-    semantic::ResolvedType,
-};
+use crate::ast::{ConstValue, F80};
+use crate::semantic::ResolvedType;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FloatFormat {

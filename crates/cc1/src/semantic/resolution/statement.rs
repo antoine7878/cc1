@@ -155,21 +155,12 @@ fn check_integral(sema: &mut Sema, node: &ExpressionNode) -> Result<QualifiedTyp
 
 fn check_for(
     sema: &mut Sema,
-    b: &(
-        ExpressionStatementNode,
-        ExpressionStatementNode,
-        Option<ExpressionNode>,
-        StatementNode,
-    ),
+    b: &(ExpressionStatementNode, ExpressionStatementNode, Option<ExpressionNode>, StatementNode),
 ) -> Result<QualifiedType, Diagnosis> {
     let (e1, e2, e3, _) = b;
     e1.expr.as_ref().and_then(|e| expr_to_void(sema, e));
     e3.as_ref().and_then(|e| expr_to_void(sema, e));
-    if let Some(e) = e2.expr.as_ref() {
-        check_scalar(sema, e)
-    } else {
-        Ok(QualifiedType::plain(sema.builtins.int))
-    }
+    if let Some(e) = e2.expr.as_ref() { check_scalar(sema, e) } else { Ok(QualifiedType::plain(sema.builtins.int)) }
 }
 
 pub fn resolve_jump_statement(resolver: &mut SymbolResolver, id: StatementId, node: &JumpStatementNode) {

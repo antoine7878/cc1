@@ -1,5 +1,7 @@
 use std::mem::take;
 
+use libft::Span;
+
 use crate::ast::statement::StatementId;
 use crate::ast::visit::{
     Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_statement, walk_translation_unit,
@@ -14,7 +16,6 @@ use crate::semantic::{
     Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, Linkage, QualifiedType, ScopeKind, Sema,
     StatementScopes, Symbol, SymbolId, SymbolKind, SymbolScopes, TagDefId, constrain, declaration, ice,
 };
-use libft::Span;
 
 #[derive(Debug)]
 pub struct SymbolResolver<'a> {
@@ -143,11 +144,7 @@ impl SymbolResolver<'_> {
         if (is_const && base.is_const) || (is_volatile && base.is_volatile) {
             self.add_diag(Diag::err((), Diagnosis::DuplicateTypeQualifiers), span)
         }
-        Some(QualifiedType::new(
-            base.id,
-            base.is_const || is_const,
-            base.is_volatile || is_volatile,
-        ))
+        Some(QualifiedType::new(base.id, base.is_const || is_const, base.is_volatile || is_volatile))
     }
 
     pub fn declare_tag(&mut self, kind: Tag, name: Option<Name>, is_definition: bool, span: &Span) -> TagDefId {
@@ -189,10 +186,7 @@ impl SymbolResolver<'_> {
         {
             return Some(old_id);
         }
-        self.add_diag(
-            Diag::err(Some(old_id), Diagnosis::DuplicateDeclaration(sym.kind, sym.name)),
-            span,
-        )
+        self.add_diag(Diag::err(Some(old_id), Diagnosis::DuplicateDeclaration(sym.kind, sym.name)), span)
     }
 }
 

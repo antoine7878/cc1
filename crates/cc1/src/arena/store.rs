@@ -13,10 +13,7 @@ pub struct Arena<Id: ArenaKey, Val> {
 
 impl<Id: ArenaKey, Val> Default for Arena<Id, Val> {
     fn default() -> Self {
-        Self {
-            data: Vec::new(),
-            marker: PhantomData,
-        }
+        Self { data: Vec::new(), marker: PhantomData }
     }
 }
 
