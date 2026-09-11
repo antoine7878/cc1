@@ -12,6 +12,7 @@ define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId);
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum ResolvedType {
     Void,
+    Bool,
     Char,
     SignedChar,
     UnsignedChar,
@@ -374,6 +375,10 @@ impl QualifiedType {
         ctx().target.layout(self.id.resolve())
     }
 
+    pub fn align(&self) -> u32 {
+        self.layout().unwrap().align
+    }
+
     pub fn is_floating(&self, sema: &Sema) -> bool {
         self.id.resolve_with(sema).is_floating()
     }
@@ -408,6 +413,7 @@ impl fmt::Display for QualifiedType {
             f.write_str("volatile ")?;
         }
         match ty.id.resolve() {
+            ResolvedType::Bool => f.write_str("bool"),
             ResolvedType::Void => f.write_str("void"),
             ResolvedType::Char => f.write_str("char"),
             ResolvedType::SignedChar => f.write_str("signed char"),

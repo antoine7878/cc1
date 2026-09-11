@@ -20,11 +20,18 @@ pub struct LlvmType {
     ty: &'static ResolvedType,
 }
 
+impl LlvmType {
+    pub fn bool() -> Self {
+        Self { ty: &ResolvedType::Bool }
+    }
+}
+
 impl fmt::Display for LlvmType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let target = &ctx().target;
         match self.ty {
-            ResolvedType::Char
+            ResolvedType::Bool
+            | ResolvedType::Char
             | ResolvedType::SignedChar
             | ResolvedType::UnsignedChar
             | ResolvedType::Short

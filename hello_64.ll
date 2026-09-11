@@ -3,23 +3,15 @@ source_filename = "rscs/hello.c"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-linux-gnu"
 
-@.str.0 = private unnamed_addr constant [7 x i8] c"Hello3\00", align 1
-@.str.1 = private unnamed_addr constant [7 x i8] c"Hello2\00", align 1
-@.str.2 = private unnamed_addr constant [6 x i8] c"Hello\00", align 1
-
 ; Function Attrs: noinline nounwind optnone uwtable
-define dso_local ptr @f3() #0 {
-  ret ptr @.str
+define dso_local i32 @fc() #0 {
+  ret i32 1
 }
 
 ; Function Attrs: noinline nounwind optnone uwtable
-define dso_local ptr @f2() #0 {
-  ret ptr @.str.1
-}
-
-; Function Attrs: noinline nounwind optnone uwtable
-define dso_local ptr @f1() #0 {
-  ret ptr @.str.2
+define dso_local void @f() #0 {
+  %1 = call i32 @fc()
+  ret void
 }
 
 attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cmov,+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }

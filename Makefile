@@ -33,10 +33,16 @@ test: all
 	cargo run --bin fcc -- -e ./rscs/hello.c -o /dev/stdout
 	@# ./a.out || echo $$?
 
+otest: all
+	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
+	cargo run --bin fcc -- -e ./rscs/hello.c  -o ./rscs/hello.ll
+	chmod 777 ./rscs/hello.ll
+	./rscs/hello.ll
+
 ftest: all
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
-	cargo run --bin fcc -- ./rscs/hello.c
-	./a.out || echo $$?
+	cargo run --bin fcc -- ./rscs/hello.c -o ./rscs/a.out
+	./rscs/a.out || echo $$?
 
 ctest: all
 	cargo nextest run -p cc1

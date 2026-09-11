@@ -19,8 +19,8 @@ impl Locals {
         self.visit_compound_statement(&node.body);
     }
 
-    pub fn get(&self, sym_id: SymbolId) -> LlvmValue {
-        self.map[&sym_id]
+    pub fn get(&self, sym_id: SymbolId) -> Option<&LlvmValue> {
+        self.map.get(&sym_id)
     }
 
     pub fn emit<W: Write>(&mut self, b: &mut Builder<W>) {

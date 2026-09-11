@@ -145,6 +145,7 @@ impl Target {
 
     pub fn layout(&self, ty: &ResolvedType) -> Option<Layout> {
         let layout = match ty {
+            ResolvedType::Bool => unimplemented!(),
             ResolvedType::Char | ResolvedType::SignedChar | ResolvedType::UnsignedChar => self.char,
             ResolvedType::Short | ResolvedType::UnsignedShort => self.short,
             ResolvedType::Int | ResolvedType::UnsignedInt => self.int,

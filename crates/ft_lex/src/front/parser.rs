@@ -58,7 +58,6 @@ impl LexParser {
         Ok(BufReader::new(file))
     }
     pub fn run(mut self, compress: bool) -> Result<Lex, LexError> {
-        use LexParserState::*;
         let mut line = String::new();
         for path in self.files.clone() {
             let mut file = Self::open_file(&mut self, path.as_str())?;
@@ -79,11 +78,11 @@ impl LexParser {
         }
 
         match self.state {
-            Definition => self.error("No rule section")?,
-            DefinitionBlock => self.error("unclosed %{{")?,
-            Rules => self.next_state(Auxiliary),
-            ActionBlock(_, _) => self.error("unclosed action")?,
-            Auxiliary => (),
+            LexParserState::Definition => self.error("No rule section")?,
+            LexParserState::DefinitionBlock => self.error("unclosed %{{")?,
+            LexParserState::Rules => self.next_state(LexParserState::Auxiliary),
+            LexParserState::ActionBlock(_, _) => self.error("unclosed action")?,
+            LexParserState::Auxiliary => (),
         }
 
         let nfa = Nfa::merge(
@@ -121,17 +120,16 @@ impl LexParser {
 
     #[rustfmt::skip]
     fn next_state(&mut self, to: LexParserState) {
-        use LexParserState::*;
         match (self.state, to) {
-            (Definition, Rules) => {
+            (LexParserState::Definition, LexParserState::Rules) => {
                 self.start_conditions = [
                     self.definition.inclusive_states.iter(),
                     self.definition.exclusive_states.iter(),
                 ].iter().cloned().flatten().flat_map(|s: &String| [s.clone(), format!("{s}_BOL")]).collect();
             }
-            (Definition, DefinitionBlock) => (),
-            (DefinitionBlock, Definition) => (),
-            (Rules, Auxiliary) => {
+            (LexParserState::Definition, LexParserState::DefinitionBlock) => (),
+            (LexParserState::DefinitionBlock, LexParserState::Definition) => (),
+            (LexParserState::Rules, LexParserState::Auxiliary) => {
                 for i in (0..self.code_fragments.len()).rev() {
                     Self::trim_vec(&mut self.code_fragments[i]);
                     if self.code_fragments[i] == b"|" {
@@ -143,21 +141,20 @@ impl LexParser {
                     }
                 }
             }
-            (Rules, ActionBlock(_, _)) => (),
-            (ActionBlock(_, _), Rules) => (),
-            (ActionBlock(_, _), ActionBlock(_, _)) => (),
+            (LexParserState::Rules, LexParserState::ActionBlock(_, _)) => (),
+            (LexParserState::ActionBlock(_, _), LexParserState::Rules) => (),
+            (LexParserState::ActionBlock(_, _), LexParserState::ActionBlock(_, _)) => (),
             _ => unreachable!()
         } self.state = to;
     }
 
     fn parse_line(&mut self, line: &str) -> Result<(), LexError> {
-        use LexParserState::*;
         match self.state {
-            Definition => self.parse_definition(line),
-            DefinitionBlock => self.parse_definition_block(line),
-            Rules => self.parse_rules(line),
-            ActionBlock(depth, comment) => self.parse_action_block(line, depth, comment),
-            Auxiliary => self.parse_auxiliary(line),
+            LexParserState::Definition => self.parse_definition(line),
+            LexParserState::DefinitionBlock => self.parse_definition_block(line),
+            LexParserState::Rules => self.parse_rules(line),
+            LexParserState::ActionBlock(depth, comment) => self.parse_action_block(line, depth, comment),
+            LexParserState::Auxiliary => self.parse_auxiliary(line),
         }
     }
 

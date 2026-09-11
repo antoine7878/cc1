@@ -73,12 +73,13 @@ pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
 }
 
 pub fn promote(sema: &Sema, re: &mut ResolvedExpression) {
-    use ResolvedType::*;
-
-    let qty = re.casted_ty();
-    match qty.id.resolve_with(sema) {
-        Char | SignedChar | UnsignedChar | Short | UnsignedShort => (),
-        &Tag(id) if id.resolve_with(sema).kind == ast::Tag::Enum => (),
+    match re.casted_ty().id.resolve_with(sema) {
+        ResolvedType::Char
+        | ResolvedType::SignedChar
+        | ResolvedType::UnsignedChar
+        | ResolvedType::Short
+        | ResolvedType::UnsignedShort => (),
+        &ResolvedType::Tag(id) if id.resolve_with(sema).kind == ast::Tag::Enum => (),
         _ => return,
     }
 
@@ -142,7 +143,7 @@ pub fn usual_arithmetic(
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,
 ) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
-    use ResolvedType::*;
+    use ResolvedType as R;
 
     let l = lhs.casted_ty().id.resolve_with(sema);
     let r = rhs.casted_ty().id.resolve_with(sema);
@@ -157,14 +158,16 @@ pub fn usual_arithmetic(
         return Ok((lhs.casted_ty(), RValue));
     }
     let to = match (l, r) {
-        (LongDouble, _) | (_, LongDouble) => sema.builtins.long_double,
-        (Double, _) | (_, Double) => sema.builtins.double,
-        (Float, _) | (_, Float) => sema.builtins.float,
-        (_, UnsignedLong) | (UnsignedLong, _) => sema.builtins.unsigned_long,
-        (UnsignedInt, Long) | (Long, UnsignedInt) if sema.target.long.size > sema.target.int.size => sema.builtins.long,
-        (UnsignedInt, Long) | (Long, UnsignedInt) => sema.builtins.unsigned_long,
-        (_, Long) | (Long, _) => sema.builtins.long,
-        (_, UnsignedInt) | (UnsignedInt, _) => sema.builtins.unsigned_int,
+        (R::LongDouble, _) | (_, R::LongDouble) => sema.builtins.long_double,
+        (R::Double, _) | (_, R::Double) => sema.builtins.double,
+        (R::Float, _) | (_, R::Float) => sema.builtins.float,
+        (_, R::UnsignedLong) | (R::UnsignedLong, _) => sema.builtins.unsigned_long,
+        (R::UnsignedInt, R::Long) | (R::Long, R::UnsignedInt) if sema.target.long.size > sema.target.int.size => {
+            sema.builtins.long
+        }
+        (R::UnsignedInt, R::Long) | (R::Long, R::UnsignedInt) => sema.builtins.unsigned_long,
+        (_, R::Long) | (R::Long, _) => sema.builtins.long,
+        (_, R::UnsignedInt) | (R::UnsignedInt, _) => sema.builtins.unsigned_int,
         _ => sema.builtins.int,
     };
     num_conv(sema, lhs, to);

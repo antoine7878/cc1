@@ -1,6 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
 use crate::ast::ConstValue;
+use crate::semantic::SymbolId;
 
 #[derive(Debug, Clone, Copy)]
 pub enum LlvmValue {
@@ -8,26 +9,25 @@ pub enum LlvmValue {
     Constant(ConstValue),
     StringLiteral(usize),
     Bool(bool),
-    Lhs(usize),
-    Rhs(usize),
+    Label(usize, usize),
+    Global(SymbolId),
 }
-
 impl LlvmValue {
-    pub fn fork(i: usize) -> (Self, Self) {
-        (Self::Lhs(i), Self::Rhs(i))
+    pub fn label(i: usize, j: usize) -> LlvmValue {
+        Self::Label(i, j)
     }
 }
 
 impl LlvmValue {
-    pub fn zero_cst() -> Self {
+    pub fn zero() -> Self {
         LlvmValue::Constant(ConstValue::zero())
     }
 
-    pub fn one_cst() -> Self {
+    pub fn one() -> Self {
         LlvmValue::Constant(ConstValue::one())
     }
 
-    pub fn minus_one_cst() -> Self {
+    pub fn minus_one() -> Self {
         LlvmValue::Constant(ConstValue::minus_one())
     }
 }
@@ -38,9 +38,9 @@ impl Display for LlvmValue {
             LlvmValue::SSA(id) => write!(f, "%{id}"),
             LlvmValue::Constant(value) => write!(f, "{value}"),
             LlvmValue::Bool(b) => write!(f, "{b}"),
-            LlvmValue::Lhs(s) => write!(f, "%lhs.l.{s}"),
-            LlvmValue::Rhs(s) => write!(f, "%rhs.l.{s}"),
+            LlvmValue::Label(i, j) => write!(f, "%l.{i}.{j}"),
             LlvmValue::StringLiteral(i) => write!(f, "@.str.{i}"),
+            LlvmValue::Global(s) => write!(f, "@{}", s.resolve().name.id.resolve()),
         }
     }
 }

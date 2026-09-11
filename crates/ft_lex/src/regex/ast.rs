@@ -1,6 +1,5 @@
 use crate::error::LexError;
-use crate::regex::Token::*;
-use crate::regex::Tokenizer;
+use crate::regex::{Token, Tokenizer};
 
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Ast {
@@ -23,7 +22,7 @@ impl TryFrom<&mut Tokenizer> for Ast {
 
         let mut expression = Expression::try_from(&mut *tokenizer)?;
 
-        let end_anchor = if tokenizer.peek() == Some(Dollar) {
+        let end_anchor = if tokenizer.peek() == Some(Token::Dollar) {
             tokenizer.next();
             true
         } else {
@@ -31,7 +30,7 @@ impl TryFrom<&mut Tokenizer> for Ast {
         };
 
         match tokenizer.next() {
-            Some(Slash) => {
+            Some(Token::Slash) => {
                 let trail = Expression::try_from(&mut *tokenizer)?;
                 expression = Expression::TrailingContext(Box::new(expression), Box::new(trail))
             }
@@ -61,7 +60,7 @@ impl TryFrom<&mut Tokenizer> for Expression {
         let mut disjunctions: Vec<Expression> = Vec::new();
 
         disjunctions.push(Self::parse_concat(tokenizer)?);
-        while let Some(Pipe) = tokenizer.peek() {
+        while let Some(Token::Pipe) = tokenizer.peek() {
             tokenizer.next();
             disjunctions.push(Self::parse_concat(tokenizer)?);
         }
@@ -82,10 +81,10 @@ impl Expression {
         let mut concats: Vec<Expression> = Vec::new();
 
         while let Some(tok) = tokenizer.peek()
-            && tok != ClosePar
-            && tok != Pipe
-            && tok != Slash
-            && tok != Dollar
+            && tok != Token::ClosePar
+            && tok != Token::Pipe
+            && tok != Token::Slash
+            && tok != Token::Dollar
         {
             concats.push(Self::parse_repeat(tokenizer)?);
         }
@@ -112,10 +111,10 @@ impl Expression {
 
     fn try_duplication(tokenizer: &mut Tokenizer) -> Result<(usize, Option<usize>), LexError> {
         match tokenizer.next() {
-            Some(Star) => Ok((0, None)),
-            Some(Plus) => Ok((1, None)),
-            Some(Question) => Ok((0, Some(1))),
-            Some(OpenCurly) => Self::parse_range(tokenizer),
+            Some(Token::Star) => Ok((0, None)),
+            Some(Token::Plus) => Ok((1, None)),
+            Some(Token::Question) => Ok((0, Some(1))),
+            Some(Token::OpenCurly) => Self::parse_range(tokenizer),
             _ => Err(LexError::AstParsing("failed parsing duplication".to_string())),
         }
     }
@@ -123,10 +122,10 @@ impl Expression {
     pub fn parse_range(tokenizer: &mut Tokenizer) -> Result<(usize, Option<usize>), LexError> {
         let min = tokenizer.next_number()?;
         let max = match tokenizer.peek() {
-            Some(Byte(b',')) => {
+            Some(Token::Byte(b',')) => {
                 tokenizer.next();
                 match tokenizer.peek() {
-                    Some(CloseCurly) => None,
+                    Some(Token::CloseCurly) => None,
                     _ => Some(tokenizer.next_number()?),
                 }
             }
@@ -139,7 +138,7 @@ impl Expression {
             return Err(LexError::AstParsing("bad iteration values".to_string()));
         }
         match tokenizer.next() {
-            Some(CloseCurly) => Ok((min, max)),
+            Some(Token::CloseCurly) => Ok((min, max)),
             None => Err(LexError::AstParsing("unclosed }}".to_string())),
             Some(tok) => Err(LexError::AstParsing(format!("Oupsi {}", u8::from(tok)))),
         }
@@ -159,17 +158,17 @@ impl TryFrom<&mut Tokenizer> for Atom {
 
     fn try_from(tokenizer: &mut Tokenizer) -> Result<Self, Self::Error> {
         match tokenizer.next() {
-            Some(Byte(c)) => Ok(Self::Literal(c)),
-            Some(Dot) => Ok(Self::AnyByte),
-            Some(OpenPar) => {
+            Some(Token::Byte(c)) => Ok(Self::Literal(c)),
+            Some(Token::Dot) => Ok(Self::AnyByte),
+            Some(Token::OpenPar) => {
                 let exp = Self::Group(Box::new(Expression::try_from(&mut *tokenizer)?));
 
-                if tokenizer.next() != Some(ClosePar) {
+                if tokenizer.next() != Some(Token::ClosePar) {
                     return Err(LexError::AstParsing("( not closed".to_string()));
                 }
                 Ok(exp)
             }
-            Some(OpenBracket) => Ok(Self::Bracket(BracketExpr::try_from(tokenizer)?)),
+            Some(Token::OpenBracket) => Ok(Self::Bracket(BracketExpr::try_from(tokenizer)?)),
             Some(tok) => Ok(Self::Literal(u8::from(tok))),
             _ => Err(LexError::AstParsing("errror parsing Atom".to_string())),
         }
@@ -187,7 +186,7 @@ impl TryFrom<&mut Tokenizer> for BracketExpr {
 
     fn try_from(tokenizer: &mut Tokenizer) -> Result<Self, Self::Error> {
         let mut negated = false;
-        if let Some(Byte(b'^')) = tokenizer.peek() {
+        if let Some(Token::Byte(b'^')) = tokenizer.peek() {
             tokenizer.next();
             negated = true
         }
@@ -195,7 +194,7 @@ impl TryFrom<&mut Tokenizer> for BracketExpr {
         let new_items: Vec<BracketItem> = (&mut *tokenizer).try_into()?;
         items.extend(new_items);
         while let Some(tok) = tokenizer.peek() {
-            if tok == CloseBracket {
+            if tok == Token::CloseBracket {
                 tokenizer.next();
                 break;
             }
@@ -211,31 +210,31 @@ impl TryFrom<&mut Tokenizer> for Vec<BracketItem> {
     fn try_from(tokenizer: &mut Tokenizer) -> Result<Self, Self::Error> {
         let first = tokenizer.next();
         match (first, tokenizer.peek()) {
-            (Some(OpenBracket), Some(Byte(b':'))) => {
+            (Some(Token::OpenBracket), Some(Token::Byte(b':'))) => {
                 tokenizer.next();
                 let name = tokenizer
-                    .next_name(Byte(b':'), CloseBracket)
+                    .next_name(Token::Byte(b':'), Token::CloseBracket)
                     .ok_or(LexError::AstParsing("class name not found".to_string()))?;
                 Ok(vec![BracketItem::Class(PosixClass::try_from(name)?)])
             }
-            (Some(OpenBracket), Some(Byte(b'.'))) => {
+            (Some(Token::OpenBracket), Some(Token::Byte(b'.'))) => {
                 tokenizer.next();
                 let name = tokenizer
-                    .next_name(Byte(b'.'), CloseBracket)
+                    .next_name(Token::Byte(b'.'), Token::CloseBracket)
                     .ok_or(LexError::AstParsing("collation not found".to_string()))?;
                 Ok(vec![BracketItem::Collation(name)])
             }
-            (Some(OpenBracket), Some(Byte(b'='))) => {
+            (Some(Token::OpenBracket), Some(Token::Byte(b'='))) => {
                 tokenizer.next();
                 let name = tokenizer
-                    .next_name(Byte(b'='), CloseBracket)
+                    .next_name(Token::Byte(b'='), Token::CloseBracket)
                     .ok_or(LexError::AstParsing("Equivalence class not found".to_string()))?;
                 Ok(vec![BracketItem::Equivalence(name)])
             }
-            (Some(Byte(start)), Some(Byte(b'-'))) => {
+            (Some(Token::Byte(start)), Some(Token::Byte(b'-'))) => {
                 tokenizer.next();
                 match tokenizer.peek() {
-                    Some(CloseBracket) => Ok(vec![BracketItem::Byte(start), BracketItem::Byte(b'-')]),
+                    Some(Token::CloseBracket) => Ok(vec![BracketItem::Byte(start), BracketItem::Byte(b'-')]),
                     Some(tok) => {
                         let end = u8::from(tok);
                         if end < start {

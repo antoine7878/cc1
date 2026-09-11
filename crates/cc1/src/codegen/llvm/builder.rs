@@ -67,12 +67,11 @@ impl<W: Write> Builder<W> {
         r
     }
 
-    pub fn binop(&mut self, op: &'static str, ty: LlvmType, a: LlvmValue, b: LlvmValue) -> LlvmValue {
+    pub fn binop(&mut self, op: &'static str, ty: LlvmType, lhs: LlvmValue, rhs: LlvmValue) -> LlvmValue {
         let r = self.fresh();
-        self.line(format_args!("  {r} = {op} {ty} {a}, {b}"));
+        self.line(format_args!("  {r} = {op} {ty} {lhs}, {rhs}"));
         r
     }
-
     pub fn zext_bool(&mut self, v: LlvmValue, ty: LlvmType) -> LlvmValue {
         let r = self.fresh();
         self.line(format_args!("  {r} = zext i1 {v} to {ty}"));
@@ -99,15 +98,14 @@ impl<W: Write> Builder<W> {
         self.current_block = l;
         match l {
             LlvmValue::SSA(i) => self.line(format_args!("{i}:")),
-            LlvmValue::Lhs(i) => self.line(format_args!("lhs.l.{i}:")),
-            LlvmValue::Rhs(i) => self.line(format_args!("rhs.l.{i}:")),
+            LlvmValue::Label(i, j) => self.line(format_args!("l.{i}.{j}:")),
             _ => unimplemented!(),
         }
     }
 
-    pub fn phi(&mut self, v1: LlvmValue, from1: LlvmValue, v2: LlvmValue, from2: LlvmValue) -> LlvmValue {
+    pub fn phi(&mut self, ty: LlvmType, v1: LlvmValue, from1: LlvmValue, v2: LlvmValue, from2: LlvmValue) -> LlvmValue {
         let r = self.fresh();
-        self.line(format_args!("  {r} = phi i1 [ {v1}, {from1} ], [ {v2}, {from2} ]"));
+        self.line(format_args!("  {r} = phi {ty} [ {v1}, {from1} ], [ {v2}, {from2} ]"));
         r
     }
 
@@ -119,5 +117,11 @@ impl<W: Write> Builder<W> {
         let s = self.fresh_string();
         self.line(format_args!(r#"{s} = private unnamed_addr constant [{len} x {ty}] c"{str}\00", align {align}"#,));
         s
+    }
+
+    pub fn call(&mut self, ty: LlvmType, f: LlvmValue) -> LlvmValue {
+        let r = self.fresh();
+        self.line(format_args!("  {r} = call {ty} {f}()"));
+        r
     }
 }

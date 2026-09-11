@@ -31,14 +31,12 @@ impl<W: Write> Generator<W> {
         self.locals.collect(node);
         self.b.reset(0);
         self.locals.emit(&mut self.b);
-        self.b.blank();
     }
 }
 
 impl<W: Write> Visitor for Generator<W> {
     fn visit_translation_unit(&mut self, node: &TranslationUnitNode) {
         self.b.target(ctx().target.datalayout, ctx().target.triple);
-        self.b.blank();
         self.globals.emit(&mut self.b);
         walk_translation_unit(self, node);
     }

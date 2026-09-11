@@ -1,11 +1,8 @@
-int *f3(void) {
-	return L"Hello3";
+int fc(void) {
+	return 1;
 }
 
-char *f2(void) {
-	return "Hello2";
-}
-
-char *f1(void) {
-	return "Hello1";
+void f(void) {
+	fc();
+	return;
 }
