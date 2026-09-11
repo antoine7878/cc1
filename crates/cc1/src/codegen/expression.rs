@@ -155,7 +155,7 @@ impl<W: Write> Generator<W> {
         let re = &sema().expr_types[node.id];
         let rel = &sema().expr_types[lhs.id];
         let qty = rel.ty;
-        let op = LlvmOperator::binary(op, qty);
+        let op = LlvmOperator::binary(op, rel.casted_ty());
         let v1 = self.fold_expression(lhs);
         let v2 = self.fold_expression(rhs);
         let v = self.b.binop(op, qty.llvm(), v1, v2);
@@ -209,7 +209,7 @@ impl<W: Write> Generator<W> {
         let loc = *self.locals.get(*sym_id).unwrap();
         let mut vr = self.fold_expression(rhs);
         if let Some(op) = op {
-            let vl = self.b.load(qty.llvm(), loc, qty.align());
+            let vl = self.b.load(rl.ty.llvm(), loc, qty.align());
             let op = LlvmOperator::binary(op, qty);
             vr = self.b.binop(op, qty.llvm(), vl, vr);
         }
@@ -252,9 +252,9 @@ impl<W: Write> Generator<W> {
         let re = &sema().expr_types[f.id];
         let qty = re.casted_ty();
         let f = self.fold_expression(f);
-        // let s = sema().expr_bindings[f.id].resolve();
-        // let g = self.globals.get_function(s.name.id);
-        self.b.call(qty.llvm(), f);
+        let ResolvedType::Pointer(inner) = qty.id.resolve() else { unreachable!() };
+        let ResolvedType::Function { ret, .. } = inner.id.resolve() else { unreachable!() };
+        self.b.call(ret.llvm(), f);
         LlvmValue::zero()
     }
 }

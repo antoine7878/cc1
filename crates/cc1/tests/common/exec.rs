@@ -1,8 +1,6 @@
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
-use cc1::ast::JumpStatement::Continue;
-
 use crate::common::Unit;
 
 const CONTAINER: &str = "linux-amd64-cont";

@@ -119,9 +119,9 @@ impl<W: Write> Builder<W> {
         s
     }
 
-    pub fn call(&mut self, ty: LlvmType, f: LlvmValue) -> LlvmValue {
+    pub fn call(&mut self, ret_ty: LlvmType, f: LlvmValue) -> LlvmValue {
         let r = self.fresh();
-        self.line(format_args!("  {r} = call {ty} {f}()"));
+        self.line(format_args!("  {r} = call {ret_ty} {f}()"));
         r
     }
 }
