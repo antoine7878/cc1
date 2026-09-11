@@ -1,5 +1,5 @@
-char *f3(void) {
-	return "Hello3";
+int *f3(void) {
+	return L"Hello3";
 }
 
 char *f2(void) {

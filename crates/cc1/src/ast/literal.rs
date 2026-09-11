@@ -3,7 +3,7 @@ use std::fmt;
 use libft::Span;
 
 use crate::ast::escape;
-use crate::semantic::{Diag, QualifiedType, Sema};
+use crate::semantic::{Diag, QualifiedType, ResolvedTypeId, Sema, sema};
 use crate::{ast_node, define_interner};
 
 define_interner!(StringConstant, StringPool, StringConstId);
@@ -12,6 +12,12 @@ define_interner!(StringConstant, StringPool, StringConstId);
 pub struct StringConstant {
     pub units: Vec<u32>,
     pub is_wide: bool,
+}
+
+impl StringConstant {
+    pub fn ty(&self) -> ResolvedTypeId {
+        if self.is_wide { sema().builtins.int } else { sema().builtins.char }
+    }
 }
 
 impl fmt::Display for StringConstant {
@@ -40,6 +46,10 @@ impl StringLiteralNode {
 
     pub fn len(&self) -> usize {
         self.constant().units.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.constant().units.is_empty()
     }
 
     pub fn ty(&self, sema: &mut Sema) -> QualifiedType {

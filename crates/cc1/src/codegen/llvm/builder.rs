@@ -117,7 +117,6 @@ impl<W: Write> Builder<W> {
 
     pub fn string_literal(&mut self, len: usize, ty: LlvmType, str: &StringConstant, align: u32) -> LlvmValue {
         let s = self.fresh_string();
-
         self.line(format_args!(r#"{s} = private unnamed_addr constant [{len} x {ty}] c"{str}\00", align {align}"#,));
         s
     }
