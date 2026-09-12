@@ -9,10 +9,20 @@ use crate::semantic::{CastKind, Diagnosis, ImplicitCast, QualifiedType, sema};
 impl<W: Write> Generator<W> {
     pub fn fold_expression(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
         if let Some(value) = sema().expr_consts.get(node.id) {
-            return Ok(LlvmSymbol::cst(sema().expr_types[node.id].casted_ty().llvm(), *value));
+            return Ok(self.constant(sema().expr_types[node.id].casted_ty(), *value));
         }
         let s = self.fold_raw(node)?;
         self.apply_casts(s, node)
+    }
+
+    pub fn constant(&mut self, qty: QualifiedType, value: ConstValue) -> LlvmSymbol {
+        if !qty.is_pointer(sema()) {
+            return LlvmSymbol::cst(qty.llvm(), value);
+        }
+        if value.is_zero() {
+            return LlvmSymbol::null();
+        }
+        self.b.convert("inttoptr", LlvmSymbol::cst(LlvmType::ptr_size(), value), qty.llvm())
     }
 
     fn apply_casts(&mut self, mut s: LlvmSymbol, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {

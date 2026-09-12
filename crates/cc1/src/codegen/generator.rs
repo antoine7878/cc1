@@ -52,10 +52,13 @@ impl<W: Write> Generator<W> {
         for id in self.locals.order_iter() {
             let sym = id.resolve();
             let Some(init) = sym.initializer else { continue };
-            let ty = id.resolve().ty.llvm();
+            let qty = sym.ty;
             match init.resolve() {
-                Initializer::Zero => self.b.store(LlvmSymbol::from(0), self.locals[id]),
-                Initializer::Value(v) => self.b.store(LlvmSymbol::cst(ty, *v), self.locals[id]),
+                Initializer::Zero => self.b.store(LlvmSymbol::zero(qty), self.locals[id]),
+                Initializer::Value(v) => {
+                    let v = self.constant(qty, *v);
+                    self.b.store(v, self.locals[id]);
+                }
                 Initializer::String(s) => {
                     let &a = self.globals.get_literal(*s).unwrap();
                     self.b.store(a, self.locals[id]);
