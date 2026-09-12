@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::io::Write;
 
-use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, UnaryOp};
+use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, Fold, UnaryOp};
 use crate::codegen::{Generator, Invariant, LlvmName, LlvmOperator, LlvmSymbol, LlvmType};
 use crate::context::ctx;
 use crate::semantic::{CastKind, Diagnosis, ImplicitCast, QualifiedType, sema};
@@ -17,6 +17,7 @@ impl<W: Write> Generator<W> {
 
     pub fn constant(&mut self, qty: QualifiedType, value: ConstValue) -> LlvmSymbol {
         if !qty.is_pointer(sema()) {
+            let value = Fold::new(&sema().target).convert(qty.id.resolve(), value).unwrap_or(value);
             return LlvmSymbol::cst(qty.llvm(), value);
         }
         if value.is_zero() {
@@ -188,8 +189,11 @@ impl<W: Write> Generator<W> {
         let v = self.fold_expression(operand)?;
         let re_operand = &sema().expr_types[operand.id];
         let qty = re_operand.casted_ty();
+        if qty.is_floating(sema()) {
+            return Ok(self.b.unop("fneg", v));
+        }
         let op = LlvmOperator::binary(&BinaryOp::Sub, qty)?;
-        Ok(self.b.binop(op, LlvmSymbol::from(0), v))
+        Ok(self.b.binop(op, LlvmSymbol::cst(v.ty, ConstValue::Int(0)), v))
     }
 
     fn unary_logic_not(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {

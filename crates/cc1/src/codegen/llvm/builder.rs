@@ -78,6 +78,12 @@ impl<W: Write> Builder<W> {
         LlvmSymbol::new(lhs.ty, r)
     }
 
+    pub fn unop(&mut self, op: &'static str, v: LlvmSymbol) -> LlvmSymbol {
+        let r = self.fresh();
+        self.line(format_args!("  {r} = {op} {v}"));
+        LlvmSymbol::new(v.ty, r)
+    }
+
     pub fn cmp(&mut self, op: &'static str, lhs: LlvmSymbol, rhs: LlvmSymbol) -> LlvmSymbol {
         let r = self.fresh();
         self.line(format_args!("  {r} = {op} {lhs}, {}", rhs.name));

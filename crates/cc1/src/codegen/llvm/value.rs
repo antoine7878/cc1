@@ -40,6 +40,10 @@ impl Display for LlvmName {
             LlvmName::SSA(id) => write!(f, "%{id}"),
             LlvmName::Constant(ConstValue::Float(v)) => write!(f, "0x{:016X}", f64::from(*v).to_bits()),
             LlvmName::Constant(ConstValue::Double(v)) => write!(f, "0x{:016X}", v.to_bits()),
+            LlvmName::Constant(ConstValue::LongDouble(v)) => {
+                let (head, mantissa) = v.to_bits();
+                write!(f, "0xK{head:04X}{mantissa:016X}")
+            }
             LlvmName::Constant(value) => write!(f, "{value}"),
             LlvmName::Bool(b) => write!(f, "{b}"),
             LlvmName::StringLiteral(i) => write!(f, "@.str.{i}"),

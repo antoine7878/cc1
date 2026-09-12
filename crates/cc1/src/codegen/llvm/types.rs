@@ -127,9 +127,9 @@ impl From<ConstValue> for LlvmFirstType {
         match value {
             ConstValue::Int(_) | ConstValue::UnsignedInt(_) => LlvmFirstType::integer(ctx().target.int.size),
             ConstValue::Long(_) | ConstValue::UnsignedLong(_) => LlvmFirstType::integer(ctx().target.long.size),
-            ConstValue::Float(_) => LlvmFirstType::integer(ctx().target.float.size),
-            ConstValue::Double(_) => LlvmFirstType::integer(ctx().target.float.size),
-            ConstValue::LongDouble(_) => LlvmFirstType::integer(ctx().target.float.size),
+            ConstValue::Float(_) => LlvmFirstType::float(ctx().target.float.size),
+            ConstValue::Double(_) => LlvmFirstType::float(ctx().target.double.size),
+            ConstValue::LongDouble(_) => LlvmFirstType::float(ctx().target.long_double.size),
         }
     }
 }
@@ -166,9 +166,9 @@ impl fmt::Display for LlvmFirstType {
             LlvmFirstType::I16 => write!(f, "i16"),
             LlvmFirstType::I32 => write!(f, "i32"),
             LlvmFirstType::I64 => write!(f, "i64"),
-            LlvmFirstType::F32 => write!(f, "f32"),
-            LlvmFirstType::F64 => write!(f, "f64"),
-            LlvmFirstType::F80 => write!(f, "x86_fp60"),
+            LlvmFirstType::F32 => write!(f, "float"),
+            LlvmFirstType::F64 => write!(f, "double"),
+            LlvmFirstType::F80 => write!(f, "x86_fp80"),
             LlvmFirstType::Ptr => write!(f, "ptr"),
             LlvmFirstType::Void => write!(f, "void"),
         }
