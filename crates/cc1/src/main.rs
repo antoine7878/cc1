@@ -14,9 +14,7 @@ fn main() {
             Analyzer::finish_externals,
             Analyzer::finalize_layouts,
         ])
-        // .report(AstPrinter::print)
         .then(Analyzer::end)
         .run(codegen::generate)
-        // .report(report::dump_symbols)
         .finally(report::dump_diagnostics);
 }

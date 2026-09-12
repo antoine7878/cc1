@@ -249,10 +249,11 @@ impl<W: Write> Generator<W> {
         self.b.named_label(l1);
         let v = self.fold_expression(rhs)?;
         let v = self.b.cmp(cmp, v, LlvmSymbol::from(0));
+        let rhs_block = self.b.current_block;
         self.b.br(v, l2, None);
 
         self.b.named_label(l2);
-        let v = self.b.phi((*op == BinaryOp::LogicalOr).into(), initial_block, v, l1);
+        let v = self.b.phi((*op == BinaryOp::LogicalOr).into(), initial_block, v, rhs_block);
         Ok(self.zext_to_int(v))
     }
 
@@ -293,14 +294,16 @@ impl<W: Write> Generator<W> {
 
         self.b.named_label(l1);
         let va = self.fold_expression(a)?;
+        let a_block = self.b.current_block;
         self.b.br(v, l3, None);
 
         self.b.named_label(l2);
         let vb = self.fold_expression(b)?;
+        let b_block = self.b.current_block;
         self.b.br(v, l3, None);
 
         self.b.named_label(l3);
-        Ok(self.b.phi(va, l1, vb, l2))
+        Ok(self.b.phi(va, a_block, vb, b_block))
     }
 
     fn call(&mut self, f: &ExpressionNode, _args: &[ExpressionNode]) -> Result<LlvmSymbol, Diagnosis> {
