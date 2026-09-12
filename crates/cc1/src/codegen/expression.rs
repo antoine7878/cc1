@@ -179,9 +179,10 @@ impl<W: Write> Generator<W> {
         let qty = re_operand.casted_ty();
         let v = self.fold_expression(operand)?;
         let lop = LlvmOperator::binary(&BinaryOp::Neq, qty)?;
-        let v = self.b.binop(lop, v, LlvmSymbol::from(0));
+        let v = self.b.cmp(lop, v, LlvmSymbol::from(0));
         let xor = LlvmOperator::unary(op, qty)?;
-        Ok(self.b.binop(xor, v, LlvmSymbol::from(true)))
+        let v = self.b.binop(xor, v, LlvmSymbol::from(true));
+        Ok(self.to_int(v))
     }
 
     fn unary_bitnot(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
@@ -222,8 +223,8 @@ impl<W: Write> Generator<W> {
         let op = LlvmOperator::binary(op, rel.casted_ty())?;
         let v1 = self.fold_expression(lhs)?;
         let v2 = self.fold_expression(rhs)?;
-        Ok(self.b.binop(op, v1, v2))
-        // self.b.zext(LlvmType::bool(), v, re.ty.llvm())
+        let v = self.b.cmp(op, v1, v2);
+        Ok(self.to_int(v))
     }
 
     fn binary_logical(
@@ -237,7 +238,7 @@ impl<W: Write> Generator<W> {
         let cmp = LlvmOperator::binary(op, rel.ty)?;
 
         let v = self.fold_expression(lhs)?;
-        let v = self.b.binop(cmp, v, LlvmSymbol::from(0));
+        let v = self.b.cmp(cmp, v, LlvmSymbol::from(0));
         let i = v.name.ssa_value()?;
         let l1 = LlvmName::label(i, 1);
         let l2 = LlvmName::label(i, 2);
@@ -249,11 +250,12 @@ impl<W: Write> Generator<W> {
 
         self.b.named_label(l1);
         let v = self.fold_expression(rhs)?;
-        let v = self.b.binop(cmp, v, LlvmSymbol::from(0));
+        let v = self.b.cmp(cmp, v, LlvmSymbol::from(0));
         self.b.br(v, l2, None);
 
         self.b.named_label(l2);
-        Ok(self.b.phi((*op == BinaryOp::LogicalOr).into(), initial_block, v, l1))
+        let v = self.b.phi((*op == BinaryOp::LogicalOr).into(), initial_block, v, l1);
+        Ok(self.to_int(v))
     }
 
     fn assign(
@@ -283,7 +285,7 @@ impl<W: Write> Generator<W> {
         b: &ExpressionNode,
     ) -> Result<LlvmSymbol, Diagnosis> {
         let v = self.fold_expression(cond)?;
-        let v = self.b.binop("icmp ne", v, LlvmSymbol::from(0));
+        let v = self.b.cmp("icmp ne", v, LlvmSymbol::from(0));
 
         let i = v.name.ssa_value()?;
         let l1 = LlvmName::label(i, 0);
@@ -315,6 +317,10 @@ impl<W: Write> Generator<W> {
         let idx2 = LlvmSymbol::idx(i);
 
         Ok(self.b.getelementptr(arr, idx1, idx2))
+    }
+
+    fn to_int(&mut self, v: LlvmSymbol) -> LlvmSymbol {
+        self.b.convert("zext", v, LlvmType::int())
     }
 
     fn explicit_cast(&mut self, node: &ExpressionNode, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
