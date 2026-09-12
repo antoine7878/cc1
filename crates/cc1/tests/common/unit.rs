@@ -139,6 +139,12 @@ impl Unit {
     pub fn const_values(&self) -> Vec<Option<ConstValue>> {
         (0..self.sema.expr_consts.len())
             .map(ExpressionId::from)
+            .filter(|&id| {
+                matches!(
+                    id.resolve(),
+                    Expression::ConstantExpression(_) | Expression::SizeofExpr(_) | Expression::SizeofType(_)
+                )
+            })
             .filter(|&id| self.sema.expr_consts.seen(id))
             .map(|id| self.sema.expr_consts.get(id).copied())
             .collect()
@@ -146,6 +152,15 @@ impl Unit {
 
     pub fn folded(&self) -> Vec<String> {
         self.const_values().into_iter().map(repr).collect()
+    }
+
+    pub fn fold_values(&self) -> Vec<String> {
+        (0..self.sema.expr_consts.len())
+            .map(ExpressionId::from)
+            .filter(|&id| !matches!(id.resolve(), Expression::Constant(_)))
+            .filter_map(|id| self.sema.expr_consts.get(id).copied())
+            .map(|value| repr(Some(value)))
+            .collect()
     }
 
     pub fn shapes(&self) -> Vec<crate::common::ty::Shape> {
@@ -483,6 +498,12 @@ pub fn folded(src: &str) -> Vec<String> {
     let unit = Unit::compile(src);
     assert!(unit.parsed(), "cc1 failed to parse:\n{src}");
     unit.folded()
+}
+
+pub fn fold_values(src: &str) -> Vec<String> {
+    let unit = Unit::compile(src);
+    assert!(unit.accepts(), "cc1 rejected:\n{src}\n{}", unit.render());
+    unit.fold_values()
 }
 
 pub fn run_syntax(name: &str, src: &str) {

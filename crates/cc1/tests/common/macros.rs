@@ -277,6 +277,16 @@ macro_rules! folds {
 }
 
 #[macro_export]
+macro_rules! folded {
+    ($name:ident, $src:expr, $expected:expr) => {
+        test_case!($name, {
+            let expected: [&str; _] = $expected;
+            assert_eq!($crate::common::fold_values($src), expected, "{}", $src);
+        });
+    };
+}
+
+#[macro_export]
 macro_rules! tree {
     ($name:ident, $src:expr, $symbol:expr, $ty:expr) => {
         test_case!($name, {

@@ -9,9 +9,14 @@ struct ConstChecker<'a> {
 
 impl Visitor for ConstChecker<'_> {
     fn visit_expression(&mut self, node: &ExpressionNode) {
-        walk_expression(self, node);
         if matches!(node.id.resolve(), Expression::ConstantExpression(_)) {
             ice::eval_constant(self.sema, node);
+            return;
+        }
+        walk_expression(self, node);
+        if !self.sema.expr_consts.seen(node.id) {
+            let value = ice::try_fold(self.sema, node);
+            self.sema.expr_consts.set(node.id, value);
         }
     }
 }

@@ -74,6 +74,9 @@ fn fold(sema: &mut Sema, expr: &ExpressionNode, sink: &mut DiagSink) -> Result<C
     if let Some(value) = sema.expr_consts.get(expr.id) {
         return Ok(*value);
     }
+    if sema.expr_consts.poisoned(expr.id) {
+        return Err(Diagnosis::Poisoned);
+    }
     match expr.id.resolve() {
         Expression::ConstantExpression(inner) => {
             integral_operands(sema, inner)?;
