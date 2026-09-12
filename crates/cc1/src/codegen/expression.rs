@@ -11,7 +11,11 @@ impl<W: Write> Generator<W> {
         if let Some(value) = sema().expr_consts.get(node.id) {
             return Ok(LlvmSymbol::cst(sema().expr_types[node.id].casted_ty().llvm(), *value));
         }
-        let mut s = self.fold_raw(node)?;
+        let s = self.fold_raw(node)?;
+        self.apply_casts(s, node)
+    }
+
+    fn apply_casts(&mut self, mut s: LlvmSymbol, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
         let re = &sema().expr_types[node.id];
         let mut from = re.ty;
         for cast in &re.casts {
@@ -153,10 +157,11 @@ impl<W: Write> Generator<W> {
     fn unary_inc_dec(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
         let re_operand = &sema().expr_types[operand.id];
         let qty = re_operand.casted_ty();
-        let v_before = self.fold_expression(operand)?;
+        let loc = self.fold_raw(operand)?;
+        let v_before = self.apply_casts(loc, operand)?;
         let lop = LlvmOperator::unary(op, qty)?;
         let v_after = self.b.binop(lop, v_before, LlvmSymbol::from(1));
-        self.b.store(v_after, v_before);
+        self.b.store(v_after, loc);
         match op {
             UnaryOp::PreDec | UnaryOp::PreInc => Ok(v_after),
             UnaryOp::PostDec | UnaryOp::PostInc => Ok(v_before),
@@ -261,11 +266,10 @@ impl<W: Write> Generator<W> {
     ) -> Result<LlvmSymbol, Diagnosis> {
         let rl = &sema().expr_types[lhs.id];
         let qty = rl.casted_ty();
-        let sym_id = sema().expr_bindings.get(lhs.id).invariant("unknown assignment target")?;
-        let loc = *self.locals.get(*sym_id).invariant("assignment target without storage")?;
+        let loc = self.fold_raw(lhs)?;
         let mut vr = self.fold_expression(rhs)?;
         if let Some(op) = op {
-            let vl = self.b.load(rl.casted_ty().llvm(), loc);
+            let vl = self.apply_casts(loc, lhs)?;
             let op = LlvmOperator::binary(op, qty)?;
             vr = self.b.binop(op, vl, vr);
         }
