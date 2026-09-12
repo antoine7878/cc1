@@ -365,12 +365,11 @@ impl<W: Write> Generator<W> {
     }
 
     fn array_subscript(&mut self, array: &ExpressionNode, idx: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let arr = self.fold_expression(array)?;
-        let idx1 = LlvmSymbol::idx(0);
-        let i = sema().expr_consts[idx.id].get_integer_value().invariant("non-integer subscript")?;
-        let idx2 = LlvmSymbol::idx(i);
-
-        Ok(self.b.getelementptr(arr, idx1, idx2))
+        let t1 = sema().expr_types[array.id].casted_ty();
+        let t2 = sema().expr_types[idx.id].casted_ty();
+        let v1 = self.fold_expression(array)?;
+        let v2 = self.fold_expression(idx)?;
+        self.arithmetic(&BinaryOp::Add, v1, t1, v2, t2)
     }
 
     fn neq_zero(&mut self, v: LlvmSymbol, qty: QualifiedType) -> Result<LlvmSymbol, Diagnosis> {

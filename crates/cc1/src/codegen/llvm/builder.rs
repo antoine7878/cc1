@@ -144,12 +144,6 @@ impl<W: Write> Builder<W> {
         self.line(format_args!("  {r} = getelementptr inbounds {elem}, ptr {}, {idx}", base.name));
         LlvmSymbol::ptr(r)
     }
-
-    pub fn getelementptr(&mut self, base: LlvmSymbol, idx1: LlvmSymbol, idx2: LlvmSymbol) -> LlvmSymbol {
-        let r = self.fresh();
-        self.line(format_args!("  {r} = getelementptr inbounds {}, ptr {}, {idx1}, {idx2}", base.ty, base.name));
-        LlvmSymbol::ptr(r)
-    }
 }
 
 // pub struct LlvmListInitilizer<'a> {
