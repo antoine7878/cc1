@@ -231,7 +231,7 @@ fn identical_function_types_share_one_interned_type() {
         .symbols
         .iter()
         .filter(|symbol| symbol.kind == SymbolKind::Function)
-        .map(|symbol| symbol.ty.expect("function type").id)
+        .map(|symbol| symbol.ty.id)
         .collect();
     assert_eq!(types[0], types[1]);
     assert_ne!(types[0], types[2]);
@@ -258,7 +258,7 @@ fn a_function_definition_records_its_return_type() {
     let def = unit.sema.functions.get(FunctionDefId::from(0));
     assert_eq!(unit.ty_tree(def.return_ty), Ty::ptr(Ty::Char));
     assert_eq!(
-        unit.ty_tree(def.sym.resolve().ty.expect("function type")),
+        unit.ty_tree(def.sym.resolve().ty),
         Ty::func(Ty::ptr(Ty::Char), [Ty::Int, Ty::Char])
     );
 }

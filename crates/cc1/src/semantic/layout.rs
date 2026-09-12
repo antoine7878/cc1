@@ -50,7 +50,7 @@ fn member(sema: &mut Sema, mem: Member) -> Option<(Layout, Option<u64>)> {
     let width = mem.width.map(|width| width.max(0) as u64);
     match mem.sym {
         Some(id) => {
-            let ty = id.resolve_with(sema).ty?;
+            let ty = id.resolve_with(sema).ty;
             Some((of(sema, ty.id)?, width))
         }
         None => Some((of(sema, sema.builtins.int)?, width)),

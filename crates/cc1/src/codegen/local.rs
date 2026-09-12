@@ -39,7 +39,7 @@ impl Locals {
 
     pub fn emit<W: Write>(&mut self, b: &mut Builder<W>) {
         for id in &self.order {
-            let qty = id.resolve().ty.unwrap();
+            let qty = id.resolve().ty;
             let slot = b.alloca(qty.llvm());
             self.map.insert(*id, slot);
         }

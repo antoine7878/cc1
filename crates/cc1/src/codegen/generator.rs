@@ -36,7 +36,7 @@ impl<W: Write> Generator<W> {
         for id in self.locals.order_iter() {
             let sym = id.resolve();
             let Some(init) = sym.initializer else { continue };
-            let ty = id.resolve().ty.unwrap().llvm();
+            let ty = id.resolve().ty.llvm();
             match init.resolve() {
                 Initializer::Zero => self.b.store(LlvmSymbol::from(0), self.locals[id]),
                 Initializer::Value(v) => self.b.store(LlvmSymbol::cst(ty, *v), self.locals[id]),

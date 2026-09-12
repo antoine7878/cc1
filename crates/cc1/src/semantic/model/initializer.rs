@@ -180,7 +180,7 @@ fn is_aggregate(sema: &Sema, ty: QualifiedType) -> bool {
 
 fn member_types(sema: &Sema, id: TagDefId) -> Vec<QualifiedType> {
     let tag = id.resolve_with(sema);
-    let named = tag.members.iter().filter_map(|member| member.sym).filter_map(|sym| sym.resolve_with(sema).ty);
+    let named = tag.members.iter().filter_map(|member| member.sym).map(|sym| sym.resolve_with(sema).ty);
     match tag.kind {
         Tag::Union => named.take(1).collect(),
         _ => named.collect(),

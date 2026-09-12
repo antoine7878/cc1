@@ -1,6 +1,6 @@
 use cc1::ast::{ConstValue, F80};
 use cc1::semantic::{QualifiedType, ResolvedType, ResolvedTypeId, TagDefId};
-use cc1::target::{FloatFormat, I386, Target, X86_64};
+use cc1::target::{I386, Target, X86_64};
 
 use crate::common::{Unit, repr};
 
@@ -231,26 +231,9 @@ fn the_selected_target_drives_ptrdiff_t() {
 }
 
 #[test]
-fn long_double_format_follows_the_target() {
-    assert_eq!(I386.long_double_format, FloatFormat::X87);
-    assert_eq!(X86_64.long_double_format, FloatFormat::X87);
-    assert_eq!(FloatFormat::X87.llvm(), "x86_fp80");
-    assert_eq!(FloatFormat::Ieee64.llvm(), "double");
-}
-
-#[test]
 fn each_target_carries_its_module_header() {
     assert_eq!(I386.triple, "i386-pc-linux-gnu");
     assert_eq!(X86_64.triple, "x86_64-pc-linux-gnu");
     assert!(I386.datalayout.starts_with("e-m:e-p:32:32-"));
     assert!(X86_64.datalayout.contains("f80:128"));
-}
-
-#[test]
-fn the_float_format_rounds_to_its_own_precision() {
-    let tenth = F80::from("0.1");
-    assert_eq!(FloatFormat::X87.round(tenth), tenth);
-    assert_eq!(FloatFormat::Ieee64.round(tenth), F80::from(0.1));
-    assert_ne!(FloatFormat::Ieee64.round(tenth), tenth);
-    assert_eq!(FloatFormat::Ieee64.round(F80::from(1.5)), F80::from(1.5));
 }

@@ -31,7 +31,7 @@ impl Globals {
 
     pub fn register_functions(&mut self) {
         for (a, b) in sema().externals.iter() {
-            let ResolvedType::Function { ret, .. } = b.symbol.resolve().ty.unwrap().id.resolve() else {
+            let ResolvedType::Function { ret, .. } = b.symbol.resolve().ty.id.resolve() else {
                 unreachable!()
             };
             let s = LlvmSymbol::new(ret.llvm(), LlvmName::Global(b.symbol));

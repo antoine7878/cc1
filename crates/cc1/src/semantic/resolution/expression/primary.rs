@@ -11,7 +11,7 @@ use crate::semantic::{
 pub fn identifier(sema: &mut Sema, node: &ExpressionNode) -> R {
     let id = sema.expr_bindings.get(node.id).copied().ok_poisoned()?;
     let sym = id.resolve_with(sema);
-    Ok((sym.ty.ok_poisoned()?, sym.expression_kind()))
+    Ok((sym.ty, sym.expression_kind()))
 }
 
 pub fn constant(sema: &mut Sema, e: &ExpressionNode) -> R {
@@ -102,7 +102,7 @@ pub fn member(sema: &mut Sema, node: &ExpressionNode, op: MemberOp, e: &Expressi
         sema.expr_bindings.set(node.id, Some(sym_id));
         sema.member_refs.set(node.id, Some(MemberRef { tag: tag_id, index }));
         let sym = sym_id.resolve_with(sema);
-        let ty = sym.ty.ok_or(Diagnosis::Poisoned)?;
+        let ty = sym.ty;
         let qty = QualifiedType::new(ty.id, ty.is_const || tag_qty.is_const, ty.is_volatile || tag_qty.is_volatile);
         Ok((qty, kind))
     })

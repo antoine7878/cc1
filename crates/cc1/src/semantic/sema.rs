@@ -232,10 +232,8 @@ impl Sema {
         }
 
         let old_ty = entry_symbol.resolve_with(self).ty;
-        if let Some((old_ty, new_ty)) = Option::zip(old_ty, new_ty)
-            && let Some(merged) = old_ty.composite(self, &new_ty)
-        {
-            entry_symbol.resolve_mut(self).ty = Some(merged);
+        if let Some(merged) = old_ty.composite(self, &new_ty) {
+            entry_symbol.resolve_mut(self).ty = merged;
         }
 
         let old_definition = entry_symbol.resolve_with(self).definition;

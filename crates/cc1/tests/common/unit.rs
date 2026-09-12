@@ -183,7 +183,6 @@ impl Unit {
 
     pub fn ty_tree(&self, qt: QualifiedType) -> Ty {
         let base = match qt.id.resolve() {
-            ResolvedType::Bool => unimplemented!(),
             ResolvedType::Void => Ty::Void,
             ResolvedType::Char => Ty::Char,
             ResolvedType::SignedChar => Ty::SChar,
@@ -233,7 +232,6 @@ impl Unit {
             .find(|symbol| symbol.name.id.resolve().as_str() == name)
             .unwrap_or_else(|| panic!("no symbol `{name}` in the unit"))
             .ty
-            .unwrap_or_else(|| panic!("symbol `{name}` has no type"))
     }
 
     pub fn prim(&self, name: &str) -> QualifiedType {
@@ -374,7 +372,7 @@ impl Unit {
                 (
                     symbol.name.id.resolve().clone(),
                     symbol.kind.to_string(),
-                    symbol.ty.map(|ty| ty.to_string()).unwrap_or_default(),
+                    symbol.ty.to_string(),
                 )
             })
             .collect()

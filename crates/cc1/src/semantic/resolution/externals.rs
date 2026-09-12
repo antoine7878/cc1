@@ -11,7 +11,7 @@ pub fn finish_externals(sema: &mut Sema) {
     });
     for (i, ext) in entries {
         let sym_id = ext.symbol;
-        let Some(mut qty) = sema.symbols.get(sym_id).ty else { continue };
+        let mut qty = sema.symbols.get(sym_id).ty;
         let mut defined = ext.defined;
         if !qty.is_function(sema)
             && defined.is_none()
@@ -21,7 +21,7 @@ pub fn finish_externals(sema: &mut Sema) {
             if let ResolvedType::Array { elem, len: None } = ty {
                 let ty = sema.types.array(*elem, Some(1));
                 qty = QualifiedType::new(ty, qty.is_const, qty.is_volatile);
-                sema.symbols.get_mut(sym_id).ty = Some(qty);
+                sema.symbols.get_mut(sym_id).ty = qty;
             }
             if !qty.is_complete(sema) {
                 sema.add_diag(Diag::err((), Diagnosis::TentativeNeverCompleted(qty)), &span);

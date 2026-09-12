@@ -69,7 +69,7 @@ pub fn define_function(resolver: &mut SymbolResolver, node: &FunctionDefinitionN
 }
 
 fn param_types(sema: &Sema, sym: SymbolId) -> Option<ParamTypes> {
-    let ty = sym.resolve_with(sema).ty?;
+    let ty = sym.resolve_with(sema).ty;
     match ty.id.resolve_with(sema) {
         ResolvedType::Function { params, .. } => Some(params.clone()),
         _ => None,
@@ -97,8 +97,8 @@ fn check_identifier_list(
     {
         return;
     }
-    let identifiers: Vec<QualifiedType> = parameters.iter().filter_map(|sym| (*sym).resolve_with(sema).ty).collect();
-    if identifiers.len() != parameters.len() || declared.is_compatible_with_identifiers(sema, &identifiers) {
+    let identifiers: Vec<QualifiedType> = parameters.iter().map(|sym| (*sym).resolve_with(sema).ty).collect();
+    if declared.is_compatible_with_identifiers(sema, &identifiers) {
         return;
     }
     sema.add_diag(Diag::err((), Diagnosis::DuplicateDeclaration(SymbolKind::Function, name)), span);

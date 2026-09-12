@@ -76,6 +76,7 @@ impl<W: Write> Generator<W> {
             BinaryOp::LogicalAnd | BinaryOp::LogicalOr => self.binary_logical(op, lhs, rhs),
         }
     }
+
     fn unary_inc_dec(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> LlvmSymbol {
         let re_operand = &sema().expr_types[operand.id];
         let qty = re_operand.casted_ty();

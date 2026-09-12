@@ -140,7 +140,7 @@ impl SymbolResolver<'_> {
         if sym.kind != SymbolKind::Typedef {
             return self.add_diag(Diag::err(None, Diagnosis::UndeclaredIdentifier(name)), span);
         }
-        let base = sym.ty?;
+        let base = sym.ty;
         if (is_const && base.is_const) || (is_volatile && base.is_volatile) {
             self.add_diag(Diag::err((), Diagnosis::DuplicateTypeQualifiers), span)
         }
@@ -264,7 +264,7 @@ impl Visitor for SymbolResolver<'_> {
     fn visit_init_declarator(&mut self, node: &InitDeclaratorNode) {
         let decl = &node.declarator;
         let Some(&sym) = self.sema.declarations.get(&decl.id) else { return };
-        let Some(ty) = sym.resolve_with(self.sema).ty else { return };
+        let ty = sym.resolve_with(self.sema).ty;
         self.visit_declarator(&node.declarator);
         if let Some(init) = &node.initializer {
             declaration::resolve_initializer(self, sym, ty, init);

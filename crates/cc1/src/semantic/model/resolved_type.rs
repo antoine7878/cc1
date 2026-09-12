@@ -361,7 +361,7 @@ impl QualifiedType {
             ResolvedType::Tag(id) => sema.tags.get(*id).members.iter().any(|member| {
                 member
                     .sym
-                    .and_then(|sym| sema.symbols.get(sym).ty)
+                    .map(|sym| sema.symbols.get(sym).ty)
                     .is_some_and(|ty| ty.is_const || ty.has_const_member(sema))
             }),
             _ => false,

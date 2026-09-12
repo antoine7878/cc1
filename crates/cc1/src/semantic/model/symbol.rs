@@ -30,7 +30,7 @@ pub enum Definition {
 #[derive(Clone, Debug)]
 pub struct Symbol {
     pub name: Name,
-    pub ty: Option<QualifiedType>,
+    pub ty: QualifiedType,
     pub storage: Option<Storage>,
     pub kind: SymbolKind,
     pub value: Option<i32>,
@@ -45,7 +45,7 @@ pub struct Symbol {
 impl Symbol {
     pub fn new(
         name: Name,
-        ty: Option<QualifiedType>,
+        ty: QualifiedType,
         storage: Option<Storage>,
         kind: SymbolKind,
         is_init: bool,
@@ -122,7 +122,7 @@ impl Symbol {
     }
 
     fn with_value(name: Name, ty: QualifiedType, value: Option<i32>, kind: SymbolKind) -> Self {
-        Self { value, ..Self::new(name, Some(ty), None, kind, true) }
+        Self { value, ..Self::new(name, ty, None, kind, true) }
     }
 
     pub fn member(name: Name, ty: QualifiedType, value: Option<i32>) -> Self {
@@ -134,17 +134,17 @@ impl Symbol {
     }
 
     pub fn function(name: Name, ty: QualifiedType, storage: Storage) -> Self {
-        Self::new(name, Some(ty), Some(storage), SymbolKind::Function, true)
+        Self::new(name, ty, Some(storage), SymbolKind::Function, true)
     }
 
     pub fn parameter(name: Name, ty: QualifiedType, storage: Storage) -> Self {
-        Self { duration: Duration::Automatic, ..Self::new(name, Some(ty), Some(storage), SymbolKind::Parameter, false) }
+        Self { duration: Duration::Automatic, ..Self::new(name, ty, Some(storage), SymbolKind::Parameter, false) }
     }
 
     pub fn is_compatible(&self, sema: &Sema, other: &Self) -> bool {
         self.name.id == other.name.id
             && self.kind == other.kind
-            && (self.ty == other.ty || Option::zip(self.ty, other.ty).is_some_and(|(a, b)| a.is_compatible(sema, &b)))
+            && (self.ty == other.ty || self.ty.is_compatible(sema, &other.ty))
     }
 
     pub fn expression_kind(&self) -> ExpressionKind {

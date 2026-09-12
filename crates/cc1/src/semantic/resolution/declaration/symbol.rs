@@ -96,7 +96,7 @@ pub fn declare_init_declarator(
     if kind == SymbolKind::Variable && !already_diagnosed && requires_complete_object(resolver, ty, storage, is_init) {
         constrain::ty::check_complete_object(ty.is_complete(resolver.sema), ty).collect(resolver, &core.span);
     }
-    let sym = Symbol::new(name, Some(ty), Some(storage), kind, is_init);
+    let sym = Symbol::new(name, ty, Some(storage), kind, is_init);
     let sym_id = declare_symbol(resolver, sym, declared_storage, &core.span);
     resolver.sema.declarations.insert(init_declarator.declarator.id, sym_id);
     Some(())
@@ -109,7 +109,7 @@ pub fn resolve_initializer(resolver: &mut SymbolResolver, sym_id: SymbolId, ty: 
         && let Some(len) = init.len()
     {
         let id = resolver.sema.types.array(*elem, Some(len));
-        sym_id.resolve_mut(resolver.sema).ty = Some(QualifiedType::new(id, ty.is_const, ty.is_volatile));
+        sym_id.resolve_mut(resolver.sema).ty = QualifiedType::new(id, ty.is_const, ty.is_volatile);
     }
     let id = resolver.sema.inits.alloc(init);
     sym_id.resolve_mut(resolver.sema).initializer = Some(id);
