@@ -134,6 +134,7 @@ fn a_run_is_skipped_once_the_pipeline_is_stopped() {
     TAPPED.store(0, Ordering::SeqCst);
     let pipeline = Pipeline::default().pass(fail).checkpoint().then(to_sema).then(to_unit).run(|| {
         TAPPED.fetch_add(1, Ordering::SeqCst);
+        Vec::new()
     });
     assert!(pipeline.stopped());
     assert_eq!(TAPPED.load(Ordering::SeqCst), 0);
@@ -144,7 +145,18 @@ fn a_run_on_a_clean_pipeline_executes() {
     CHECKED.store(0, Ordering::SeqCst);
     let pipeline = Pipeline::default().then(to_sema).then(to_unit).run(|| {
         CHECKED.fetch_add(1, Ordering::SeqCst);
+        Vec::new()
     });
     assert!(!pipeline.stopped());
+    assert!(!pipeline.failed());
     assert_eq!(CHECKED.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn a_run_reporting_an_error_fails_the_pipeline() {
+    let pipeline = Pipeline::default()
+        .then(to_sema)
+        .then(to_unit)
+        .run(|| vec![DiagnosisNode::new(Diagnosis::Invariant("test"), Span::default())]);
+    assert!(pipeline.failed());
 }

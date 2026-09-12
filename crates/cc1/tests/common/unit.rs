@@ -442,7 +442,8 @@ impl Unit {
 
     pub fn ir(&self) -> String {
         let mut buf = Vec::new();
-        generate_to(&mut buf);
+        let diagnosis = generate_to(&mut buf);
+        assert!(diagnosis.is_empty(), "codegen diagnosis: {diagnosis:?}");
         String::from_utf8(buf).expect("ir is utf-8")
     }
 

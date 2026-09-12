@@ -29,6 +29,12 @@ impl Errors for () {
     }
 }
 
+impl Errors for Vec<DiagnosisNode> {
+    fn error_count(&self) -> usize {
+        count(self)
+    }
+}
+
 pub struct Pipeline<T> {
     state: T,
     exit_code: i32,
@@ -94,18 +100,17 @@ impl<T: Errors> Pipeline<T> {
     pub fn failed(&self) -> bool {
         self.exit_code > 0
     }
+
+    pub fn finally(self, f: fn(&T)) -> ! {
+        f(&self.state);
+        exit(self.exit_code)
+    }
 }
 
 impl Pipeline<()> {
-    pub fn run(self, f: fn()) -> Self {
-        if !self.stopped {
-            f();
-        }
-        self
-    }
-
-    pub fn finally(self, f: fn()) -> ! {
-        f();
-        exit(self.exit_code)
+    pub fn run<U: Errors + Default>(self, f: fn() -> U) -> Pipeline<U> {
+        let state = if self.stopped { U::default() } else { f() };
+        let exit_code = if state.error_count() > 0 { 1 } else { self.exit_code };
+        Pipeline { state, exit_code, stopped: self.stopped }
     }
 }

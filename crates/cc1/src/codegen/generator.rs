@@ -1,19 +1,23 @@
 use std::io::{Write, stdout};
 
+use libft::Span;
+
 use crate::ast::visit::walk_translation_unit;
 use crate::ast::{
     ExpressionNode, FunctionDefinitionNode, JumpStatement, JumpStatementNode, TranslationUnitNode, Visitor,
 };
 use crate::codegen::{Builder, Globals, LlvmSymbol, Locals};
 use crate::context::ctx;
-use crate::semantic::{Initializer, sema};
+use crate::semantic::{Diagnosis, DiagnosisNode, Initializer, sema};
 
-pub fn generate() {
-    generate_to(stdout());
+pub fn generate() -> Vec<DiagnosisNode> {
+    generate_to(stdout())
 }
 
-pub fn generate_to<W: Write>(w: W) {
-    Generator::new(w).visit_translation_unit(&ctx().ast);
+pub fn generate_to<W: Write>(w: W) -> Vec<DiagnosisNode> {
+    let mut generator = Generator::new(w);
+    generator.visit_translation_unit(&ctx().ast);
+    generator.diagnosis
 }
 
 #[derive(Debug)]
@@ -21,11 +25,23 @@ pub struct Generator<W: Write> {
     pub b: Builder<W>,
     pub locals: Locals,
     pub globals: Globals,
+    pub diagnosis: Vec<DiagnosisNode>,
 }
 
 impl<W: Write> Generator<W> {
     fn new(w: W) -> Self {
-        Self { b: Builder::new(w), locals: Locals::default(), globals: Globals::default() }
+        Self { b: Builder::new(w), locals: Locals::default(), globals: Globals::default(), diagnosis: Vec::new() }
+    }
+
+    fn emit(&mut self, res: Result<(), Diagnosis>, span: &Span) {
+        if let Err(diagnosis) = res {
+            self.diagnosis.push(DiagnosisNode::new(diagnosis, *span));
+        }
+    }
+
+    fn fold_into(&mut self, e: &ExpressionNode, slot: LlvmSymbol) {
+        let res = self.fold_expression(e).map(|v| self.b.store(v, slot));
+        self.emit(res, &e.span);
     }
 
     fn allocas(&mut self, node: &FunctionDefinitionNode) {
@@ -45,10 +61,7 @@ impl<W: Write> Generator<W> {
                     self.b.store(a, self.locals[id]);
                 }
                 Initializer::List(_) => todo!("list init"),
-                Initializer::Expr(e) => {
-                    let v = self.fold_expression(e);
-                    self.b.store(v, self.locals[id])
-                }
+                Initializer::Expr(e) => self.fold_into(e, self.locals[id]),
                 Initializer::Address(_) => todo!("address init"),
             }
         }
@@ -74,8 +87,8 @@ impl<W: Write> Visitor for Generator<W> {
     fn visit_jump_statement(&mut self, node: &JumpStatementNode) {
         match &node.stmt {
             JumpStatement::Return(Some(e)) => {
-                let v = self.fold_expression(e);
-                self.b.ret(v);
+                let res = self.fold_expression(e).map(|v| self.b.ret(v));
+                self.emit(res, &e.span);
             }
             JumpStatement::Return(None) => self.b.ret_void(),
             _ => todo!(),
@@ -83,6 +96,7 @@ impl<W: Write> Visitor for Generator<W> {
     }
 
     fn visit_expression(&mut self, node: &ExpressionNode) {
-        self.fold_expression(node);
+        let res = self.fold_expression(node).map(|_| ());
+        self.emit(res, &node.span);
     }
 }

@@ -1,7 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
 use crate::ast::ConstValue;
-use crate::semantic::SymbolId;
+use crate::semantic::{Diagnosis, SymbolId};
 
 #[derive(Debug, Clone, Copy)]
 pub enum LlvmName {
@@ -22,6 +22,13 @@ impl ConstValue {
 impl LlvmName {
     pub fn label(i: usize, j: usize) -> LlvmName {
         Self::Label(i, j)
+    }
+
+    pub fn ssa_value(&self) -> Result<usize, Diagnosis> {
+        match self {
+            LlvmName::SSA(i) => Ok(*i),
+            _ => Err(Diagnosis::Invariant("not SSA name")),
+        }
     }
 }
 

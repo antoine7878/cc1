@@ -1,22 +1,23 @@
 use crate::ast::{BinaryOp, UnaryOp};
-use crate::semantic::{Class, QualifiedType, sema};
+use crate::codegen::Invariant;
+use crate::semantic::{Class, Diagnosis, QualifiedType, sema};
 
 pub struct LlvmOperator;
 
 impl LlvmOperator {
-    pub fn unary(op: &UnaryOp, qty: QualifiedType) -> &'static str {
-        let Some(class) = qty.class(sema()) else { todo!() };
+    pub fn unary(op: &UnaryOp, qty: QualifiedType) -> Result<&'static str, Diagnosis> {
+        let class = qty.class(sema()).invariant("unary operator on non-scalar type")?;
         match (op, class) {
-            (UnaryOp::LogicalNot | UnaryOp::BitNot, _) => "xor",
+            (UnaryOp::LogicalNot | UnaryOp::BitNot, _) => Ok("xor"),
             (UnaryOp::Plus | UnaryOp::PreInc | UnaryOp::PostInc, _) => Self::binary(&BinaryOp::Add, qty),
             (UnaryOp::Minus | UnaryOp::PreDec | UnaryOp::PostDec, _) => Self::binary(&BinaryOp::Sub, qty),
-            (UnaryOp::Deref | UnaryOp::Addr, _) => todo!(),
+            (UnaryOp::Deref | UnaryOp::Addr, _) => Err(Diagnosis::Invariant("deref/addr is not an llvm operator")),
         }
     }
 
-    pub fn binary(op: &BinaryOp, qty: QualifiedType) -> &'static str {
-        let Some(class) = qty.class(sema()) else { todo!() };
-        match (op, class) {
+    pub fn binary(op: &BinaryOp, qty: QualifiedType) -> Result<&'static str, Diagnosis> {
+        let class = qty.class(sema()).invariant("binary operator on non-scalar type")?;
+        let op = match (op, class) {
             (BinaryOp::Add, Class::Signed) => "add nsw",
             (BinaryOp::Add, Class::Unsigned) => "add",
             (BinaryOp::Add, Class::Float) => "fadd",
@@ -55,7 +56,10 @@ impl LlvmOperator {
             (BinaryOp::GreaterEq, Class::Unsigned) => "icmp uge",
             (BinaryOp::GreaterEq, Class::Float) => "fcmp oge",
             (BinaryOp::LogicalAnd | BinaryOp::LogicalOr, _) => "icmp ne",
-            (BinaryOp::Mod | BinaryOp::Left | BinaryOp::Right, Class::Float) => unreachable!(),
-        }
+            (BinaryOp::Mod | BinaryOp::Left | BinaryOp::Right, Class::Float) => {
+                return Err(Diagnosis::Invariant("integer-only operator on floating type"));
+            }
+        };
+        Ok(op)
     }
 }

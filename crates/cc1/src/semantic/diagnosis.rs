@@ -19,6 +19,7 @@ pub enum Diagnosis {
 
     BadArguments(String),
     Poisoned,
+    Invariant(&'static str),
     InvalidOperand,
     SyntaxError { found: &'static str, expected: ExpectedTokens },
 
@@ -238,6 +239,7 @@ impl DiagnosisNode {
             Diagnosis::UndefinedLabel(name) => format!("use of undeclared label '{}'", name.id.resolve()),
 
             Diagnosis::Poisoned => "Internal error".to_string(),
+            Diagnosis::Invariant(what) => format!("internal error: {what}: violated semantic constraint"),
             Diagnosis::InvalidOperand => "invalid operand".to_string(),
             Diagnosis::SyntaxError { found, expected } if expected.is_empty() => format!("syntax error, unexpected {}", token_label(found)),
             Diagnosis::SyntaxError { found, expected } => format!("syntax error, unexpected {}, expecting {expected}", token_label(found)),

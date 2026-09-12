@@ -37,6 +37,12 @@ pub struct QualifiedType {
 }
 
 impl ResolvedType {
+    pub fn pointee(&self) -> Option<QualifiedType> {
+        match self {
+            ResolvedType::Pointer(i) => Some(*i),
+            _ => None,
+        }
+    }
     pub fn is_complete(&self, sema: &Sema) -> bool {
         match self {
             ResolvedType::Void => false,

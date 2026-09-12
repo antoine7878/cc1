@@ -8,3 +8,15 @@ pub use generator::{Generator, generate, generate_to};
 pub use global::Globals;
 pub use llvm::{Builder, LlvmName, LlvmOperator, LlvmSymbol, LlvmType};
 pub use local::Locals;
+
+use crate::semantic::Diagnosis;
+
+pub trait Invariant<T> {
+    fn invariant(self, what: &'static str) -> Result<T, Diagnosis>;
+}
+
+impl<T> Invariant<T> for Option<T> {
+    fn invariant(self, what: &'static str) -> Result<T, Diagnosis> {
+        self.ok_or(Diagnosis::Invariant(what))
+    }
+}
