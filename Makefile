@@ -28,7 +28,7 @@ $(YACC_RS): $(C_Y)
 # 	clang -E -std=c89 rscs/hello.c > rscs/hello.i
 # 	./$(CC1) -m32 rscs/hello.i
 
-test: all
+test: all llvm
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
 	cargo run --bin fcc -- -e ./rscs/hello.c -o /dev/stdout
 	@# ./a.out || echo $$?
@@ -62,8 +62,8 @@ cc:
 	rm ./a.out
 
 llvm:
-	clang $(CFF) -O0 -S -m64 -emit-llvm rscs/hello.c -o hello_64.ll
-	clang $(CFF) -O0 -S -m32 -emit-llvm rscs/hello.c -o hello_32.ll
+	clang $(CFF) -O0 -S -m64 -emit-llvm rscs/hello.c -o ./rscs/hello_64.ll
+	clang $(CFF) -O0 -S -m32 -emit-llvm rscs/hello.c -o ./rscs/hello_32.ll
 
 empty :=
 space := $(empty) $(empty)
@@ -93,4 +93,4 @@ clean:
 
 re: clean all
 
-.PHONY: all clean re test ctest ttest c cc coverage $(FT_LEX) $(FT_YACC) $(NAME)
+.PHONY: all clean re test ctest ttest c cc coverage $(FT_LEX) $(FT_YACC) $(NAME) llvm

@@ -7,6 +7,9 @@ use crate::semantic::{ResolvedType, sema};
 
 impl<W: Write> Generator<W> {
     pub fn fold_expression(&mut self, node: &ExpressionNode) -> LlvmValue {
+        if let Some(value) = sema().expr_consts.get(node.id) {
+            return LlvmValue::Constant(*value);
+        }
         match node.id.resolve() {
             Expression::Constant(value_node) => LlvmValue::Constant(value_node.value),
             Expression::Identifier(_) => self.ident(node),
@@ -20,9 +23,7 @@ impl<W: Write> Generator<W> {
             Expression::ArraySubscripting { .. } => todo!(),
             Expression::Member(_, _, _) => todo!(),
             Expression::Cast(_, _) => todo!(),
-            Expression::ConstantExpression(_) | Expression::SizeofExpr(_) | Expression::SizeofType(_) => {
-                LlvmValue::Constant(sema().expr_consts[node.id])
-            }
+            Expression::ConstantExpression(_) | Expression::SizeofExpr(_) | Expression::SizeofType(_) => unreachable!(),
         }
     }
 

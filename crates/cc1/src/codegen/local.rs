@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 use std::io::Write;
+use std::ops::Index;
+use std::vec::IntoIter;
 
 use crate::ast::visit::walk_init_declarator;
-use crate::ast::{Expression, FunctionDefinitionNode, InitDeclaratorNode, Visitor};
+use crate::ast::{FunctionDefinitionNode, InitDeclaratorNode, Visitor};
 use crate::codegen::llvm::{Builder, LlvmValue};
-use crate::semantic::{Duration, Initializer, SymbolId, sema};
+use crate::semantic::{Duration, SymbolId, sema};
 
 #[derive(Debug, Default)]
 pub struct Locals {
@@ -12,7 +14,18 @@ pub struct Locals {
     order: Vec<SymbolId>,
 }
 
+impl Index<SymbolId> for Locals {
+    type Output = LlvmValue;
+    fn index(&self, index: SymbolId) -> &Self::Output {
+        self.get(index).unwrap()
+    }
+}
+
 impl Locals {
+    pub fn order_iter(&self) -> IntoIter<SymbolId> {
+        self.order.clone().into_iter()
+    }
+
     pub fn collect(&mut self, node: &FunctionDefinitionNode) {
         self.map.clear();
         self.order.clear();
@@ -30,25 +43,24 @@ impl Locals {
             self.map.insert(*id, slot);
         }
 
-        for id in &self.order {
-            let sym = id.resolve();
-            let Some(init) = sym.initializer else { continue };
-            let ty = id.resolve().ty.unwrap().llvm();
-            match init.resolve() {
-                Initializer::Zero => b.store(ty, LlvmValue::zero(), self.map[id]),
-                Initializer::Value(v) => b.store(ty, v.llvm(), self.map[id]),
-                Initializer::Address(_) => todo!("address init"),
-                Initializer::String(_) => todo!("string init"),
-                Initializer::List(_) => todo!("list init"),
-                Initializer::Expr(e) => match e.resolve() {
-                    Expression::Constant(_) => {
-                        let v = sema().expr_consts[*e];
-                        b.store(ty, v.llvm(), self.map[id])
-                    }
-                    e => todo!(),
-                },
-            }
-        }
+        // for id in &self.order {
+        //     let sym = id.resolve();
+        //     let Some(init) = sym.initializer else { continue };
+        //     let ty = id.resolve().ty.unwrap().llvm();
+        //     match init.resolve() {
+        //         Initializer::Zero => b.store(ty, LlvmValue::zero(), self.map[id]),
+        //         Initializer::Value(v) => b.store(ty, v.llvm(), self.map[id]),
+        //         Initializer::Address(_) => todo!("address init"),
+        //         Initializer::String(s) => {
+        //             let str = s.resolve();
+        //         }
+        //         Initializer::List(_) => todo!("list init"),
+        //         Initializer::Expr(e) => match e.resolve() {
+        //             Expression::Constant(e) => b.store(ty, e.value.llvm(), self.map[id]),
+        //             e => todo!(),
+        //         },
+        //     }
+        // }
     }
 }
 

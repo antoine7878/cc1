@@ -5,10 +5,10 @@ use crate::ast::{
     ExpressionNode, FunctionDefinitionNode, JumpStatement, JumpStatementNode, TranslationUnitNode, Visitor,
 };
 use crate::codegen::Globals;
-use crate::codegen::llvm::Builder;
+use crate::codegen::llvm::{Builder, LlvmValue};
 use crate::codegen::local::Locals;
 use crate::context::ctx;
-use crate::semantic::{ResolvedType, sema};
+use crate::semantic::{Initializer, ResolvedType, sema};
 
 pub fn generate() {
     generate_to(stdout());
@@ -34,6 +34,26 @@ impl<W: Write> Generator<W> {
         self.locals.collect(node);
         self.b.reset(0);
         self.locals.emit(&mut self.b);
+
+        for id in self.locals.order_iter() {
+            let sym = id.resolve();
+            let Some(init) = sym.initializer else { continue };
+            let ty = id.resolve().ty.unwrap().llvm();
+            match init.resolve() {
+                Initializer::Zero => self.b.store(ty, LlvmValue::zero(), self.locals[id]),
+                Initializer::Value(v) => self.b.store(ty, v.llvm(), self.locals[id]),
+                Initializer::Address(_) => todo!("address init"),
+                Initializer::String(s) => {
+                    let &a = self.globals.get_literal(*s).unwrap();
+                    self.b.store(ty, a, self.locals[id])
+                }
+                Initializer::List(_) => todo!("list init"),
+                Initializer::Expr(e) => {
+                    let v = self.fold_expression(e);
+                    self.b.store(ty, v, self.locals[id])
+                }
+            }
+        }
     }
 }
 

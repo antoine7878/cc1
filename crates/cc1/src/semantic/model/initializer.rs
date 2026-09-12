@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::slice::Iter;
 
 use crate::ast::visit::Visitor;
-use crate::ast::{ConstValue, Expression, ExpressionId, ExpressionNode, InitializerNode, StringConstId, Tag};
+use crate::ast::{ConstValue, Expression, ExpressionNode, InitializerNode, StringConstId, Tag};
 use crate::semantic::resolution::expression;
 use crate::semantic::{
     AssignmentContext, Diag, DiagCollector, Diagnosis, Duration, Place, QualifiedType, ResolvedType, Sema,
@@ -19,7 +19,7 @@ pub enum Initializer {
     Address(Place),
     String(StringConstId),
     List(Vec<Initializer>),
-    Expr(ExpressionId),
+    Expr(ExpressionNode),
 }
 
 impl Initializer {
@@ -60,7 +60,7 @@ fn single(resolver: &mut SymbolResolver, ty: QualifiedType, e: &ExpressionNode, 
         return Initializer::Zero;
     }
     if !constant {
-        return Initializer::Expr(e.id);
+        return Initializer::Expr(e.clone());
     }
     if let Some(value) = ice::try_fold(resolver.sema, e) {
         return Initializer::Value(value);
