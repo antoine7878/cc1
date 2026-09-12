@@ -1,23 +1,22 @@
 use std::cmp::Ordering;
 use std::io::Write;
 
-use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, Fold, UnaryOp};
+use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, UnaryOp};
 use crate::codegen::{Generator, Invariant, LlvmName, LlvmOperator, LlvmSymbol, LlvmType};
 use crate::context::ctx;
 use crate::semantic::{CastKind, Diagnosis, ImplicitCast, QualifiedType, sema};
 
 impl<W: Write> Generator<W> {
     pub fn fold_expression(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        if let Some(value) = sema().expr_consts.get(node.id) {
-            return Ok(self.constant(sema().expr_types[node.id].casted_ty(), *value));
-        }
-        let s = self.fold_raw(node)?;
+        let s = match sema().expr_consts.get(node.id) {
+            Some(value) => self.constant(sema().expr_types[node.id].ty, *value),
+            None => self.fold_raw(node)?,
+        };
         self.apply_casts(s, node)
     }
 
     pub fn constant(&mut self, qty: QualifiedType, value: ConstValue) -> LlvmSymbol {
         if !qty.is_pointer(sema()) {
-            let value = Fold::new(&sema().target).convert(qty.id.resolve(), value).unwrap_or(value);
             return LlvmSymbol::cst(qty.llvm(), value);
         }
         if value.is_zero() {

@@ -133,3 +133,5 @@ exits!(negative_zero, "int main(void) { double d; d = 0.0; d = -d; return 1.0 / 
 
 exits!(call_void, "void f(void) { return; } int main(void) { f(); return 42; }", 42);
 exits!(call_argument, "int f(int x) { return x + 1; } int main(void) { return f(41); }", 42);
+
+exits!(initializer_evaluated_once, "int main(void) { int x = 40; int y = x++; return x + y; }", 81);
