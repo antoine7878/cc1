@@ -49,7 +49,7 @@ impl<W: Write> Builder<W> {
 
     pub fn define(&mut self, binding: LlvmSymbol) {
         self.blank();
-        self.line(format_args!("define {}() {{", binding.name));
+        self.line(format_args!("define {}() {{", binding));
     }
 
     pub fn end_function(&mut self) {
@@ -59,7 +59,7 @@ impl<W: Write> Builder<W> {
     pub fn alloca(&mut self, ty: LlvmType) -> LlvmSymbol {
         let r = self.fresh();
         self.line(format_args!("  {r} = alloca {ty}"));
-        LlvmSymbol::new(ty, r)
+        LlvmSymbol::ptr(r)
     }
 
     pub fn load(&mut self, ty: LlvmType, slot: LlvmSymbol) -> LlvmSymbol {
@@ -78,15 +78,9 @@ impl<W: Write> Builder<W> {
         LlvmSymbol::new(lhs.ty, r)
     }
 
-    pub fn zext(&mut self, from: LlvmSymbol, to: LlvmType) -> LlvmSymbol {
+    pub fn convert(&mut self, conv: &'static str, from: LlvmSymbol, to: LlvmType) -> LlvmSymbol {
         let r = self.fresh();
-        self.line(format_args!("  {r} = zext {from} to {to}"));
-        LlvmSymbol::new(to, r)
-    }
-
-    pub fn trunc(&mut self, from: LlvmSymbol, to: LlvmType) -> LlvmSymbol {
-        let r = self.fresh();
-        self.line(format_args!("  {r} = trunc {from} to {to}"));
+        self.line(format_args!("  {r} = {conv} {from} to {to}"));
         LlvmSymbol::new(to, r)
     }
 

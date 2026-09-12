@@ -27,6 +27,13 @@ impl LlvmSymbol {
     pub fn cst(ty: LlvmType, value: ConstValue) -> Self {
         Self { ty, name: LlvmName::Constant(value) }
     }
+    pub fn void() -> Self {
+        Self { ty: LlvmType::void(), name: LlvmName::None }
+    }
+
+    pub fn null() -> Self {
+        Self::ptr(LlvmName::Null)
+    }
 }
 
 impl From<ConstValue> for LlvmSymbol {

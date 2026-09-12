@@ -48,6 +48,13 @@ impl LlvmType {
     pub fn int() -> Self {
         LlvmType::First(LlvmFirstType::integer(ctx().target.int.size))
     }
+
+    pub fn size(&self) -> u32 {
+        match self {
+            LlvmType::First(f) => f.size(),
+            LlvmType::Array(len, elem) => *len as u32 * elem.size(),
+        }
+    }
 }
 
 impl From<&ResolvedTypeId> for LlvmType {
@@ -62,6 +69,7 @@ impl From<&ResolvedTypeId> for LlvmType {
 #[derive(Debug, Clone, Copy)]
 pub enum LlvmFirstType {
     I1,
+    I8,
     I16,
     I32,
     I64,
@@ -75,7 +83,7 @@ pub enum LlvmFirstType {
 impl LlvmFirstType {
     fn integer(i: u32) -> Self {
         match i {
-            1 => Self::I1,
+            1 => Self::I8,
             2 => Self::I16,
             4 => Self::I32,
             8 => Self::I64,
@@ -89,6 +97,21 @@ impl LlvmFirstType {
             8 => Self::F64,
             12 | 16 => Self::F80,
             _ => unimplemented!(),
+        }
+    }
+
+    pub fn size(&self) -> u32 {
+        match self {
+            LlvmFirstType::I1 => 0,
+            LlvmFirstType::I8 => 1,
+            LlvmFirstType::I16 => 2,
+            LlvmFirstType::I32 => 4,
+            LlvmFirstType::I64 => 8,
+            LlvmFirstType::F32 => 4,
+            LlvmFirstType::F64 => 8,
+            LlvmFirstType::F80 => sema().target.long_double.size,
+            LlvmFirstType::Ptr => sema().target.pointer.size,
+            LlvmFirstType::Void => 0,
         }
     }
 }
@@ -139,6 +162,7 @@ impl fmt::Display for LlvmFirstType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LlvmFirstType::I1 => write!(f, "i1"),
+            LlvmFirstType::I8 => write!(f, "i8"),
             LlvmFirstType::I16 => write!(f, "i16"),
             LlvmFirstType::I32 => write!(f, "i32"),
             LlvmFirstType::I64 => write!(f, "i64"),

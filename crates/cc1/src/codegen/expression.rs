@@ -2,15 +2,79 @@ use std::cmp::Ordering;
 use std::io::Write;
 
 use crate::ast::{BinaryOp, Expression, ExpressionNode, UnaryOp};
-use crate::codegen::{Generator, Invariant, LlvmName, LlvmOperator, LlvmSymbol};
-use crate::semantic::{Diagnosis, sema};
+use crate::codegen::{Generator, Invariant, LlvmName, LlvmOperator, LlvmSymbol, LlvmType};
+use crate::context::ctx;
+use crate::semantic::{CastKind, Diagnosis, ImplicitCast, QualifiedType, sema};
 
 impl<W: Write> Generator<W> {
     pub fn fold_expression(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
         if let Some(value) = sema().expr_consts.get(node.id) {
             return Ok(LlvmSymbol::cst(sema().expr_types[node.id].casted_ty().llvm(), *value));
         }
-        self.fold_raw(node)
+        let mut s = self.fold_raw(node)?;
+        let re = &sema().expr_types[node.id];
+        let mut from = re.ty;
+        for cast in &re.casts {
+            s = self.convert(s, from, cast)?;
+            from = cast.to;
+        }
+        Ok(s)
+    }
+
+    fn convert(&mut self, v: LlvmSymbol, from: QualifiedType, cast: &ImplicitCast) -> Result<LlvmSymbol, Diagnosis> {
+        let to = cast.to;
+        let conv = match cast.kind {
+            CastKind::ArrayToPointer | CastKind::FunctionToPointer | CastKind::PointerConversion => return Ok(v),
+            CastKind::LValueToRValue => return Ok(self.b.load(to.llvm(), v)),
+            CastKind::ToVoid => return Ok(LlvmSymbol::void()),
+            CastKind::NullPointer => return Ok(LlvmSymbol::null()),
+            CastKind::IntegerPromotion | CastKind::IntegerConversion => Self::i_to_i(from, to),
+            CastKind::IntegerToFloating => Some(Self::i_to_f(from)),
+            CastKind::FloatingToInteger => Some(Self::f_to_i(to)),
+            CastKind::FloatingConversion => Self::f_to_f(from, to),
+            CastKind::PointerToInteger => Some("ptrtoint"),
+            CastKind::IntegerToPointer => self.i_to_p(to, v, from),
+        };
+        Ok(match conv {
+            Some(conv) => self.b.convert(conv, v, to.llvm()),
+            None => v,
+        })
+    }
+
+    fn i_to_i(from: QualifiedType, to: QualifiedType) -> Option<&'static str> {
+        Self::i_to_i_size(from, sema().layout(&to.id).size)
+    }
+
+    fn i_to_i_size(from: QualifiedType, to_size: u32) -> Option<&'static str> {
+        match u32::cmp(&sema().layout(&from.id).size, &to_size) {
+            Ordering::Less if from.is_signed(sema()) => Some("sext"),
+            Ordering::Less => Some("zext"),
+            Ordering::Greater => Some("trunc"),
+            Ordering::Equal => None,
+        }
+    }
+
+    fn i_to_f(from: QualifiedType) -> &'static str {
+        if from.is_signed(sema()) { "sitofp" } else { "uitofp" }
+    }
+
+    fn f_to_i(to: QualifiedType) -> &'static str {
+        if to.is_signed(sema()) { "fptosi" } else { "fptoui" }
+    }
+
+    fn f_to_f(from: QualifiedType, to: QualifiedType) -> Option<&'static str> {
+        match u32::cmp(&sema().layout(&from.id).size, &sema().layout(&to.id).size) {
+            Ordering::Less => Some("fpext"),
+            Ordering::Greater => Some("fptrunc"),
+            Ordering::Equal => None,
+        }
+    }
+
+    fn i_to_p(&mut self, to: QualifiedType, v: LlvmSymbol, from: QualifiedType) -> Option<&'static str> {
+        if let Some(ext) = Self::i_to_i_size(from, ctx().target.pointer.size) {
+            self.b.convert(ext, v, LlvmType::ptr_size());
+        }
+        Some("inttoptr")
     }
 
     pub fn fold_raw(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
@@ -28,7 +92,7 @@ impl<W: Write> Generator<W> {
             Expression::FunctionCall(f, args) => self.call(f, args),
             Expression::ArraySubscripting(array, idx) => self.array_subscript(array, idx),
             Expression::Member(_, _, _) => todo!(),
-            Expression::Cast(_, e) => self.cast(node, e),
+            Expression::Cast(_, e) => self.explicit_cast(node, e),
             Expression::ConstantExpression(_) | Expression::SizeofExpr(_) | Expression::SizeofType(_) => {
                 Err(Diagnosis::Invariant("non folded constant expression"))
             }
@@ -44,14 +108,12 @@ impl<W: Write> Generator<W> {
     }
 
     fn ident(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let re = &sema().expr_types[node.id];
         let sym_id = sema().expr_bindings.get(node.id).invariant("unknown identifier")?;
 
         if let Some(v) = self.globals.get_function(sym_id.resolve().name.id) {
             return Ok(*v);
         }
-        let local = *self.locals.get(*sym_id).invariant("identifier without storage")?;
-        Ok(self.b.load(re.ty.llvm(), local))
+        self.locals.get(*sym_id).copied().invariant("identifier without storage")
     }
 
     fn unary(&mut self, op: &UnaryOp, e: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
@@ -131,11 +193,8 @@ impl<W: Write> Generator<W> {
     }
 
     fn unary_deref(&mut self, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let re_operand = &sema().expr_types[operand.id];
-        let qty = re_operand.casted_ty();
         let v = self.fold_expression(operand)?;
-        let qty = qty.id.resolve().pointee().invariant("deref of non-pointer")?;
-        Ok(self.b.load(qty.llvm(), v))
+        Ok(LlvmSymbol::ptr(v.name))
     }
 
     fn binary_arithmetic(
@@ -255,23 +314,14 @@ impl<W: Write> Generator<W> {
         let i = sema().expr_consts[idx.id].get_integer_value().invariant("non-integer subscript")?;
         let idx2 = LlvmSymbol::idx(i);
 
-        let v = self.b.getelementptr(arr, idx1, idx2);
-        let ty = sema().expr_types[array.id].ty.llvm();
-        Ok(self.b.load(ty, v))
+        Ok(self.b.getelementptr(arr, idx1, idx2))
     }
 
-    fn cast(&mut self, node: &ExpressionNode, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let from_ty = sema().expr_types[operand.id].casted_ty();
-        let from_size = sema().layout(&from_ty.id).size;
-
-        let to_ty = sema().expr_types[node.id].ty;
-        let to_size = sema().layout(&to_ty.id).size;
+    fn explicit_cast(&mut self, node: &ExpressionNode, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
         let v = self.fold_expression(operand)?;
-
-        Ok(match u32::cmp(&from_size, &to_size) {
-            Ordering::Less => self.b.zext(v, to_ty.llvm()),
-            Ordering::Greater => self.b.trunc(v, to_ty.llvm()),
-            Ordering::Equal => v,
-        })
+        if sema().expr_types[node.id].ty.is_void(sema()) {
+            return Ok(LlvmSymbol::void());
+        }
+        Ok(v)
     }
 }

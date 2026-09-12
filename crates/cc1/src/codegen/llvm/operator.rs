@@ -40,7 +40,7 @@ impl LlvmOperator {
             (BinaryOp::BitOr, _) => "or",
             (BinaryOp::BitXor, _) => "xor",
             (BinaryOp::Eq, Class::Float) => "fcmp oeq",
-            (BinaryOp::Neq, Class::Float) => "fcmp one",
+            (BinaryOp::Neq, Class::Float) => "fcmp une",
             (BinaryOp::Eq, _) => "icmp eq",
             (BinaryOp::Neq, _) => "icmp ne",
             (BinaryOp::Lower, Class::Signed) => "icmp slt",

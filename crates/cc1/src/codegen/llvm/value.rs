@@ -11,6 +11,8 @@ pub enum LlvmName {
     Bool(bool),
     Label(usize, usize),
     Global(SymbolId),
+    Null,
+    None,
 }
 
 impl ConstValue {
@@ -41,6 +43,8 @@ impl Display for LlvmName {
             LlvmName::StringLiteral(i) => write!(f, "@.str.{i}"),
             LlvmName::Label(i, j) => write!(f, "%l.{i}.{j}"),
             LlvmName::Global(s) => write!(f, "@{}", s.resolve().name.id.resolve()),
+            LlvmName::Null => write!(f, "null"),
+            LlvmName::None => Ok(()),
         }
     }
 }

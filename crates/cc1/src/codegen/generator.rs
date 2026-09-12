@@ -60,8 +60,8 @@ impl<W: Write> Generator<W> {
                     let &a = self.globals.get_literal(*s).unwrap();
                     self.b.store(a, self.locals[id]);
                 }
-                Initializer::List(_) => todo!("list init"),
                 Initializer::Expr(e) => self.fold_into(e, self.locals[id]),
+                Initializer::List(_) => todo!("list init"),
                 Initializer::Address(_) => todo!("address init"),
             }
         }
