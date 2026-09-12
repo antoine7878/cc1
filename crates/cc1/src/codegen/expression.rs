@@ -33,7 +33,7 @@ impl<W: Write> Generator<W> {
             CastKind::FloatingToInteger => Some(Self::f_to_i(to)),
             CastKind::FloatingConversion => Self::f_to_f(from, to),
             CastKind::PointerToInteger => Some("ptrtoint"),
-            CastKind::IntegerToPointer => self.i_to_p(to, v, from),
+            CastKind::IntegerToPointer => self.i_to_p(v, from),
         };
         Ok(match conv {
             Some(conv) => self.b.convert(conv, v, to.llvm()),
@@ -70,7 +70,7 @@ impl<W: Write> Generator<W> {
         }
     }
 
-    fn i_to_p(&mut self, to: QualifiedType, v: LlvmSymbol, from: QualifiedType) -> Option<&'static str> {
+    fn i_to_p(&mut self, v: LlvmSymbol, from: QualifiedType) -> Option<&'static str> {
         if let Some(ext) = Self::i_to_i_size(from, ctx().target.pointer.size) {
             self.b.convert(ext, v, LlvmType::ptr_size());
         }
