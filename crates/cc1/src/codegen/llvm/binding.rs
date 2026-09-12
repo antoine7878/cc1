@@ -3,6 +3,7 @@ use std::fmt::{self, Display, Formatter};
 use crate::{
     ast::ConstValue,
     codegen::{LlvmName, LlvmType, llvm::types::LlvmFirstType},
+    semantic::{QualifiedType, sema},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -33,6 +34,17 @@ impl LlvmSymbol {
 
     pub fn null() -> Self {
         Self::ptr(LlvmName::Null)
+    }
+
+    pub fn zero(qty: QualifiedType) -> Self {
+        let sema = sema();
+        if qty.is_pointer(sema) {
+            Self::null()
+        } else if qty.is_floating(sema) {
+            Self::cst(qty.llvm(), ConstValue::Double(0.0))
+        } else {
+            Self::cst(qty.llvm(), ConstValue::Int(0))
+        }
     }
 }
 

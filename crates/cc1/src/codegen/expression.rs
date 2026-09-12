@@ -176,8 +176,7 @@ impl<W: Write> Generator<W> {
         let re_operand = &sema().expr_types[operand.id];
         let qty = re_operand.casted_ty();
         let v = self.fold_expression(operand)?;
-        let lop = LlvmOperator::binary(&BinaryOp::Neq, qty)?;
-        let v = self.b.cmp(lop, v, LlvmSymbol::from(0));
+        let v = self.to_bool(v, qty)?;
         let xor = LlvmOperator::unary(op, qty)?;
         let v = self.b.binop(xor, v, LlvmSymbol::from(true));
         Ok(self.zext_to_int(v))
@@ -232,11 +231,8 @@ impl<W: Write> Generator<W> {
         rhs: &ExpressionNode,
     ) -> Result<LlvmSymbol, Diagnosis> {
         let initial_block = self.b.current_block;
-        let rel = &sema().expr_types[lhs.id];
-        let cmp = LlvmOperator::binary(op, rel.ty)?;
-
         let v = self.fold_expression(lhs)?;
-        let v = self.b.cmp(cmp, v, LlvmSymbol::from(0));
+        let v = self.to_bool(v, sema().expr_types[lhs.id].casted_ty())?;
         let i = v.name.ssa_value()?;
         let l1 = LlvmName::label(i, 1);
         let l2 = LlvmName::label(i, 2);
@@ -248,7 +244,7 @@ impl<W: Write> Generator<W> {
 
         self.b.named_label(l1);
         let v = self.fold_expression(rhs)?;
-        let v = self.b.cmp(cmp, v, LlvmSymbol::from(0));
+        let v = self.to_bool(v, sema().expr_types[rhs.id].casted_ty())?;
         let rhs_block = self.b.current_block;
         self.b.br(v, l2, None);
 
@@ -284,7 +280,7 @@ impl<W: Write> Generator<W> {
         b: &ExpressionNode,
     ) -> Result<LlvmSymbol, Diagnosis> {
         let v = self.fold_expression(cond)?;
-        let v = self.b.cmp("icmp ne", v, LlvmSymbol::from(0));
+        let v = self.to_bool(v, sema().expr_types[cond.id].casted_ty())?;
 
         let i = v.name.ssa_value()?;
         let l1 = LlvmName::label(i, 0);
@@ -318,6 +314,11 @@ impl<W: Write> Generator<W> {
         let idx2 = LlvmSymbol::idx(i);
 
         Ok(self.b.getelementptr(arr, idx1, idx2))
+    }
+
+    fn to_bool(&mut self, v: LlvmSymbol, qty: QualifiedType) -> Result<LlvmSymbol, Diagnosis> {
+        let op = LlvmOperator::binary(&BinaryOp::Neq, qty)?;
+        Ok(self.b.cmp(op, v, LlvmSymbol::zero(qty)))
     }
 
     fn zext_to_int(&mut self, v: LlvmSymbol) -> LlvmSymbol {
