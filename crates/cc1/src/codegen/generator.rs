@@ -15,8 +15,7 @@ pub fn generate() {
 }
 
 pub fn generate_to<W: Write>(w: W) {
-    let mut generator = Generator::new(w);
-    generator.visit_translation_unit(&ctx().ast);
+    Generator::new(w).visit_translation_unit(&ctx().ast);
 }
 
 #[derive(Debug)]

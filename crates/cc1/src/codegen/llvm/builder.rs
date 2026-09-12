@@ -55,16 +55,20 @@ impl<W: Write> Builder<W> {
         self.line(format_args!("}}"));
     }
 
-    pub fn alloca(&mut self, ty: LlvmType, align: u32) -> LlvmValue {
+    pub fn alloca(&mut self, ty: LlvmType) -> LlvmValue {
         let r = self.fresh();
-        self.line(format_args!("  {r} = alloca {ty}, align {align}"));
+        self.line(format_args!("  {r} = alloca {ty}"));
         r
     }
 
-    pub fn load(&mut self, ty: LlvmType, slot: LlvmValue, align: u32) -> LlvmValue {
+    pub fn load(&mut self, ty: LlvmType, slot: LlvmValue) -> LlvmValue {
         let r = self.fresh();
-        self.line(format_args!("  {r} = load {ty}, ptr {slot}, align {align}"));
+        self.line(format_args!("  {r} = load {ty}, ptr {slot}"));
         r
+    }
+
+    pub fn store(&mut self, ty: LlvmType, src: LlvmValue, dst: LlvmValue) {
+        self.line(format_args!("  store {ty} {src}, ptr {dst}"))
     }
 
     pub fn binop(&mut self, op: &'static str, ty: LlvmType, lhs: LlvmValue, rhs: LlvmValue) -> LlvmValue {
@@ -109,13 +113,9 @@ impl<W: Write> Builder<W> {
         r
     }
 
-    pub fn store(&mut self, ty: LlvmType, src: LlvmValue, dst: LlvmValue, align: u32) {
-        self.line(format_args!("  store {ty} {src}, ptr {dst}, align {align}"))
-    }
-
-    pub fn string_literal(&mut self, len: usize, ty: LlvmType, str: &StringConstant, align: u32) -> LlvmValue {
+    pub fn string_literal(&mut self, len: usize, ty: LlvmType, str: &StringConstant) -> LlvmValue {
         let s = self.fresh_string();
-        self.line(format_args!(r#"{s} = private unnamed_addr constant [{len} x {ty}] c"{str}\00", align {align}"#,));
+        self.line(format_args!(r#"{s} = private unnamed_addr constant [{len} x {ty}] c"{str}\00""#,));
         s
     }
 

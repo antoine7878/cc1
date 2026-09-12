@@ -44,12 +44,11 @@ impl fmt::Display for LlvmType {
             ResolvedType::Float => write!(f, "{}", target.float.llvm()),
             ResolvedType::Double => write!(f, "{}", target.double.llvm()),
             ResolvedType::LongDouble => write!(f, "{}", target.long_double.llvm()),
-            ResolvedType::Array { elem, len: Some(len) } => write!(f, "{}, {}", len, elem.llvm()),
+            ResolvedType::Array { elem, len: Some(len) } => write!(f, "[{} x {}]", len, elem.llvm()),
             ResolvedType::Pointer(_) => write!(f, "ptr"),
             ResolvedType::Function { .. } => todo!(),
             ResolvedType::Tag { .. } => todo!(),
             ResolvedType::Array { len: None, .. } => unreachable!(),
-            // %1 = alloca [2 x i32], align 4
         }
     }
 }

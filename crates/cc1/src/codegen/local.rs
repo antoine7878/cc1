@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::io::Write;
 
 use crate::ast::visit::walk_init_declarator;
-use crate::ast::{FunctionDefinitionNode, InitDeclaratorNode, Visitor};
+use crate::ast::{Expression, FunctionDefinitionNode, InitDeclaratorNode, Visitor};
 use crate::codegen::llvm::{Builder, LlvmValue};
-use crate::semantic::{Duration, SymbolId, sema};
+use crate::semantic::{Duration, Initializer, SymbolId, sema};
 
 #[derive(Debug, Default)]
 pub struct Locals {
@@ -24,10 +24,30 @@ impl Locals {
     }
 
     pub fn emit<W: Write>(&mut self, b: &mut Builder<W>) {
-        for &sym_id in &self.order {
-            let qty = sym_id.resolve().ty.unwrap();
-            let slot = b.alloca(qty.llvm(), qty.layout().unwrap().align);
-            self.map.insert(sym_id, slot);
+        for id in &self.order {
+            let qty = id.resolve().ty.unwrap();
+            let slot = b.alloca(qty.llvm());
+            self.map.insert(*id, slot);
+        }
+
+        for id in &self.order {
+            let sym = id.resolve();
+            let Some(init) = sym.initializer else { continue };
+            let ty = id.resolve().ty.unwrap().llvm();
+            match init.resolve() {
+                Initializer::Zero => b.store(ty, LlvmValue::zero(), self.map[id]),
+                Initializer::Value(v) => b.store(ty, v.llvm(), self.map[id]),
+                Initializer::Address(_) => todo!("address init"),
+                Initializer::String(_) => todo!("string init"),
+                Initializer::List(_) => todo!("list init"),
+                Initializer::Expr(e) => match e.resolve() {
+                    Expression::Constant(_) => {
+                        let v = sema().expr_consts[*e];
+                        b.store(ty, v.llvm(), self.map[id])
+                    }
+                    e => todo!(),
+                },
+            }
         }
     }
 }

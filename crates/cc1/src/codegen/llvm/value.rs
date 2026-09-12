@@ -12,6 +12,13 @@ pub enum LlvmValue {
     Label(usize, usize),
     Global(SymbolId),
 }
+
+impl ConstValue {
+    pub fn llvm(&self) -> LlvmValue {
+        LlvmValue::Constant(*self)
+    }
+}
+
 impl LlvmValue {
     pub fn label(i: usize, j: usize) -> LlvmValue {
         Self::Label(i, j)

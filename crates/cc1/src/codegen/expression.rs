@@ -35,7 +35,7 @@ impl<W: Write> Generator<W> {
             return *v;
         }
         let local = self.locals.get(sym_id).unwrap();
-        self.b.load(qty.llvm(), *local, qty.align())
+        self.b.load(qty.llvm(), *local)
     }
 
     fn unary(&mut self, node: &ExpressionNode, op: &UnaryOp, e: &ExpressionNode) -> LlvmValue {
@@ -85,7 +85,7 @@ impl<W: Write> Generator<W> {
         let vr = self.fold_expression(e);
         let lop = LlvmOperator::unary(op, qty);
         let v = self.b.binop(lop, qty.llvm(), vr, LlvmValue::one());
-        self.b.store(qty.llvm(), v, loc, qty.align());
+        self.b.store(qty.llvm(), v, loc);
         match op {
             UnaryOp::PreDec | UnaryOp::PreInc => v,
             UnaryOp::PostDec | UnaryOp::PostInc => vr,
@@ -98,7 +98,7 @@ impl<W: Write> Generator<W> {
         let qty = re.casted_ty();
         let v = self.fold_expression(e);
         let ResolvedType::Pointer(qty) = qty.id.resolve() else { unreachable!() };
-        self.b.load(qty.llvm(), v, qty.align())
+        self.b.load(qty.llvm(), v)
     }
 
     fn binary(
@@ -209,11 +209,11 @@ impl<W: Write> Generator<W> {
         let loc = *self.locals.get(*sym_id).unwrap();
         let mut vr = self.fold_expression(rhs);
         if let Some(op) = op {
-            let vl = self.b.load(rl.ty.llvm(), loc, qty.align());
+            let vl = self.b.load(rl.ty.llvm(), loc);
             let op = LlvmOperator::binary(op, qty);
             vr = self.b.binop(op, qty.llvm(), vl, vr);
         }
-        self.b.store(qty.llvm(), vr, loc, qty.align());
+        self.b.store(qty.llvm(), vr, loc);
         vr
     }
 

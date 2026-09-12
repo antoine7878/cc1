@@ -2,10 +2,9 @@ use std::fmt;
 use std::iter::zip;
 
 use crate::ast::Tag;
-use crate::context::ctx;
 use crate::define_interner;
 use crate::semantic::{ParamTypes, Sema, TagDefId};
-use crate::target::{Layout, Target};
+use crate::target::Target;
 
 define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId);
 
@@ -369,14 +368,6 @@ impl QualifiedType {
 
     pub fn is_integer(&self, sema: &Sema) -> bool {
         self.id.resolve_with(sema).is_integer()
-    }
-
-    pub fn layout(&self) -> Option<Layout> {
-        ctx().target.layout(self.id.resolve())
-    }
-
-    pub fn align(&self) -> u32 {
-        self.layout().unwrap().align
     }
 
     pub fn is_floating(&self, sema: &Sema) -> bool {

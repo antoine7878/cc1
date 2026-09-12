@@ -1,4 +1,4 @@
-void f1(void) {
-	int a[2];
-	return;
+int f(void) {
+	int a = 1;
+	return a;
 }

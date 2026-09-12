@@ -30,6 +30,10 @@ impl Initializer {
             _ => None,
         }
     }
+
+    pub fn is_empty(&self) -> Option<bool> {
+        unimplemented!()
+    }
 }
 
 type Cursor<'a> = Peekable<Iter<'a, InitializerNode>>;

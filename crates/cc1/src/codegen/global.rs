@@ -24,9 +24,8 @@ impl Globals {
         for (i, str) in ctx().arenas.strings.iter().enumerate() {
             let ty = str.ty(&sema().builtins).resolve();
             let lty = ty.llvm();
-            let align = ctx().target.layout(ty).unwrap().align;
             let len = str.units.len();
-            let v = b.string_literal(len, lty, str, align);
+            let v = b.string_literal(len, lty, str);
             self.strings.insert(i.into(), v);
         }
     }
