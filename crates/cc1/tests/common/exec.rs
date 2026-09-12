@@ -62,10 +62,8 @@ pub fn run_exit(name: &str, src: &str, expected: i32) {
     assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", unit.render());
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{src}");
 
-    if std::env::var_os("CC1_GCC_CHECK").is_some() {
-        let gcc = run_gcc(src);
-        assert_eq!(gcc.status, expected, "`{name}` expected value disagrees with gcc:\n{src}\n{}", gcc.stderr);
-    }
+    let gcc = run_gcc(src);
+    assert_eq!(gcc.status, expected, "`{name}` expected value disagrees with gcc:\n{src}\n{}", gcc.stderr);
 
     let ir = unit.ir();
     let run = run_ir(&ir);

@@ -1,4 +1,4 @@
-use std::env::{temp_dir, var_os};
+use std::env::temp_dir;
 use std::fs::{create_dir, remove_dir_all};
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -10,7 +10,6 @@ static COUNTER: AtomicU64 = AtomicU64::new(0);
 #[derive(Debug)]
 pub struct TmpDir {
     path: PathBuf,
-    keep: bool,
 }
 
 impl TmpDir {
@@ -20,9 +19,7 @@ impl TmpDir {
             let count = COUNTER.fetch_add(1, Ordering::Relaxed);
             let path = base.join(format!("{}-{}-{}", prefix, id(), count));
             match create_dir(&path) {
-                Ok(()) => {
-                    return Self { path, keep: var_os("FT_KEEP_TMP").is_some() };
-                }
+                Ok(()) => return Self { path },
                 Err(e) if e.kind() == ErrorKind::AlreadyExists => continue,
                 Err(e) => panic!("cannot create {}: {e}", path.display()),
             }
@@ -41,17 +38,14 @@ impl TmpDir {
         self.join(name).to_string_lossy().into_owned()
     }
 
-    pub fn keep(mut self) -> PathBuf {
-        self.keep = true;
+    pub fn keep(self) -> PathBuf {
         self.path.clone()
     }
 }
 
 impl Drop for TmpDir {
     fn drop(&mut self) {
-        if !self.keep {
-            let _ = remove_dir_all(&self.path);
-        }
+        let _ = remove_dir_all(&self.path);
     }
 }
 
