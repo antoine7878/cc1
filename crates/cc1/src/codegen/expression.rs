@@ -153,15 +153,13 @@ impl<W: Write> Generator<W> {
     fn unary_inc_dec(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
         let re_operand = &sema().expr_types[operand.id];
         let qty = re_operand.casted_ty();
-        let sym_id = sema().expr_bindings.get(operand.id).invariant("unknown inc/dec operand")?;
-        let loc = *self.locals.get(*sym_id).invariant("inc/dec operand without storage")?;
-        let vr = self.fold_expression(operand)?;
+        let v_before = self.fold_expression(operand)?;
         let lop = LlvmOperator::unary(op, qty)?;
-        let v = self.b.binop(lop, vr, LlvmSymbol::from(1));
-        self.b.store(v, loc);
+        let v_after = self.b.binop(lop, v_before, LlvmSymbol::from(1));
+        self.b.store(v_after, v_before);
         match op {
-            UnaryOp::PreDec | UnaryOp::PreInc => Ok(v),
-            UnaryOp::PostDec | UnaryOp::PostInc => Ok(vr),
+            UnaryOp::PreDec | UnaryOp::PreInc => Ok(v_after),
+            UnaryOp::PostDec | UnaryOp::PostInc => Ok(v_before),
             _ => Err(Diagnosis::Invariant("non inc/dec operator in unary_inc_dec")),
         }
     }
@@ -182,7 +180,7 @@ impl<W: Write> Generator<W> {
         let v = self.b.cmp(lop, v, LlvmSymbol::from(0));
         let xor = LlvmOperator::unary(op, qty)?;
         let v = self.b.binop(xor, v, LlvmSymbol::from(true));
-        Ok(self.to_int(v))
+        Ok(self.zext_to_int(v))
     }
 
     fn unary_bitnot(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
@@ -224,7 +222,7 @@ impl<W: Write> Generator<W> {
         let v1 = self.fold_expression(lhs)?;
         let v2 = self.fold_expression(rhs)?;
         let v = self.b.cmp(op, v1, v2);
-        Ok(self.to_int(v))
+        Ok(self.zext_to_int(v))
     }
 
     fn binary_logical(
@@ -255,7 +253,7 @@ impl<W: Write> Generator<W> {
 
         self.b.named_label(l2);
         let v = self.b.phi((*op == BinaryOp::LogicalOr).into(), initial_block, v, l1);
-        Ok(self.to_int(v))
+        Ok(self.zext_to_int(v))
     }
 
     fn assign(
@@ -319,7 +317,7 @@ impl<W: Write> Generator<W> {
         Ok(self.b.getelementptr(arr, idx1, idx2))
     }
 
-    fn to_int(&mut self, v: LlvmSymbol) -> LlvmSymbol {
+    fn zext_to_int(&mut self, v: LlvmSymbol) -> LlvmSymbol {
         self.b.convert("zext", v, LlvmType::int())
     }
 
