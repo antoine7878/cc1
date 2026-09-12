@@ -17,9 +17,10 @@ use crate::ast::{
     TranslationUnitNode, Type, TypeSpecifier, Union, Variant,
 };
 use crate::context::ctx;
-use crate::semantic::{ExpressionKind, sema};
+use crate::semantic::{ExpressionKind, Sema};
 
-pub struct AstPrinter {
+pub struct AstPrinter<'a> {
+    sema: &'a Sema,
     depth: usize,
     lines: Vec<Line>,
     open: Vec<usize>,
@@ -31,13 +32,13 @@ struct Line {
     children: usize,
 }
 
-impl AstPrinter {
-    pub fn print() {
-        let _ = Self::write_ast(stdout());
+impl<'a> AstPrinter<'a> {
+    pub fn print(sema: &'a Sema) {
+        let _ = Self::write_ast(sema, stdout());
     }
 
-    pub fn write_ast<W: Write>(mut w: W) -> io::Result<()> {
-        let mut printer = Self { depth: 0, lines: Vec::new(), open: Vec::new() };
+    pub fn write_ast<W: Write>(sema: &'a Sema, mut w: W) -> io::Result<()> {
+        let mut printer = Self { sema, depth: 0, lines: Vec::new(), open: Vec::new() };
         printer.visit_translation_unit(&ctx().ast);
         printer.render(&mut w)
     }
@@ -71,8 +72,7 @@ impl AstPrinter {
     }
 
     fn print_expression_type(&mut self, id: ExpressionId) {
-        let sema = sema();
-        let Some(resolved) = sema.expr_types.get(id) else { return };
+        let Some(resolved) = self.sema.expr_types.get(id) else { return };
         self.put(format_args!("{GREEN}'{}'{CYAN}", resolved.ty));
         if matches!(resolved.kind, ExpressionKind::LValue) {
             self.put(format_args!(" lvalue"));
@@ -129,7 +129,7 @@ impl AstPrinter {
     }
 }
 
-impl Visitor for AstPrinter {
+impl Visitor for AstPrinter<'_> {
     fn visit_translation_unit(&mut self, node: &TranslationUnitNode) {
         let idx = self.lines.len();
         self.lines.push(Line { depth: 0, text: format!("{node}"), children: 0 });

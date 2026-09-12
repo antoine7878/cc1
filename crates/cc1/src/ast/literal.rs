@@ -3,7 +3,7 @@ use std::fmt;
 use libft::Span;
 
 use crate::ast::escape;
-use crate::semantic::{Diag, QualifiedType, ResolvedTypeId, Sema, sema};
+use crate::semantic::{Builtins, Diag, QualifiedType, ResolvedTypeId, Sema};
 use crate::{ast_node, define_interner};
 
 define_interner!(StringConstant, StringPool, StringConstId);
@@ -15,8 +15,8 @@ pub struct StringConstant {
 }
 
 impl StringConstant {
-    pub fn ty(&self) -> ResolvedTypeId {
-        if self.is_wide { sema().builtins.int } else { sema().builtins.char }
+    pub fn ty(&self, builtins: &Builtins) -> ResolvedTypeId {
+        if self.is_wide { builtins.int } else { builtins.char }
     }
 }
 
@@ -54,10 +54,8 @@ impl StringLiteralNode {
 
     pub fn ty(&self, sema: &mut Sema) -> QualifiedType {
         let constant = self.constant();
-        let (is_wide, len) = (constant.is_wide, constant.units.len());
-        let base_id = if is_wide { sema.builtins.int } else { sema.builtins.char };
-        let base = QualifiedType::plain(base_id);
-        QualifiedType::plain(sema.types.array(base, Some(len + 1)))
+        let base = QualifiedType::plain(constant.ty(&sema.builtins));
+        QualifiedType::plain(sema.types.array(base, Some(constant.units.len() + 1)))
     }
 }
 

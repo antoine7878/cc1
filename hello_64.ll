@@ -4,15 +4,9 @@ target datalayout = "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:
 target triple = "arm64-apple-macosx26.0.0"
 
 ; Function Attrs: noinline nounwind optnone ssp uwtable(sync)
-define i32 @f() #0 {
-  ret i32 23
-}
-
-; Function Attrs: noinline nounwind optnone ssp uwtable(sync)
-define i32 @fc() #0 {
-  %1 = alloca i32, align 4
-  %2 = call i32 @f()
-  ret i32 %2
+define void @f1() #0 {
+  %1 = alloca [2 x i32], align 4
+  ret void
 }
 
 attributes #0 = { noinline nounwind optnone ssp uwtable(sync) "frame-pointer"="non-leaf-no-reserve" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="apple-m1" "target-features"="+aes,+altnzcv,+ccdp,+ccidx,+ccpp,+complxnum,+crc,+dit,+dotprod,+flagm,+fp-armv8,+fp16fml,+fptoint,+fullfp16,+jsconv,+lse,+neon,+pauth,+perfmon,+predres,+ras,+rcpc,+rdm,+sb,+sha2,+sha3,+specrestrict,+ssbs,+v8.1a,+v8.2a,+v8.3a,+v8.4a,+v8a" "tune-cpu"="apple-m5" }

@@ -1,5 +1,4 @@
-int fc(void) {
-	int a;
-	unsigned b;
-	return a < b;
+void f1(void) {
+	int a[2];
+	return;
 }

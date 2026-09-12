@@ -11,18 +11,18 @@ impl<W: Write> Generator<W> {
             Expression::Constant(value_node) => LlvmValue::Constant(value_node.value),
             Expression::Identifier(_) => self.ident(node),
             Expression::StringLiteral(s) => *self.globals.get_literal(s.id).unwrap(),
-            Expression::ConstantExpression(e) => LlvmValue::Constant(sema().expr_consts[e.id]),
             Expression::Binary(op, lhs, rhs) => self.binary(node, op, lhs, rhs),
             Expression::Unary(op, e) => self.unary(node, op, e),
             Expression::Assign(op, lhs, rhs) => self.assign(node, op, lhs, rhs),
             Expression::List(lst) => lst.iter().fold(LlvmValue::zero(), |_, e| self.fold_expression(e)),
             Expression::Ternary(e, lhs, rhs) => self.ternary(node, e, lhs, rhs),
-            Expression::ArraySubscripting { .. } => todo!(),
             Expression::FunctionCall(f, args) => self.call(f, args),
+            Expression::ArraySubscripting { .. } => todo!(),
             Expression::Member(_, _, _) => todo!(),
-            Expression::SizeofExpr(_) => todo!(),
-            Expression::SizeofType(_) => todo!(),
             Expression::Cast(_, _) => todo!(),
+            Expression::ConstantExpression(_) | Expression::SizeofExpr(_) | Expression::SizeofType(_) => {
+                LlvmValue::Constant(sema().expr_consts[node.id])
+            }
         }
     }
 

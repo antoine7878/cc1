@@ -22,7 +22,7 @@ impl Globals {
 
     pub fn emit_literals<W: Write>(&mut self, b: &mut Builder<W>) {
         for (i, str) in ctx().arenas.strings.iter().enumerate() {
-            let ty = str.ty().resolve();
+            let ty = str.ty(&sema().builtins).resolve();
             let lty = ty.llvm();
             let align = ctx().target.layout(ty).unwrap().align;
             let len = str.units.len();
