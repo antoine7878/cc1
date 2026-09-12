@@ -273,6 +273,9 @@ impl<W: Write> Generator<W> {
             let vl = self.apply_casts(loc, lhs)?;
             let op = LlvmOperator::binary(op, qty)?;
             vr = self.b.binop(op, vl, vr);
+            if let Some(cast) = &rl.result_cast {
+                vr = self.convert(vr, qty, cast)?;
+            }
         }
         self.b.store(vr, loc);
         Ok(vr)
