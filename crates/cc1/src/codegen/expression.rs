@@ -128,7 +128,7 @@ impl<W: Write> Generator<W> {
         if let Some(v) = self.globals.get_function(sym_id.resolve().name.id) {
             return Ok(*v);
         }
-        self.locals.get(*sym_id).copied().invariant("identifier without storage")
+        self.locals.get(*sym_id).copied().invariant("unknown identifier")
     }
 
     fn unary(&mut self, op: &UnaryOp, e: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
