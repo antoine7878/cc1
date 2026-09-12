@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::io::Write;
 
-use crate::ast::{BinaryOp, Expression, ExpressionNode, UnaryOp};
+use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, UnaryOp};
 use crate::codegen::{Generator, Invariant, LlvmName, LlvmOperator, LlvmSymbol, LlvmType};
 use crate::context::ctx;
 use crate::semantic::{CastKind, Diagnosis, ImplicitCast, QualifiedType, sema};
@@ -160,13 +160,17 @@ impl<W: Write> Generator<W> {
         let qty = re_operand.casted_ty();
         let loc = self.fold_raw(operand)?;
         let v_before = self.apply_casts(loc, operand)?;
-        let lop = LlvmOperator::unary(op, qty)?;
-        let v_after = self.b.binop(lop, v_before, LlvmSymbol::from(1));
+        let bop = match op {
+            UnaryOp::PreInc | UnaryOp::PostInc => BinaryOp::Add,
+            UnaryOp::PreDec | UnaryOp::PostDec => BinaryOp::Sub,
+            _ => return Err(Diagnosis::Invariant("non inc/dec operator in unary_inc_dec")),
+        };
+        let one = LlvmSymbol::from(1);
+        let v_after = self.arithmetic(&bop, v_before, qty, one, QualifiedType::plain(sema().builtins.int))?;
         self.b.store(v_after, loc);
         match op {
             UnaryOp::PreDec | UnaryOp::PreInc => Ok(v_after),
-            UnaryOp::PostDec | UnaryOp::PostInc => Ok(v_before),
-            _ => Err(Diagnosis::Invariant("non inc/dec operator in unary_inc_dec")),
+            _ => Ok(v_before),
         }
     }
 
@@ -207,13 +211,59 @@ impl<W: Write> Generator<W> {
         lhs: &ExpressionNode,
         rhs: &ExpressionNode,
     ) -> Result<LlvmSymbol, Diagnosis> {
-        let sema = sema();
-        let rel = &sema.expr_types[lhs.id];
-        let qty = rel.casted_ty();
-        let op = LlvmOperator::binary(op, qty)?;
+        let t1 = sema().expr_types[lhs.id].casted_ty();
+        let t2 = sema().expr_types[rhs.id].casted_ty();
         let v1 = self.fold_expression(lhs)?;
         let v2 = self.fold_expression(rhs)?;
-        Ok(self.b.binop(op, v1, v2))
+        self.arithmetic(op, v1, t1, v2, t2)
+    }
+
+    fn arithmetic(
+        &mut self,
+        op: &BinaryOp,
+        v1: LlvmSymbol,
+        t1: QualifiedType,
+        v2: LlvmSymbol,
+        t2: QualifiedType,
+    ) -> Result<LlvmSymbol, Diagnosis> {
+        let sema = sema();
+        match (op, t1.is_pointer(sema), t2.is_pointer(sema)) {
+            (BinaryOp::Sub, true, true) => self.pointer_difference(v1, v2, t1),
+            (BinaryOp::Add | BinaryOp::Sub, true, false) => self.pointer_offset(v1, t1, v2, *op == BinaryOp::Sub),
+            (BinaryOp::Add, false, true) => self.pointer_offset(v2, t2, v1, false),
+            _ => Ok(self.b.binop(LlvmOperator::binary(op, t1)?, v1, v2)),
+        }
+    }
+
+    fn pointer_offset(
+        &mut self,
+        base: LlvmSymbol,
+        ty: QualifiedType,
+        mut idx: LlvmSymbol,
+        negate: bool,
+    ) -> Result<LlvmSymbol, Diagnosis> {
+        let elem = ty.id.resolve().pointee().invariant("pointer arithmetic on non-pointer")?;
+        if negate {
+            idx = self.b.binop("sub", LlvmSymbol::cst(idx.ty, ConstValue::Int(0)), idx);
+        }
+        Ok(self.b.gep(elem.llvm(), base, idx))
+    }
+
+    fn pointer_difference(
+        &mut self,
+        v1: LlvmSymbol,
+        v2: LlvmSymbol,
+        ty: QualifiedType,
+    ) -> Result<LlvmSymbol, Diagnosis> {
+        let elem = ty.id.resolve().pointee().invariant("pointer difference on non-pointer")?;
+        let a = self.b.convert("ptrtoint", v1, LlvmType::ptr_size());
+        let b = self.b.convert("ptrtoint", v2, LlvmType::ptr_size());
+        let d = self.b.binop("sub", a, b);
+        let size = sema().layout(&elem.id).size;
+        if size == 1 {
+            return Ok(d);
+        }
+        Ok(self.b.binop("sdiv exact", d, LlvmSymbol::idx(u64::from(size))))
     }
 
     fn binary_comparison(
@@ -271,8 +321,7 @@ impl<W: Write> Generator<W> {
         let mut vr = self.fold_expression(rhs)?;
         if let Some(op) = op {
             let vl = self.apply_casts(loc, lhs)?;
-            let op = LlvmOperator::binary(op, qty)?;
-            vr = self.b.binop(op, vl, vr);
+            vr = self.arithmetic(op, vl, qty, vr, sema().expr_types[rhs.id].casted_ty())?;
             if let Some(cast) = &rl.result_cast {
                 vr = self.convert(vr, qty, cast)?;
             }

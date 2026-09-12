@@ -178,7 +178,7 @@ impl fmt::Display for LlvmType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LlvmType::First(t) => write!(f, "{t}"),
-            LlvmType::Array(len, t) => write!(f, "[{len} {t}]"),
+            LlvmType::Array(len, t) => write!(f, "[{len} x {t}]"),
         }
     }
 }
