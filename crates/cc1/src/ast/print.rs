@@ -234,6 +234,7 @@ impl Visitor for AstPrinter<'_> {
             }
         });
     }
+
     fn visit_type(&mut self, node: &Type) {
         self.print_node(node, |printer| {
             for spec in &node.specifiers {

@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self};
 use std::iter::zip;
 
 use crate::ast::Tag;
@@ -11,7 +11,6 @@ define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId);
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum ResolvedType {
     Void,
-    Bool,
     Char,
     SignedChar,
     UnsignedChar,
@@ -160,10 +159,12 @@ pub struct Builtins {
     pub long_double: ResolvedTypeId,
     pub ptrdiff_t: ResolvedTypeId,
     pub size_t: ResolvedTypeId,
+    pub void_ptr: QualifiedType,
 }
 
 impl Builtins {
     pub fn new(types: &mut ResolvedTypeArena, target: &Target) -> Self {
+        let v = types.alloc(ResolvedType::Void);
         Self {
             void: types.alloc(ResolvedType::Void),
             char: types.alloc(ResolvedType::Char),
@@ -180,6 +181,7 @@ impl Builtins {
             long_double: types.alloc(ResolvedType::LongDouble),
             ptrdiff_t: types.alloc(target.ptrdiff_t.clone()),
             size_t: types.alloc(target.size_t.clone()),
+            void_ptr: QualifiedType::plain(v),
         }
     }
 }
@@ -404,7 +406,6 @@ impl fmt::Display for QualifiedType {
             f.write_str("volatile ")?;
         }
         match ty.id.resolve() {
-            ResolvedType::Bool => f.write_str("bool"),
             ResolvedType::Void => f.write_str("void"),
             ResolvedType::Char => f.write_str("char"),
             ResolvedType::SignedChar => f.write_str("signed char"),

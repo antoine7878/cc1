@@ -4,7 +4,7 @@ use std::fmt;
 use crate::ast::{BinaryOp, F80, UnaryOp, escape};
 use crate::ast_node;
 use crate::semantic::{Diag, Diagnosis, QualifiedType, ResolvedType, Sema};
-use crate::target::{FloatFormat, Target};
+use crate::target::Target;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ConstValue {
@@ -53,18 +53,6 @@ impl fmt::Display for ConstValue {
 }
 
 impl ConstValue {
-    pub fn zero() -> Self {
-        ConstValue::Int(0)
-    }
-
-    pub fn one() -> Self {
-        ConstValue::Int(1)
-    }
-
-    pub fn minus_one() -> Self {
-        ConstValue::Int(-1)
-    }
-
     pub fn get_integer_value(&self) -> Option<u64> {
         match *self {
             ConstValue::Int(c) => Some(c as u64),
@@ -118,13 +106,13 @@ impl ConstValue {
         }
     }
 
-    fn parse_float(s: &str, target: &Target) -> Self {
+    fn parse_float(s: &str) -> Self {
         let s = s.to_lowercase();
         let suffix = Self::get_float_suffix(s.as_str());
         let s = &s[0..(s.len() - suffix.len())];
         match suffix {
             "f" => ConstValue::Float(s.parse::<f32>().unwrap()),
-            "l" => ConstValue::LongDouble(target.long_double_format.round(F80::from(s))),
+            "l" => ConstValue::LongDouble(F80::from(s)),
             _ => ConstValue::Double(s.parse::<f64>().unwrap()),
         }
     }
@@ -182,7 +170,7 @@ impl ConstValue {
         if s.contains('\'') {
             Diag::ok(Self::parse_char(s, target))
         } else if !lower.starts_with("0x") && (lower.contains('.') || lower.contains('e')) {
-            Diag::ok(Self::parse_float(s, target))
+            Diag::ok(Self::parse_float(s))
         } else {
             Self::parse_integer(s, target)
         }
@@ -319,13 +307,9 @@ impl<'a> Fold<'a> {
         match ty {
             ResolvedType::Float => Some(ConstValue::Float(value.to_f64() as f32)),
             ResolvedType::Double => Some(ConstValue::Double(value.to_f64())),
-            ResolvedType::LongDouble => Some(self.long_double(value.to_f80())),
+            ResolvedType::LongDouble => Some(ConstValue::LongDouble(value.to_f80())),
             _ => self.target.cast(ty, value),
         }
-    }
-
-    fn long_double(&self, value: F80) -> ConstValue {
-        ConstValue::LongDouble(self.target.long_double_format.round(value))
     }
 
     fn shift(&self, ty: &ResolvedType, op: BinaryOp, lhs: ConstValue, rhs: ConstValue) -> ConstValue {
@@ -360,7 +344,7 @@ impl<'a> Fold<'a> {
     fn floating(&self, ty: &ResolvedType, op: BinaryOp, lhs: ConstValue, rhs: ConstValue) -> ConstValue {
         use BinaryOp::{Add, Div, Mul, Sub};
 
-        if matches!(ty, ResolvedType::LongDouble) && self.target.long_double_format == FloatFormat::X87 {
+        if matches!(ty, ResolvedType::LongDouble) && self.target.long_double.size == 16 {
             let (a, b) = (lhs.to_f80(), rhs.to_f80());
             return ConstValue::LongDouble(match op {
                 Add => a + b,
@@ -435,7 +419,7 @@ impl<'a> Fold<'a> {
 
     fn neg(&self, ty: &ResolvedType, value: ConstValue) -> Diag<ConstValue> {
         if matches!(ty, ResolvedType::LongDouble) {
-            return Diag::ok(self.long_double(-value.to_f80()));
+            return Diag::ok(ConstValue::LongDouble(-value.to_f80()));
         }
         if ty.is_floating() {
             let negated = self.convert(ty, ConstValue::Double(-value.to_f64()));

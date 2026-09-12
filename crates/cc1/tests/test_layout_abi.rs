@@ -1,5 +1,5 @@
 // i386 System V layout, cross-checked against gcc 13.3.0 -m32 (elf32-i386) in the
-// container from docker.mk. The host gcc targets mach-o arm and disagrees on
+// container from docker.mk. The host gcc does not target elf32-i386 and disagrees on
 // long double and bit-field packing, so it cannot be used as the oracle here.
 
 size!(abi_size_0, "struct S { double m0; unsigned short m1[1]; signed char m2; };", "struct S", 12);

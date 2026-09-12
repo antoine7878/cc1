@@ -37,6 +37,7 @@ pub struct Type {
     pub specifiers: Vec<DeclarationSpecifier>,
     pub declarator: DeclaratorNode,
 }
+
 impl ExpressionArena {
     pub fn identifier(&mut self, name: Name, span: Span) -> ExpressionNode {
         ExpressionNode::new(self.alloc(Expression::Identifier(name)), span)

@@ -1,35 +1,36 @@
-use std::fmt::{self, Display};
+use std::fmt::{self};
 use std::io::Write;
 
 use crate::ast::StringConstant;
-use crate::codegen::llvm::{LlvmType, LlvmValue};
+use crate::codegen::LlvmSymbol;
+use crate::codegen::llvm::{LlvmName, LlvmType};
 
 #[derive(Debug)]
 pub struct Builder<W: Write> {
     w: W,
     counter: usize,
-    pub current_block: LlvmValue,
+    pub current_block: LlvmName,
     str_counter: usize,
 }
 
 impl<W: Write> Builder<W> {
     pub fn new(w: W) -> Self {
-        Self { w, counter: 0, str_counter: 0, current_block: LlvmValue::SSA(0) }
+        Self { w, counter: 0, str_counter: 0, current_block: LlvmName::SSA(0) }
     }
 
     pub fn reset(&mut self, counter: usize) {
-        self.current_block = LlvmValue::SSA(0);
+        self.current_block = LlvmName::SSA(0);
         self.counter = counter;
     }
 
-    pub fn fresh_string(&mut self) -> LlvmValue {
+    pub fn fresh_string(&mut self) -> LlvmName {
         self.str_counter += 1;
-        LlvmValue::StringLiteral(self.str_counter)
+        LlvmName::StringLiteral(self.str_counter)
     }
 
-    pub fn fresh(&mut self) -> LlvmValue {
+    pub fn fresh(&mut self) -> LlvmName {
         self.counter += 1;
-        LlvmValue::SSA(self.counter)
+        LlvmName::SSA(self.counter)
     }
 
     fn line(&mut self, args: fmt::Arguments<'_>) {
@@ -46,82 +47,112 @@ impl<W: Write> Builder<W> {
         self.line(format_args!(""));
     }
 
-    pub fn define(&mut self, ret: LlvmType, name: impl Display) {
+    pub fn define(&mut self, binding: LlvmSymbol) {
         self.blank();
-        self.line(format_args!("define {ret} @{name}() {{"));
+        self.line(format_args!("define {}() {{", binding.name));
     }
 
     pub fn end_function(&mut self) {
         self.line(format_args!("}}"));
     }
 
-    pub fn alloca(&mut self, ty: LlvmType) -> LlvmValue {
+    pub fn alloca(&mut self, ty: LlvmType) -> LlvmSymbol {
         let r = self.fresh();
         self.line(format_args!("  {r} = alloca {ty}"));
-        r
+        LlvmSymbol::new(ty, r)
     }
 
-    pub fn load(&mut self, ty: LlvmType, slot: LlvmValue) -> LlvmValue {
+    pub fn load(&mut self, ty: LlvmType, slot: LlvmSymbol) -> LlvmSymbol {
         let r = self.fresh();
-        self.line(format_args!("  {r} = load {ty}, ptr {slot}"));
-        r
+        self.line(format_args!("  {r} = load {ty}, {slot}"));
+        LlvmSymbol::new(ty, r)
     }
 
-    pub fn store(&mut self, ty: LlvmType, src: LlvmValue, dst: LlvmValue) {
-        self.line(format_args!("  store {ty} {src}, ptr {dst}"))
+    pub fn store(&mut self, src: LlvmSymbol, dst: LlvmSymbol) {
+        self.line(format_args!("  store {src}, {dst}"))
     }
 
-    pub fn binop(&mut self, op: &'static str, ty: LlvmType, lhs: LlvmValue, rhs: LlvmValue) -> LlvmValue {
+    pub fn binop(&mut self, op: &'static str, lhs: LlvmSymbol, rhs: LlvmSymbol) -> LlvmSymbol {
         let r = self.fresh();
-        self.line(format_args!("  {r} = {op} {ty} {lhs}, {rhs}"));
-        r
-    }
-    pub fn zext_bool(&mut self, v: LlvmValue, ty: LlvmType) -> LlvmValue {
-        let r = self.fresh();
-        self.line(format_args!("  {r} = zext i1 {v} to {ty}"));
-        r
+        self.line(format_args!("  {r} = {op} {lhs}, {}", rhs.name));
+        LlvmSymbol::new(lhs.ty, r)
     }
 
-    pub fn ret(&mut self, ty: LlvmType, v: LlvmValue) {
-        self.line(format_args!("  ret {ty} {v}"));
+    pub fn zext(&mut self, from: LlvmSymbol, to: LlvmType) -> LlvmSymbol {
+        let r = self.fresh();
+        self.line(format_args!("  {r} = zext {from} to {to}"));
+        LlvmSymbol::new(to, r)
+    }
+
+    pub fn trunc(&mut self, from: LlvmSymbol, to: LlvmType) -> LlvmSymbol {
+        let r = self.fresh();
+        self.line(format_args!("  {r} = trunc {from} to {to}"));
+        LlvmSymbol::new(to, r)
+    }
+
+    pub fn ret(&mut self, b: LlvmSymbol) {
+        self.line(format_args!("  ret {b}"));
     }
 
     pub fn ret_void(&mut self) {
         self.line(format_args!("  ret void"));
     }
 
-    pub fn br(&mut self, v: LlvmValue, l1: LlvmValue, l2: Option<LlvmValue>) {
+    pub fn br(&mut self, cond: LlvmSymbol, l1: LlvmName, l2: Option<LlvmName>) {
         match l2 {
-            Some(l2) => self.line(format_args!("  br i1 {v}, label {l1}, label {l2}")),
+            Some(l2) => self.line(format_args!("  br {cond}, label {l1}, label {l2}")),
             None => self.line(format_args!("  br label {l1}")),
         }
     }
 
-    pub fn named_label(&mut self, l: LlvmValue) {
+    pub fn named_label(&mut self, l: LlvmName) {
         self.blank();
         self.current_block = l;
         match l {
-            LlvmValue::SSA(i) => self.line(format_args!("{i}:")),
-            LlvmValue::Label(i, j) => self.line(format_args!("l.{i}.{j}:")),
+            LlvmName::SSA(i) => self.line(format_args!("{i}:")),
+            LlvmName::Label(i, j) => self.line(format_args!("l.{i}.{j}:")),
             _ => unimplemented!(),
         }
     }
 
-    pub fn phi(&mut self, ty: LlvmType, v1: LlvmValue, from1: LlvmValue, v2: LlvmValue, from2: LlvmValue) -> LlvmValue {
+    pub fn phi(&mut self, s1: LlvmSymbol, l1: LlvmName, s2: LlvmSymbol, l2: LlvmName) -> LlvmSymbol {
         let r = self.fresh();
-        self.line(format_args!("  {r} = phi {ty} [ {v1}, {from1} ], [ {v2}, {from2} ]"));
-        r
+        self.line(format_args!("  {r} = phi {} [ {}, {l1} ], [ {}, {l2} ]", s1.ty, s1.name, s2.name));
+        LlvmSymbol::new(s1.ty, r)
     }
 
-    pub fn string_literal(&mut self, len: usize, ty: LlvmType, str: &StringConstant) -> LlvmValue {
+    pub fn string_literal(&mut self, str: &StringConstant) -> LlvmSymbol {
         let s = self.fresh_string();
-        self.line(format_args!(r#"{s} = private unnamed_addr constant [{len} x {ty}] c"{str}\00""#,));
-        s
+        let len = str.units.len() + 1;
+        let ty = if str.is_wide { LlvmType::int() } else { LlvmType::char() };
+        let _ = self.w.write_fmt(format_args!("{s} = private unnamed_addr constant [{len} x {ty}] ["));
+        for c in &str.units {
+            let _ = self.w.write_fmt(format_args!("{ty} {c}, "));
+        }
+        self.line(format_args!("{ty} 0]"));
+        LlvmSymbol::new(ty, s)
     }
 
-    pub fn call(&mut self, ret_ty: LlvmType, f: LlvmValue) -> LlvmValue {
+    pub fn call(&mut self, f: LlvmSymbol) -> LlvmSymbol {
         let r = self.fresh();
-        self.line(format_args!("  {r} = call {ret_ty} {f}()"));
-        r
+        self.line(format_args!("  {r} = call {f}()"));
+        LlvmSymbol::new(f.ty, r)
+    }
+
+    pub fn getelementptr(&mut self, base: LlvmSymbol, idx1: LlvmSymbol, idx2: LlvmSymbol) -> LlvmSymbol {
+        let r = self.fresh();
+        self.line(format_args!("  {r} = getelementptr inbounds {}, ptr {}, {idx1}, {idx2}", base.ty, base.name));
+        LlvmSymbol::ptr(r)
     }
 }
+
+// pub struct LlvmListInitilizer<'a> {
+//     values: &'a [LlvmValue],
+//     ty: LlvmType,
+// }
+
+// impl<'a> Display for LlvmListInitilizer<'a> {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         self.values.iter().try_for_each(|v| write!(f, "{}, {}", v, self.ty))
+//     }
+// }

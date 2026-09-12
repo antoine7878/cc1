@@ -5,23 +5,28 @@ use std::vec::IntoIter;
 
 use crate::ast::visit::walk_init_declarator;
 use crate::ast::{FunctionDefinitionNode, InitDeclaratorNode, Visitor};
-use crate::codegen::llvm::{Builder, LlvmValue};
+use crate::codegen::{Builder, LlvmSymbol};
 use crate::semantic::{Duration, SymbolId, sema};
 
 #[derive(Debug, Default)]
 pub struct Locals {
-    map: HashMap<SymbolId, LlvmValue>,
+    map: HashMap<SymbolId, LlvmSymbol>,
     order: Vec<SymbolId>,
 }
 
 impl Index<SymbolId> for Locals {
-    type Output = LlvmValue;
+    type Output = LlvmSymbol;
+
     fn index(&self, index: SymbolId) -> &Self::Output {
         self.get(index).unwrap()
     }
 }
 
 impl Locals {
+    pub fn get(&self, sym_id: SymbolId) -> Option<&LlvmSymbol> {
+        self.map.get(&sym_id)
+    }
+
     pub fn order_iter(&self) -> IntoIter<SymbolId> {
         self.order.clone().into_iter()
     }
@@ -30,10 +35,6 @@ impl Locals {
         self.map.clear();
         self.order.clear();
         self.visit_compound_statement(&node.body);
-    }
-
-    pub fn get(&self, sym_id: SymbolId) -> Option<&LlvmValue> {
-        self.map.get(&sym_id)
     }
 
     pub fn emit<W: Write>(&mut self, b: &mut Builder<W>) {

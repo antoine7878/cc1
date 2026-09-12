@@ -67,6 +67,7 @@ impl Sema {
     pub fn new(target: Target) -> Self {
         let mut types = ResolvedTypeArena::default();
         let builtins = Builtins::new(&mut types, &target);
+
         Self {
             diagnosis: Vec::new(),
             symbols: SymbolArena::default(),
@@ -248,6 +249,11 @@ impl Sema {
         }
 
         entry_symbol
+    }
+
+    pub fn layout(&self, id: &ResolvedTypeId) -> Layout {
+        let ty = self.types.get(*id);
+        self.target.layout(ty).unwrap_or_else(|| self.layouts[id])
     }
 }
 

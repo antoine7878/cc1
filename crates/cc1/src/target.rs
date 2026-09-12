@@ -1,27 +1,5 @@
-use crate::ast::{ConstValue, F80};
+use crate::ast::ConstValue;
 use crate::semantic::ResolvedType;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FloatFormat {
-    Ieee64,
-    X87,
-}
-
-impl FloatFormat {
-    pub const fn llvm(self) -> &'static str {
-        match self {
-            FloatFormat::Ieee64 => "double",
-            FloatFormat::X87 => "x86_fp80",
-        }
-    }
-
-    pub fn round(self, value: F80) -> F80 {
-        match self {
-            FloatFormat::X87 => value,
-            FloatFormat::Ieee64 => F80::from(f64::from(value)),
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Layout {
@@ -32,14 +10,6 @@ pub struct Layout {
 impl Layout {
     pub const fn new(size: u32, align: u32) -> Self {
         Self { size, align }
-    }
-
-    pub fn llvm(&self) -> &str {
-        match self {
-            Layout { size: 4, .. } => "float",
-            Layout { size: 8, .. } => "double",
-            _ => unimplemented!(),
-        }
     }
 }
 
@@ -53,7 +23,6 @@ pub struct Target {
     pub float: Layout,
     pub double: Layout,
     pub long_double: Layout,
-    pub long_double_format: FloatFormat,
     pub pointer: Layout,
     pub size_t: ResolvedType,
     pub ptrdiff_t: ResolvedType,
@@ -73,7 +42,6 @@ pub const I386: Target = Target {
     float: Layout::new(4, 4),
     double: Layout::new(8, 4),
     long_double: Layout::new(12, 4),
-    long_double_format: FloatFormat::X87,
     pointer: Layout::new(4, 4),
     size_t: ResolvedType::UnsignedInt,
     ptrdiff_t: ResolvedType::Int,
@@ -93,7 +61,6 @@ pub const X86_64: Target = Target {
     float: Layout::new(4, 4),
     double: Layout::new(8, 8),
     long_double: Layout::new(16, 16),
-    long_double_format: FloatFormat::X87,
     pointer: Layout::new(8, 8),
     size_t: ResolvedType::UnsignedLong,
     ptrdiff_t: ResolvedType::Long,
@@ -102,26 +69,6 @@ pub const X86_64: Target = Target {
     byte_size: 8,
     triple: "x86_64-pc-linux-gnu",
     datalayout: "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
-};
-
-pub const ARM64_DARWIN: Target = Target {
-    name: "arm64",
-    char: Layout::new(1, 1),
-    short: Layout::new(2, 2),
-    int: Layout::new(4, 4),
-    long: Layout::new(8, 8),
-    float: Layout::new(4, 4),
-    double: Layout::new(8, 8),
-    long_double: Layout::new(8, 8),
-    long_double_format: FloatFormat::Ieee64,
-    pointer: Layout::new(8, 8),
-    size_t: ResolvedType::UnsignedLong,
-    ptrdiff_t: ResolvedType::Long,
-    wchar_t: ResolvedType::Int,
-    char_signed: true,
-    byte_size: 8,
-    triple: "arm64-apple-macosx26.0.0",
-    datalayout: "e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32",
 };
 
 impl Default for Target {
@@ -145,7 +92,6 @@ impl Target {
 
     pub fn layout(&self, ty: &ResolvedType) -> Option<Layout> {
         let layout = match ty {
-            ResolvedType::Bool => Layout::new(1, 4),
             ResolvedType::Char | ResolvedType::SignedChar | ResolvedType::UnsignedChar => self.char,
             ResolvedType::Short | ResolvedType::UnsignedShort => self.short,
             ResolvedType::Int | ResolvedType::UnsignedInt => self.int,

@@ -1,114 +1,61 @@
+use std::cmp::Ordering;
 use std::io::Write;
 
 use crate::ast::{BinaryOp, Expression, ExpressionNode, UnaryOp};
-use crate::codegen::llvm::{LlvmOperator, LlvmValue};
-use crate::codegen::{Generator, LlvmType};
+use crate::codegen::llvm::LlvmOperator;
+use crate::codegen::{Generator, LlvmName, LlvmSymbol};
 use crate::semantic::{ResolvedType, sema};
 
 impl<W: Write> Generator<W> {
-    pub fn fold_expression(&mut self, node: &ExpressionNode) -> LlvmValue {
+    pub fn fold_expression(&mut self, node: &ExpressionNode) -> LlvmSymbol {
         if let Some(value) = sema().expr_consts.get(node.id) {
-            return LlvmValue::Constant(*value);
+            return LlvmSymbol::cst(sema().expr_types[node.id].casted_ty().llvm(), *value);
         }
+        self.fold_raw(node)
+    }
+
+    pub fn fold_raw(&mut self, node: &ExpressionNode) -> LlvmSymbol {
         match node.id.resolve() {
-            Expression::Constant(value_node) => LlvmValue::Constant(value_node.value),
             Expression::Identifier(_) => self.ident(node),
             Expression::StringLiteral(s) => *self.globals.get_literal(s.id).unwrap(),
-            Expression::Binary(op, lhs, rhs) => self.binary(node, op, lhs, rhs),
-            Expression::Unary(op, e) => self.unary(node, op, e),
-            Expression::Assign(op, lhs, rhs) => self.assign(node, op, lhs, rhs),
-            Expression::List(lst) => lst.iter().fold(LlvmValue::zero(), |_, e| self.fold_expression(e)),
-            Expression::Ternary(e, lhs, rhs) => self.ternary(node, e, lhs, rhs),
+            Expression::Constant(value_node) => LlvmSymbol::from(value_node.value),
+            Expression::Binary(op, lhs, rhs) => self.binary(op, lhs, rhs),
+            Expression::Unary(op, e) => self.unary(op, e),
+            Expression::Assign(op, lhs, rhs) => self.assign(op, lhs, rhs),
+            Expression::List(lst) => lst.iter().fold(LlvmSymbol::from(0), |_, e| self.fold_expression(e)),
+            Expression::Ternary(e, lhs, rhs) => self.ternary(e, lhs, rhs),
             Expression::FunctionCall(f, args) => self.call(f, args),
-            Expression::ArraySubscripting { .. } => todo!(),
+            Expression::ArraySubscripting(array, idx) => self.array_subscript(array, idx),
             Expression::Member(_, _, _) => todo!(),
-            Expression::Cast(_, _) => todo!(),
+            Expression::Cast(_, e) => self.cast(node, e),
             Expression::ConstantExpression(_) | Expression::SizeofExpr(_) | Expression::SizeofType(_) => unreachable!(),
         }
     }
 
-    fn ident(&mut self, node: &ExpressionNode) -> LlvmValue {
+    fn ident(&mut self, node: &ExpressionNode) -> LlvmSymbol {
         let re = &sema().expr_types[node.id];
-        let qty = re.casted_ty();
         let sym_id = sema().expr_bindings[node.id];
 
         if let Some(v) = self.globals.get_function(sym_id.resolve().name.id) {
             return *v;
         }
-        let local = self.locals.get(sym_id).unwrap();
-        self.b.load(qty.llvm(), *local)
+        let local = self.locals[sym_id];
+        self.b.load(re.ty.llvm(), local)
     }
 
-    fn unary(&mut self, node: &ExpressionNode, op: &UnaryOp, e: &ExpressionNode) -> LlvmValue {
+    fn unary(&mut self, op: &UnaryOp, e: &ExpressionNode) -> LlvmSymbol {
         match op {
-            UnaryOp::PostInc | UnaryOp::PostDec | UnaryOp::PreInc | UnaryOp::PreDec => self.unary_inc_dec(node, op, e),
+            UnaryOp::PostInc | UnaryOp::PostDec | UnaryOp::PreInc | UnaryOp::PreDec => self.unary_inc_dec(op, e),
             UnaryOp::Plus => self.fold_expression(e),
-            UnaryOp::Minus => self.unary_minus(node, e),
-            UnaryOp::LogicalNot => self.unary_logic_not(node, op, e),
-            UnaryOp::BitNot => self.unary_bitnot(node, op, e),
+            UnaryOp::Minus => self.unary_minus(e),
+            UnaryOp::LogicalNot => self.unary_logic_not(op, e),
+            UnaryOp::BitNot => self.unary_bitnot(op, e),
             UnaryOp::Addr => self.fold_expression(e),
-            UnaryOp::Deref => self.unary_deref(node, e),
+            UnaryOp::Deref => self.unary_deref(e),
         }
     }
 
-    fn unary_minus(&mut self, _node: &ExpressionNode, e: &ExpressionNode) -> LlvmValue {
-        let v = self.fold_expression(e);
-        let re = &sema().expr_types[e.id];
-        let qty = re.casted_ty();
-        let op = LlvmOperator::binary(&BinaryOp::Sub, qty);
-        self.b.binop(op, qty.llvm(), LlvmValue::zero(), v)
-    }
-
-    fn unary_logic_not(&mut self, _node: &ExpressionNode, op: &UnaryOp, e: &ExpressionNode) -> LlvmValue {
-        let re = &sema().expr_types[e.id];
-        let qty = re.casted_ty();
-        let v = self.fold_expression(e);
-        let lop = LlvmOperator::binary(&BinaryOp::LogicalAnd, qty);
-        let v = self.b.binop(lop, qty.llvm(), v, LlvmValue::zero());
-        let op = LlvmOperator::unary(op, qty);
-        let v = self.b.binop(op, qty.llvm(), v, true.into());
-        self.b.zext_bool(v, re.casted_ty().llvm())
-    }
-
-    fn unary_bitnot(&mut self, _node: &ExpressionNode, op: &UnaryOp, e: &ExpressionNode) -> LlvmValue {
-        let re = &sema().expr_types[e.id];
-        let qty = re.casted_ty();
-        let v = self.fold_expression(e);
-        let op = LlvmOperator::unary(op, qty);
-        self.b.binop(op, qty.llvm(), v, LlvmValue::minus_one())
-    }
-
-    fn unary_inc_dec(&mut self, _node: &ExpressionNode, op: &UnaryOp, e: &ExpressionNode) -> LlvmValue {
-        let re = &sema().expr_types[e.id];
-        let qty = re.casted_ty();
-        let sym_id = sema().expr_bindings.get(e.id).unwrap();
-        let loc = *self.locals.get(*sym_id).unwrap();
-        let vr = self.fold_expression(e);
-        let lop = LlvmOperator::unary(op, qty);
-        let v = self.b.binop(lop, qty.llvm(), vr, LlvmValue::one());
-        self.b.store(qty.llvm(), v, loc);
-        match op {
-            UnaryOp::PreDec | UnaryOp::PreInc => v,
-            UnaryOp::PostDec | UnaryOp::PostInc => vr,
-            _ => unreachable!(),
-        }
-    }
-
-    fn unary_deref(&mut self, _node: &ExpressionNode, e: &ExpressionNode) -> LlvmValue {
-        let re = &sema().expr_types[e.id];
-        let qty = re.casted_ty();
-        let v = self.fold_expression(e);
-        let ResolvedType::Pointer(qty) = qty.id.resolve() else { unreachable!() };
-        self.b.load(qty.llvm(), v)
-    }
-
-    fn binary(
-        &mut self,
-        node: &ExpressionNode,
-        op: &BinaryOp,
-        lhs: &ExpressionNode,
-        rhs: &ExpressionNode,
-    ) -> LlvmValue {
+    fn binary(&mut self, op: &BinaryOp, lhs: &ExpressionNode, rhs: &ExpressionNode) -> LlvmSymbol {
         match op {
             BinaryOp::Add
             | BinaryOp::Sub
@@ -119,68 +66,95 @@ impl<W: Write> Generator<W> {
             | BinaryOp::Right
             | BinaryOp::BitAnd
             | BinaryOp::BitOr
-            | BinaryOp::BitXor => self.binary_arithmetic(node, op, lhs, rhs),
+            | BinaryOp::BitXor => self.binary_arithmetic(op, lhs, rhs),
             BinaryOp::Greater
             | BinaryOp::Lower
             | BinaryOp::GreaterEq
             | BinaryOp::LowerEq
             | BinaryOp::Eq
-            | BinaryOp::Neq => self.binary_comparison(node, op, lhs, rhs),
-            BinaryOp::LogicalAnd | BinaryOp::LogicalOr => self.binary_logical(node, op, lhs, rhs),
+            | BinaryOp::Neq => self.binary_comparison(op, lhs, rhs),
+            BinaryOp::LogicalAnd | BinaryOp::LogicalOr => self.binary_logical(op, lhs, rhs),
+        }
+    }
+    fn unary_inc_dec(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> LlvmSymbol {
+        let re_operand = &sema().expr_types[operand.id];
+        let qty = re_operand.casted_ty();
+        let sym_id = sema().expr_bindings.get(operand.id).unwrap();
+        let loc = *self.locals.get(*sym_id).unwrap();
+        let vr = self.fold_expression(operand);
+        let lop = LlvmOperator::unary(op, qty);
+        let v = self.b.binop(lop, vr, LlvmSymbol::from(1));
+        self.b.store(v, loc);
+        match op {
+            UnaryOp::PreDec | UnaryOp::PreInc => v,
+            UnaryOp::PostDec | UnaryOp::PostInc => vr,
+            _ => unreachable!(),
         }
     }
 
-    fn binary_arithmetic(
-        &mut self,
-        _node: &ExpressionNode,
-        op: &BinaryOp,
-        lhs: &ExpressionNode,
-        rhs: &ExpressionNode,
-    ) -> LlvmValue {
+    fn unary_minus(&mut self, operand: &ExpressionNode) -> LlvmSymbol {
+        let v = self.fold_expression(operand);
+        let re_operand = &sema().expr_types[operand.id];
+        let qty = re_operand.casted_ty();
+        let op = LlvmOperator::binary(&BinaryOp::Sub, qty);
+        self.b.binop(op, LlvmSymbol::from(0), v)
+    }
+
+    fn unary_logic_not(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> LlvmSymbol {
+        let re_operand = &sema().expr_types[operand.id];
+        let qty = re_operand.casted_ty();
+        let v = self.fold_expression(operand);
+        let lop = LlvmOperator::binary(&BinaryOp::Neq, qty);
+        let v = self.b.binop(lop, v, LlvmSymbol::from(0));
+        let xor = LlvmOperator::unary(op, qty);
+        self.b.binop(xor, v, LlvmSymbol::from(true))
+    }
+
+    fn unary_bitnot(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> LlvmSymbol {
+        let re_operand = &sema().expr_types[operand.id];
+        let qty = re_operand.casted_ty();
+        let v = self.fold_expression(operand);
+        let xor = LlvmOperator::unary(op, qty);
+        self.b.binop(xor, v, LlvmSymbol::from(-1))
+    }
+
+    fn unary_deref(&mut self, operand: &ExpressionNode) -> LlvmSymbol {
+        let re_operand = &sema().expr_types[operand.id];
+        let qty = re_operand.casted_ty();
+        let v = self.fold_expression(operand);
+        let ResolvedType::Pointer(qty) = qty.id.resolve() else { unreachable!() };
+        self.b.load(qty.llvm(), v)
+    }
+
+    fn binary_arithmetic(&mut self, op: &BinaryOp, lhs: &ExpressionNode, rhs: &ExpressionNode) -> LlvmSymbol {
         let sema = sema();
         let rel = &sema.expr_types[lhs.id];
         let qty = rel.casted_ty();
         let op = LlvmOperator::binary(op, qty);
         let v1 = self.fold_expression(lhs);
         let v2 = self.fold_expression(rhs);
-        self.b.binop(op, qty.llvm(), v1, v2)
+        self.b.binop(op, v1, v2)
     }
 
-    fn binary_comparison(
-        &mut self,
-        node: &ExpressionNode,
-        op: &BinaryOp,
-        lhs: &ExpressionNode,
-        rhs: &ExpressionNode,
-    ) -> LlvmValue {
-        let re = &sema().expr_types[node.id];
+    fn binary_comparison(&mut self, op: &BinaryOp, lhs: &ExpressionNode, rhs: &ExpressionNode) -> LlvmSymbol {
         let rel = &sema().expr_types[lhs.id];
-        let qty = rel.ty;
         let op = LlvmOperator::binary(op, rel.casted_ty());
         let v1 = self.fold_expression(lhs);
         let v2 = self.fold_expression(rhs);
-        let v = self.b.binop(op, qty.llvm(), v1, v2);
-        self.b.zext_bool(v, re.casted_ty().llvm())
+        self.b.binop(op, v1, v2)
+        // self.b.zext(LlvmType::bool(), v, re.ty.llvm())
     }
 
-    fn binary_logical(
-        &mut self,
-        node: &ExpressionNode,
-        op: &BinaryOp,
-        lhs: &ExpressionNode,
-        rhs: &ExpressionNode,
-    ) -> LlvmValue {
-        let re = &sema().expr_types[node.id];
-        let rel = &sema().expr_types[lhs.id];
-        let rer = &sema().expr_types[rhs.id];
+    fn binary_logical(&mut self, op: &BinaryOp, lhs: &ExpressionNode, rhs: &ExpressionNode) -> LlvmSymbol {
         let initial_block = self.b.current_block;
-        let llvm_op = LlvmOperator::binary(op, re.ty);
+        let rel = &sema().expr_types[lhs.id];
+        let cmp = LlvmOperator::binary(op, rel.ty);
 
         let v = self.fold_expression(lhs);
-        let v = self.b.binop(llvm_op, rel.ty.llvm(), v, LlvmValue::zero());
-        let LlvmValue::SSA(i) = v else { unreachable!() };
-        let l1 = LlvmValue::label(i, 1);
-        let l2 = LlvmValue::label(i, 2);
+        let v = self.b.binop(cmp, v, LlvmSymbol::from(0));
+        let LlvmName::SSA(i) = v.name else { unreachable!() };
+        let l1 = LlvmName::label(i, 1);
+        let l2 = LlvmName::label(i, 2);
         match op {
             BinaryOp::LogicalAnd => self.b.br(v, l1, Some(l2)),
             BinaryOp::LogicalOr => self.b.br(v, l2, Some(l1)),
@@ -189,52 +163,36 @@ impl<W: Write> Generator<W> {
 
         self.b.named_label(l1);
         let v = self.fold_expression(rhs);
-        let v = self.b.binop(llvm_op, rer.ty.llvm(), v, LlvmValue::zero());
+        let v = self.b.binop(cmp, v, LlvmSymbol::from(0));
         self.b.br(v, l2, None);
 
         self.b.named_label(l2);
-        let v = self.b.phi(LlvmType::bool(), (*op == BinaryOp::LogicalOr).into(), initial_block, v, l1);
-        self.b.zext_bool(v, re.casted_ty().llvm())
+        self.b.phi((*op == BinaryOp::LogicalOr).into(), initial_block, v, l1)
     }
 
-    fn assign(
-        &mut self,
-        _node: &ExpressionNode,
-        op: &Option<BinaryOp>,
-        lhs: &ExpressionNode,
-        rhs: &ExpressionNode,
-    ) -> LlvmValue {
+    fn assign(&mut self, op: &Option<BinaryOp>, lhs: &ExpressionNode, rhs: &ExpressionNode) -> LlvmSymbol {
         let rl = &sema().expr_types[lhs.id];
         let qty = rl.casted_ty();
         let sym_id = sema().expr_bindings.get(lhs.id).unwrap();
         let loc = *self.locals.get(*sym_id).unwrap();
         let mut vr = self.fold_expression(rhs);
         if let Some(op) = op {
-            let vl = self.b.load(rl.ty.llvm(), loc);
+            let vl = self.b.load(rl.casted_ty().llvm(), loc);
             let op = LlvmOperator::binary(op, qty);
-            vr = self.b.binop(op, qty.llvm(), vl, vr);
+            vr = self.b.binop(op, vl, vr);
         }
-        self.b.store(qty.llvm(), vr, loc);
+        self.b.store(vr, loc);
         vr
     }
 
-    fn ternary(
-        &mut self,
-        node: &ExpressionNode,
-        e: &ExpressionNode,
-        a: &ExpressionNode,
-        b: &ExpressionNode,
-    ) -> LlvmValue {
-        let re = &sema().expr_types[node.id];
-        let ree = &sema().expr_types[e.id];
-        let qty = ree.casted_ty();
-        let v = self.fold_expression(e);
-        let v = self.b.binop("icmp ne", qty.llvm(), v, LlvmValue::zero());
+    fn ternary(&mut self, cond: &ExpressionNode, a: &ExpressionNode, b: &ExpressionNode) -> LlvmSymbol {
+        let v = self.fold_expression(cond);
+        let v = self.b.binop("icmp ne", v, LlvmSymbol::from(0));
 
-        let LlvmValue::SSA(i) = v else { unreachable!() };
-        let l1 = LlvmValue::label(i, 6);
-        let l2 = LlvmValue::label(i, 8);
-        let l3 = LlvmValue::label(i, 10);
+        let LlvmName::SSA(i) = v.name else { unreachable!() };
+        let l1 = LlvmName::label(i, 0);
+        let l2 = LlvmName::label(i, 1);
+        let l3 = LlvmName::label(i, 2);
         self.b.br(v, l1, Some(l2));
 
         self.b.named_label(l1);
@@ -246,16 +204,37 @@ impl<W: Write> Generator<W> {
         self.b.br(v, l3, None);
 
         self.b.named_label(l3);
-        self.b.phi(re.casted_ty().llvm(), va, l1, vb, l2)
+        self.b.phi(va, l1, vb, l2)
     }
 
-    fn call(&mut self, f: &ExpressionNode, _args: &[ExpressionNode]) -> LlvmValue {
-        let re = &sema().expr_types[f.id];
-        let qty = re.casted_ty();
+    fn call(&mut self, f: &ExpressionNode, _args: &[ExpressionNode]) -> LlvmSymbol {
         let f = self.fold_expression(f);
-        let ResolvedType::Pointer(inner) = qty.id.resolve() else { unreachable!() };
-        let ResolvedType::Function { ret, .. } = inner.id.resolve() else { unreachable!() };
-        self.b.call(ret.llvm(), f);
-        LlvmValue::zero()
+        self.b.call(f)
+    }
+
+    fn array_subscript(&mut self, array: &ExpressionNode, idx: &ExpressionNode) -> LlvmSymbol {
+        let arr = self.fold_expression(array);
+        let idx1 = LlvmSymbol::idx(0);
+        let i = sema().expr_consts[idx.id].get_integer_value().unwrap();
+        let idx2 = LlvmSymbol::idx(i);
+
+        let v = self.b.getelementptr(arr, idx1, idx2);
+        let ty = sema().expr_types[array.id].ty.llvm();
+        self.b.load(ty, v)
+    }
+
+    fn cast(&mut self, node: &ExpressionNode, operand: &ExpressionNode) -> LlvmSymbol {
+        let from_ty = sema().expr_types[operand.id].casted_ty();
+        let from_size = sema().layout(&from_ty.id).size;
+
+        let to_ty = sema().expr_types[node.id].ty;
+        let to_size = sema().layout(&to_ty.id).size;
+        let v = self.fold_expression(operand);
+
+        match u32::cmp(&from_size, &to_size) {
+            Ordering::Less => self.b.zext(v, to_ty.llvm()),
+            Ordering::Greater => self.b.trunc(v, to_ty.llvm()),
+            Ordering::Equal => v,
+        }
     }
 }

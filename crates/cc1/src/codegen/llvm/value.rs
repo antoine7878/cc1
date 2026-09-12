@@ -4,7 +4,7 @@ use crate::ast::ConstValue;
 use crate::semantic::SymbolId;
 
 #[derive(Debug, Clone, Copy)]
-pub enum LlvmValue {
+pub enum LlvmName {
     SSA(usize),
     Constant(ConstValue),
     StringLiteral(usize),
@@ -14,45 +14,31 @@ pub enum LlvmValue {
 }
 
 impl ConstValue {
-    pub fn llvm(&self) -> LlvmValue {
-        LlvmValue::Constant(*self)
+    pub fn llvm(&self) -> LlvmName {
+        LlvmName::Constant(*self)
     }
 }
 
-impl LlvmValue {
-    pub fn label(i: usize, j: usize) -> LlvmValue {
+impl LlvmName {
+    pub fn label(i: usize, j: usize) -> LlvmName {
         Self::Label(i, j)
     }
 }
 
-impl LlvmValue {
-    pub fn zero() -> Self {
-        LlvmValue::Constant(ConstValue::zero())
-    }
-
-    pub fn one() -> Self {
-        LlvmValue::Constant(ConstValue::one())
-    }
-
-    pub fn minus_one() -> Self {
-        LlvmValue::Constant(ConstValue::minus_one())
-    }
-}
-
-impl Display for LlvmValue {
+impl Display for LlvmName {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            LlvmValue::SSA(id) => write!(f, "%{id}"),
-            LlvmValue::Constant(value) => write!(f, "{value}"),
-            LlvmValue::Bool(b) => write!(f, "{b}"),
-            LlvmValue::Label(i, j) => write!(f, "%l.{i}.{j}"),
-            LlvmValue::StringLiteral(i) => write!(f, "@.str.{i}"),
-            LlvmValue::Global(s) => write!(f, "@{}", s.resolve().name.id.resolve()),
+            LlvmName::SSA(id) => write!(f, "%{id}"),
+            LlvmName::Constant(value) => write!(f, "{value}"),
+            LlvmName::Bool(b) => write!(f, "{b}"),
+            LlvmName::StringLiteral(i) => write!(f, "@.str.{i}"),
+            LlvmName::Label(i, j) => write!(f, "%l.{i}.{j}"),
+            LlvmName::Global(s) => write!(f, "@{}", s.resolve().name.id.resolve()),
         }
     }
 }
 
-impl From<bool> for LlvmValue {
+impl From<bool> for LlvmName {
     fn from(value: bool) -> Self {
         Self::Bool(value)
     }

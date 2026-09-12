@@ -28,7 +28,7 @@ $(YACC_RS): $(C_Y)
 # 	clang -E -std=c89 rscs/hello.c > rscs/hello.i
 # 	./$(CC1) -m32 rscs/hello.i
 
-test: all llvm
+test: llvm all
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
 	cargo run --bin fcc -- -e ./rscs/hello.c -o /dev/stdout
 	@# ./a.out || echo $$?

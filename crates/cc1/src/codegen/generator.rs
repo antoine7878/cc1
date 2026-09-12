@@ -4,11 +4,9 @@ use crate::ast::visit::walk_translation_unit;
 use crate::ast::{
     ExpressionNode, FunctionDefinitionNode, JumpStatement, JumpStatementNode, TranslationUnitNode, Visitor,
 };
-use crate::codegen::Globals;
-use crate::codegen::llvm::{Builder, LlvmValue};
-use crate::codegen::local::Locals;
+use crate::codegen::{Builder, Globals, LlvmSymbol, Locals};
 use crate::context::ctx;
-use crate::semantic::{Initializer, ResolvedType, sema};
+use crate::semantic::{Initializer, sema};
 
 pub fn generate() {
     generate_to(stdout());
@@ -40,18 +38,18 @@ impl<W: Write> Generator<W> {
             let Some(init) = sym.initializer else { continue };
             let ty = id.resolve().ty.unwrap().llvm();
             match init.resolve() {
-                Initializer::Zero => self.b.store(ty, LlvmValue::zero(), self.locals[id]),
-                Initializer::Value(v) => self.b.store(ty, v.llvm(), self.locals[id]),
-                Initializer::Address(_) => todo!("address init"),
+                Initializer::Zero => self.b.store(LlvmSymbol::from(0), self.locals[id]),
+                Initializer::Value(v) => self.b.store(LlvmSymbol::cst(ty, *v), self.locals[id]),
                 Initializer::String(s) => {
                     let &a = self.globals.get_literal(*s).unwrap();
-                    self.b.store(ty, a, self.locals[id])
+                    self.b.store(a, self.locals[id]);
                 }
                 Initializer::List(_) => todo!("list init"),
                 Initializer::Expr(e) => {
                     let v = self.fold_expression(e);
-                    self.b.store(ty, v, self.locals[id])
+                    self.b.store(v, self.locals[id])
                 }
+                Initializer::Address(_) => todo!("address init"),
             }
         }
     }
@@ -66,10 +64,8 @@ impl<W: Write> Visitor for Generator<W> {
 
     fn visit_function_definition(&mut self, node: &FunctionDefinitionNode) {
         let sym = sema().declarations[&node.declarator.id].resolve();
-        let ty = sym.ty.unwrap().id.resolve();
-        let ResolvedType::Function { ret, .. } = ty else { unreachable!() };
-        let ret_ty = ret.id.resolve();
-        self.b.define(ret_ty.llvm(), sym.name.id.resolve());
+        let f = self.globals.get_function(sym.name.id).unwrap();
+        self.b.define(*f);
         self.allocas(node);
         self.visit_compound_statement(&node.body);
         self.b.end_function();
@@ -78,9 +74,8 @@ impl<W: Write> Visitor for Generator<W> {
     fn visit_jump_statement(&mut self, node: &JumpStatementNode) {
         match &node.stmt {
             JumpStatement::Return(Some(e)) => {
-                let ty = sema().expr_types[e.id].ty.llvm();
                 let v = self.fold_expression(e);
-                self.b.ret(ty, v);
+                self.b.ret(v);
             }
             JumpStatement::Return(None) => self.b.ret_void(),
             _ => todo!(),
