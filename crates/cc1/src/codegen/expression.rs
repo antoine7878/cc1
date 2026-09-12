@@ -26,6 +26,7 @@ impl<W: Write> Generator<W> {
     }
 
     fn convert(&mut self, v: LlvmSymbol, from: QualifiedType, cast: &ImplicitCast) -> Result<LlvmSymbol, Diagnosis> {
+        let mut v = v;
         let to = cast.to;
         let conv = match cast.kind {
             CastKind::ArrayToPointer | CastKind::FunctionToPointer | CastKind::PointerConversion => return Ok(v),
@@ -37,7 +38,7 @@ impl<W: Write> Generator<W> {
             CastKind::FloatingToInteger => Some(Self::f_to_i(to)),
             CastKind::FloatingConversion => Self::f_to_f(from, to),
             CastKind::PointerToInteger => Some("ptrtoint"),
-            CastKind::IntegerToPointer => self.i_to_p(v, from),
+            CastKind::IntegerToPointer => self.i_to_p(&mut v, from),
         };
         Ok(match conv {
             Some(conv) => self.b.convert(conv, v, to.llvm()),
@@ -74,9 +75,9 @@ impl<W: Write> Generator<W> {
         }
     }
 
-    fn i_to_p(&mut self, v: LlvmSymbol, from: QualifiedType) -> Option<&'static str> {
+    fn i_to_p(&mut self, v: &mut LlvmSymbol, from: QualifiedType) -> Option<&'static str> {
         if let Some(ext) = Self::i_to_i_size(from, ctx().target.pointer.size) {
-            self.b.convert(ext, v, LlvmType::ptr_size());
+            *v = self.b.convert(ext, *v, LlvmType::ptr_size());
         }
         Some("inttoptr")
     }
@@ -181,7 +182,7 @@ impl<W: Write> Generator<W> {
         let re_operand = &sema().expr_types[operand.id];
         let qty = re_operand.casted_ty();
         let v = self.fold_expression(operand)?;
-        let v = self.to_bool(v, qty)?;
+        let v = self.neq_zero(v, qty)?;
         let xor = LlvmOperator::unary(op, qty)?;
         let v = self.b.binop(xor, v, LlvmSymbol::from(true));
         Ok(self.zext_to_int(v))
@@ -237,7 +238,7 @@ impl<W: Write> Generator<W> {
     ) -> Result<LlvmSymbol, Diagnosis> {
         let initial_block = self.b.current_block;
         let v = self.fold_expression(lhs)?;
-        let v = self.to_bool(v, sema().expr_types[lhs.id].casted_ty())?;
+        let v = self.neq_zero(v, sema().expr_types[lhs.id].casted_ty())?;
         let i = v.name.ssa_value()?;
         let l1 = LlvmName::label(i, 1);
         let l2 = LlvmName::label(i, 2);
@@ -249,7 +250,7 @@ impl<W: Write> Generator<W> {
 
         self.b.named_label(l1);
         let v = self.fold_expression(rhs)?;
-        let v = self.to_bool(v, sema().expr_types[rhs.id].casted_ty())?;
+        let v = self.neq_zero(v, sema().expr_types[rhs.id].casted_ty())?;
         let rhs_block = self.b.current_block;
         self.b.br(v, l2, None);
 
@@ -284,7 +285,7 @@ impl<W: Write> Generator<W> {
         b: &ExpressionNode,
     ) -> Result<LlvmSymbol, Diagnosis> {
         let v = self.fold_expression(cond)?;
-        let v = self.to_bool(v, sema().expr_types[cond.id].casted_ty())?;
+        let v = self.neq_zero(v, sema().expr_types[cond.id].casted_ty())?;
 
         let i = v.name.ssa_value()?;
         let l1 = LlvmName::label(i, 0);
@@ -320,7 +321,7 @@ impl<W: Write> Generator<W> {
         Ok(self.b.getelementptr(arr, idx1, idx2))
     }
 
-    fn to_bool(&mut self, v: LlvmSymbol, qty: QualifiedType) -> Result<LlvmSymbol, Diagnosis> {
+    fn neq_zero(&mut self, v: LlvmSymbol, qty: QualifiedType) -> Result<LlvmSymbol, Diagnosis> {
         let op = LlvmOperator::binary(&BinaryOp::Neq, qty)?;
         Ok(self.b.cmp(op, v, LlvmSymbol::zero(qty)))
     }
