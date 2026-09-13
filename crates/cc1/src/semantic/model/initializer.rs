@@ -32,7 +32,7 @@ impl Initializer {
     }
 
     pub fn is_empty(&self) -> Option<bool> {
-        unimplemented!()
+        self.len().map(|l| l == 0)
     }
 }
 
