@@ -1,6 +1,7 @@
 use std::env::temp_dir;
 use std::fs::{create_dir, remove_dir_all};
 use std::io::ErrorKind;
+use std::mem::forget;
 use std::path::{Path, PathBuf};
 use std::process::id;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -39,7 +40,9 @@ impl TmpDir {
     }
 
     pub fn keep(self) -> PathBuf {
-        self.path.clone()
+        let path = self.path.clone();
+        forget(self);
+        path
     }
 }
 
