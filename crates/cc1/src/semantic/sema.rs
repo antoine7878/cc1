@@ -53,6 +53,7 @@ pub struct Sema {
     pub externals: HashMap<StringId, External>,
     pub stmts: SideTable<StatementId, ResolvedStatement>,
 
+    pub function_defs: HashMap<DeclaratorId, FunctionDefId>,
     pub layouts: HashMap<ResolvedTypeId, Layout>,
     pub target: Target,
 }
@@ -83,6 +84,7 @@ impl Sema {
             member_refs: SideTable::default(),
             stmts: SideTable::default(),
 
+            function_defs: HashMap::default(),
             declarations: HashMap::default(),
             externals: HashMap::default(),
 

@@ -372,9 +372,10 @@ impl<W: Write> Generator<W> {
         Ok(self.b.phi(va, a_block, vb, b_block))
     }
 
-    fn call(&mut self, f: &ExpressionNode, _args: &[ExpressionNode]) -> Result<LlvmSymbol, Diagnosis> {
+    fn call(&mut self, f: &ExpressionNode, args: &[ExpressionNode]) -> Result<LlvmSymbol, Diagnosis> {
         let f = self.fold_expression(f)?;
-        Ok(self.b.call(f))
+        let args = args.iter().map(|e| self.fold_expression(e)).collect::<Result<Vec<_>, Diagnosis>>()?;
+        Ok(self.b.call(f, args.as_slice()))
     }
 
     fn array_subscript(&mut self, array: &ExpressionNode, idx: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {

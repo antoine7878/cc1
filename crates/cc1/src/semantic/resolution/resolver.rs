@@ -240,6 +240,7 @@ impl Visitor for SymbolResolver<'_> {
         let Some(header) = declaration::define_function(self, node) else { return };
         let f = header.id;
         self.current_function = Some(f);
+        self.sema.function_defs.insert(node.declarator.id, f);
         declaration::bind_function_parameters(self, node, &header);
         self.visit_compound_statement(&node.body);
         self.resolve_gotos(f);

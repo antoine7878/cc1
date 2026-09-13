@@ -44,9 +44,8 @@ impl<W: Write> Generator<W> {
         self.emit(res, &e.span);
     }
 
-    fn allocas(&mut self, node: &FunctionDefinitionNode) {
-        self.locals.collect(node);
-        self.b.reset(0);
+    fn allocas(&mut self) {
+        self.b.reset(self.locals.parameters.len().saturating_sub(1));
         self.locals.emit(&mut self.b);
 
         for id in self.locals.order_iter() {
@@ -81,8 +80,9 @@ impl<W: Write> Visitor for Generator<W> {
     fn visit_function_definition(&mut self, node: &FunctionDefinitionNode) {
         let sym = sema().declarations[&node.declarator.id].resolve();
         let f = self.globals.get_function(sym.name.id).unwrap();
-        self.b.define(*f);
-        self.allocas(node);
+        self.locals.collect(node);
+        self.b.define(*f, self.locals.parameters.as_slice());
+        self.allocas();
         self.visit_compound_statement(&node.body);
         self.b.end_function();
     }

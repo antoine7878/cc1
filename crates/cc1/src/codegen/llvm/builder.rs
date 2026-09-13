@@ -2,8 +2,7 @@ use std::fmt::{self};
 use std::io::Write;
 
 use crate::ast::StringConstant;
-use crate::codegen::LlvmSymbol;
-use crate::codegen::llvm::{LlvmName, LlvmType};
+use crate::codegen::{LlvmName, LlvmSymbol, LlvmType};
 
 #[derive(Debug)]
 pub struct Builder<W: Write> {
@@ -47,9 +46,21 @@ impl<W: Write> Builder<W> {
         self.line(format_args!(""));
     }
 
-    pub fn define(&mut self, binding: LlvmSymbol) {
+    pub fn define(&mut self, binding: LlvmSymbol, parameters: &[LlvmSymbol]) {
         self.blank();
-        self.line(format_args!("define {}() {{", binding));
+        let _ = self.w.write_fmt(format_args!("define {}(", binding));
+        self.params(parameters);
+        let _ = self.w.write_fmt(format_args!(") {{\n"));
+    }
+
+    fn params(&mut self, parameters: &[LlvmSymbol]) {
+        let mut it = parameters.iter().peekable();
+        while let Some(param) = it.next() {
+            let _ = self.w.write_fmt(format_args!("{param}"));
+            if it.peek().is_some() {
+                let _ = self.w.write_fmt(format_args!(", "));
+            }
+        }
     }
 
     pub fn end_function(&mut self) {
@@ -139,9 +150,11 @@ impl<W: Write> Builder<W> {
         LlvmSymbol::new(ty, s)
     }
 
-    pub fn call(&mut self, f: LlvmSymbol) -> LlvmSymbol {
+    pub fn call(&mut self, f: LlvmSymbol, parameters: &[LlvmSymbol]) -> LlvmSymbol {
         let r = self.fresh();
-        self.line(format_args!("  {r} = call {f}()"));
+        let _ = self.w.write_fmt(format_args!("  {r} = call {f}("));
+        self.params(parameters);
+        let _ = self.w.write_fmt(format_args!(")\n"));
         LlvmSymbol::new(f.ty, r)
     }
 

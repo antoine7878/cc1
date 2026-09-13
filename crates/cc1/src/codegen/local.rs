@@ -1,17 +1,26 @@
 use std::collections::HashMap;
 use std::io::Write;
+use std::iter;
 use std::ops::Index;
 use std::vec::IntoIter;
 
 use crate::ast::visit::walk_init_declarator;
 use crate::ast::{FunctionDefinitionNode, InitDeclaratorNode, Visitor};
-use crate::codegen::{Builder, LlvmSymbol};
-use crate::semantic::{Duration, SymbolId, sema};
+use crate::codegen::{Builder, LlvmName, LlvmSymbol, LlvmType};
+use crate::semantic::{Duration, FunctionDefId, SymbolId, sema};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Locals {
     map: HashMap<SymbolId, LlvmSymbol>,
     order: Vec<SymbolId>,
+    f: FunctionDefId,
+    pub parameters: Vec<LlvmSymbol>,
+}
+
+impl Default for Locals {
+    fn default() -> Self {
+        Self { map: HashMap::default(), order: Vec::default(), f: 0.into(), parameters: Vec::default() }
+    }
 }
 
 impl Index<SymbolId> for Locals {
@@ -31,9 +40,20 @@ impl Locals {
         self.order.clone().into_iter()
     }
 
-    pub fn collect(&mut self, node: &FunctionDefinitionNode) {
+    fn clear(&mut self) {
         self.map.clear();
         self.order.clear();
+        self.parameters.clear();
+    }
+
+    pub fn collect(&mut self, node: &FunctionDefinitionNode) {
+        self.clear();
+        self.f = sema().function_defs[&node.declarator.id];
+        for (i, param) in self.f.resolve().parameters.iter().enumerate() {
+            self.order.push(*param);
+            let v = LlvmSymbol::new(param.resolve().ty.llvm(), LlvmName::SSA(i));
+            self.parameters.push(v);
+        }
         self.visit_compound_statement(&node.body);
     }
 
@@ -43,25 +63,10 @@ impl Locals {
             let slot = b.alloca(qty.llvm());
             self.map.insert(*id, slot);
         }
-
-        // for id in &self.order {
-        //     let sym = id.resolve();
-        //     let Some(init) = sym.initializer else { continue };
-        //     let ty = id.resolve().ty.unwrap().llvm();
-        //     match init.resolve() {
-        //         Initializer::Zero => b.store(ty, LlvmValue::zero(), self.map[id]),
-        //         Initializer::Value(v) => b.store(ty, v.llvm(), self.map[id]),
-        //         Initializer::Address(_) => todo!("address init"),
-        //         Initializer::String(s) => {
-        //             let str = s.resolve();
-        //         }
-        //         Initializer::List(_) => todo!("list init"),
-        //         Initializer::Expr(e) => match e.resolve() {
-        //             Expression::Constant(e) => b.store(ty, e.value.llvm(), self.map[id]),
-        //             e => todo!(),
-        //         },
-        //     }
-        // }
+        for (param, id) in iter::zip(&self.parameters, &self.order) {
+            let local = self.map[id];
+            b.store(*param, local);
+        }
     }
 }
 
