@@ -74,9 +74,6 @@ impl From<i32> for LlvmSymbol {
 
 impl Display for LlvmSymbol {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.ty {
-            LlvmType::First(LlvmFirstType::Void) => write!(f, "void"),
-            _ => write!(f, "{} {}", self.ty, self.name),
-        }
+        write!(f, "{} {}", self.ty, self.name)
     }
 }

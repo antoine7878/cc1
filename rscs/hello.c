@@ -1,5 +1,8 @@
+void f(void) {
+	return;
+}
+
 int main(void) {
-	int x = 40;
-	int y = x++;
-	return x + y;
+	f();
+	return 42;
 }

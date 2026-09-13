@@ -45,7 +45,7 @@ impl<W: Write> Generator<W> {
     }
 
     fn allocas(&mut self) {
-        self.b.reset(self.locals.parameters.len().saturating_sub(1));
+        self.b.reset(self.locals.parameters.len());
         self.locals.emit(&mut self.b);
 
         for id in self.locals.order_iter() {

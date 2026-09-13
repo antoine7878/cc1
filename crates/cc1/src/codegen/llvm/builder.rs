@@ -152,7 +152,10 @@ impl<W: Write> Builder<W> {
 
     pub fn call(&mut self, f: LlvmSymbol, parameters: &[LlvmSymbol]) -> LlvmSymbol {
         let r = self.fresh();
-        let _ = self.w.write_fmt(format_args!("  {r} = call {f}("));
+        let _ = match f.ty.is_void() {
+            true => self.w.write_fmt(format_args!("  call {f}(")),
+            false => self.w.write_fmt(format_args!("  {r} = call {f}(")),
+        };
         self.params(parameters);
         let _ = self.w.write_fmt(format_args!(")\n"));
         LlvmSymbol::new(f.ty, r)

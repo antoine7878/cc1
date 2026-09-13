@@ -55,6 +55,10 @@ impl LlvmType {
             LlvmType::Array(len, elem) => *len as u32 * elem.size(),
         }
     }
+
+    pub fn is_void(&self) -> bool {
+        matches!(self, LlvmType::First(LlvmFirstType::Void))
+    }
 }
 
 impl From<&ResolvedTypeId> for LlvmType {
