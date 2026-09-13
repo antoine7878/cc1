@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::{
     ast::ConstValue,
-    codegen::{LlvmName, LlvmType, llvm::types::LlvmFirstType},
+    codegen::{LlvmName, LlvmType},
     semantic::{QualifiedType, sema},
 };
 

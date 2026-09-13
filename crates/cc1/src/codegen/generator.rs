@@ -4,7 +4,8 @@ use libft::Span;
 
 use crate::ast::visit::walk_translation_unit;
 use crate::ast::{
-    ExpressionNode, FunctionDefinitionNode, JumpStatement, JumpStatementNode, TranslationUnitNode, Visitor,
+    ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, JumpStatement, JumpStatementNode, TranslationUnitNode,
+    Visitor,
 };
 use crate::codegen::{Builder, Globals, LlvmSymbol, Locals};
 use crate::context::ctx;
@@ -102,4 +103,6 @@ impl<W: Write> Visitor for Generator<W> {
         let res = self.fold_expression(node).map(|_| ());
         self.emit(res, &node.span);
     }
+
+    fn visit_init_declarator(&mut self, _node: &InitDeclaratorNode) {}
 }
