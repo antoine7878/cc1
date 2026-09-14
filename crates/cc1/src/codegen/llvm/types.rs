@@ -202,11 +202,11 @@ fn tag_name(f: &mut fmt::Formatter<'_>, id: TagDefId) -> fmt::Result {
         Tag::Enum => return write!(f, "{}", LlvmType::int()),
     };
     let Some(name) = def.name else {
-        return write!(f, "%{kind}.anon.{id}");
+        return write!(f, "%{kind}.anon.{}", usize::from(id));
     };
     let shadowed = sema().tags.iter().filter(|t| t.name.is_some_and(|n| n.id == name.id)).count() > 1;
     match shadowed {
-        true => write!(f, "%{kind}.{}.{id}", name.id.resolve()),
+        true => write!(f, "%{kind}.{}.{}", name.id.resolve(), usize::from(id)),
         false => write!(f, "%{kind}.{}", name.id.resolve()),
     }
 }

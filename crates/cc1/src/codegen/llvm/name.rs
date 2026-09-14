@@ -45,12 +45,12 @@ impl Display for LlvmName {
             }
             LlvmName::Constant(value) => write!(f, "{value}"),
             LlvmName::Bool(b) => write!(f, "{b}"),
-            LlvmName::StringLiteral(i) => write!(f, "@.str.{}", i),
+            LlvmName::StringLiteral(i) => write!(f, "@.str.{}", usize::from(*i)),
             LlvmName::Label(i, j) => write!(f, "%l.{i}.{j}"),
             LlvmName::Global(s) => {
                 let sym = s.resolve();
                 match sym.linkage {
-                    Linkage::None => write!(f, "@{}.{s}", sym.name.id.resolve()),
+                    Linkage::None => write!(f, "@{}.{}", sym.name.id.resolve(), usize::from(*s)),
                     _ => write!(f, "@{}", sym.name.id.resolve()),
                 }
             }
