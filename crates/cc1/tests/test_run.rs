@@ -46,25 +46,25 @@ exits!(signed_remainder_negative, "int main(void) { int a; a = -85; return -(a %
 exits!(arithmetic_shift, "int main(void) { int a; a = -168; return -(a >> 2); }", 42);
 exits!(logical_shift, "int main(void) { unsigned a; a = 0xa8000000u; return a >> 26; }", 42);
 
-// exits!(ignore "call ptr instead of call <ret ty>", call_in_expression, "int f(void) { return 6; } int g(void) { return 7; } int main(void) { return f() * g(); }", 42);
-// exits!(ignore "call ptr instead of call <ret ty>", call_prototype_first, "int f(void); int main(void) { return f(); } int f(void) { return 42; }", 42);
-// exits!(ignore "call arguments", call_two_arguments, "int f(int a, int b) { return a * b; } int main(void) { return f(6, 7); }", 42);
-// exits!(ignore "call arguments", call_char_argument, "int f(char c) { return c; } int main(void) { return f(42); }", 42);
-// exits!(ignore "call arguments", call_short_argument, "int f(short s) { return s; } int main(void) { return f(42); }", 42);
-// exits!(ignore "call arguments", recursion, "int fact(int n) { return n ? n * fact(n - 1) : 1; } int main(void) { return fact(5) - 78; }", 42);
+exits!(ignore "call ptr instead of call <ret ty>", call_in_expression, "int f(void) { return 6; } int g(void) { return 7; } int main(void) { return f() * g(); }", 42);
+exits!(ignore "call ptr instead of call <ret ty>", call_prototype_first, "int f(void); int main(void) { return f(); } int f(void) { return 42; }", 42);
+exits!(ignore "call arguments", call_two_arguments, "int f(int a, int b) { return a * b; } int main(void) { return f(6, 7); }", 42);
+exits!(ignore "call arguments", call_char_argument, "int f(char c) { return c; } int main(void) { return f(42); }", 42);
+exits!(ignore "call arguments", call_short_argument, "int f(short s) { return s; } int main(void) { return f(42); }", 42);
+exits!(ignore "call arguments", recursion, "int fact(int n) { return n ? n * fact(n - 1) : 1; } int main(void) { return fact(5) - 78; }", 42);
 
 exits!(if_true, "int main(void) { if (1) return 42; return 7; }", 42);
-// exits!(ignore "control flow", if_false, "int main(void) { if (0) return 7; return 42; }", 42);
-// exits!(ignore "control flow", if_else, "int main(void) { if (0) return 7; else return 42; }", 42);
-// exits!(ignore "control flow", while_loop, "int main(void) { int i; i = 0; while (i < 42) i++; return i; }", 42);
-// exits!(ignore "control flow", do_while, "int main(void) { int i; i = 0; do i++; while (i < 42); return i; }", 42);
-// exits!(ignore "control flow", for_loop, "int main(void) { int i; int s; s = 0; for (i = 0; i < 7; i++) s += 6; return s; }", 42);
-// exits!(ignore "control flow", break_loop, "int main(void) { int i; for (i = 0; ; i++) if (i == 42) break; return i; }", 42);
-// exits!(ignore "control flow", continue_loop, "int main(void) { int i; int s; s = 0; for (i = 0; i < 10; i++) { if (i % 2) continue; s += i; } return s + 22; }", 42);
-// exits!(ignore "control flow", goto_label, "int main(void) { int i; i = 0; again: i++; if (i < 42) goto again; return i; }", 42);
-// exits!(ignore "switch", switch_case, "int main(void) { switch (2) { case 1: return 1; case 2: return 42; default: return 3; } }", 42);
-// exits!(ignore "switch", switch_default, "int main(void) { switch (9) { case 1: return 1; default: return 42; } }", 42);
-// exits!(ignore "switch", switch_fallthrough, "int main(void) { int x; x = 40; switch (1) { case 1: x++; case 2: x++; break; case 3: x = 0; } return x; }", 42);
+exits!(ignore "control flow", if_false, "int main(void) { if (0) return 7; return 42; }", 42);
+exits!(ignore "control flow", if_else, "int main(void) { if (0) return 7; else return 42; }", 42);
+exits!(ignore "control flow", while_loop, "int main(void) { int i; i = 0; while (i < 42) i++; return i; }", 42);
+exits!(ignore "control flow", do_while, "int main(void) { int i; i = 0; do i++; while (i < 42); return i; }", 42);
+exits!(ignore "control flow", for_loop, "int main(void) { int i; int s; s = 0; for (i = 0; i < 7; i++) s += 6; return s; }", 42);
+exits!(ignore "control flow", break_loop, "int main(void) { int i; for (i = 0; ; i++) if (i == 42) break; return i; }", 42);
+exits!(ignore "control flow", continue_loop, "int main(void) { int i; int s; s = 0; for (i = 0; i < 10; i++) { if (i % 2) continue; s += i; } return s + 22; }", 42);
+exits!(ignore "control flow", goto_label, "int main(void) { int i; i = 0; again: i++; if (i < 42) goto again; return i; }", 42);
+exits!(ignore "switch", switch_case, "int main(void) { switch (2) { case 1: return 1; case 2: return 42; default: return 3; } }", 42);
+exits!(ignore "switch", switch_default, "int main(void) { switch (9) { case 1: return 1; default: return 42; } }", 42);
+exits!(ignore "switch", switch_fallthrough, "int main(void) { int x; x = 40; switch (1) { case 1: x++; case 2: x++; break; case 3: x = 0; } return x; }", 42);
 exits!(nested_blocks, "int main(void) { int x; x = 1; { int x; x = 7; } return x + 41; }", 42);
 
 exits!(short_circuit_and, "int f(void) { return 0; } int main(void) { int x; x = 42; (0 && (x = 1)); return x; }", 42);
@@ -75,10 +75,53 @@ exits!(long_arithmetic, "int main(void) { long a; a = 100000L; return (a * 42) /
 exits!(sizeof_int, "int main(void) { return sizeof(int) * 10 + 2; }", 42);
 exits!(sizeof_expr, "int main(void) { long l; return sizeof l * 10 + 2; }", 42);
 exits!(cast, "int main(void) { return (int) 42.9; }", 42);
-// exits!(ignore "globals", global_variable, "int g; int main(void) { g = 42; return g; }", 42);
-// exits!(ignore "globals", global_initialized, "int g = 42; int main(void) { return g; }", 42);
-// exits!(ignore "globals", static_local, "int f(void) { static int n = 40; return ++n; } int main(void) { f(); return f(); }", 42);
-// exits!(ignore "aggregates", struct_member, "struct s { int a; int b; }; int main(void) { struct s v; v.a = 40; v.b = 2; return v.a + v.b; }", 42);
+exits!(global_variable, "int g; int main(void) { g = 42; return g; }", 42);
+exits!(global_initialized, "int g = 42; int main(void) { return g; }", 42);
+exits!(static_local, "int f(void) { static int n = 40; return ++n; } int main(void) { f(); return f(); }", 42);
+exits!(global_short, "short g = -1; int main(void) { return g + 43; }", 42);
+exits!(global_char, "char g = 'A'; int main(void) { return g - 23; }", 42);
+exits!(global_unsigned, "unsigned g = 0xffffffffu; int main(void) { return g / 0x06185ea6u; }", 42);
+exits!(global_long, "long g = -100000L; int main(void) { return -(g / 2500) + 2; }", 42);
+exits!(global_double_from_int, "double g = 2; int main(void) { return g * 21; }", 42);
+exits!(global_float, "float g = 1.5; int main(void) { return g * 28; }", 42);
+exits!(global_long_double, "long double g = 0.5; int main(void) { return g * 84; }", 42);
+exits!(global_negative, "int g = -42; int main(void) { return -g; }", 42);
+exits!(global_const, "const int g = 42; int main(void) { return g; }", 42);
+exits!(global_enum, "enum e { A = 40, B }; enum e g = B; int main(void) { return g + 1; }", 42);
+exits!(global_tentative, "int g; int g; int main(void) { return g + 42; }", 42);
+exits!(global_extern_then_defined, "extern int g; int main(void) { return g; } int g = 42;", 42);
+exits!(global_static_internal, "static int g = 40; int main(void) { return g + 2; }", 42);
+exits!(global_null_pointer, "int *p = 0; int main(void) { return p == 0 ? 42 : 7; }", 42);
+exits!(global_pointer_to_global, "int g = 42; int *p = &g; int main(void) { return *p; }", 42);
+exits!(global_pointer_to_element, "int a[3] = {1, 2, 42}; int *p = &a[2]; int main(void) { return *p; }", 42);
+exits!(global_pointer_arithmetic, "int a[3] = {1, 42, 3}; int *p = a + 1; int main(void) { return *p; }", 42);
+exits!(global_function_pointer, "int f(void) { return 42; } int (*fp)(void) = f; int main(void) { return fp == f ? 42 : 7; }", 42);
+exits!(global_string_array, "char s[] = \"abc\"; int main(void) { return s[1] - 56; }", 42);
+exits!(global_string_array_padded, "char s[8] = \"ab\"; int main(void) { return s[0] - 55 + s[7]; }", 42);
+exits!(global_string_array_exact, "char s[2] = \"ab\"; int main(void) { return s[1] - 56; }", 42);
+exits!(global_string_pointer, "char *p = \"xyz\" + 1; int main(void) { return *p - 79; }", 42);
+exits!(global_array_partial, "int a[4] = {40, 2}; int main(void) { return a[0] + a[1] + a[2] + a[3]; }", 42);
+exits!(global_array_unsized, "int a[] = {1, 2, 3}; int main(void) { return sizeof a / sizeof a[0] * 14; }", 42);
+exits!(global_array_2d, "int a[2][3] = {{1, 2}, {3, 40}}; int main(void) { return a[1][1] + a[0][1]; }", 42);
+exits!(global_array_2d_flat, "int a[2][2] = {1, 2, 3, 40}; int main(void) { return a[1][1] + a[0][1]; }", 42);
+exits!(global_double_array, "double a[2] = {1, 41.0}; int main(void) { return (int) (a[0] + a[1]); }", 42);
+exits!(global_pointer_array, "int x = 42; int *a[2] = {0, &x}; int main(void) { return *a[1]; }", 42);
+exits!(global_struct, "struct s { char c; int a; } v = {'a', 42}; int *p = &v.a; int main(void) { return *p; }", 42);
+exits!(global_struct_partial, "struct s { int a; int b; } v = {42}; int *p = &v.b; int main(void) { return *p + 42; }", 42);
+exits!(global_struct_nested, "struct i { int a; }; struct o { char c; struct i in; } v = {'x', {42}}; int *p = &v.in.a; int main(void) { return *p; }", 42);
+exits!(global_struct_array, "struct s { char c; int a; } v[2] = {{'a', 1}, {'b', 42}}; int *p = &v[1].a; int main(void) { return *p; }", 42);
+exits!(global_struct_with_array, "struct s { int a[3]; } v = {{1, 2, 42}}; int *p = &v.a[2]; int main(void) { return *p; }", 42);
+exits!(global_union_first, "union u { int a; char c; } v = {42}; int *p = &v.a; int main(void) { return *p; }", 42);
+exits!(global_union_narrow, "union u { char c; int a; } v = {'*'}; char *p = &v.c; int main(void) { return *p; }", 42);
+exits!(global_union_pad, "union u { char c; int a; } v = {'*'}; int *p = &v.a; int main(void) { return *p & 0xff; }", 42);
+exits!(global_struct_zero, "struct s { char c; int a; } v; int *p = &v.a; int main(void) { return *p + 42; }", 42);
+exits!(global_struct_ptr_member, "int x = 42; struct s { int *p; } v = {&x}; int **pp = &v.p; int main(void) { return **pp; }", 42);
+exits!(global_struct_shadowed, "struct s { int a; } v = {40}; int *p = &v.a; int main(void) { struct s { char c; } w; return *p + sizeof w + 1; }", 42);
+exits!(static_local_twice, "int f(void) { static int n = 20; return ++n; } int g(void) { static int n = 0; return ++n; } int main(void) { f(); g(); return f() + g() * 10; }", 42);
+exits!(static_local_pointer, "int f(void) { static int n = 42; static int *p = &n; return *p; } int main(void) { return f(); }", 42);
+exits!(static_local_zero, "int f(void) { static int n; return n + 42; } int main(void) { return f(); }", 42);
+exits!(static_local_array, "int f(void) { static int a[2] = {2, 40}; return a[0] + a[1]; } int main(void) { return f(); }", 42);
+exits!(ignore "aggregates", struct_member, "struct s { int a; int b; }; int main(void) { struct s v; v.a = 40; v.b = 2; return v.a + v.b; }", 42);
 exits!(enum_constant, "enum e { A = 40, B }; int main(void) { return B + 1; }", 42);
 
 exits!(short_local, "int main(void) { short s; s = 1000; return s / 24 + 1; }", 42);
@@ -110,7 +153,11 @@ exits!(compound_assign_int_double, "int main(void) { int i; double d; i = 40; d 
 
 exits!(pointer_add, "int main(void) { int a[2]; int *p; a[1] = 42; p = a; return *(p + 1); }", 42);
 exits!(pointer_difference, "int main(void) { int a[3]; int *p; int *q; p = a; q = &a[2]; return (q - p) + 40; }", 42);
-exits!(pointer_comparison, "int main(void) { int a[2]; int *p; int *q; p = a; q = &a[1]; return (p < q) + (p == q) + 41; }", 42);
+exits!(
+    pointer_comparison,
+    "int main(void) { int a[2]; int *p; int *q; p = a; q = &a[1]; return (p < q) + (p == q) + 41; }",
+    42
+);
 exits!(pointer_increment, "int main(void) { int a[2]; int *p; a[0] = 1; a[1] = 42; p = a; p++; return *p; }", 42);
 
 exits!(array_index, "int main(void) { int a[3]; a[0] = 40; a[1] = 2; a[2] = a[0] + a[1]; return a[2]; }", 42);

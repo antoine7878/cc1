@@ -1,5 +1,5 @@
 use crate::ast::Tag;
-use crate::semantic::{Member, ResolvedType, ResolvedTypeId, Sema, TagDefId};
+use crate::semantic::{Member, ResolvedType, ResolvedTypeId, Sema, SymbolId, TagDefId};
 use crate::target::Layout;
 
 fn round_up(value: u64, multiple: u64) -> u64 {
@@ -29,6 +29,10 @@ pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Option<Layout> {
 pub fn finalize(sema: &mut Sema) {
     for index in 0..sema.tags.len() {
         let _ = of_tag(sema, TagDefId::from(index));
+    }
+    for index in 0..sema.symbols.len() {
+        let ty = sema.symbols.get(SymbolId::from(index)).ty;
+        let _ = of(sema, ty.id);
     }
 }
 

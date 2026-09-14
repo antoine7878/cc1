@@ -1,20 +1,21 @@
-use std::fmt::{self};
+use std::fmt::{self, Display};
 use std::io::Write;
+use std::iter::once;
 
-use crate::ast::StringConstant;
-use crate::codegen::{LlvmName, LlvmSymbol, LlvmType};
+use crate::codegen::{LlvmInit, LlvmName, LlvmSymbol, LlvmType};
+use crate::ast::Tag;
+use crate::semantic::{Definition, Linkage, SymbolId, TagDef, TagDefId, sema};
 
 #[derive(Debug)]
 pub struct Builder<W: Write> {
     w: W,
     counter: usize,
     pub current_block: LlvmName,
-    str_counter: usize,
 }
 
 impl<W: Write> Builder<W> {
     pub fn new(w: W) -> Self {
-        Self { w, counter: 0, str_counter: 0, current_block: LlvmName::SSA(0) }
+        Self { w, counter: 0, current_block: LlvmName::SSA(0) }
     }
 
     pub fn reset(&mut self, counter: usize) {
@@ -22,14 +23,13 @@ impl<W: Write> Builder<W> {
         self.counter = counter;
     }
 
-    pub fn fresh_string(&mut self) -> LlvmName {
-        self.str_counter += 1;
-        LlvmName::StringLiteral(self.str_counter)
-    }
-
     pub fn fresh(&mut self) -> LlvmName {
         self.counter += 1;
         LlvmName::SSA(self.counter)
+    }
+
+    fn write_all(&mut self, str: &[u8]) {
+        let _ = self.w.write_all(str);
     }
 
     fn line(&mut self, args: fmt::Arguments<'_>) {
@@ -46,21 +46,26 @@ impl<W: Write> Builder<W> {
         self.line(format_args!(""));
     }
 
-    pub fn define(&mut self, binding: LlvmSymbol, parameters: &[LlvmSymbol]) {
+    pub fn define(&mut self, binding: LlvmSymbol, parameters: &[LlvmSymbol], is_variadic: bool) {
         self.blank();
-        let _ = self.w.write_fmt(format_args!("define {}(", binding));
-        self.params(parameters);
-        let _ = self.w.write_fmt(format_args!(") {{\n"));
+        let _ = self.w.write_fmt(format_args!("define {}", binding));
+        self.params(parameters, is_variadic);
+        self.line(format_args!(" {{"));
     }
 
-    fn params(&mut self, parameters: &[LlvmSymbol]) {
+    fn params(&mut self, parameters: &[LlvmSymbol], is_variadic: bool) {
         let mut it = parameters.iter().peekable();
+        let _ = self.w.write_all(b"(");
         while let Some(param) = it.next() {
             let _ = self.w.write_fmt(format_args!("{param}"));
             if it.peek().is_some() {
-                let _ = self.w.write_fmt(format_args!(", "));
+                let _ = self.w.write_all(b", ");
             }
         }
+        if is_variadic {
+            let _ = self.w.write_all(b", ...");
+        }
+        let _ = self.w.write_all(b")");
     }
 
     pub fn end_function(&mut self) {
@@ -138,26 +143,14 @@ impl<W: Write> Builder<W> {
         LlvmSymbol::new(s1.ty, r)
     }
 
-    pub fn string_literal(&mut self, str: &StringConstant) -> LlvmSymbol {
-        let s = self.fresh_string();
-        let len = str.units.len() + 1;
-        let ty = if str.is_wide { LlvmType::int() } else { LlvmType::char() };
-        let _ = self.w.write_fmt(format_args!("{s} = private unnamed_addr constant [{len} x {ty}] ["));
-        for c in &str.units {
-            let _ = self.w.write_fmt(format_args!("{ty} {c}, "));
-        }
-        self.line(format_args!("{ty} 0]"));
-        LlvmSymbol::new(ty, s)
-    }
-
     pub fn call(&mut self, f: LlvmSymbol, parameters: &[LlvmSymbol]) -> LlvmSymbol {
         let r = self.fresh();
         let _ = match f.ty.is_void() {
-            true => self.w.write_fmt(format_args!("  call {f}(")),
-            false => self.w.write_fmt(format_args!("  {r} = call {f}(")),
+            true => self.w.write_fmt(format_args!("  call {f}")),
+            false => self.w.write_fmt(format_args!("  {r} = call {f}")),
         };
-        self.params(parameters);
-        let _ = self.w.write_fmt(format_args!(")\n"));
+        self.params(parameters, false);
+        self.line(format_args!(""));
         LlvmSymbol::new(f.ty, r)
     }
 
@@ -166,15 +159,79 @@ impl<W: Write> Builder<W> {
         self.line(format_args!("  {r} = getelementptr inbounds {elem}, ptr {}, {idx}", base.name));
         LlvmSymbol::ptr(r)
     }
+
+    pub fn string_literal(&mut self, s: LlvmSymbol, str: &[u32]) {
+        let len = str.len() + 1;
+        let ty = s.ty;
+        let _ = self.w.write_fmt(format_args!("{} = private unnamed_addr constant ", s.name));
+        self.array(ty, str.iter().chain(once(&0)), len);
+        self.blank();
+    }
+
+    fn array<T, I>(&mut self, ty: LlvmType, elems: I, len: usize)
+    where
+        I: IntoIterator<Item = T>,
+        T: Display,
+    {
+        let _ = self.w.write_fmt(format_args!("[{} x {ty}] [", len));
+        for (i, c) in elems.into_iter().enumerate() {
+            let _ = self.w.write_fmt(format_args!("{ty} {c}"));
+            if i != len - 1 {
+                let _ = self.w.write_all(b", ");
+            }
+        }
+        let _ = self.w.write_all(b"]");
+    }
+
+    pub fn type_def(&mut self, id: TagDefId) {
+        let def = id.resolve();
+        let ty = LlvmType::Tag(id);
+        match def.kind {
+            Tag::Enum => (),
+            _ if !def.is_complete => self.line(format_args!("{ty} = type opaque")),
+            Tag::Struct => self.struct_def(ty, def),
+            Tag::Union => self.union_def(ty, def),
+        }
+    }
+
+    fn struct_def(&mut self, ty: LlvmType, def: &TagDef) {
+        let _ = self.w.write_fmt(format_args!("{ty} = type {{ "));
+        let mut it = def.members.iter().peekable();
+        while let Some(member) = it.next() {
+            let sym = member.sym.expect("bitfield in a type definition");
+            let _ = self.w.write_fmt(format_args!("{}", sym.resolve().ty.llvm()));
+            if it.peek().is_some() {
+                self.write_all(b", ");
+            }
+        }
+        self.line(format_args!(" }}"));
+    }
+
+    fn union_def(&mut self, ty: LlvmType, def: &TagDef) {
+        let size = ty.size();
+        let members = def.members.iter().filter_map(|member| member.sym).map(|sym| sym.resolve().ty);
+        let Some(widest) = members.max_by_key(|qty| sema().layout(&qty.id).align) else {
+            return self.line(format_args!("{ty} = type {{ [{size} x {}] }}", LlvmType::char()));
+        };
+        match size - sema().layout(&widest.id).size {
+            0 => self.line(format_args!("{ty} = type {{ {} }}", widest.llvm())),
+            pad => self.line(format_args!("{ty} = type {{ {}, [{pad} x {}] }}", widest.llvm(), LlvmType::char())),
+        }
+    }
+
+    pub fn global(&mut self, sym_id: SymbolId) {
+        let sym = sym_id.resolve();
+        let name = LlvmName::Global(sym_id);
+        let align = sema().layout(&sym.ty.id).align;
+        let kind = if sym.ty.is_const { "constant" } else { "global" };
+        if sym.definition == Definition::Declaration {
+            return self.line(format_args!("{name} = external {kind} {}, align {align}", sym.ty.llvm()));
+        }
+        let linkage = match sym.linkage {
+            Linkage::External => "",
+            Linkage::Internal | Linkage::None => "internal ",
+        };
+        let init = LlvmInit::new(sym.ty, sym.initializer.map(|i| i.resolve()));
+        self.line(format_args!("{name} = {linkage}{kind} {init}, align {align}"));
+    }
 }
-
-// pub struct LlvmListInitilizer<'a> {
-//     values: &'a [LlvmValue],
-//     ty: LlvmType,
-// }
-
-// impl<'a> Display for LlvmListInitilizer<'a> {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         self.values.iter().try_for_each(|v| write!(f, "{}, {}", v, self.ty))
-//     }
-// }

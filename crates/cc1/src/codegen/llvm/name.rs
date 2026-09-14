@@ -1,13 +1,12 @@
 use std::fmt::{self, Display, Formatter};
 
-use crate::ast::ConstValue;
-use crate::semantic::{Diagnosis, SymbolId};
-
+use crate::ast::{ConstValue, StringConstId};
+use crate::semantic::{Diagnosis, Linkage, SymbolId};
 #[derive(Debug, Clone, Copy)]
 pub enum LlvmName {
     SSA(usize),
     Constant(ConstValue),
-    StringLiteral(usize),
+    StringLiteral(StringConstId),
     Bool(bool),
     Label(usize, usize),
     Global(SymbolId),
@@ -46,9 +45,15 @@ impl Display for LlvmName {
             }
             LlvmName::Constant(value) => write!(f, "{value}"),
             LlvmName::Bool(b) => write!(f, "{b}"),
-            LlvmName::StringLiteral(i) => write!(f, "@.str.{i}"),
+            LlvmName::StringLiteral(i) => write!(f, "@.str.{}", i),
             LlvmName::Label(i, j) => write!(f, "%l.{i}.{j}"),
-            LlvmName::Global(s) => write!(f, "@{}", s.resolve().name.id.resolve()),
+            LlvmName::Global(s) => {
+                let sym = s.resolve();
+                match sym.linkage {
+                    Linkage::None => write!(f, "@{}.{s}", sym.name.id.resolve()),
+                    _ => write!(f, "@{}", sym.name.id.resolve()),
+                }
+            }
             LlvmName::Null => write!(f, "null"),
             LlvmName::None => Ok(()),
         }

@@ -1,30 +1,47 @@
 ; ModuleID = 'rscs/hello.c'
 source_filename = "rscs/hello.c"
-target datalayout = "e-m:e-p:32:32-p270:32:32-p271:32:32-p272:64:64-i128:128-f64:32:64-f80:32-n8:16:32-S128"
-target triple = "i386-pc-linux-gnu"
+target datalayout = "e-m:o-p:32:32-Fi8-f64:32:64-v64:32:64-v128:32:128-a:0:32-n32-S32"
+target triple = "armv4t-apple-macosx26.0.0"
 
-; Function Attrs: noinline nounwind optnone uwtable
-define dso_local void @f() #0 {
-  ret void
+%struct.S = type { i32 }
+
+@x = global %struct.S { i32 1 }, align 4
+@b = global i16 1, align 2
+@a = global i32 0, align 4
+@arr = global [2 x i32] zeroinitializer, align 4
+
+; Function Attrs: noinline nounwind optnone ssp
+define ptr @h() #0 {
+  %1 = alloca [2 x i32], align 4
+  %2 = getelementptr inbounds [2 x i32], ptr %1, i32 0, i32 0
+  ret ptr %2
 }
 
-; Function Attrs: noinline nounwind optnone uwtable
-define dso_local i32 @main() #0 {
-  %1 = alloca i32, align 4
-  store i32 0, ptr %1, align 4
-  call void @f()
-  ret i32 42
+; Function Attrs: noinline nounwind optnone ssp
+define i32 @g() #0 {
+  %1 = load i32, ptr @a, align 4
+  ret i32 %1
 }
 
-attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="i686" "target-features"="+cmov,+cx8,+x87" "tune-cpu"="generic" }
+; Function Attrs: noinline nounwind optnone ssp
+define i32 @f() #0 {
+  %1 = alloca %struct.S, align 4
+  call void @llvm.memcpy.p0.p0.i32(ptr align 4 %1, ptr align 4 @x, i32 4, i1 false)
+  %2 = getelementptr inbounds nuw %struct.S, ptr %1, i32 0, i32 0
+  %3 = load i32, ptr %2, align 4
+  ret i32 %3
+}
 
-!llvm.module.flags = !{!0, !1, !2, !3, !4, !5}
-!llvm.ident = !{!6}
+; Function Attrs: nocallback nofree nosync nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i32(ptr noalias writeonly captures(none), ptr noalias readonly captures(none), i32, i1 immarg) #1
 
-!0 = !{i32 1, !"NumRegisterParameters", i32 0}
-!1 = !{i32 1, !"wchar_size", i32 4}
-!2 = !{i32 8, !"PIC Level", i32 2}
-!3 = !{i32 7, !"PIE Level", i32 2}
-!4 = !{i32 7, !"uwtable", i32 2}
-!5 = !{i32 7, !"frame-pointer", i32 2}
-!6 = !{!"Ubuntu clang version 18.1.3 (1ubuntu1)"}
+attributes #0 = { noinline nounwind optnone ssp "frame-pointer"="non-leaf-no-reserve" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="arm7tdmi" "target-features"="+armv4t,+soft-float,+strict-align,-aes,-bf16,-d32,-dotprod,-fp-armv8,-fp-armv8d16,-fp-armv8d16sp,-fp-armv8sp,-fp16,-fp16fml,-fp64,-fpregs,-fullfp16,-mve,-mve.fp,-neon,-sha2,-thumb-mode,-vfp2,-vfp2sp,-vfp3,-vfp3d16,-vfp3d16sp,-vfp3sp,-vfp4,-vfp4d16,-vfp4d16sp,-vfp4sp" "use-soft-float"="true" }
+attributes #1 = { nocallback nofree nosync nounwind willreturn memory(argmem: readwrite) }
+
+!llvm.module.flags = !{!0, !1, !2}
+!llvm.ident = !{!3}
+
+!0 = !{i32 1, !"min_enum_size", i32 4}
+!1 = !{i32 8, !"PIC Level", i32 2}
+!2 = !{i32 7, !"frame-pointer", i32 4}
+!3 = !{!"Homebrew clang version 23.1.0"}

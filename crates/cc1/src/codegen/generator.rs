@@ -9,7 +9,7 @@ use crate::ast::{
 };
 use crate::codegen::{Builder, Globals, LlvmSymbol, Locals};
 use crate::context::ctx;
-use crate::semantic::{Diagnosis, DiagnosisNode, Initializer, sema};
+use crate::semantic::{Diagnosis, DiagnosisNode, Initializer, SymbolId, sema};
 
 pub fn generate() -> Vec<DiagnosisNode> {
     generate_to(stdout())
@@ -45,28 +45,45 @@ impl<W: Write> Generator<W> {
         self.emit(res, &e.span);
     }
 
-    fn allocas(&mut self) {
+    fn emit_locals(&mut self) {
         self.b.reset(self.locals.parameters.len());
-        self.locals.emit(&mut self.b);
-
+        self.locals.emit_decl(&mut self.b);
         for id in self.locals.order_iter() {
-            let sym = id.resolve();
-            let Some(init) = sym.initializer else { continue };
-            let qty = sym.ty;
-            match init.resolve() {
-                Initializer::Zero => self.b.store(LlvmSymbol::zero(qty), self.locals[id]),
-                Initializer::Value(v) => {
-                    let v = self.constant(qty, *v);
-                    self.b.store(v, self.locals[id]);
-                }
-                Initializer::String(s) => {
-                    let &a = self.globals.get_literal(*s).unwrap();
-                    self.b.store(a, self.locals[id]);
-                }
-                Initializer::Expr(e) => self.fold_into(e, self.locals[id]),
-                Initializer::List(_) => todo!("list init"),
-                Initializer::Address(_) => todo!("address init"),
+            self.emit_init(id);
+        }
+    }
+
+    fn emit_init(&mut self, id: SymbolId) {
+        let sym = id.resolve();
+        let Some(init) = sym.initializer else { return };
+        let qty = sym.ty;
+        match init.resolve() {
+            Initializer::Zero => self.b.store(LlvmSymbol::zero(qty), self.locals[id]),
+            Initializer::Value(v) => {
+                let v = self.constant(qty, *v);
+                self.b.store(v, self.locals[id]);
             }
+            Initializer::String(s) => {
+                let &a = self.globals.get_literal(*s).unwrap();
+                self.b.store(a, self.locals[id]);
+            }
+            Initializer::Expr(e) => self.fold_into(e, self.locals[id]),
+            Initializer::List(_) => todo!("list init"),
+            Initializer::Address(_) => todo!("address init"),
+        }
+    }
+
+    fn emit_globals(&mut self) {
+        let mut strings: Vec<_> = self.globals.strings.iter().collect();
+        strings.sort_by_key(|(id, _)| usize::from(**id));
+        for (id, sym) in strings {
+            self.b.string_literal(*sym, id.resolve().units.as_slice());
+        }
+        for index in 0..sema().tags.len() {
+            self.b.type_def(index.into());
+        }
+        for sym in &self.globals.order {
+            self.b.global(*sym);
         }
     }
 }
@@ -74,16 +91,18 @@ impl<W: Write> Generator<W> {
 impl<W: Write> Visitor for Generator<W> {
     fn visit_translation_unit(&mut self, node: &TranslationUnitNode) {
         self.b.target(ctx().target.datalayout, ctx().target.triple);
-        self.globals.emit(&mut self.b);
+        self.globals.collect(node);
+        self.emit_globals();
+
         walk_translation_unit(self, node);
     }
 
     fn visit_function_definition(&mut self, node: &FunctionDefinitionNode) {
-        let sym = sema().declarations[&node.declarator.id].resolve();
-        let f = self.globals.get_function(sym.name.id).unwrap();
+        let sym = sema().declarations[&node.declarator.id];
+        let f = self.globals.get_symbol(sym).unwrap();
         self.locals.collect(node);
-        self.b.define(*f, self.locals.parameters.as_slice());
-        self.allocas();
+        self.b.define(*f, self.locals.parameters(), self.locals.is_variadic());
+        self.emit_locals();
         self.visit_compound_statement(&node.body);
         self.b.end_function();
     }

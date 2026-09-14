@@ -1,9 +1,9 @@
 use std::fmt;
 
 use crate::{
-    ast::ConstValue,
+    ast::{ConstValue, Tag},
     context::ctx,
-    semantic::{QualifiedType, ResolvedType, ResolvedTypeId, sema},
+    semantic::{QualifiedType, ResolvedType, ResolvedTypeId, TagDefId, sema},
 };
 
 impl ResolvedTypeId {
@@ -21,7 +21,8 @@ impl QualifiedType {
 #[derive(Debug, Clone, Copy)]
 pub enum LlvmType {
     First(LlvmFirstType),
-    Array(usize, LlvmFirstType),
+    Array(usize, ResolvedTypeId),
+    Tag(TagDefId),
 }
 
 impl LlvmType {
@@ -52,21 +53,16 @@ impl LlvmType {
     pub fn size(&self) -> u32 {
         match self {
             LlvmType::First(f) => f.size(),
-            LlvmType::Array(len, elem) => *len as u32 * elem.size(),
+            LlvmType::Array(len, elem) => *len as u32 * elem.llvm().size(),
+            LlvmType::Tag(id) => {
+                let ty = sema().types.lookup(&ResolvedType::Tag(*id)).expect("unregistered tag type");
+                sema().layout(&ty).size
+            }
         }
     }
 
     pub fn is_void(&self) -> bool {
         matches!(self, LlvmType::First(LlvmFirstType::Void))
-    }
-}
-
-impl From<&ResolvedTypeId> for LlvmType {
-    fn from(value: &ResolvedTypeId) -> Self {
-        match value.resolve() {
-            ResolvedType::Array { elem, len } => LlvmType::Array(len.unwrap(), LlvmFirstType::from(&elem.id)),
-            _ => LlvmType::First(LlvmFirstType::from(value)),
-        }
     }
 }
 
@@ -138,6 +134,17 @@ impl From<ConstValue> for LlvmFirstType {
     }
 }
 
+impl From<&ResolvedTypeId> for LlvmType {
+    fn from(value: &ResolvedTypeId) -> Self {
+        match value.resolve() {
+            ResolvedType::Function { ret, .. } => ret.llvm(),
+            ResolvedType::Array { elem, len } => LlvmType::Array(len.unwrap_or(0), elem.id),
+            ResolvedType::Tag(id) => LlvmType::Tag(*id),
+            _ => LlvmType::First(LlvmFirstType::from(value)),
+        }
+    }
+}
+
 impl From<&ResolvedTypeId> for LlvmFirstType {
     fn from(ty: &ResolvedTypeId) -> Self {
         match ty.resolve() {
@@ -155,9 +162,7 @@ impl From<&ResolvedTypeId> for LlvmFirstType {
             }
             ResolvedType::Void => LlvmFirstType::Void,
             ResolvedType::Pointer(_) => LlvmFirstType::Ptr,
-            // ResolvedType::Function { .. } => todo!(),
-            // ResolvedType::Tag { .. } => todo!(),
-            _ => todo!(),
+            ResolvedType::Function { .. } | ResolvedType::Tag { .. } | ResolvedType::Array { .. } => unreachable!(),
         }
     }
 }
@@ -178,12 +183,31 @@ impl fmt::Display for LlvmFirstType {
         }
     }
 }
+
 impl fmt::Display for LlvmType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LlvmType::First(t) => write!(f, "{t}"),
-            LlvmType::Array(len, t) => write!(f, "[{len} x {t}]"),
+            LlvmType::Array(len, t) => write!(f, "[{len} x {}]", t.llvm()),
+            LlvmType::Tag(id) => tag_name(f, *id),
         }
+    }
+}
+
+fn tag_name(f: &mut fmt::Formatter<'_>, id: TagDefId) -> fmt::Result {
+    let def = id.resolve();
+    let kind = match def.kind {
+        Tag::Struct => "struct",
+        Tag::Union => "union",
+        Tag::Enum => return write!(f, "{}", LlvmType::int()),
+    };
+    let Some(name) = def.name else {
+        return write!(f, "%{kind}.anon.{id}");
+    };
+    let shadowed = sema().tags.iter().filter(|t| t.name.is_some_and(|n| n.id == name.id)).count() > 1;
+    match shadowed {
+        true => write!(f, "%{kind}.{}.{id}", name.id.resolve()),
+        false => write!(f, "%{kind}.{}", name.id.resolve()),
     }
 }
 

@@ -63,7 +63,7 @@ impl<T> From<usize> for ArenaId<T> {
 
 impl<T> Display for ArenaId<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}Id({})", std::any::type_name::<T>().rsplit("::").next().unwrap_or("?"), self.0)
+        write!(f, "{}", self.0)
     }
 }
 

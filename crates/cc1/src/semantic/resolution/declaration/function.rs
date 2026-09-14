@@ -14,6 +14,12 @@ pub struct FunctionHeader {
     pub declared: Option<ParamTypes>,
 }
 
+impl Default for FunctionHeader {
+    fn default() -> Self {
+        Self { id: 0.into(), params: DeclaredParams::Unspecified, declared: None }
+    }
+}
+
 pub fn bind_function_parameters(resolver: &mut SymbolResolver, node: &FunctionDefinitionNode, header: &FunctionHeader) {
     resolver.enter_prototype();
     let lst = &node.old_style_declarations;
@@ -55,7 +61,9 @@ pub fn define_function(resolver: &mut SymbolResolver, node: &FunctionDefinitionN
         }
         _ => rty,
     };
-    let &ResolvedType::Function { ret: return_ty, .. } = ty.id.resolve_with(resolver.sema) else { unreachable!() };
+    let &ResolvedType::Function { ret: return_ty, .. } = ty.id.resolve_with(resolver.sema) else {
+        unreachable!()
+    };
     let is_defined_return = return_ty.is_void(resolver.sema) || return_ty.is_complete(resolver.sema);
     constrain::ty::check_definition_return(is_defined_return, return_ty).collect(resolver, decl_span);
     let prior = resolver.sema.linkage_of_name(name.id);

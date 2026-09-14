@@ -7,20 +7,14 @@ use std::vec::IntoIter;
 use crate::ast::visit::walk_init_declarator;
 use crate::ast::{FunctionDefinitionNode, InitDeclaratorNode, Visitor};
 use crate::codegen::{Builder, LlvmName, LlvmSymbol};
-use crate::semantic::{Duration, FunctionDefId, SymbolId, sema};
+use crate::semantic::{DeclaredParams, Duration, FunctionHeader, SymbolId, sema};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Locals {
     map: HashMap<SymbolId, LlvmSymbol>,
     order: Vec<SymbolId>,
-    f: FunctionDefId,
+    f: FunctionHeader,
     pub parameters: Vec<LlvmSymbol>,
-}
-
-impl Default for Locals {
-    fn default() -> Self {
-        Self { map: HashMap::default(), order: Vec::default(), f: 0.into(), parameters: Vec::default() }
-    }
 }
 
 impl Index<SymbolId> for Locals {
@@ -48,8 +42,9 @@ impl Locals {
 
     pub fn collect(&mut self, node: &FunctionDefinitionNode) {
         self.clear();
-        self.f = sema().function_defs[&node.declarator.id];
-        for (i, param) in self.f.resolve().parameters.iter().enumerate() {
+        self.f = sema().function_defs[&node.declarator.id].clone();
+
+        for (i, param) in self.f.id.resolve().parameters.iter().enumerate() {
             self.order.push(*param);
             let v = LlvmSymbol::new(param.resolve().ty.llvm(), LlvmName::SSA(i));
             self.parameters.push(v);
@@ -57,12 +52,21 @@ impl Locals {
         self.visit_compound_statement(&node.body);
     }
 
-    pub fn emit<W: Write>(&mut self, b: &mut Builder<W>) {
+    pub fn parameters(&self) -> &[LlvmSymbol] {
+        &self.parameters
+    }
+
+    pub fn is_variadic(&self) -> bool {
+        matches!(self.f.params, DeclaredParams::Prototype { is_variadic: true, .. })
+    }
+
+    pub fn emit_decl<W: Write>(&mut self, b: &mut Builder<W>) {
         for id in &self.order {
             let qty = id.resolve().ty;
             let slot = b.alloca(qty.llvm());
             self.map.insert(*id, slot);
         }
+
         for (param, id) in iter::zip(&self.parameters, &self.order) {
             let local = self.map[id];
             b.store(*param, local);

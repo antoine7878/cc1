@@ -123,12 +123,11 @@ impl<W: Write> Generator<W> {
     }
 
     fn ident(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let sym_id = sema().expr_bindings.get(node.id).invariant("unknown identifier")?;
-
-        if let Some(v) = self.globals.get_function(sym_id.resolve().name.id) {
+        let &sym_id = sema().expr_bindings.get(node.id).invariant("unknown identifier")?;
+        if let Some(v) = self.globals.get_symbol(sym_id) {
             return Ok(*v);
         }
-        self.locals.get(*sym_id).copied().invariant("unknown identifier")
+        self.locals.get(sym_id).copied().invariant("unknown identifier")
     }
 
     fn unary(&mut self, op: &UnaryOp, e: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {

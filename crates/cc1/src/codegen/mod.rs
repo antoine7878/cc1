@@ -6,7 +6,7 @@ pub mod local;
 
 pub use generator::{Generator, generate, generate_to};
 pub use global::Globals;
-pub use llvm::{Builder, LlvmName, LlvmOperator, LlvmSymbol, LlvmType};
+pub use llvm::{Builder, LlvmInit, LlvmName, LlvmOperator, LlvmSymbol, LlvmType};
 pub use local::Locals;
 
 use crate::semantic::Diagnosis;

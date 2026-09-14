@@ -6,6 +6,7 @@ use libft::Span;
 use crate::arena::{Global, Has, HasMut, HasTable, Owned, SideTable};
 use crate::ast::statement::StatementId;
 use crate::ast::{AstArenas, ConstValue, DeclaratorId, ExpressionId, StringId};
+use crate::semantic::declaration::FunctionHeader;
 use crate::semantic::{
     Builtins, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDef, FunctionDefArena, FunctionDefId,
     Initializer, InitializerArena, InitializerId, Linkage, MemberRef, ResolvedExpression, ResolvedStatement,
@@ -53,7 +54,7 @@ pub struct Sema {
     pub externals: HashMap<StringId, External>,
     pub stmts: SideTable<StatementId, ResolvedStatement>,
 
-    pub function_defs: HashMap<DeclaratorId, FunctionDefId>,
+    pub function_defs: HashMap<DeclaratorId, FunctionHeader>,
     pub layouts: HashMap<ResolvedTypeId, Layout>,
     pub target: Target,
 }
