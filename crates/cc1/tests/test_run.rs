@@ -180,5 +180,11 @@ exits!(negative_zero, "int main(void) { double d; d = 0.0; d = -d; return 1.0 / 
 
 exits!(call_void, "void f(void) { return; } int main(void) { f(); return 42; }", 42);
 exits!(call_argument, "int f(int x) { return x + 1; } int main(void) { return f(41); }", 42);
+exits!(declare_prototype, "int abs(int); int main(void) { return abs(-42); }", 42);
+exits!(declare_void, "void exit(int); int main(void) { exit(42); return 0; }", 42);
+exits!(declare_pointer_param, "int atoi(const char *); int main(void) { return atoi(\"42\"); }", 42);
+exits!(declare_unspecified, "int abs(); int main(void) { return abs(-42); }", 42);
+exits!(declare_variadic, "int sprintf(char *, const char *, ...); int atoi(const char *); int main(void) { char b[8]; sprintf(b, \"%d\", 42); return atoi(b); }", 42);
+exits!(declare_after_use, "int main(void) { return abs(-42); } int abs(int);", 42);
 
 exits!(initializer_evaluated_once, "int main(void) { int x = 40; int y = x++; return x + y; }", 81);

@@ -9,7 +9,7 @@ use crate::ast::{
 };
 use crate::codegen::{Builder, Globals, LlvmSymbol, Locals};
 use crate::context::ctx;
-use crate::semantic::{Diagnosis, DiagnosisNode, Initializer, SymbolId, sema};
+use crate::semantic::{Definition, Diagnosis, DiagnosisNode, Initializer, SymbolId, sema};
 
 pub fn generate() -> Vec<DiagnosisNode> {
     generate_to(stdout())
@@ -77,13 +77,18 @@ impl<W: Write> Generator<W> {
         let mut strings: Vec<_> = self.globals.strings.iter().collect();
         strings.sort_by_key(|(id, _)| usize::from(**id));
         for (id, sym) in strings {
-            self.b.string_literal(*sym, id.resolve().units.as_slice());
+            self.b.string_literal(sym.name, id.resolve());
         }
         for index in 0..sema().tags.len() {
             self.b.type_def(index.into());
         }
         for sym in &self.globals.order {
             self.b.global(*sym);
+        }
+        for sym in &self.globals.functions {
+            if sym.resolve().definition != Definition::Definition {
+                self.b.declare(*sym);
+            }
         }
     }
 }

@@ -3,8 +3,8 @@ use std::io::Write;
 use std::iter::once;
 
 use crate::codegen::{LlvmInit, LlvmName, LlvmSymbol, LlvmType};
-use crate::ast::Tag;
-use crate::semantic::{Definition, Linkage, SymbolId, TagDef, TagDefId, sema};
+use crate::ast::{StringConstant, Tag};
+use crate::semantic::{Definition, Linkage, ParamTypes, ResolvedType, SymbolId, TagDef, TagDefId, sema};
 
 #[derive(Debug)]
 pub struct Builder<W: Write> {
@@ -160,11 +160,11 @@ impl<W: Write> Builder<W> {
         LlvmSymbol::ptr(r)
     }
 
-    pub fn string_literal(&mut self, s: LlvmSymbol, str: &[u32]) {
-        let len = str.len() + 1;
-        let ty = s.ty;
-        let _ = self.w.write_fmt(format_args!("{} = private unnamed_addr constant ", s.name));
-        self.array(ty, str.iter().chain(once(&0)), len);
+    pub fn string_literal(&mut self, name: LlvmName, str: &StringConstant) {
+        let len = str.units.len() + 1;
+        let ty = if str.is_wide { LlvmType::int() } else { LlvmType::char() };
+        let _ = self.w.write_fmt(format_args!("{name} = private unnamed_addr constant "));
+        self.array(ty, str.units.iter().chain(once(&0)), len);
         self.blank();
     }
 
@@ -217,6 +217,30 @@ impl<W: Write> Builder<W> {
             0 => self.line(format_args!("{ty} = type {{ {} }}", widest.llvm())),
             pad => self.line(format_args!("{ty} = type {{ {}, [{pad} x {}] }}", widest.llvm(), LlvmType::char())),
         }
+    }
+
+    pub fn declare(&mut self, sym_id: SymbolId) {
+        let sym = sym_id.resolve();
+        let ResolvedType::Function { ret, params } = sym.ty.id.resolve() else {
+            unreachable!("declare on a non-function")
+        };
+        let _ = self.w.write_fmt(format_args!("declare {} {}(", ret.llvm(), LlvmName::Global(sym_id)));
+        match params {
+            ParamTypes::Unspecified => self.write_all(b"..."),
+            ParamTypes::Prototype { params, is_variadic } => {
+                let mut it = params.iter().peekable();
+                while let Some(param) = it.next() {
+                    let _ = self.w.write_fmt(format_args!("{}", param.llvm()));
+                    if it.peek().is_some() {
+                        self.write_all(b", ");
+                    }
+                }
+                if *is_variadic {
+                    self.write_all(if params.is_empty() { b"..." } else { b", ..." });
+                }
+            }
+        }
+        self.line(format_args!(")"));
     }
 
     pub fn global(&mut self, sym_id: SymbolId) {

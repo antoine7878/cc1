@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::ast::visit::walk_init_declarator;
 use crate::ast::{InitDeclaratorNode, StringConstId, TranslationUnitNode, Visitor};
 use crate::codegen::llvm::LlvmName;
-use crate::codegen::{LlvmSymbol, LlvmType};
+use crate::codegen::LlvmSymbol;
 use crate::context::ctx;
 use crate::semantic::{Duration, SymbolId, sema};
 
@@ -12,6 +12,7 @@ pub struct Globals {
     pub strings: HashMap<StringConstId, LlvmSymbol>,
     map: HashMap<SymbolId, LlvmSymbol>,
     pub order: Vec<SymbolId>,
+    pub functions: Vec<SymbolId>,
 }
 
 impl Globals {
@@ -28,6 +29,7 @@ impl Globals {
         self.collect_externals();
         self.visit_translation_unit(node);
         self.order.sort_by_key(|id| usize::from(*id));
+        self.functions.sort_by_key(|id| usize::from(*id));
     }
 
     fn collect_externals(&mut self) {
@@ -44,6 +46,7 @@ impl Globals {
         let name = LlvmName::Global(sym_id);
         if qty.is_function(sema()) {
             self.map.insert(sym_id, LlvmSymbol::new(qty.llvm(), name));
+            self.functions.push(sym_id);
             return;
         }
         self.map.insert(sym_id, LlvmSymbol::ptr(name));
@@ -51,10 +54,8 @@ impl Globals {
     }
 
     fn collect_literals(&mut self) {
-        for (i, str) in ctx().arenas.strings.iter().enumerate() {
-            let ty = if str.is_wide { LlvmType::int() } else { LlvmType::char() };
-            let v = LlvmSymbol::new(ty, LlvmName::StringLiteral(i.into()));
-            self.strings.insert(i.into(), v);
+        for i in 0..ctx().arenas.strings.len() {
+            self.strings.insert(i.into(), LlvmSymbol::ptr(LlvmName::StringLiteral(i.into())));
         }
     }
 }

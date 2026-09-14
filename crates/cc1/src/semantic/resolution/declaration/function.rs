@@ -211,6 +211,9 @@ pub fn implicit_declare_function(resolver: &mut SymbolResolver, fn_name: &Name, 
     let ret = QualifiedType::plain(resolver.sema.builtins.int);
     let fn_ty = resolver.sema.types.function(ret, ParamTypes::Unspecified);
     let ty = QualifiedType::plain(fn_ty);
-    let sym = Symbol::function(*fn_name, ty, Storage::Extern);
+    let prior = resolver.sema.linkage_of_name(fn_name.id);
+    let mut sym = Symbol::function(*fn_name, ty, Storage::Extern);
+    sym.linkage = Symbol::linkage_of(resolver.scope_kind(), Some(Storage::Extern), SymbolKind::Function, prior);
+    sym.definition = Definition::Declaration;
     resolver.declare(sym, span);
 }
