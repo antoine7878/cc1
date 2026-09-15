@@ -368,7 +368,10 @@ impl<W: Write> Generator<W> {
         self.b.br(v, l3, None);
 
         self.b.named_label(l3);
-        Ok(self.b.phi(va, a_block, vb, b_block))
+        match va.ty.is_void() {
+            true => Ok(va),
+            false => Ok(self.b.phi(va, a_block, vb, b_block)),
+        }
     }
 
     fn call(&mut self, f: &ExpressionNode, args: &[ExpressionNode]) -> Result<LlvmSymbol, Diagnosis> {

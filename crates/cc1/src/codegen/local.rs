@@ -5,14 +5,14 @@ use std::ops::Index;
 use std::vec::IntoIter;
 
 use crate::ast::visit::walk_init_declarator;
-use crate::ast::{FunctionDefinitionNode, InitDeclaratorNode, Visitor};
+use crate::ast::{CompoundStatementNode, FunctionDefinitionNode, Visitor};
 use crate::codegen::{Builder, LlvmName, LlvmSymbol};
 use crate::semantic::{DeclaredParams, Duration, FunctionHeader, SymbolId, sema};
 
 #[derive(Debug, Default)]
 pub struct Locals {
     map: HashMap<SymbolId, LlvmSymbol>,
-    order: Vec<SymbolId>,
+    pub order: Vec<SymbolId>,
     f: FunctionHeader,
     pub parameters: Vec<LlvmSymbol>,
 }
@@ -40,16 +40,18 @@ impl Locals {
         self.parameters.clear();
     }
 
-    pub fn collect(&mut self, node: &FunctionDefinitionNode) {
+    pub fn collect_params(&mut self, node: &FunctionDefinitionNode) {
         self.clear();
         self.f = sema().function_defs[&node.declarator.id].clone();
-
         for (i, param) in self.f.id.resolve().parameters.iter().enumerate() {
             self.order.push(*param);
             let v = LlvmSymbol::new(param.resolve().ty.llvm(), LlvmName::SSA(i));
             self.parameters.push(v);
         }
-        self.visit_compound_statement(&node.body);
+    }
+
+    pub fn collect_locals(&mut self, node: &CompoundStatementNode) {
+        self.visit_compound_statement(node);
     }
 
     pub fn parameters(&self) -> &[LlvmSymbol] {
@@ -75,13 +77,17 @@ impl Locals {
 }
 
 impl Visitor for Locals {
-    fn visit_init_declarator(&mut self, node: &InitDeclaratorNode) {
-        walk_init_declarator(self, node);
-        let sym_id = sema().declarations[&node.declarator.id];
-        let sym = sym_id.resolve();
-        if sym.duration != Duration::Automatic {
-            return;
+    fn visit_compound_statement(&mut self, node: &CompoundStatementNode) {
+        for node in &node.declarations {
+            for node in &node.init_declarators {
+                walk_init_declarator(self, node);
+                let sym_id = sema().declarations[&node.declarator.id];
+                let sym = sym_id.resolve();
+                if sym.duration != Duration::Automatic {
+                    return;
+                }
+                self.order.push(sym_id);
+            }
         }
-        self.order.push(sym_id);
     }
 }

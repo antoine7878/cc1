@@ -54,14 +54,18 @@ exits!(ignore "call arguments", call_short_argument, "int f(short s) { return s;
 exits!(ignore "call arguments", recursion, "int fact(int n) { return n ? n * fact(n - 1) : 1; } int main(void) { return fact(5) - 78; }", 42);
 
 exits!(if_true, "int main(void) { if (1) return 42; return 7; }", 42);
-exits!(ignore "control flow", if_false, "int main(void) { if (0) return 7; return 42; }", 42);
-exits!(ignore "control flow", if_else, "int main(void) { if (0) return 7; else return 42; }", 42);
-exits!(ignore "control flow", while_loop, "int main(void) { int i; i = 0; while (i < 42) i++; return i; }", 42);
-exits!(ignore "control flow", do_while, "int main(void) { int i; i = 0; do i++; while (i < 42); return i; }", 42);
-exits!(ignore "control flow", for_loop, "int main(void) { int i; int s; s = 0; for (i = 0; i < 7; i++) s += 6; return s; }", 42);
-exits!(ignore "control flow", break_loop, "int main(void) { int i; for (i = 0; ; i++) if (i == 42) break; return i; }", 42);
-exits!(ignore "control flow", continue_loop, "int main(void) { int i; int s; s = 0; for (i = 0; i < 10; i++) { if (i % 2) continue; s += i; } return s + 22; }", 42);
-exits!(ignore "control flow", goto_label, "int main(void) { int i; i = 0; again: i++; if (i < 42) goto again; return i; }", 42);
+exits!(if_false, "int main(void) { if (0) return 7; return 42; }", 42);
+exits!(if_else, "int main(void) { if (0) return 7; else return 42; }", 42);
+exits!(while_loop, "int main(void) { int i; i = 0; while (i < 42) i++; return i; }", 42);
+exits!(do_while, "int main(void) { int i; i = 0; do i++; while (i < 42); return i; }", 42);
+exits!(for_loop, "int main(void) { int i; int s; s = 0; for (i = 0; i < 7; i++) s += 6; return s; }", 42);
+exits!(break_loop, "int main(void) { int i; for (i = 0; ; i++) if (i == 42) break; return i; }", 42);
+exits!(
+    continue_loop,
+    "int main(void) { int i; int s; s = 0; for (i = 0; i < 10; i++) { if (i % 2) continue; s += i; } return s + 22; }",
+    42
+);
+exits!(goto_label, "int main(void) { int i; i = 0; again: i++; if (i < 42) goto again; return i; }", 42);
 exits!(ignore "switch", switch_case, "int main(void) { switch (2) { case 1: return 1; case 2: return 42; default: return 3; } }", 42);
 exits!(ignore "switch", switch_default, "int main(void) { switch (9) { case 1: return 1; default: return 42; } }", 42);
 exits!(ignore "switch", switch_fallthrough, "int main(void) { int x; x = 40; switch (1) { case 1: x++; case 2: x++; break; case 3: x = 0; } return x; }", 42);
@@ -95,7 +99,11 @@ exits!(global_null_pointer, "int *p = 0; int main(void) { return p == 0 ? 42 : 7
 exits!(global_pointer_to_global, "int g = 42; int *p = &g; int main(void) { return *p; }", 42);
 exits!(global_pointer_to_element, "int a[3] = {1, 2, 42}; int *p = &a[2]; int main(void) { return *p; }", 42);
 exits!(global_pointer_arithmetic, "int a[3] = {1, 42, 3}; int *p = a + 1; int main(void) { return *p; }", 42);
-exits!(global_function_pointer, "int f(void) { return 42; } int (*fp)(void) = f; int main(void) { return fp == f ? 42 : 7; }", 42);
+exits!(
+    global_function_pointer,
+    "int f(void) { return 42; } int (*fp)(void) = f; int main(void) { return fp == f ? 42 : 7; }",
+    42
+);
 exits!(global_string_array, "char s[] = \"abc\"; int main(void) { return s[1] - 56; }", 42);
 exits!(global_string_array_padded, "char s[8] = \"ab\"; int main(void) { return s[0] - 55 + s[7]; }", 42);
 exits!(global_string_array_exact, "char s[2] = \"ab\"; int main(void) { return s[1] - 56; }", 42);
@@ -107,20 +115,60 @@ exits!(global_array_2d_flat, "int a[2][2] = {1, 2, 3, 40}; int main(void) { retu
 exits!(global_double_array, "double a[2] = {1, 41.0}; int main(void) { return (int) (a[0] + a[1]); }", 42);
 exits!(global_pointer_array, "int x = 42; int *a[2] = {0, &x}; int main(void) { return *a[1]; }", 42);
 exits!(global_struct, "struct s { char c; int a; } v = {'a', 42}; int *p = &v.a; int main(void) { return *p; }", 42);
-exits!(global_struct_partial, "struct s { int a; int b; } v = {42}; int *p = &v.b; int main(void) { return *p + 42; }", 42);
-exits!(global_struct_nested, "struct i { int a; }; struct o { char c; struct i in; } v = {'x', {42}}; int *p = &v.in.a; int main(void) { return *p; }", 42);
-exits!(global_struct_array, "struct s { char c; int a; } v[2] = {{'a', 1}, {'b', 42}}; int *p = &v[1].a; int main(void) { return *p; }", 42);
-exits!(global_struct_with_array, "struct s { int a[3]; } v = {{1, 2, 42}}; int *p = &v.a[2]; int main(void) { return *p; }", 42);
+exits!(
+    global_struct_partial,
+    "struct s { int a; int b; } v = {42}; int *p = &v.b; int main(void) { return *p + 42; }",
+    42
+);
+exits!(
+    global_struct_nested,
+    "struct i { int a; }; struct o { char c; struct i in; } v = {'x', {42}}; int *p = &v.in.a; int main(void) { return *p; }",
+    42
+);
+exits!(
+    global_struct_array,
+    "struct s { char c; int a; } v[2] = {{'a', 1}, {'b', 42}}; int *p = &v[1].a; int main(void) { return *p; }",
+    42
+);
+exits!(
+    global_struct_with_array,
+    "struct s { int a[3]; } v = {{1, 2, 42}}; int *p = &v.a[2]; int main(void) { return *p; }",
+    42
+);
 exits!(global_union_first, "union u { int a; char c; } v = {42}; int *p = &v.a; int main(void) { return *p; }", 42);
 exits!(global_union_narrow, "union u { char c; int a; } v = {'*'}; char *p = &v.c; int main(void) { return *p; }", 42);
-exits!(global_union_pad, "union u { char c; int a; } v = {'*'}; int *p = &v.a; int main(void) { return *p & 0xff; }", 42);
+exits!(
+    global_union_pad,
+    "union u { char c; int a; } v = {'*'}; int *p = &v.a; int main(void) { return *p & 0xff; }",
+    42
+);
 exits!(global_struct_zero, "struct s { char c; int a; } v; int *p = &v.a; int main(void) { return *p + 42; }", 42);
-exits!(global_struct_ptr_member, "int x = 42; struct s { int *p; } v = {&x}; int **pp = &v.p; int main(void) { return **pp; }", 42);
-exits!(global_struct_shadowed, "struct s { int a; } v = {40}; int *p = &v.a; int main(void) { struct s { char c; } w; return *p + sizeof w + 1; }", 42);
-exits!(static_local_twice, "int f(void) { static int n = 20; return ++n; } int g(void) { static int n = 0; return ++n; } int main(void) { f(); g(); return f() + g() * 10; }", 42);
-exits!(static_local_pointer, "int f(void) { static int n = 42; static int *p = &n; return *p; } int main(void) { return f(); }", 42);
+exits!(
+    global_struct_ptr_member,
+    "int x = 42; struct s { int *p; } v = {&x}; int **pp = &v.p; int main(void) { return **pp; }",
+    42
+);
+exits!(
+    global_struct_shadowed,
+    "struct s { int a; } v = {40}; int *p = &v.a; int main(void) { struct s { char c; } w; return *p + sizeof w + 1; }",
+    42
+);
+exits!(
+    static_local_twice,
+    "int f(void) { static int n = 20; return ++n; } int g(void) { static int n = 0; return ++n; } int main(void) { f(); g(); return f() + g() * 10; }",
+    42
+);
+exits!(
+    static_local_pointer,
+    "int f(void) { static int n = 42; static int *p = &n; return *p; } int main(void) { return f(); }",
+    42
+);
 exits!(static_local_zero, "int f(void) { static int n; return n + 42; } int main(void) { return f(); }", 42);
-exits!(static_local_array, "int f(void) { static int a[2] = {2, 40}; return a[0] + a[1]; } int main(void) { return f(); }", 42);
+exits!(
+    static_local_array,
+    "int f(void) { static int a[2] = {2, 40}; return a[0] + a[1]; } int main(void) { return f(); }",
+    42
+);
 exits!(ignore "aggregates", struct_member, "struct s { int a; int b; }; int main(void) { struct s v; v.a = 40; v.b = 2; return v.a + v.b; }", 42);
 exits!(enum_constant, "enum e { A = 40, B }; int main(void) { return B + 1; }", 42);
 
@@ -184,7 +232,39 @@ exits!(declare_prototype, "int abs(int); int main(void) { return abs(-42); }", 4
 exits!(declare_void, "void exit(int); int main(void) { exit(42); return 0; }", 42);
 exits!(declare_pointer_param, "int atoi(const char *); int main(void) { return atoi(\"42\"); }", 42);
 exits!(declare_unspecified, "int abs(); int main(void) { return abs(-42); }", 42);
-exits!(declare_variadic, "int sprintf(char *, const char *, ...); int atoi(const char *); int main(void) { char b[8]; sprintf(b, \"%d\", 42); return atoi(b); }", 42);
+exits!(
+    declare_variadic,
+    "int sprintf(char *, const char *, ...); int atoi(const char *); int main(void) { char b[8]; sprintf(b, \"%d\", 42); return atoi(b); }",
+    42
+);
 exits!(declare_after_use, "int main(void) { return abs(-42); } int abs(int);", 42);
 
 exits!(initializer_evaluated_once, "int main(void) { int x = 40; int y = x++; return x + y; }", 81);
+
+exits!(void_function_body, "void f(void) { } int main(void) { f(); return 42; }", 42);
+exits!(void_function_explicit_return, "void f(void) { return; } int main(void) { f(); return 42; }", 42);
+exits!(nonvoid_fall_off_end_unused, "int f(void) { } int main(void) { f(); return 42; }", 42);
+exits!(double_return, "int main(void) { return 42; return 1; }", 42);
+exits!(dead_code_after_return, "int main(void) { int x; x = 1; return x + 41; x = 2; }", 42);
+exits!(dead_block_after_return, "int main(void) { return 42; { int y; y = 1; } }", 42);
+exits!(void_call_then_ssa, "void f(void) { } int main(void) { int x; f(); x = 40; return x + 2; }", 42);
+exits!(ternary_void, "void f(void) { } int main(void) { 1 ? f() : f(); return 42; }", 42);
+exits!(
+    ternary_void_false_arm,
+    "int g; void f(void) { g = 1; } void h(void) { g = 42; } int main(void) { 0 ? f() : h(); return g; }",
+    42
+);
+
+exits!(init_then_assign_before_nested_init, "int main(void) { int a = 1; a = 42; { int b = a; return b; } }", 42);
+exits!(init_from_assigned_variable, "int main(void) { int a; a = 42; { int b = a; return b; } }", 42);
+exits!(
+    init_after_side_effect,
+    "int g; int f(void) { return g; } int main(void) { g = 42; { int x = f(); return x; } }",
+    42
+);
+exits!(
+    init_reads_previous_init,
+    "int main(void) { int a = 20; { int b = a; a = 1; { int c = a + b; return c * 2; } } }",
+    42
+);
+exits!(ignore "control flow", init_in_loop_body, "int main(void) { int i; int s; s = 0; for (i = 0; i < 3; i++) { int x = 10; x += i; s += x; } return s + 9; }", 42);

@@ -10,7 +10,7 @@ C_Y = crates/cc1/src/parser/c.y
 LEX_RS =  crates/cc1/src/parser/lex.rs
 YACC_RS = crates/cc1/src/parser/yacc.rs
 
-all: $(LEX_RS) $(YACC_RS)
+all: $(LEX_RS) $(YACC_RS) ## build cc1, cpp and fcc
 	cargo build -p cpp -p cc1 -p fcc
 
 $(FT_LEX) $(FT_YACC):
@@ -24,44 +24,35 @@ $(YACC_RS): $(C_Y)
 
 # ----- test --------------------
 
-# test: all
-# 	clang -E -std=c89 rscs/hello.c > rscs/hello.i
-# 	./$(CC1) -m32 rscs/hello.i
-
-test: llvm all
+test: llvm all ## emit LLVM IR for rscs/hello.c to stdout
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
 	cargo run --bin fcc -- -e ./rscs/hello.c -o /dev/stdout
 	@# ./a.out || echo $$?
 
-otest: all
-	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
-	cargo run --bin fcc -- -e ./rscs/hello.c  -o ./rscs/hello.ll
-	opt -passes=verify -S ./rscs/hello.ll
-
-ftest: all
+ftest: all ## compile and run rscs/hello.c with fcc
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
 	cargo run --bin fcc -- ./rscs/hello.c -o ./rscs/a.out
 	./rscs/a.out || echo $$?
 
-ctest: all
+ctest: all ## run the cc1 test suite
 	cargo nextest run -p cc1
 
-ttest: all
+ttest: all ## run every test in the workspace
 	cargo nextest run
 
 # ----- reference --------------------
 
 CFF = -m32 -std=iso9899:1990 -pedantic-errors
 
-c:
+c: ## compile rscs/hello.c with gcc
 	gcc -c $(CFF) rscs/hello.c -o /dev/null
 
-cc:
+cc: ## compile and run rscs/hello.c with gcc
 	gcc $(CFF) rscs/hello.c
 	./a.out
 	rm ./a.out
 
-llvm:
+llvm: ## emit reference LLVM IR (32/64-bit) for rscs/hello.c with clang -O0
 	clang $(CFF) -O0 -S -m64 -emit-llvm rscs/hello.c -o ./rscs/hello_64.ll
 	clang $(CFF) -O0 -S -m32 -emit-llvm rscs/hello.c -o ./rscs/hello_32.ll
 
@@ -84,13 +75,16 @@ COV_SKIP = \
 	crates/cc1/src/ast/type_specifier.rs \
 	crates/cc1/src/semantic/diagnosis.rs
 
-coverage: all
+coverage: all ## run tests coverage report
 	cargo llvm-cov nextest --ignore-filename-regex '$(subst $(space),|,$(strip $(COV_SKIP)))'
 
-clean:
+clean: ## clean generated and compiled files
 	cargo clean
 	rm -f $(LEX_RS) $(YACC_RS)
 
-re: clean all
+re: clean all ## clean and rebuild
+
+help: ## show this help
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: all clean re test ctest ttest c cc coverage $(FT_LEX) $(FT_YACC) $(NAME) llvm

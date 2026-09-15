@@ -2,10 +2,10 @@ use std::io::{Write, stdout};
 
 use libft::Span;
 
-use crate::ast::visit::walk_translation_unit;
+use crate::ast::visit::{walk_compound_statement, walk_statement, walk_translation_unit};
 use crate::ast::{
-    ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, JumpStatement, JumpStatementNode, TranslationUnitNode,
-    Visitor,
+    CompoundStatementNode, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, JumpStatement,
+    JumpStatementNode, StatementNode, TranslationUnitNode, Visitor,
 };
 use crate::codegen::{Builder, Globals, LlvmSymbol, Locals};
 use crate::context::ctx;
@@ -34,7 +34,7 @@ impl<W: Write> Generator<W> {
         Self { b: Builder::new(w), locals: Locals::default(), globals: Globals::default(), diagnosis: Vec::new() }
     }
 
-    fn emit(&mut self, res: Result<(), Diagnosis>, span: &Span) {
+    fn collect_diag(&mut self, res: Result<(), Diagnosis>, span: &Span) {
         if let Err(diagnosis) = res {
             self.diagnosis.push(DiagnosisNode::new(diagnosis, *span));
         }
@@ -42,15 +42,15 @@ impl<W: Write> Generator<W> {
 
     fn fold_into(&mut self, e: &ExpressionNode, slot: LlvmSymbol) {
         let res = self.fold_expression(e).map(|v| self.b.store(v, slot));
-        self.emit(res, &e.span);
+        self.collect_diag(res, &e.span);
     }
 
     fn emit_locals(&mut self) {
-        self.b.reset(self.locals.parameters.len());
         self.locals.emit_decl(&mut self.b);
-        for id in self.locals.order_iter() {
-            self.emit_init(id);
+        for id in &self.locals.order.clone() {
+            self.emit_init(*id);
         }
+        self.locals.order.clear();
     }
 
     fn emit_init(&mut self, id: SymbolId) {
@@ -105,18 +105,25 @@ impl<W: Write> Visitor for Generator<W> {
     fn visit_function_definition(&mut self, node: &FunctionDefinitionNode) {
         let sym = sema().declarations[&node.declarator.id];
         let f = self.globals.get_symbol(sym).unwrap();
-        self.locals.collect(node);
+        self.locals.collect_params(node);
         self.b.define(*f, self.locals.parameters(), self.locals.is_variadic());
+        self.b.reset(self.locals.parameters.len());
         self.emit_locals();
         self.visit_compound_statement(&node.body);
-        self.b.end_function();
+        self.b.end_function(sym);
+    }
+
+    fn visit_compound_statement(&mut self, node: &CompoundStatementNode) {
+        self.locals.collect_locals(node);
+        self.emit_locals();
+        walk_compound_statement(self, node);
     }
 
     fn visit_jump_statement(&mut self, node: &JumpStatementNode) {
         match &node.stmt {
             JumpStatement::Return(Some(e)) => {
                 let res = self.fold_expression(e).map(|v| self.b.ret(v));
-                self.emit(res, &e.span);
+                self.collect_diag(res, &e.span);
             }
             JumpStatement::Return(None) => self.b.ret_void(),
             _ => todo!(),
@@ -125,7 +132,13 @@ impl<W: Write> Visitor for Generator<W> {
 
     fn visit_expression(&mut self, node: &ExpressionNode) {
         let res = self.fold_expression(node).map(|_| ());
-        self.emit(res, &node.span);
+        self.collect_diag(res, &node.span);
+    }
+
+    fn visit_statement(&mut self, node: &StatementNode) {
+        if !self.b.has_block_ret {
+            walk_statement(self, node);
+        }
     }
 
     fn visit_init_declarator(&mut self, _node: &InitDeclaratorNode) {}

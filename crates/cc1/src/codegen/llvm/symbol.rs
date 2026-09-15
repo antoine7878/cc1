@@ -1,10 +1,8 @@
 use std::fmt::{self, Display, Formatter};
 
-use crate::{
-    ast::ConstValue,
-    codegen::{LlvmName, LlvmType},
-    semantic::{QualifiedType, sema},
-};
+use crate::ast::ConstValue;
+use crate::codegen::{LlvmName, LlvmType};
+use crate::semantic::{QualifiedType, sema};
 
 #[derive(Debug, Clone, Copy)]
 pub struct LlvmSymbol {
