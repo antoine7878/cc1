@@ -5,7 +5,7 @@ use std::ops::Index;
 use std::vec::IntoIter;
 
 use crate::ast::visit::walk_init_declarator;
-use crate::ast::{CompoundStatementNode, FunctionDefinitionNode, Visitor};
+use crate::ast::{FunctionDefinitionNode, InitDeclaratorNode, Visitor};
 use crate::codegen::{Builder, LlvmName, LlvmSymbol};
 use crate::semantic::{DeclaredParams, Duration, FunctionHeader, SymbolId, sema};
 
@@ -40,6 +40,11 @@ impl Locals {
         self.parameters.clear();
     }
 
+    pub fn collect_locals(&mut self, node: &FunctionDefinitionNode) {
+        self.collect_params(node);
+        self.collect_declarations(node);
+    }
+
     pub fn collect_params(&mut self, node: &FunctionDefinitionNode) {
         self.clear();
         self.f = sema().function_defs[&node.declarator.id].clone();
@@ -50,8 +55,8 @@ impl Locals {
         }
     }
 
-    pub fn collect_locals(&mut self, node: &CompoundStatementNode) {
-        self.visit_compound_statement(node);
+    pub fn collect_declarations(&mut self, node: &FunctionDefinitionNode) {
+        self.visit_compound_statement(&node.body);
     }
 
     pub fn parameters(&self) -> &[LlvmSymbol] {
@@ -77,17 +82,13 @@ impl Locals {
 }
 
 impl Visitor for Locals {
-    fn visit_compound_statement(&mut self, node: &CompoundStatementNode) {
-        for node in &node.declarations {
-            for node in &node.init_declarators {
-                walk_init_declarator(self, node);
-                let sym_id = sema().declarations[&node.declarator.id];
-                let sym = sym_id.resolve();
-                if sym.duration != Duration::Automatic {
-                    return;
-                }
-                self.order.push(sym_id);
-            }
+    fn visit_init_declarator(&mut self, node: &InitDeclaratorNode) {
+        walk_init_declarator(self, node);
+        let sym_id = sema().declarations[&node.declarator.id];
+        let sym = sym_id.resolve();
+        if sym.duration != Duration::Automatic {
+            return;
         }
+        self.order.push(sym_id);
     }
 }

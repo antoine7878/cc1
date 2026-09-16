@@ -50,6 +50,7 @@ impl<W: Write> Builder<W> {
 
     pub fn define(&mut self, binding: LlvmSymbol, parameters: &[LlvmSymbol], is_variadic: bool) {
         self.blank();
+        self.reset(parameters.len());
         let _ = self.w.write_fmt(format_args!("define {}", binding));
         self.params(parameters, is_variadic);
         self.line(format_args!(" {{"));

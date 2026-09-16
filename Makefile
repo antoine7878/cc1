@@ -49,7 +49,7 @@ c: ## compile rscs/hello.c with gcc
 
 cc: ## compile and run rscs/hello.c with gcc
 	gcc $(CFF) rscs/hello.c
-	./a.out
+	./a.out || echo $$?
 	rm ./a.out
 
 llvm: ## emit reference LLVM IR (32/64-bit) for rscs/hello.c with clang -O0

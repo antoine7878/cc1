@@ -1,9 +1,7 @@
 
 int main(void) {
-	int a = 1;
-	a = 42;
-	{
-		int b = a;
-		return b;
-	}
+	int n = 40;
+	int x;
+	x = 2;
+	return n + x;
 }

@@ -7,7 +7,7 @@ use crate::context::ctx;
 use crate::semantic::{CastKind, Diagnosis, ImplicitCast, QualifiedType, sema};
 
 impl<W: Write> Generator<W> {
-    pub fn fold_expression(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+    pub fn emit_expression(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
         let s = match sema().expr_consts.get(node.id) {
             Some(value) => self.constant(sema().expr_types[node.id].ty, *value),
             None => self.fold_raw(node)?,
@@ -117,7 +117,7 @@ impl<W: Write> Generator<W> {
     fn list(&mut self, lst: &[ExpressionNode]) -> Result<LlvmSymbol, Diagnosis> {
         let mut last = LlvmSymbol::from(0);
         for e in lst {
-            last = self.fold_expression(e)?;
+            last = self.emit_expression(e)?;
         }
         Ok(last)
     }
@@ -133,11 +133,11 @@ impl<W: Write> Generator<W> {
     fn unary(&mut self, op: &UnaryOp, e: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
         match op {
             UnaryOp::PostInc | UnaryOp::PostDec | UnaryOp::PreInc | UnaryOp::PreDec => self.unary_inc_dec(op, e),
-            UnaryOp::Plus => self.fold_expression(e),
+            UnaryOp::Plus => self.emit_expression(e),
             UnaryOp::Minus => self.unary_minus(e),
             UnaryOp::LogicalNot => self.unary_logic_not(op, e),
             UnaryOp::BitNot => self.unary_bitnot(op, e),
-            UnaryOp::Addr => self.fold_expression(e),
+            UnaryOp::Addr => self.emit_expression(e),
             UnaryOp::Deref => self.unary_deref(e),
         }
     }
@@ -184,7 +184,7 @@ impl<W: Write> Generator<W> {
     }
 
     fn unary_minus(&mut self, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let v = self.fold_expression(operand)?;
+        let v = self.emit_expression(operand)?;
         let re_operand = &sema().expr_types[operand.id];
         let qty = re_operand.casted_ty();
         if qty.is_floating(sema()) {
@@ -197,7 +197,7 @@ impl<W: Write> Generator<W> {
     fn unary_logic_not(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
         let re_operand = &sema().expr_types[operand.id];
         let qty = re_operand.casted_ty();
-        let v = self.fold_expression(operand)?;
+        let v = self.emit_expression(operand)?;
         let v = self.neq_zero(v, qty)?;
         let xor = LlvmOperator::unary(op, qty)?;
         let v = self.b.binop(xor, v, LlvmSymbol::from(true));
@@ -207,13 +207,13 @@ impl<W: Write> Generator<W> {
     fn unary_bitnot(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
         let re_operand = &sema().expr_types[operand.id];
         let qty = re_operand.casted_ty();
-        let v = self.fold_expression(operand)?;
+        let v = self.emit_expression(operand)?;
         let xor = LlvmOperator::unary(op, qty)?;
         Ok(self.b.binop(xor, v, LlvmSymbol::from(-1)))
     }
 
     fn unary_deref(&mut self, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let v = self.fold_expression(operand)?;
+        let v = self.emit_expression(operand)?;
         Ok(LlvmSymbol::ptr(v.name))
     }
 
@@ -225,8 +225,8 @@ impl<W: Write> Generator<W> {
     ) -> Result<LlvmSymbol, Diagnosis> {
         let t1 = sema().expr_types[lhs.id].casted_ty();
         let t2 = sema().expr_types[rhs.id].casted_ty();
-        let v1 = self.fold_expression(lhs)?;
-        let v2 = self.fold_expression(rhs)?;
+        let v1 = self.emit_expression(lhs)?;
+        let v2 = self.emit_expression(rhs)?;
         self.arithmetic(op, v1, t1, v2, t2)
     }
 
@@ -286,8 +286,8 @@ impl<W: Write> Generator<W> {
     ) -> Result<LlvmSymbol, Diagnosis> {
         let rel = &sema().expr_types[lhs.id];
         let op = LlvmOperator::binary(op, rel.casted_ty())?;
-        let v1 = self.fold_expression(lhs)?;
-        let v2 = self.fold_expression(rhs)?;
+        let v1 = self.emit_expression(lhs)?;
+        let v2 = self.emit_expression(rhs)?;
         let v = self.b.cmp(op, v1, v2);
         Ok(self.zext_to_int(v))
     }
@@ -299,7 +299,7 @@ impl<W: Write> Generator<W> {
         rhs: &ExpressionNode,
     ) -> Result<LlvmSymbol, Diagnosis> {
         let initial_block = self.b.current_block;
-        let v = self.fold_expression(lhs)?;
+        let v = self.emit_expression(lhs)?;
         let v = self.neq_zero(v, sema().expr_types[lhs.id].casted_ty())?;
         let i = v.name.ssa_value()?;
         let l1 = LlvmName::label(i, 1);
@@ -311,7 +311,7 @@ impl<W: Write> Generator<W> {
         }
 
         self.b.named_label(l1);
-        let v = self.fold_expression(rhs)?;
+        let v = self.emit_expression(rhs)?;
         let v = self.neq_zero(v, sema().expr_types[rhs.id].casted_ty())?;
         let rhs_block = self.b.current_block;
         self.b.br(v, l2, None);
@@ -330,7 +330,7 @@ impl<W: Write> Generator<W> {
         let rl = &sema().expr_types[lhs.id];
         let qty = rl.casted_ty();
         let loc = self.fold_raw(lhs)?;
-        let mut vr = self.fold_expression(rhs)?;
+        let mut vr = self.emit_expression(rhs)?;
         if let Some(op) = op {
             let vl = self.apply_casts(loc, lhs)?;
             vr = self.arithmetic(op, vl, qty, vr, sema().expr_types[rhs.id].casted_ty())?;
@@ -348,7 +348,7 @@ impl<W: Write> Generator<W> {
         a: &ExpressionNode,
         b: &ExpressionNode,
     ) -> Result<LlvmSymbol, Diagnosis> {
-        let v = self.fold_expression(cond)?;
+        let v = self.emit_expression(cond)?;
         let v = self.neq_zero(v, sema().expr_types[cond.id].casted_ty())?;
 
         let i = v.name.ssa_value()?;
@@ -358,12 +358,12 @@ impl<W: Write> Generator<W> {
         self.b.br(v, l1, Some(l2));
 
         self.b.named_label(l1);
-        let va = self.fold_expression(a)?;
+        let va = self.emit_expression(a)?;
         let a_block = self.b.current_block;
         self.b.br(v, l3, None);
 
         self.b.named_label(l2);
-        let vb = self.fold_expression(b)?;
+        let vb = self.emit_expression(b)?;
         let b_block = self.b.current_block;
         self.b.br(v, l3, None);
 
@@ -375,16 +375,16 @@ impl<W: Write> Generator<W> {
     }
 
     fn call(&mut self, f: &ExpressionNode, args: &[ExpressionNode]) -> Result<LlvmSymbol, Diagnosis> {
-        let f = self.fold_expression(f)?;
-        let args = args.iter().map(|e| self.fold_expression(e)).collect::<Result<Vec<_>, Diagnosis>>()?;
+        let f = self.emit_expression(f)?;
+        let args = args.iter().map(|e| self.emit_expression(e)).collect::<Result<Vec<_>, Diagnosis>>()?;
         Ok(self.b.call(f, args.as_slice()))
     }
 
     fn array_subscript(&mut self, array: &ExpressionNode, idx: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
         let t1 = sema().expr_types[array.id].casted_ty();
         let t2 = sema().expr_types[idx.id].casted_ty();
-        let v1 = self.fold_expression(array)?;
-        let v2 = self.fold_expression(idx)?;
+        let v1 = self.emit_expression(array)?;
+        let v2 = self.emit_expression(idx)?;
         self.arithmetic(&BinaryOp::Add, v1, t1, v2, t2)
     }
 
@@ -398,7 +398,7 @@ impl<W: Write> Generator<W> {
     }
 
     fn explicit_cast(&mut self, node: &ExpressionNode, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let v = self.fold_expression(operand)?;
+        let v = self.emit_expression(operand)?;
         if sema().expr_types[node.id].ty.is_void(sema()) {
             return Ok(LlvmSymbol::void());
         }

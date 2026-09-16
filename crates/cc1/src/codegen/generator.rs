@@ -9,7 +9,7 @@ use crate::ast::{
 };
 use crate::codegen::{Builder, Globals, LlvmSymbol, Locals};
 use crate::context::ctx;
-use crate::semantic::{Definition, Diagnosis, DiagnosisNode, Initializer, SymbolId, sema};
+use crate::semantic::{Definition, Diagnosis, DiagnosisNode, Duration, Initializer, SymbolId, sema};
 
 pub fn generate() -> Vec<DiagnosisNode> {
     generate_to(stdout())
@@ -40,19 +40,6 @@ impl<W: Write> Generator<W> {
         }
     }
 
-    fn fold_into(&mut self, e: &ExpressionNode, slot: LlvmSymbol) {
-        let res = self.fold_expression(e).map(|v| self.b.store(v, slot));
-        self.collect_diag(res, &e.span);
-    }
-
-    fn emit_locals(&mut self) {
-        self.locals.emit_decl(&mut self.b);
-        for id in &self.locals.order.clone() {
-            self.emit_init(*id);
-        }
-        self.locals.order.clear();
-    }
-
     fn emit_init(&mut self, id: SymbolId) {
         let sym = id.resolve();
         let Some(init) = sym.initializer else { return };
@@ -67,7 +54,10 @@ impl<W: Write> Generator<W> {
                 let &a = self.globals.get_literal(*s).unwrap();
                 self.b.store(a, self.locals[id]);
             }
-            Initializer::Expr(e) => self.fold_into(e, self.locals[id]),
+            Initializer::Expr(e) => {
+                let res = self.emit_expression(e).map(|v| self.b.store(v, self.locals[id]));
+                self.collect_diag(res, &e.span);
+            }
             Initializer::List(_) => todo!("list init"),
             Initializer::Address(_) => todo!("address init"),
         }
@@ -105,24 +95,21 @@ impl<W: Write> Visitor for Generator<W> {
     fn visit_function_definition(&mut self, node: &FunctionDefinitionNode) {
         let sym = sema().declarations[&node.declarator.id];
         let f = self.globals.get_symbol(sym).unwrap();
-        self.locals.collect_params(node);
+        self.locals.collect_locals(node);
         self.b.define(*f, self.locals.parameters(), self.locals.is_variadic());
-        self.b.reset(self.locals.parameters.len());
-        self.emit_locals();
+        self.locals.emit_decl(&mut self.b);
         self.visit_compound_statement(&node.body);
         self.b.end_function(sym);
     }
 
     fn visit_compound_statement(&mut self, node: &CompoundStatementNode) {
-        self.locals.collect_locals(node);
-        self.emit_locals();
         walk_compound_statement(self, node);
     }
 
     fn visit_jump_statement(&mut self, node: &JumpStatementNode) {
         match &node.stmt {
             JumpStatement::Return(Some(e)) => {
-                let res = self.fold_expression(e).map(|v| self.b.ret(v));
+                let res = self.emit_expression(e).map(|v| self.b.ret(v));
                 self.collect_diag(res, &e.span);
             }
             JumpStatement::Return(None) => self.b.ret_void(),
@@ -131,7 +118,7 @@ impl<W: Write> Visitor for Generator<W> {
     }
 
     fn visit_expression(&mut self, node: &ExpressionNode) {
-        let res = self.fold_expression(node).map(|_| ());
+        let res = self.emit_expression(node).map(|_| ());
         self.collect_diag(res, &node.span);
     }
 
@@ -141,5 +128,11 @@ impl<W: Write> Visitor for Generator<W> {
         }
     }
 
-    fn visit_init_declarator(&mut self, _node: &InitDeclaratorNode) {}
+    fn visit_init_declarator(&mut self, node: &InitDeclaratorNode) {
+        let sym_id = sema().declarations[&node.declarator.id];
+        if sym_id.resolve().duration != Duration::Automatic {
+            return;
+        }
+        self.emit_init(sym_id);
+    }
 }
