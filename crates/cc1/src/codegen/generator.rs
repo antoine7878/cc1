@@ -2,11 +2,10 @@ use std::io::{Write, stdout};
 
 use libft::Span;
 
-use crate::ast::visit::{walk_compound_statement, walk_statement, walk_translation_unit};
+use crate::ast::visit::{walk_statement, walk_translation_unit};
 use crate::ast::{
-    BinaryOp, CompoundStatementNode, Expression, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode,
-    IterationStatementNode, JumpStatementNode, SelectionStatementNode, StatementNode, TranslationUnitNode, UnaryOp,
-    Visitor,
+    BinaryOp, Expression, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, Statement, StatementNode,
+    TranslationUnitNode, UnaryOp, Visitor,
 };
 use crate::codegen::{Builder, Globals, LlvmName, LlvmSymbol, Locals};
 use crate::context::ctx;
@@ -128,36 +127,21 @@ impl<W: Write> Visitor for Generator<W> {
         self.b.end_function(sym);
     }
 
-    fn visit_compound_statement(&mut self, node: &CompoundStatementNode) {
-        walk_compound_statement(self, node);
-    }
-
-    fn visit_jump_statement(&mut self, node: &JumpStatementNode) {
-        let res = self.jump_statement(node);
-        self.collect_diag(res, &node.span);
-    }
-
-    fn visit_selection_statement(&mut self, node: &SelectionStatementNode) {
-        let res = self.selection_statement(node);
-        self.collect_diag(res, &node.span);
-    }
-
-    fn visit_iteration_statement(&mut self, node: &IterationStatementNode) {
-        let res = self.iteration_statement(node);
-        self.collect_diag(res, &node.span);
-    }
-
     fn visit_expression(&mut self, node: &ExpressionNode) {
         let res = self.emit_expression(node).map(|_| ());
         self.collect_diag(res, &node.span);
     }
 
     fn visit_statement(&mut self, node: &StatementNode) {
-        if !self.b.has_block_ret {
-            walk_statement(self, node);
-        }
+        let res = match node.id.resolve() {
+            Statement::Jump(node) => self.jump_statement(node),
+            Statement::Selection(node) => self.selection_statement(node),
+            Statement::Iteration(node) => self.iteration_statement(node),
+            Statement::Labeled(node) => self.labeled_statement(node),
+            _ => return walk_statement(self, node),
+        };
+        self.collect_diag(res, &node.span);
     }
-
     fn visit_init_declarator(&mut self, node: &InitDeclaratorNode) {
         let sym_id = sema().declarations[&node.declarator.id];
         if sym_id.resolve().duration != Duration::Automatic {

@@ -4,7 +4,7 @@ use libft::{BLUE, RESET};
 
 use crate::ast::{
     BinaryOp, DeclarationSpecifier, Declarator, Enum, Expression, FunctionParameters, Initializer, IterationStatement,
-    JumpStatement, Labeled, MemberOp, Qualifier, SelectionStatement, Storage, Type, TypeSpecifier, UnaryOp, Variant,
+    JumpStatement, LabeledStatement, MemberOp, Qualifier, SelectionStatement, Storage, Type, TypeSpecifier, UnaryOp, Variant,
 };
 
 impl Display for UnaryOp {
@@ -187,12 +187,12 @@ impl Display for FunctionParameters {
     }
 }
 
-impl Display for Labeled {
+impl Display for LabeledStatement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            Labeled::Identifier(..) => "Identifier",
-            Labeled::Case(..) => "Case",
-            Labeled::Default(_) => "Default",
+            LabeledStatement::Identifier(..) => "Identifier",
+            LabeledStatement::Case(..) => "Case",
+            LabeledStatement::Default(_) => "Default",
         };
         write!(f, "{}", s)
     }

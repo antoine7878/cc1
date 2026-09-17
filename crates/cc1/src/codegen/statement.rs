@@ -2,7 +2,8 @@ use std::io::Write;
 
 use crate::ast::{
     ExpressionNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, JumpStatement,
-    JumpStatementNode, SelectionStatement, SelectionStatementNode, StatementNode, Visitor,
+    JumpStatementNode, LabeledStatement, LabeledStatementNode, SelectionStatement, SelectionStatementNode,
+    StatementNode, Visitor,
 };
 use crate::codegen::{Generator, LlvmName};
 use crate::semantic::Diagnosis;
@@ -121,8 +122,23 @@ impl<W: Write> Generator<W> {
             JumpStatement::Return(None) => self.b.ret_void(),
             JumpStatement::Break => self.b.br(self.break_label),
             JumpStatement::Continue => self.b.br(self.continue_label),
-            JumpStatement::Goto(_a) => todo!(),
+            JumpStatement::Goto(a) => self.b.br(LlvmName::NamedLabel(a.id)),
         }
+        Ok(())
+    }
+
+    pub fn labeled_statement(&mut self, node: &LabeledStatementNode) -> Result<(), Diagnosis> {
+        let stmt = match &node.inner {
+            LabeledStatement::Identifier(label, stmt) => {
+                let l = LlvmName::NamedLabel(label.id);
+                self.b.br(l);
+                self.b.emit_label(l);
+                stmt
+            }
+            LabeledStatement::Default(stmt) => stmt,
+            LabeledStatement::Case(_, stmt) => stmt,
+        };
+        self.visit_statement(stmt);
         Ok(())
     }
 }

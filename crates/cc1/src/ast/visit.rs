@@ -4,7 +4,7 @@ use crate::ast::{
     CompoundStatementNode, ConstValueNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, Enum,
     Expression, ExpressionNode, ExpressionStatementNode, ExternalDeclaration, ExternalDeclarationNode,
     FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, InitDeclaratorNode, Initializer,
-    InitializerNode, IterationStatement, IterationStatementNode, JumpStatement, JumpStatementNode, Labeled,
+    InitializerNode, IterationStatement, IterationStatementNode, JumpStatement, JumpStatementNode, LabeledStatement,
     LabeledStatementNode, Name, ParameterDeclaration, Qualifier, SelectionStatement, SelectionStatementNode, Statement,
     StatementNode, StringLiteralNode, Struct, StructDeclaration, StructMemberDeclarator, TranslationUnitNode, Type,
     TypeSpecifier, Union, Variant,
@@ -207,15 +207,15 @@ pub fn walk_statement<V: Visitor + ?Sized>(v: &mut V, node: &StatementNode) {
 
 pub fn walk_labeled_statement<V: Visitor + ?Sized>(v: &mut V, node: &LabeledStatementNode) {
     match &node.inner {
-        Labeled::Identifier(name, stmt) => {
+        LabeledStatement::Identifier(name, stmt) => {
             v.visit_name(name);
             v.visit_statement(stmt);
         }
-        Labeled::Case(expr, stmt) => {
+        LabeledStatement::Case(expr, stmt) => {
             v.visit_expression(expr);
             v.visit_statement(stmt);
         }
-        Labeled::Default(stmt) => v.visit_statement(stmt),
+        LabeledStatement::Default(stmt) => v.visit_statement(stmt),
     }
 }
 

@@ -29,7 +29,7 @@ pub use name::{Name, StringArena, StringId};
 pub use operator::{BinaryOp, MemberOp, UnaryOp};
 pub use statement::{
     CompoundStatementNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, JumpStatement,
-    JumpStatementNode, Labeled, LabeledStatementNode, SelectionStatement, SelectionStatementNode, Statement,
+    JumpStatementNode, LabeledStatement, LabeledStatementNode, SelectionStatement, SelectionStatementNode, Statement,
     StatementArena, StatementNode,
 };
 pub use tag::{

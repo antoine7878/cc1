@@ -2,7 +2,7 @@ use crate::ast::statement::StatementId;
 use crate::ast::visit::{Visitor, walk_jump_statement, walk_labeled_statement};
 use crate::ast::{
     ExpressionNode, ExpressionStatementNode, Fold, IterationStatement, IterationStatementNode, JumpStatement,
-    JumpStatementNode, Labeled, LabeledStatementNode, SelectionStatement, SelectionStatementNode, StatementNode,
+    JumpStatementNode, LabeledStatement, LabeledStatementNode, SelectionStatement, SelectionStatementNode, StatementNode,
 };
 use crate::semantic::resolution::expression::{self, operands};
 use crate::semantic::{
@@ -18,13 +18,13 @@ pub fn resolve_labeled_statement(resolver: &mut SymbolResolver, id: StatementId,
 
 fn check_labeled_statement(resolver: &mut SymbolResolver, id: StatementId, node: &LabeledStatementNode) {
     let res = match &node.inner {
-        Labeled::Identifier(name, _) => {
+        LabeledStatement::Identifier(name, _) => {
             resolver.define_label(*name, &node.span);
             resolver.sema.stmts.set(id, Some(ResolvedStatement::Label(name.id)));
             Ok(())
         }
-        Labeled::Case(expr, _) => check_case(resolver, id, expr),
-        Labeled::Default(_) => check_default(resolver, id),
+        LabeledStatement::Case(expr, _) => check_case(resolver, id, expr),
+        LabeledStatement::Default(_) => check_default(resolver, id),
     };
     if let Err(diag) = res {
         resolver.sema.add_diag(Diag::err((), diag), &node.span);

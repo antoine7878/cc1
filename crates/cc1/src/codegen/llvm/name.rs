@@ -1,6 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
-use crate::ast::{ConstValue, StringConstId};
+use crate::ast::{ConstValue, StringConstId, StringId};
 use crate::semantic::{Diagnosis, Linkage, SymbolId};
 #[derive(Debug, Clone, Copy)]
 pub enum LlvmName {
@@ -9,6 +9,7 @@ pub enum LlvmName {
     StringLiteral(StringConstId),
     Bool(bool),
     Label(usize),
+    NamedLabel(StringId),
     Global(SymbolId),
     Null,
     None,
@@ -47,6 +48,7 @@ impl Display for LlvmName {
             LlvmName::Bool(b) => write!(f, "{b}"),
             LlvmName::StringLiteral(i) => write!(f, "@.str.{}", usize::from(*i)),
             LlvmName::Label(i) => write!(f, "%.l{i}"),
+            LlvmName::NamedLabel(i) => write!(f, "%.ln.{}", i.resolve()),
             LlvmName::Global(s) => {
                 let sym = s.resolve();
                 match sym.linkage {

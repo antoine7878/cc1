@@ -82,7 +82,25 @@ exits!(
     "int main(void) { int n; int c; n = 27; c = 0; while (n != 1) { n = n % 2 ? 3 * n + 1 : n / 2; c++; } do c--; while (c > 42); return c; }",
     42
 );
-exits!(ignore "control flow", goto_label, "int main(void) { int i; i = 0; again: i++; if (i < 42) goto again; return i; }", 42);
+exits!(goto_label, "int main(void) { int i; i = 0; again: i++; if (i < 42) goto again; return i; }", 42);
+exits!(
+    goto_forward_and_backward,
+    "int main(void) { int i; int s; i = 0; s = 0; loop: if (i == 6) goto done; s += ++i; goto loop; done: return s * 2; }",
+    42
+);
+exits!(goto_skips_statement, "int main(void) { int i; i = 0; goto skip; i = 100; skip: i += 42; return i; }", 42);
+exits!(
+    goto_out_of_nested_loops,
+    "int main(void) { int i; i = 0; for (;;) { while (1) { if (++i == 42) goto out; } } out: return i; }",
+    42
+);
+exits!(
+    goto_label_per_function,
+    "int f(int n) { int r; r = 0; again: if (n > 0) { r += n--; goto again; } return r; } int main(void) { return f(8) + 6; }",
+    42
+);
+exits!(goto_into_block, "int main(void) { int x; x = 0; { goto in; } { int y; y = 42; in: x = 42; } return x; }", 42);
+exits!(goto_chain, "int main(void) { int x; x = 40; goto a; b: x += 2; return x; a: goto b; }", 42);
 exits!(ignore "switch", switch_case, "int main(void) { switch (2) { case 1: return 1; case 2: return 42; default: return 3; } }", 42);
 exits!(ignore "switch", switch_default, "int main(void) { switch (9) { case 1: return 1; default: return 42; } }", 42);
 exits!(ignore "switch", switch_fallthrough, "int main(void) { int x; x = 40; switch (1) { case 1: x++; case 2: x++; break; case 3: x = 0; } return x; }", 42);

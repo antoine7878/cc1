@@ -38,12 +38,20 @@ impl<W: Write> Builder<W> {
     }
 
     fn write_all(&mut self, str: &[u8]) {
-        let _ = self.w.write_all(str);
+        if !self.has_block_ret {
+            let _ = self.w.write_all(str);
+        }
+    }
+
+    fn write_fmt(&mut self, args: fmt::Arguments<'_>) {
+        if !self.has_block_ret {
+            let _ = self.w.write_fmt(args);
+        }
     }
 
     fn line(&mut self, args: fmt::Arguments<'_>) {
-        let _ = self.w.write_fmt(args);
-        let _ = self.w.write_all(b"\n");
+        self.write_fmt(args);
+        self.write_all(b"\n");
     }
 
     pub fn target(&mut self, datalayout: &str, triple: &str) {
@@ -58,24 +66,24 @@ impl<W: Write> Builder<W> {
     pub fn define(&mut self, binding: LlvmSymbol, parameters: &[LlvmSymbol], is_variadic: bool) {
         self.blank();
         self.reset(parameters.len());
-        let _ = self.w.write_fmt(format_args!("define {}", binding));
+        self.write_fmt(format_args!("define {}", binding));
         self.params(parameters, is_variadic);
         self.line(format_args!(" {{"));
     }
 
     fn params(&mut self, parameters: &[LlvmSymbol], is_variadic: bool) {
         let mut it = parameters.iter().peekable();
-        let _ = self.w.write_all(b"(");
+        self.write_all(b"(");
         while let Some(param) = it.next() {
-            let _ = self.w.write_fmt(format_args!("{param}"));
+            self.write_fmt(format_args!("{param}"));
             if it.peek().is_some() {
-                let _ = self.w.write_all(b", ");
+                self.write_all(b", ");
             }
         }
         if is_variadic {
-            let _ = self.w.write_all(b", ...");
+            self.write_all(b", ...");
         }
-        let _ = self.w.write_all(b")");
+        self.write_all(b")");
     }
 
     pub fn end_function(&mut self, f: SymbolId) {
@@ -87,7 +95,7 @@ impl<W: Write> Builder<W> {
                 false => self.ret(LlvmSymbol::zero(*ret)),
             }
         }
-        self.line(format_args!("}}"));
+        let _ = self.w.write_all(b"}\n");
     }
 
     pub fn alloca(&mut self, ty: LlvmType) -> LlvmSymbol {
@@ -131,35 +139,23 @@ impl<W: Write> Builder<W> {
     }
 
     pub fn ret(&mut self, b: LlvmSymbol) {
-        if self.has_block_ret {
-            return;
-        };
-        self.has_block_ret = true;
         self.line(format_args!("  ret {b}"));
+        self.has_block_ret = true;
     }
 
     pub fn ret_void(&mut self) {
-        if self.has_block_ret {
-            return;
-        };
-        self.has_block_ret = true;
         self.line(format_args!("  ret void"));
+        self.has_block_ret = true;
     }
 
     pub fn brc(&mut self, cond: LlvmSymbol, l1: LlvmName, l2: LlvmName) {
-        if self.has_block_ret {
-            return;
-        }
-        self.has_block_ret = true;
         self.line(format_args!("  br {cond}, label {l1}, label {l2}"));
+        self.has_block_ret = true;
     }
 
-    pub fn br(&mut self, l1: LlvmName) {
-        if self.has_block_ret {
-            return;
-        }
+    pub fn br(&mut self, l: LlvmName) {
+        self.line(format_args!("  br label {l}"));
         self.has_block_ret = true;
-        self.line(format_args!("  br label {l1}"));
     }
 
     pub fn emit_label(&mut self, l: LlvmName) {
@@ -168,6 +164,7 @@ impl<W: Write> Builder<W> {
         self.current_block = l;
         match l {
             LlvmName::Label(i) => self.line(format_args!(".l{i}:")),
+            LlvmName::NamedLabel(s) => self.line(format_args!(".ln.{}:", s.resolve())),
             _ => unimplemented!(),
         }
     }
@@ -186,7 +183,7 @@ impl<W: Write> Builder<W> {
     }
 
     fn call_void(&mut self, f: LlvmSymbol, parameters: &[LlvmSymbol]) -> LlvmSymbol {
-        let _ = self.w.write_fmt(format_args!("  call {f}"));
+        self.write_fmt(format_args!("  call {f}"));
         self.params(parameters, false);
         self.line(format_args!(""));
         LlvmSymbol::void()
@@ -194,7 +191,7 @@ impl<W: Write> Builder<W> {
 
     fn call_ret(&mut self, f: LlvmSymbol, parameters: &[LlvmSymbol]) -> LlvmSymbol {
         let r = self.fresh();
-        let _ = self.w.write_fmt(format_args!("  {r} = call {f}"));
+        self.write_fmt(format_args!("  {r} = call {f}"));
         self.params(parameters, false);
         self.line(format_args!(""));
         LlvmSymbol::new(f.ty, r)
@@ -209,7 +206,7 @@ impl<W: Write> Builder<W> {
     pub fn string_literal(&mut self, name: LlvmName, str: &StringConstant) {
         let len = str.units.len() + 1;
         let ty = if str.is_wide { LlvmType::int() } else { LlvmType::char() };
-        let _ = self.w.write_fmt(format_args!("{name} = private unnamed_addr constant "));
+        self.write_fmt(format_args!("{name} = private unnamed_addr constant "));
         self.array(ty, str.units.iter().chain(once(&0)), len);
         self.blank();
     }
@@ -219,14 +216,14 @@ impl<W: Write> Builder<W> {
         I: IntoIterator<Item = T>,
         T: Display,
     {
-        let _ = self.w.write_fmt(format_args!("[{} x {ty}] [", len));
+        self.write_fmt(format_args!("[{} x {ty}] [", len));
         for (i, c) in elems.into_iter().enumerate() {
-            let _ = self.w.write_fmt(format_args!("{ty} {c}"));
+            self.write_fmt(format_args!("{ty} {c}"));
             if i != len - 1 {
-                let _ = self.w.write_all(b", ");
+                self.write_all(b", ");
             }
         }
-        let _ = self.w.write_all(b"]");
+        self.write_all(b"]");
     }
 
     pub fn type_def(&mut self, id: TagDefId) {
@@ -241,11 +238,11 @@ impl<W: Write> Builder<W> {
     }
 
     fn struct_def(&mut self, ty: LlvmType, def: &TagDef) {
-        let _ = self.w.write_fmt(format_args!("{ty} = type {{ "));
+        self.write_fmt(format_args!("{ty} = type {{ "));
         let mut it = def.members.iter().peekable();
         while let Some(member) = it.next() {
             let sym = member.sym.expect("bitfield in a type definition");
-            let _ = self.w.write_fmt(format_args!("{}", sym.resolve().ty.llvm()));
+            self.write_fmt(format_args!("{}", sym.resolve().ty.llvm()));
             if it.peek().is_some() {
                 self.write_all(b", ");
             }
@@ -270,13 +267,13 @@ impl<W: Write> Builder<W> {
         let ResolvedType::Function { ret, params } = sym.ty.id.resolve() else {
             unreachable!("declare on a non-function")
         };
-        let _ = self.w.write_fmt(format_args!("declare {} {}(", ret.llvm(), LlvmName::Global(sym_id)));
+        self.write_fmt(format_args!("declare {} {}(", ret.llvm(), LlvmName::Global(sym_id)));
         match params {
             ParamTypes::Unspecified => self.write_all(b"..."),
             ParamTypes::Prototype { params, is_variadic } => {
                 let mut it = params.iter().peekable();
                 while let Some(param) = it.next() {
-                    let _ = self.w.write_fmt(format_args!("{}", param.llvm()));
+                    self.write_fmt(format_args!("{}", param.llvm()));
                     if it.peek().is_some() {
                         self.write_all(b", ");
                     }

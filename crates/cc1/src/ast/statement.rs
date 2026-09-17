@@ -23,12 +23,12 @@ pub enum Statement {
 
 ast_node! {
     pub struct LabeledStatementNode {
-        pub inner: Labeled,
+        pub inner: LabeledStatement,
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Labeled {
+pub enum LabeledStatement {
     Identifier(Name, StatementNode),
     Case(ExpressionNode, StatementNode),
     Default(StatementNode),
@@ -118,15 +118,15 @@ impl StatementArena {
 
 impl LabeledStatementNode {
     pub fn identifier(name: Name, stmt: StatementNode, span: Span) -> LabeledStatementNode {
-        Self::new(Labeled::Identifier(name, stmt), span)
+        Self::new(LabeledStatement::Identifier(name, stmt), span)
     }
 
     pub fn case(node: ExpressionNode, stmt: StatementNode, span: Span) -> LabeledStatementNode {
-        Self::new(Labeled::Case(node, stmt), span)
+        Self::new(LabeledStatement::Case(node, stmt), span)
     }
 
     pub fn default(stmt: StatementNode, span: Span) -> LabeledStatementNode {
-        Self::new(Labeled::Default(stmt), span)
+        Self::new(LabeledStatement::Default(stmt), span)
     }
 }
 impl SelectionStatementNode {
