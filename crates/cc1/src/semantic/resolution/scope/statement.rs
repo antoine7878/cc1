@@ -34,8 +34,8 @@ impl StatementScopes {
         self.0.push(StatementScope::Switch { stmt, control, cases: Vec::new(), default: None })
     }
 
-    pub fn pop(&mut self) -> Option<(StatementId, ResolvedStatement)> {
-        self.0.pop().map(Into::into)
+    pub fn pop(&mut self) -> Option<StatementScope> {
+        self.0.pop()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -87,13 +87,13 @@ impl StatementScopes {
     }
 }
 
-impl From<StatementScope> for (StatementId, ResolvedStatement) {
-    fn from(value: StatementScope) -> Self {
-        match value {
+impl StatementScope {
+    pub fn into_resolved(self) -> (StatementId, Option<ResolvedStatement>) {
+        match self {
             StatementScope::Switch { stmt, control, cases, default } => {
-                (stmt, ResolvedStatement::Switch { control, cases, default })
+                (stmt, Some(ResolvedStatement::Switch { control, cases, default }))
             }
-            StatementScope::Loop(stmt) => (stmt, ResolvedStatement::Loop(stmt)),
+            StatementScope::Loop(stmt) => (stmt, None),
         }
     }
 }

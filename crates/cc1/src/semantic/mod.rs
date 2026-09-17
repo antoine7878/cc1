@@ -12,6 +12,6 @@ pub use declaration::FunctionHeader;
 pub use diagnosis::{Diag, DiagCollector, Diagnosis, DiagnosisNode, ExpectedTokens};
 pub use eval::ice;
 pub use model::*;
-pub use resolution::scope::{ScopeKind, StatementScopes, SymbolScopes};
+pub use resolution::scope::{ScopeKind, StatementScope, StatementScopes, SymbolScopes};
 pub use resolution::{SymbolResolver, declaration, finish_externals, mark_uses};
 pub use sema::{Sema, install, sema};

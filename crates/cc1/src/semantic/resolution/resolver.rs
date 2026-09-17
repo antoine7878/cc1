@@ -100,8 +100,10 @@ impl SymbolResolver<'_> {
     }
 
     pub fn leave_stmt(&mut self) {
-        let (id, resolved) = self.stmt_scopes.pop().expect("a statement scope to leave");
-        self.sema.stmts.set(id, Some(resolved));
+        let scope = self.stmt_scopes.pop().expect("a statement scope to leave");
+        if let (id, Some(resolved)) = scope.into_resolved() {
+            self.sema.stmts.set(id, Some(resolved));
+        }
     }
 
     pub fn breakable(&self) -> Option<StatementId> {

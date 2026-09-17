@@ -165,6 +165,9 @@ impl<W: Write> Builder<W> {
         match l {
             LlvmName::Label(i) => self.line(format_args!(".l{i}:")),
             LlvmName::NamedLabel(s) => self.line(format_args!(".ln.{}:", s.resolve())),
+            LlvmName::BreakLabel(i) => self.line(format_args!(".brk.{}:", usize::from(i))),
+            LlvmName::ContinueLabel(i) => self.line(format_args!(".cnt.{}:", usize::from(i))),
+            LlvmName::CaseLabel(i) => self.line(format_args!(".case.{}:", usize::from(i))),
             _ => unimplemented!(),
         }
     }

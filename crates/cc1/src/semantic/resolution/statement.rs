@@ -2,7 +2,8 @@ use crate::ast::statement::StatementId;
 use crate::ast::visit::{Visitor, walk_jump_statement, walk_labeled_statement};
 use crate::ast::{
     ExpressionNode, ExpressionStatementNode, Fold, IterationStatement, IterationStatementNode, JumpStatement,
-    JumpStatementNode, LabeledStatement, LabeledStatementNode, SelectionStatement, SelectionStatementNode, StatementNode,
+    JumpStatementNode, LabeledStatement, LabeledStatementNode, SelectionStatement, SelectionStatementNode,
+    StatementNode,
 };
 use crate::semantic::resolution::expression::{self, operands};
 use crate::semantic::{
@@ -20,7 +21,6 @@ fn check_labeled_statement(resolver: &mut SymbolResolver, id: StatementId, node:
     let res = match &node.inner {
         LabeledStatement::Identifier(name, _) => {
             resolver.define_label(*name, &node.span);
-            resolver.sema.stmts.set(id, Some(ResolvedStatement::Label(name.id)));
             Ok(())
         }
         LabeledStatement::Case(expr, _) => check_case(resolver, id, expr),
@@ -45,14 +45,12 @@ fn check_case(resolver: &mut SymbolResolver, id: StatementId, expr: &ExpressionN
     let Some(value) = Fold::new(&sema.target).convert(ty, value) else {
         return Err(Diagnosis::Poisoned);
     };
-    let stmt = resolver.record_case(value, id)?;
-    resolver.sema.stmts.set(id, Some(ResolvedStatement::Case(value, stmt)));
+    resolver.record_case(value, id)?;
     Ok(())
 }
 
 fn check_default(resolver: &mut SymbolResolver, id: StatementId) -> R {
-    let stmt = resolver.record_default(id)?;
-    resolver.sema.stmts.set(id, Some(ResolvedStatement::Default(stmt)));
+    resolver.record_default(id)?;
     Ok(())
 }
 
@@ -182,7 +180,6 @@ fn check_jump_statement(
     let res = match &node.stmt {
         JumpStatement::Goto(name) => {
             resolver.reference_label(*name);
-            resolver.sema.stmts.set(id, Some(ResolvedStatement::Goto(name.id)));
             Ok(())
         }
         JumpStatement::Return(_) => check_return(resolver.sema, node, return_ty.expect("a return inside a function")),

@@ -1,8 +1,8 @@
 use cc1::ast::statement::StatementId;
 use cc1::ast::{ConstValue, StringId};
 use cc1::semantic::{
-    Diagnosis, QualifiedType, ResolvedStatement, ResolvedTypeId, ScopeKind, StatementScopes, SymbolId, SymbolScopes,
-    TagDefId,
+    Diagnosis, QualifiedType, ResolvedStatement, ResolvedTypeId, ScopeKind, StatementScope, StatementScopes, SymbolId,
+    SymbolScopes, TagDefId,
 };
 
 fn name(index: usize) -> StringId {
@@ -235,9 +235,13 @@ fn a_switch_has_at_most_one_default() {
 fn leaving_a_scope_yields_the_statement_it_resolves() {
     let mut scopes = StatementScopes::default();
     scopes.push_loop(stmt(1));
-    assert!(matches!(scopes.pop(), Some((id, ResolvedStatement::Loop(_))) if id == stmt(1)));
+    let scope = scopes.pop();
+    assert!(matches!(scope, Some(StatementScope::Loop(id)) if id == stmt(1)));
+    let (id, resolved) = scope.unwrap().into_resolved();
+    assert_eq!(id, stmt(1));
+    assert!(resolved.is_none());
     assert!(scopes.is_empty());
-    assert_eq!(scopes.pop().map(|(id, _)| id), None);
+    assert!(scopes.pop().is_none());
 }
 
 #[test]
@@ -245,7 +249,9 @@ fn leaving_a_switch_carries_its_cases_out() {
     let mut scopes = switch_scope();
     scopes.record_case(ConstValue::Int(7), stmt(1)).unwrap();
     scopes.record_default(stmt(2)).unwrap();
-    let Some((id, ResolvedStatement::Switch { control, cases, default })) = scopes.pop() else {
+    let Some(scope) = scopes.pop() else { panic!("a switch statement") };
+    let (id, resolved) = scope.into_resolved();
+    let Some(ResolvedStatement::Switch { control, cases, default }) = resolved else {
         panic!("a switch statement")
     };
     assert_eq!(id, stmt(0));

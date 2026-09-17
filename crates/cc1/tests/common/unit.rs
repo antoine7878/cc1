@@ -296,7 +296,6 @@ impl Unit {
 
     fn render_statement(&self, stmt: &ResolvedStatement) -> String {
         match stmt {
-            ResolvedStatement::Loop(_) => "loop".to_string(),
             ResolvedStatement::Switch { control, cases, default } => {
                 let control = control.to_string();
                 let cases: Vec<String> =
@@ -304,14 +303,8 @@ impl Unit {
                 let default = default.map_or_else(|| "none".to_string(), |id| format!("#{}", usize::from(id)));
                 format!("switch {control} [{}] default={default}", cases.join(", "))
             }
-            ResolvedStatement::Case(value, target) => {
-                format!("case {}->#{}", repr(Some(*value)), usize::from(*target))
-            }
-            ResolvedStatement::Default(target) => format!("default->#{}", usize::from(*target)),
             ResolvedStatement::Break(target) => format!("break->#{}", usize::from(*target)),
             ResolvedStatement::Continue(target) => format!("continue->#{}", usize::from(*target)),
-            ResolvedStatement::Goto(name) => format!("goto {}", name.resolve()),
-            ResolvedStatement::Label(name) => format!("label {}", name.resolve()),
         }
     }
 

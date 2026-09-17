@@ -59,12 +59,12 @@ reject!(control_switch_requires_an_integer, "void f(double d){ switch (d) { case
 stmts!(
     stmt_loop_holds_its_jumps,
     "void f(void){ while (1) { break; continue; } }",
-    &["#0 break->#3", "#1 continue->#3", "#3 loop"]
+    &["#0 break->#3", "#1 continue->#3"]
 );
 stmts!(
     stmt_switch_holds_its_cases,
     "void f(void){ switch (2) { case 1: break; default: ; } }",
-    &["#0 break->#5", "#1 case Int(1)->#5", "#3 default->#5", "#5 switch int [Int(1)->#1] default=#3",]
+    &["#0 break->#5", "#5 switch int [Int(1)->#1] default=#3",]
 );
 
 // A break binds to the innermost loop or switch, a continue to the innermost loop,
@@ -72,21 +72,21 @@ stmts!(
 stmts!(
     stmt_switch_inside_a_loop,
     "void f(void){ while (1) { switch (2) { case 1: break; continue; } } }",
-    &["#0 break->#4", "#1 case Int(1)->#4", "#2 continue->#6", "#4 switch int [Int(1)->#1] default=none", "#6 loop",]
+    &["#0 break->#4", "#2 continue->#6", "#4 switch int [Int(1)->#1] default=none"]
 );
 stmts!(
     stmt_loop_inside_a_switch,
     "void f(void){ switch (2) { while (1) { case 1: break; } } }",
-    &["#0 break->#3", "#1 case Int(1)->#5", "#3 loop", "#5 switch int [Int(1)->#1] default=none",]
+    &["#0 break->#3", "#5 switch int [Int(1)->#1] default=none"]
 );
 
-stmts!(stmt_goto_and_label, "void f(void){ goto l; l: ; }", &["#0 goto l", "#2 label l"]);
+accept!(stmt_goto_and_label, "void f(void){ goto l; l: ; }");
 
 // 6.6.4.2 the controlling expression is promoted and each case is converted to that type
 stmts!(
     stmt_case_values_take_the_promoted_control_type,
     "void f(char c){ switch (c) { case 1: ; case 'a': ; } }",
-    &["#1 case Int(1)->#5", "#3 case Int(97)->#5", "#5 switch int [Int(1)->#1, Int(97)->#3] default=none",]
+    &["#5 switch int [Int(1)->#1, Int(97)->#3] default=none"]
 );
 
 accept!(stmt_case_beyond_the_unpromoted_range, "void f(char c){ switch (c) { case 1: ; case 257: ; } }");

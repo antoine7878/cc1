@@ -7,7 +7,7 @@ use crate::ast::{
     BinaryOp, Expression, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, Statement, StatementNode,
     TranslationUnitNode, UnaryOp, Visitor,
 };
-use crate::codegen::{Builder, Globals, LlvmName, LlvmSymbol, Locals};
+use crate::codegen::{Builder, Globals, LlvmSymbol, Locals};
 use crate::context::ctx;
 use crate::semantic::{Definition, Diagnosis, DiagnosisNode, Duration, Initializer, SymbolId, sema};
 
@@ -27,20 +27,11 @@ pub struct Generator<W: Write> {
     pub locals: Locals,
     pub globals: Globals,
     pub diagnosis: Vec<DiagnosisNode>,
-    pub break_label: LlvmName,
-    pub continue_label: LlvmName,
 }
 
 impl<W: Write> Generator<W> {
     fn new(w: W) -> Self {
-        Self {
-            b: Builder::new(w),
-            locals: Locals::default(),
-            globals: Globals::default(),
-            diagnosis: Vec::new(),
-            break_label: LlvmName::label(0),
-            continue_label: LlvmName::label(0),
-        }
+        Self { b: Builder::new(w), locals: Locals::default(), globals: Globals::default(), diagnosis: Vec::new() }
     }
 
     fn collect_diag(&mut self, res: Result<(), Diagnosis>, span: &Span) {
@@ -134,10 +125,10 @@ impl<W: Write> Visitor for Generator<W> {
 
     fn visit_statement(&mut self, node: &StatementNode) {
         let res = match node.id.resolve() {
-            Statement::Jump(node) => self.jump_statement(node),
-            Statement::Selection(selection_node) => self.selection_statement(node, selection_node),
-            Statement::Iteration(node) => self.iteration_statement(node),
-            Statement::Labeled(node) => self.labeled_statement(node),
+            Statement::Jump(inner) => self.jump_statement(node.id, inner),
+            Statement::Selection(inner) => self.selection_statement(node.id, inner),
+            Statement::Iteration(inner) => self.iteration_statement(node.id, inner),
+            Statement::Labeled(inner) => self.labeled_statement(node.id, inner),
             _ => return walk_statement(self, node),
         };
         self.collect_diag(res, &node.span);

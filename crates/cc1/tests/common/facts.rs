@@ -45,11 +45,11 @@ impl Visitor for FactChecker<'_> {
         let at = usize::from(node.id);
         let recorded = self.sema.stmts.get(node.id).is_some();
         match node.id.resolve() {
-            Statement::Iteration(_) => self.require(recorded, "loop facts", at),
-            Statement::Labeled(_) => self.require(recorded, "label facts", at),
             Statement::Jump(inner) => match inner.stmt {
-                cc1::ast::JumpStatement::Return(_) => (),
-                _ => self.require(recorded, "jump target", at),
+                cc1::ast::JumpStatement::Break | cc1::ast::JumpStatement::Continue => {
+                    self.require(recorded, "jump target", at)
+                }
+                _ => (),
             },
             Statement::Selection(inner) => match inner.stmt {
                 cc1::ast::SelectionStatement::Switch(_, _) => self.require(recorded, "switch table", at),

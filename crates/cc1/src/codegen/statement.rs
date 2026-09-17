@@ -1,23 +1,19 @@
 use std::io::Write;
 
+use crate::ast::statement::StatementId;
 use crate::ast::{
     ExpressionNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, JumpStatement,
     JumpStatementNode, LabeledStatement, LabeledStatementNode, SelectionStatement, SelectionStatementNode,
     StatementNode, Visitor,
 };
 use crate::codegen::{Generator, LlvmName};
-use crate::semantic::{Diagnosis, sema};
+use crate::semantic::{Diagnosis, ResolvedStatement, sema};
 
 impl<W: Write> Generator<W> {
-    pub fn selection_statement(
-        &mut self,
-        node: &StatementNode,
-        selection_node: &SelectionStatementNode,
-    ) -> Result<(), Diagnosis> {
-        let rs = &sema().stmts[node.id];
-        match &selection_node.stmt {
+    pub fn selection_statement(&mut self, id: StatementId, node: &SelectionStatementNode) -> Result<(), Diagnosis> {
+        match &node.stmt {
             SelectionStatement::If(cond, then, otherwise) => self.if_statement(cond, then, otherwise),
-            SelectionStatement::Switch(cond, stmt) => self.switch_statement(rs),
+            SelectionStatement::Switch(cond, body) => self.switch_statement(id, cond, body),
         }
     }
 
@@ -46,49 +42,56 @@ impl<W: Write> Generator<W> {
         Ok(())
     }
 
-    fn switch_statement(&mut self, condition: &ExpressionNode, body: &StatementNode) -> Result<(), Diagnosis> {
-        // let rs = sema().stmts[]
+    fn switch_statement(
+        &mut self,
+        _id: StatementId,
+        _condition: &ExpressionNode,
+        _body: &StatementNode,
+    ) -> Result<(), Diagnosis> {
         Ok(())
     }
 
-    pub fn iteration_statement(&mut self, node: &IterationStatementNode) -> Result<(), Diagnosis> {
+    pub fn iteration_statement(&mut self, id: StatementId, node: &IterationStatementNode) -> Result<(), Diagnosis> {
         match &node.stmt {
-            IterationStatement::While(cond, stmt) => self.while_statement(cond, stmt),
-            IterationStatement::Do(stmt, cond) => self.do_statement(stmt, cond),
-            IterationStatement::For(b) => self.for_statement(b),
+            IterationStatement::While(cond, stmt) => self.while_statement(id, cond, stmt),
+            IterationStatement::Do(stmt, cond) => self.do_statement(id, stmt, cond),
+            IterationStatement::For(b) => self.for_statement(id, b),
         }
     }
 
-    fn in_loop<R>(&mut self, continue_l: LlvmName, break_l: LlvmName, f: impl FnOnce(&mut Self) -> R) -> R {
-        let saved = (self.continue_label, self.break_label);
-        self.continue_label = continue_l;
-        self.break_label = break_l;
-        let r = f(self);
-        (self.continue_label, self.break_label) = saved;
-        r
+    fn while_statement(
+        &mut self,
+        id: StatementId,
+        condition: &ExpressionNode,
+        body: &StatementNode,
+    ) -> Result<(), Diagnosis> {
+        self.emit_loop(id, false, Some(condition), None, body)
     }
 
-    fn while_statement(&mut self, condition: &ExpressionNode, body: &StatementNode) -> Result<(), Diagnosis> {
-        self.emit_loop(false, Some(condition), None, body)
-    }
-
-    fn do_statement(&mut self, body: &StatementNode, condition: &ExpressionNode) -> Result<(), Diagnosis> {
-        self.emit_loop(true, Some(condition), None, body)
+    fn do_statement(
+        &mut self,
+        id: StatementId,
+        body: &StatementNode,
+        condition: &ExpressionNode,
+    ) -> Result<(), Diagnosis> {
+        self.emit_loop(id, true, Some(condition), None, body)
     }
 
     fn for_statement(
         &mut self,
+        id: StatementId,
         b: &(ExpressionStatementNode, ExpressionStatementNode, Option<ExpressionNode>, StatementNode),
     ) -> Result<(), Diagnosis> {
         let (init, cond, action, body) = b;
         if let Some(init) = &init.expr {
             self.emit_expression(init)?;
         }
-        self.emit_loop(false, cond.expr.as_ref(), action.as_ref(), body)
+        self.emit_loop(id, false, cond.expr.as_ref(), action.as_ref(), body)
     }
 
     fn emit_loop(
         &mut self,
+        id: StatementId,
         enter_at_body: bool,
         condition: Option<&ExpressionNode>,
         action: Option<&ExpressionNode>,
@@ -96,8 +99,8 @@ impl<W: Write> Generator<W> {
     ) -> Result<(), Diagnosis> {
         let cond_l = self.b.fresh_label();
         let body_l = self.b.fresh_label();
-        let action_l = self.b.fresh_label();
-        let end_l = self.b.fresh_label();
+        let action_l = LlvmName::ContinueLabel(id);
+        let end_l = LlvmName::BreakLabel(id);
 
         self.b.br(if enter_at_body { body_l } else { cond_l });
         self.b.emit_label(cond_l);
@@ -109,7 +112,7 @@ impl<W: Write> Generator<W> {
             None => self.b.br(body_l),
         }
         self.b.emit_label(body_l);
-        self.in_loop(action_l, end_l, |g| g.visit_statement(body));
+        self.visit_statement(body);
         self.b.br(action_l);
         self.b.emit_label(action_l);
         if let Some(action) = action {
@@ -120,28 +123,34 @@ impl<W: Write> Generator<W> {
         Ok(())
     }
 
-    pub fn jump_statement(&mut self, node: &JumpStatementNode) -> Result<(), Diagnosis> {
+    pub fn jump_statement(&mut self, id: StatementId, node: &JumpStatementNode) -> Result<(), Diagnosis> {
         match &node.stmt {
             JumpStatement::Return(Some(e)) => self.emit_expression(e).map(|v| self.b.ret(v))?,
             JumpStatement::Return(None) => self.b.ret_void(),
-            JumpStatement::Break => self.b.br(self.break_label),
-            JumpStatement::Continue => self.b.br(self.continue_label),
+            JumpStatement::Break => {
+                let &ResolvedStatement::Break(target) = &sema().stmts[id] else {
+                    return Err(Diagnosis::Invariant("break target"));
+                };
+                self.b.br(LlvmName::BreakLabel(target));
+            }
+            JumpStatement::Continue => {
+                let &ResolvedStatement::Continue(target) = &sema().stmts[id] else {
+                    return Err(Diagnosis::Invariant("continue target"));
+                };
+                self.b.br(LlvmName::ContinueLabel(target));
+            }
             JumpStatement::Goto(a) => self.b.br(LlvmName::NamedLabel(a.id)),
         }
         Ok(())
     }
 
-    pub fn labeled_statement(&mut self, node: &LabeledStatementNode) -> Result<(), Diagnosis> {
-        let stmt = match &node.inner {
-            LabeledStatement::Identifier(label, stmt) => {
-                let l = LlvmName::NamedLabel(label.id);
-                self.b.br(l);
-                self.b.emit_label(l);
-                stmt
-            }
-            LabeledStatement::Default(stmt) => stmt,
-            LabeledStatement::Case(_, stmt) => stmt,
+    pub fn labeled_statement(&mut self, id: StatementId, node: &LabeledStatementNode) -> Result<(), Diagnosis> {
+        let (l, stmt) = match &node.inner {
+            LabeledStatement::Identifier(label, stmt) => (LlvmName::NamedLabel(label.id), stmt),
+            LabeledStatement::Case(_, stmt) | LabeledStatement::Default(stmt) => (LlvmName::CaseLabel(id), stmt),
         };
+        self.b.br(l);
+        self.b.emit_label(l);
         self.visit_statement(stmt);
         Ok(())
     }

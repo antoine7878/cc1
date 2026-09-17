@@ -1,5 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
+use crate::ast::statement::StatementId;
 use crate::ast::{ConstValue, StringConstId, StringId};
 use crate::semantic::{Diagnosis, Linkage, SymbolId};
 #[derive(Debug, Clone, Copy)]
@@ -10,6 +11,9 @@ pub enum LlvmName {
     Bool(bool),
     Label(usize),
     NamedLabel(StringId),
+    BreakLabel(StatementId),
+    ContinueLabel(StatementId),
+    CaseLabel(StatementId),
     Global(SymbolId),
     Null,
     None,
@@ -49,6 +53,9 @@ impl Display for LlvmName {
             LlvmName::StringLiteral(i) => write!(f, "@.str.{}", usize::from(*i)),
             LlvmName::Label(i) => write!(f, "%.l{i}"),
             LlvmName::NamedLabel(i) => write!(f, "%.ln.{}", i.resolve()),
+            LlvmName::BreakLabel(i) => write!(f, "%.brk.{}", usize::from(*i)),
+            LlvmName::ContinueLabel(i) => write!(f, "%.cnt.{}", usize::from(*i)),
+            LlvmName::CaseLabel(i) => write!(f, "%.case.{}", usize::from(*i)),
             LlvmName::Global(s) => {
                 let sym = s.resolve();
                 match sym.linkage {

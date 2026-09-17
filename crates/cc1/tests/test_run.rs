@@ -101,6 +101,32 @@ exits!(
 );
 exits!(goto_into_block, "int main(void) { int x; x = 0; { goto in; } { int y; y = 42; in: x = 42; } return x; }", 42);
 exits!(goto_chain, "int main(void) { int x; x = 40; goto a; b: x += 2; return x; a: goto b; }", 42);
+
+exits!(
+    break_inner_of_nested_loops,
+    "int main(void) { int i; int j; int s; s = 0; for (i = 0; i < 5; i++) { for (j = 0; ; j++) { if (j == 3) break; s += j; } s += i; } return s + 17; }",
+    42
+);
+exits!(
+    continue_inner_of_nested_loops,
+    "int main(void) { int i; int j; int s; s = 0; for (i = 0; i < 3; i++) { for (j = 0; j < 4; j++) { if (j == 1) continue; s += j; } } return s * 2 + 12; }",
+    42
+);
+exits!(
+    break_inside_do_while,
+    "int main(void) { int i; i = 0; do { if (i == 42) break; i++; } while (1); return i; }",
+    42
+);
+exits!(
+    continue_inside_while,
+    "int main(void) { int i; int s; i = 0; s = 0; while (i < 10) { i++; if (i & 1) continue; s += i; } return s + 12; }",
+    42
+);
+exits!(
+    labeled_loop_body,
+    "int main(void) { int i; i = 0; for (;;) { top: if (i >= 42) break; i++; if (i < 42) goto top; } return i; }",
+    42
+);
 exits!(ignore "switch", switch_case, "int main(void) { switch (2) { case 1: return 1; case 2: return 42; default: return 3; } }", 42);
 exits!(ignore "switch", switch_default, "int main(void) { switch (9) { case 1: return 1; default: return 42; } }", 42);
 exits!(ignore "switch", switch_fallthrough, "int main(void) { int x; x = 40; switch (1) { case 1: x++; case 2: x++; break; case 3: x = 0; } return x; }", 42);
