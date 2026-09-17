@@ -6,13 +6,18 @@ use crate::ast::{
     StatementNode, Visitor,
 };
 use crate::codegen::{Generator, LlvmName};
-use crate::semantic::Diagnosis;
+use crate::semantic::{Diagnosis, sema};
 
 impl<W: Write> Generator<W> {
-    pub fn selection_statement(&mut self, node: &SelectionStatementNode) -> Result<(), Diagnosis> {
-        match &node.stmt {
+    pub fn selection_statement(
+        &mut self,
+        node: &StatementNode,
+        selection_node: &SelectionStatementNode,
+    ) -> Result<(), Diagnosis> {
+        let rs = &sema().stmts[node.id];
+        match &selection_node.stmt {
             SelectionStatement::If(cond, then, otherwise) => self.if_statement(cond, then, otherwise),
-            SelectionStatement::Switch(cond, stmt) => self.switch_statement(cond, stmt),
+            SelectionStatement::Switch(cond, stmt) => self.switch_statement(rs),
         }
     }
 
@@ -42,9 +47,8 @@ impl<W: Write> Generator<W> {
     }
 
     fn switch_statement(&mut self, condition: &ExpressionNode, body: &StatementNode) -> Result<(), Diagnosis> {
-        let _ = body;
-        let _ = condition;
-        todo!()
+        // let rs = sema().stmts[]
+        Ok(())
     }
 
     pub fn iteration_statement(&mut self, node: &IterationStatementNode) -> Result<(), Diagnosis> {

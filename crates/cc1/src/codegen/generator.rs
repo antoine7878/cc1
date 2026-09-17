@@ -135,7 +135,7 @@ impl<W: Write> Visitor for Generator<W> {
     fn visit_statement(&mut self, node: &StatementNode) {
         let res = match node.id.resolve() {
             Statement::Jump(node) => self.jump_statement(node),
-            Statement::Selection(node) => self.selection_statement(node),
+            Statement::Selection(selection_node) => self.selection_statement(node, selection_node),
             Statement::Iteration(node) => self.iteration_statement(node),
             Statement::Labeled(node) => self.labeled_statement(node),
             _ => return walk_statement(self, node),
