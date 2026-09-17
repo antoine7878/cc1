@@ -4,10 +4,11 @@ use libft::Span;
 
 use crate::ast::visit::{walk_compound_statement, walk_statement, walk_translation_unit};
 use crate::ast::{
-    CompoundStatementNode, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, JumpStatement,
-    JumpStatementNode, StatementNode, TranslationUnitNode, Visitor,
+    BinaryOp, CompoundStatementNode, Expression, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode,
+    IterationStatement, IterationStatementNode, JumpStatement, JumpStatementNode, SelectionStatement,
+    SelectionStatementNode, StatementNode, TranslationUnitNode, UnaryOp, Visitor,
 };
-use crate::codegen::{Builder, Globals, LlvmSymbol, Locals};
+use crate::codegen::{Builder, Globals, LlvmName, LlvmSymbol, Locals};
 use crate::context::ctx;
 use crate::semantic::{Definition, Diagnosis, DiagnosisNode, Duration, Initializer, SymbolId, sema};
 
@@ -27,11 +28,18 @@ pub struct Generator<W: Write> {
     pub locals: Locals,
     pub globals: Globals,
     pub diagnosis: Vec<DiagnosisNode>,
+    pub ret_label: LlvmName,
 }
 
 impl<W: Write> Generator<W> {
     fn new(w: W) -> Self {
-        Self { b: Builder::new(w), locals: Locals::default(), globals: Globals::default(), diagnosis: Vec::new() }
+        Self {
+            b: Builder::new(w),
+            locals: Locals::default(),
+            globals: Globals::default(),
+            diagnosis: Vec::new(),
+            ret_label: LlvmName::label(0),
+        }
     }
 
     fn collect_diag(&mut self, res: Result<(), Diagnosis>, span: &Span) {
@@ -61,6 +69,22 @@ impl<W: Write> Generator<W> {
             Initializer::List(_) => todo!("list init"),
             Initializer::Address(_) => todo!("address init"),
         }
+    }
+
+    pub fn emit_condition(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+        let re = &sema().expr_types[node.id];
+        if re.casts.is_empty() && sema().expr_consts.get(node.id).is_none() {
+            match node.id.resolve() {
+                Expression::Binary(op, lhs, rhs) if op.is_comparison() => return self.comparison(op, lhs, rhs),
+                Expression::Binary(op @ (BinaryOp::LogicalAnd | BinaryOp::LogicalOr), lhs, rhs) => {
+                    return self.logical(op, lhs, rhs);
+                }
+                Expression::Unary(UnaryOp::LogicalNot, e) => return self.logic_not(e),
+                _ => {}
+            }
+        }
+        let v = self.emit_expression(node)?;
+        self.neq_zero(v, re.casted_ty())
     }
 
     fn emit_globals(&mut self) {
@@ -115,6 +139,16 @@ impl<W: Write> Visitor for Generator<W> {
             JumpStatement::Return(None) => self.b.ret_void(),
             _ => todo!(),
         }
+    }
+
+    fn visit_selection_statement(&mut self, node: &SelectionStatementNode) {
+        let res = self.selection_statement(node);
+        self.collect_diag(res, &node.span);
+    }
+
+    fn visit_iteration_statement(&mut self, node: &IterationStatementNode) {
+        let res = self.iteration_statement(node);
+        self.collect_diag(res, &node.span);
     }
 
     fn visit_expression(&mut self, node: &ExpressionNode) {

@@ -43,13 +43,7 @@ pub struct Symbol {
 }
 
 impl Symbol {
-    pub fn new(
-        name: Name,
-        ty: QualifiedType,
-        storage: Option<Storage>,
-        kind: SymbolKind,
-        is_init: bool,
-    ) -> Self {
+    pub fn new(name: Name, ty: QualifiedType, storage: Option<Storage>, kind: SymbolKind, is_init: bool) -> Self {
         Self {
             name,
             ty,

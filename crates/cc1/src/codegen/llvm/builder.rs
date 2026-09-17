@@ -9,25 +9,32 @@ use crate::semantic::{Definition, Linkage, ParamTypes, ResolvedType, SymbolId, T
 #[derive(Debug)]
 pub struct Builder<W: Write> {
     w: W,
-    counter: usize,
+    ssa_counter: usize,
+    label_counter: usize,
     pub current_block: LlvmName,
     pub has_block_ret: bool,
 }
 
 impl<W: Write> Builder<W> {
     pub fn new(w: W) -> Self {
-        Self { w, counter: 0, current_block: LlvmName::SSA(0), has_block_ret: false }
+        Self { w, ssa_counter: 0, label_counter: 0, current_block: LlvmName::SSA(0), has_block_ret: false }
     }
 
     pub fn reset(&mut self, counter: usize) {
         self.has_block_ret = false;
         self.current_block = LlvmName::SSA(0);
-        self.counter = counter;
+        self.ssa_counter = counter;
+        self.label_counter = 0;
     }
 
     pub fn fresh(&mut self) -> LlvmName {
-        self.counter += 1;
-        LlvmName::SSA(self.counter)
+        self.ssa_counter += 1;
+        LlvmName::SSA(self.ssa_counter)
+    }
+
+    pub fn fresh_label(&mut self) -> LlvmName {
+        self.label_counter += 1;
+        LlvmName::label(self.label_counter)
     }
 
     fn write_all(&mut self, str: &[u8]) {
@@ -139,21 +146,28 @@ impl<W: Write> Builder<W> {
         self.line(format_args!("  ret void"));
     }
 
-    pub fn br(&mut self, cond: LlvmSymbol, l1: LlvmName, l2: Option<LlvmName>) {
-        self.has_block_ret = true;
-        match l2 {
-            Some(l2) => self.line(format_args!("  br {cond}, label {l1}, label {l2}")),
-            None => self.line(format_args!("  br label {l1}")),
+    pub fn brc(&mut self, cond: LlvmSymbol, l1: LlvmName, l2: LlvmName) {
+        if self.has_block_ret {
+            return;
         }
+        self.has_block_ret = true;
+        self.line(format_args!("  br {cond}, label {l1}, label {l2}"));
     }
 
-    pub fn named_label(&mut self, l: LlvmName) {
+    pub fn br(&mut self, l1: LlvmName) {
+        if self.has_block_ret {
+            return;
+        }
+        self.has_block_ret = true;
+        self.line(format_args!("  br label {l1}"));
+    }
+
+    pub fn emit_label(&mut self, l: LlvmName) {
         self.blank();
         self.has_block_ret = false;
         self.current_block = l;
         match l {
-            LlvmName::SSA(i) => self.line(format_args!("{i}:")),
-            LlvmName::Label(i, j) => self.line(format_args!("l.{i}.{j}:")),
+            LlvmName::Label(i) => self.line(format_args!(".l{i}:")),
             _ => unimplemented!(),
         }
     }

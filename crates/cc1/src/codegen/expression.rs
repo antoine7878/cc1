@@ -2,12 +2,18 @@ use std::cmp::Ordering;
 use std::io::Write;
 
 use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, UnaryOp};
-use crate::codegen::{Generator, Invariant, LlvmName, LlvmOperator, LlvmSymbol, LlvmType};
+use crate::codegen::{Generator, Invariant, LlvmOperator, LlvmSymbol, LlvmType};
 use crate::context::ctx;
 use crate::semantic::{CastKind, Diagnosis, ImplicitCast, QualifiedType, sema};
 
 impl<W: Write> Generator<W> {
     pub fn emit_expression(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+        println!("-----------------------------------------------");
+        let re = &sema().expr_types[node.id];
+        for a in &re.casts {
+            println!("{}", a.kind);
+        }
+        println!("-----------------------------------------------");
         let s = match sema().expr_consts.get(node.id) {
             Some(value) => self.constant(sema().expr_types[node.id].ty, *value),
             None => self.fold_raw(node)?,
@@ -49,6 +55,7 @@ impl<W: Write> Generator<W> {
             CastKind::FloatingConversion => Self::f_to_f(from, to),
             CastKind::PointerToInteger => Some("ptrtoint"),
             CastKind::IntegerToPointer => self.i_to_p(&mut v, from),
+            CastKind::ToBool => todo!(),
         };
         Ok(match conv {
             Some(conv) => self.b.convert(conv, v, to.llvm()),
@@ -135,7 +142,7 @@ impl<W: Write> Generator<W> {
             UnaryOp::PostInc | UnaryOp::PostDec | UnaryOp::PreInc | UnaryOp::PreDec => self.unary_inc_dec(op, e),
             UnaryOp::Plus => self.emit_expression(e),
             UnaryOp::Minus => self.unary_minus(e),
-            UnaryOp::LogicalNot => self.unary_logic_not(op, e),
+            UnaryOp::LogicalNot => self.unary_logic_not(e),
             UnaryOp::BitNot => self.unary_bitnot(op, e),
             UnaryOp::Addr => self.emit_expression(e),
             UnaryOp::Deref => self.unary_deref(e),
@@ -194,14 +201,14 @@ impl<W: Write> Generator<W> {
         Ok(self.b.binop(op, LlvmSymbol::cst(v.ty, ConstValue::Int(0)), v))
     }
 
-    fn unary_logic_not(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let re_operand = &sema().expr_types[operand.id];
-        let qty = re_operand.casted_ty();
-        let v = self.emit_expression(operand)?;
-        let v = self.neq_zero(v, qty)?;
-        let xor = LlvmOperator::unary(op, qty)?;
-        let v = self.b.binop(xor, v, LlvmSymbol::from(true));
+    fn unary_logic_not(&mut self, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+        let v = self.logic_not(operand)?;
         Ok(self.zext_to_int(v))
+    }
+
+    pub fn logic_not(&mut self, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+        let v = self.emit_condition(operand)?;
+        Ok(self.b.binop("xor", v, LlvmSymbol::from(true)))
     }
 
     fn unary_bitnot(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
@@ -284,12 +291,21 @@ impl<W: Write> Generator<W> {
         lhs: &ExpressionNode,
         rhs: &ExpressionNode,
     ) -> Result<LlvmSymbol, Diagnosis> {
+        let v = self.comparison(op, lhs, rhs)?;
+        Ok(self.zext_to_int(v))
+    }
+
+    pub fn comparison(
+        &mut self,
+        op: &BinaryOp,
+        lhs: &ExpressionNode,
+        rhs: &ExpressionNode,
+    ) -> Result<LlvmSymbol, Diagnosis> {
         let rel = &sema().expr_types[lhs.id];
         let op = LlvmOperator::binary(op, rel.casted_ty())?;
         let v1 = self.emit_expression(lhs)?;
         let v2 = self.emit_expression(rhs)?;
-        let v = self.b.cmp(op, v1, v2);
-        Ok(self.zext_to_int(v))
+        Ok(self.b.cmp(op, v1, v2))
     }
 
     fn binary_logical(
@@ -298,27 +314,33 @@ impl<W: Write> Generator<W> {
         lhs: &ExpressionNode,
         rhs: &ExpressionNode,
     ) -> Result<LlvmSymbol, Diagnosis> {
+        let v = self.logical(op, lhs, rhs)?;
+        Ok(self.zext_to_int(v))
+    }
+
+    pub fn logical(
+        &mut self,
+        op: &BinaryOp,
+        lhs: &ExpressionNode,
+        rhs: &ExpressionNode,
+    ) -> Result<LlvmSymbol, Diagnosis> {
+        let l1 = self.b.fresh_label();
+        let l2 = self.b.fresh_label();
         let initial_block = self.b.current_block;
-        let v = self.emit_expression(lhs)?;
-        let v = self.neq_zero(v, sema().expr_types[lhs.id].casted_ty())?;
-        let i = v.name.ssa_value()?;
-        let l1 = LlvmName::label(i, 1);
-        let l2 = LlvmName::label(i, 2);
+        let v = self.emit_condition(lhs)?;
         match op {
-            BinaryOp::LogicalAnd => self.b.br(v, l1, Some(l2)),
-            BinaryOp::LogicalOr => self.b.br(v, l2, Some(l1)),
+            BinaryOp::LogicalAnd => self.b.brc(v, l1, l2),
+            BinaryOp::LogicalOr => self.b.brc(v, l2, l1),
             _ => return Err(Diagnosis::Invariant("non logical operator in binary_logical")),
         }
 
-        self.b.named_label(l1);
-        let v = self.emit_expression(rhs)?;
-        let v = self.neq_zero(v, sema().expr_types[rhs.id].casted_ty())?;
+        self.b.emit_label(l1);
+        let v = self.emit_condition(rhs)?;
         let rhs_block = self.b.current_block;
-        self.b.br(v, l2, None);
+        self.b.br(l2);
 
-        self.b.named_label(l2);
-        let v = self.b.phi((*op == BinaryOp::LogicalOr).into(), initial_block, v, rhs_block);
-        Ok(self.zext_to_int(v))
+        self.b.emit_label(l2);
+        Ok(self.b.phi((*op == BinaryOp::LogicalOr).into(), initial_block, v, rhs_block))
     }
 
     fn assign(
@@ -348,26 +370,21 @@ impl<W: Write> Generator<W> {
         a: &ExpressionNode,
         b: &ExpressionNode,
     ) -> Result<LlvmSymbol, Diagnosis> {
-        let v = self.emit_expression(cond)?;
-        let v = self.neq_zero(v, sema().expr_types[cond.id].casted_ty())?;
+        let l1 = self.b.fresh_label();
+        let l2 = self.b.fresh_label();
+        let l3 = self.b.fresh_label();
 
-        let i = v.name.ssa_value()?;
-        let l1 = LlvmName::label(i, 0);
-        let l2 = LlvmName::label(i, 1);
-        let l3 = LlvmName::label(i, 2);
-        self.b.br(v, l1, Some(l2));
-
-        self.b.named_label(l1);
+        let cond = self.emit_condition(cond)?;
+        self.b.brc(cond, l1, l2);
+        self.b.emit_label(l1);
         let va = self.emit_expression(a)?;
         let a_block = self.b.current_block;
-        self.b.br(v, l3, None);
-
-        self.b.named_label(l2);
+        self.b.br(l3);
+        self.b.emit_label(l2);
         let vb = self.emit_expression(b)?;
         let b_block = self.b.current_block;
-        self.b.br(v, l3, None);
-
-        self.b.named_label(l3);
+        self.b.br(l3);
+        self.b.emit_label(l3);
         match va.ty.is_void() {
             true => Ok(va),
             false => Ok(self.b.phi(va, a_block, vb, b_block)),
@@ -388,7 +405,7 @@ impl<W: Write> Generator<W> {
         self.arithmetic(&BinaryOp::Add, v1, t1, v2, t2)
     }
 
-    fn neq_zero(&mut self, v: LlvmSymbol, qty: QualifiedType) -> Result<LlvmSymbol, Diagnosis> {
+    pub fn neq_zero(&mut self, v: LlvmSymbol, qty: QualifiedType) -> Result<LlvmSymbol, Diagnosis> {
         let op = LlvmOperator::binary(&BinaryOp::Neq, qty)?;
         Ok(self.b.cmp(op, v, LlvmSymbol::zero(qty)))
     }

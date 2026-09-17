@@ -7,14 +7,23 @@ target triple = "x86_64-pc-linux-gnu"
 define dso_local i32 @main() #0 {
   %1 = alloca i32, align 4
   %2 = alloca i32, align 4
-  %3 = alloca i32, align 4
   store i32 0, ptr %1, align 4
-  store i32 40, ptr %2, align 4
-  store i32 2, ptr %3, align 4
+  br label %3
+
+3:                                                ; preds = %6, %0
   %4 = load i32, ptr %2, align 4
-  %5 = load i32, ptr %3, align 4
-  %6 = add nsw i32 %4, %5
-  ret i32 %6
+  %5 = icmp slt i32 %4, 10
+  br i1 %5, label %6, label %9
+
+6:                                                ; preds = %3
+  %7 = load i32, ptr %2, align 4
+  %8 = add nsw i32 %7, 1
+  store i32 %8, ptr %2, align 4
+  br label %3
+
+9:                                                ; preds = %3
+  %10 = load i32, ptr %2, align 4
+  ret i32 %10
 }
 
 attributes #0 = { noinline nounwind optnone uwtable "frame-pointer"="all" "min-legal-vector-width"="0" "no-trapping-math"="true" "stack-protector-buffer-size"="8" "target-cpu"="x86-64" "target-features"="+cmov,+cx8,+fxsr,+mmx,+sse,+sse2,+x87" "tune-cpu"="generic" }

@@ -3,6 +3,7 @@ pub mod generator;
 pub mod global;
 pub mod llvm;
 pub mod local;
+pub mod statement;
 
 pub use generator::{Generator, generate, generate_to};
 pub use global::Globals;

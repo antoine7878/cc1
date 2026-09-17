@@ -8,7 +8,7 @@ pub enum LlvmName {
     Constant(ConstValue),
     StringLiteral(StringConstId),
     Bool(bool),
-    Label(usize, usize),
+    Label(usize),
     Global(SymbolId),
     Null,
     None,
@@ -21,8 +21,8 @@ impl ConstValue {
 }
 
 impl LlvmName {
-    pub fn label(i: usize, j: usize) -> LlvmName {
-        Self::Label(i, j)
+    pub fn label(i: usize) -> LlvmName {
+        Self::Label(i)
     }
 
     pub fn ssa_value(&self) -> Result<usize, Diagnosis> {
@@ -46,7 +46,7 @@ impl Display for LlvmName {
             LlvmName::Constant(value) => write!(f, "{value}"),
             LlvmName::Bool(b) => write!(f, "{b}"),
             LlvmName::StringLiteral(i) => write!(f, "@.str.{}", usize::from(*i)),
-            LlvmName::Label(i, j) => write!(f, "%l.{i}.{j}"),
+            LlvmName::Label(i) => write!(f, "%.l{i}"),
             LlvmName::Global(s) => {
                 let sym = s.resolve();
                 match sym.linkage {

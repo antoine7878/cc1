@@ -257,10 +257,7 @@ fn a_function_definition_records_its_return_type() {
     let unit = accepted("char *f(int a, char b) { return 0; }");
     let def = unit.sema.functions.get(FunctionDefId::from(0));
     assert_eq!(unit.ty_tree(def.return_ty), Ty::ptr(Ty::Char));
-    assert_eq!(
-        unit.ty_tree(def.sym.resolve().ty),
-        Ty::func(Ty::ptr(Ty::Char), [Ty::Int, Ty::Char])
-    );
+    assert_eq!(unit.ty_tree(def.sym.resolve().ty), Ty::func(Ty::ptr(Ty::Char), [Ty::Int, Ty::Char]));
 }
 
 #[test]

@@ -54,13 +54,32 @@ exits!(ignore "call arguments", call_short_argument, "int f(short s) { return s;
 exits!(ignore "call arguments", recursion, "int fact(int n) { return n ? n * fact(n - 1) : 1; } int main(void) { return fact(5) - 78; }", 42);
 
 exits!(if_true, "int main(void) { if (1) return 42; return 7; }", 42);
-exits!(ignore "control flow", if_false, "int main(void) { if (0) return 7; return 42; }", 42);
-exits!(ignore "control flow", if_else, "int main(void) { if (0) return 7; else return 42; }", 42);
-exits!(ignore "control flow", while_loop, "int main(void) { int i; i = 0; while (i < 42) i++; return i; }", 42);
-exits!(ignore "control flow", do_while, "int main(void) { int i; i = 0; do i++; while (i < 42); return i; }", 42);
-exits!(ignore "control flow", for_loop, "int main(void) { int i; int s; s = 0; for (i = 0; i < 7; i++) s += 6; return s; }", 42);
-exits!(ignore "control flow", break_loop, "int main(void) { int i; for (i = 0; ; i++) if (i == 42) break; return i; }", 42);
-exits!(ignore "control flow", continue_loop, "int main(void) { int i; int s; s = 0; for (i = 0; i < 10; i++) { if (i % 2) continue; s += i; } return s + 22; }", 42);
+exits!(if_false, "int main(void) { if (0) return 7; return 42; }", 42);
+exits!(if_else, "int main(void) { if (0) return 7; else return 42; }", 42);
+exits!(
+    if_else_if_chain,
+    "int f(int x) { if (x > 0) return 1; else if (x < 0) return -1; return 0; } int main(void) { return f(5) * 40 + f(-3) + f(0) + 3; }",
+    42
+);
+exits!(while_loop, "int main(void) { int i; i = 0; while (i < 42) i++; return i; }", 42);
+exits!(do_while, "int main(void) { int i; i = 0; do i++; while (i < 42); return i; }", 42);
+exits!(for_loop, "int main(void) { int i; int s; s = 0; for (i = 0; i < 7; i++) s += 6; return s; }", 42);
+exits!(break_loop, "int main(void) { int i; for (i = 0; ; i++) if (i == 42) break; return i; }", 42);
+exits!(
+    continue_loop,
+    "int main(void) { int i; int s; s = 0; for (i = 0; i < 10; i++) { if (i % 2) continue; s += i; } return s + 22; }",
+    42
+);
+exits!(
+    continue_then_break,
+    "int main(void) { int i; int s; s = 0; for (i = 0; i < 100; i++) { if (i % 2) continue; if (i > 12) break; s += i; } return s; }",
+    42
+);
+exits!(
+    while_then_do_while,
+    "int main(void) { int n; int c; n = 27; c = 0; while (n != 1) { n = n % 2 ? 3 * n + 1 : n / 2; c++; } do c--; while (c > 42); return c; }",
+    42
+);
 exits!(ignore "control flow", goto_label, "int main(void) { int i; i = 0; again: i++; if (i < 42) goto again; return i; }", 42);
 exits!(ignore "switch", switch_case, "int main(void) { switch (2) { case 1: return 1; case 2: return 42; default: return 3; } }", 42);
 exits!(ignore "switch", switch_default, "int main(void) { switch (9) { case 1: return 1; default: return 42; } }", 42);
@@ -263,9 +282,25 @@ exits!(
     "int main(void) { int a = 20; { int b = a; a = 1; { int c = a + b; return c * 2; } } }",
     42
 );
-exits!(ignore "control flow", init_in_loop_body, "int main(void) { int i; int s; s = 0; for (i = 0; i < 3; i++) { int x = 10; x += i; s += x; } return s + 9; }", 42);
-exits!(static_then_auto, "int f(void) { static int n = 40; int x; x = 2; return n + x; } int main(void) { return f(); }", 42);
-exits!(static_then_auto_init, "int f(void) { static int n = 40; int x = 2; return n + x; } int main(void) { return f(); }", 42);
-exits!(auto_then_static, "int f(void) { int x = 2; static int n = 40; return n + x; } int main(void) { return f(); }", 42);
+exits!(
+    init_in_loop_body,
+    "int main(void) { int i; int s; s = 0; for (i = 0; i < 3; i++) { int x = 10; x += i; s += x; } return s + 9; }",
+    42
+);
+exits!(
+    static_then_auto,
+    "int f(void) { static int n = 40; int x; x = 2; return n + x; } int main(void) { return f(); }",
+    42
+);
+exits!(
+    static_then_auto_init,
+    "int f(void) { static int n = 40; int x = 2; return n + x; } int main(void) { return f(); }",
+    42
+);
+exits!(
+    auto_then_static,
+    "int f(void) { int x = 2; static int n = 40; return n + x; } int main(void) { return f(); }",
+    42
+);
 exits!(sibling_blocks_init, "int main(void) { int r; { int a = 40; r = a; } { int b = 2; r += b; } return r; }", 42);
 exits!(init_from_outer_shadowed, "int main(void) { int x = 1; { int x = 42; return x; } }", 42);

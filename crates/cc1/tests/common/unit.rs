@@ -368,13 +368,7 @@ impl Unit {
         self.sema
             .symbols
             .iter()
-            .map(|symbol| {
-                (
-                    symbol.name.id.resolve().clone(),
-                    symbol.kind.to_string(),
-                    symbol.ty.to_string(),
-                )
-            })
+            .map(|symbol| (symbol.name.id.resolve().clone(), symbol.kind.to_string(), symbol.ty.to_string()))
             .collect()
     }
 
