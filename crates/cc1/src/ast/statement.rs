@@ -14,11 +14,11 @@ ast_node! {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Statement {
     Labeled(LabeledStatementNode),
-    Compound(CompoundStatementNode),
-    Expression(ExpressionStatementNode),
     Selection(SelectionStatementNode),
     Iteration(IterationStatementNode),
     Jump(JumpStatementNode),
+    Expression(ExpressionStatementNode),
+    Compound(CompoundStatementNode),
 }
 
 ast_node! {

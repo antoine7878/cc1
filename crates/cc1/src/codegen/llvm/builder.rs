@@ -159,8 +159,8 @@ impl<W: Write> Builder<W> {
     }
 
     pub fn emit_label(&mut self, l: LlvmName) {
-        self.blank();
         self.has_block_ret = false;
+        self.blank();
         self.current_block = l;
         match l {
             LlvmName::Label(i) => self.line(format_args!(".l{i}:")),
@@ -303,5 +303,14 @@ impl<W: Write> Builder<W> {
         };
         let init = LlvmInit::new(sym.ty, sym.initializer.map(|i| i.resolve()));
         self.line(format_args!("{name} = {linkage}{kind} {init}, align {align}"));
+    }
+
+    pub fn switch(&mut self, condition: LlvmSymbol, cases: &[(LlvmSymbol, LlvmName)], default_l: LlvmName) {
+        self.line(format_args!("  switch {}, label {} [", condition, default_l));
+        for (value, label) in cases {
+            self.line(format_args!("    {}, label {}", value, label));
+        }
+        self.line(format_args!("  ]"));
+        self.has_block_ret = true;
     }
 }

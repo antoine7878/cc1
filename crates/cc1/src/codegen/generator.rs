@@ -2,6 +2,7 @@ use std::io::{Write, stdout};
 
 use libft::Span;
 
+use crate::ast::statement::StatementId;
 use crate::ast::visit::{walk_statement, walk_translation_unit};
 use crate::ast::{
     BinaryOp, Expression, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, Statement, StatementNode,
@@ -97,6 +98,16 @@ impl<W: Write> Generator<W> {
             }
         }
     }
+
+    pub fn emit_statement(&mut self, id: StatementId) -> Result<(), Diagnosis> {
+        match id.resolve() {
+            Statement::Jump(inner) => self.jump_statement(id, inner),
+            Statement::Selection(inner) => self.selection_statement(id, inner),
+            Statement::Iteration(inner) => self.iteration_statement(id, inner),
+            Statement::Labeled(inner) => self.labeled_statement(id, inner),
+            _ => Ok(()),
+        }
+    }
 }
 
 impl<W: Write> Visitor for Generator<W> {
@@ -125,14 +136,14 @@ impl<W: Write> Visitor for Generator<W> {
 
     fn visit_statement(&mut self, node: &StatementNode) {
         let res = match node.id.resolve() {
-            Statement::Jump(inner) => self.jump_statement(node.id, inner),
-            Statement::Selection(inner) => self.selection_statement(node.id, inner),
-            Statement::Iteration(inner) => self.iteration_statement(node.id, inner),
-            Statement::Labeled(inner) => self.labeled_statement(node.id, inner),
-            _ => return walk_statement(self, node),
+            Statement::Jump(_) | Statement::Selection(_) | Statement::Iteration(_) | Statement::Labeled(_) => {
+                self.emit_statement(node.id)
+            }
+            Statement::Expression(_) | Statement::Compound(_) => return walk_statement(self, node),
         };
         self.collect_diag(res, &node.span);
     }
+
     fn visit_init_declarator(&mut self, node: &InitDeclaratorNode) {
         let sym_id = sema().declarations[&node.declarator.id];
         if sym_id.resolve().duration != Duration::Automatic {

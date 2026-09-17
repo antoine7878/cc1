@@ -6,14 +6,14 @@ use crate::ast::{
     JumpStatementNode, LabeledStatement, LabeledStatementNode, SelectionStatement, SelectionStatementNode,
     StatementNode, Visitor,
 };
-use crate::codegen::{Generator, LlvmName};
+use crate::codegen::{Generator, LlvmName, LlvmSymbol};
 use crate::semantic::{Diagnosis, ResolvedStatement, sema};
 
 impl<W: Write> Generator<W> {
     pub fn selection_statement(&mut self, id: StatementId, node: &SelectionStatementNode) -> Result<(), Diagnosis> {
         match &node.stmt {
             SelectionStatement::If(cond, then, otherwise) => self.if_statement(cond, then, otherwise),
-            SelectionStatement::Switch(cond, body) => self.switch_statement(id, cond, body),
+            SelectionStatement::Switch(condition, body) => self.switch_statement(id, condition, body),
         }
     }
 
@@ -44,13 +44,26 @@ impl<W: Write> Generator<W> {
 
     fn switch_statement(
         &mut self,
-        _id: StatementId,
-        _condition: &ExpressionNode,
-        _body: &StatementNode,
+        id: StatementId,
+        condition: &ExpressionNode,
+        body: &StatementNode,
     ) -> Result<(), Diagnosis> {
+        let ResolvedStatement::Switch { control, cases, default } = &sema().stmts[id] else {
+            return Err(Diagnosis::Invariant("switch"));
+        };
+        let end_l = LlvmName::BreakLabel(id);
+        let condition = self.emit_expression(condition)?;
+        let llvm_cases = cases
+            .iter()
+            .map(|(v, id)| (LlvmSymbol::new(control.llvm(), v.llvm()), LlvmName::CaseLabel(*id)))
+            .collect::<Vec<_>>();
+        let llvm_default = default.map(LlvmName::CaseLabel);
+        self.b.switch(condition, &llvm_cases, llvm_default.unwrap_or(end_l));
+        self.visit_statement(body);
+        self.b.br(end_l);
+        self.b.emit_label(end_l);
         Ok(())
     }
-
     pub fn iteration_statement(&mut self, id: StatementId, node: &IterationStatementNode) -> Result<(), Diagnosis> {
         match &node.stmt {
             IterationStatement::While(cond, stmt) => self.while_statement(id, cond, stmt),

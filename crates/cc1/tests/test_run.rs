@@ -127,9 +127,13 @@ exits!(
     "int main(void) { int i; i = 0; for (;;) { top: if (i >= 42) break; i++; if (i < 42) goto top; } return i; }",
     42
 );
-exits!(ignore "switch", switch_case, "int main(void) { switch (2) { case 1: return 1; case 2: return 42; default: return 3; } }", 42);
-exits!(ignore "switch", switch_default, "int main(void) { switch (9) { case 1: return 1; default: return 42; } }", 42);
-exits!(ignore "switch", switch_fallthrough, "int main(void) { int x; x = 40; switch (1) { case 1: x++; case 2: x++; break; case 3: x = 0; } return x; }", 42);
+exits!(switch_case, "int main(void) { switch (2) { case 1: return 1; case 2: return 42; default: return 3; } }", 42);
+exits!(switch_default, "int main(void) { switch (9) { case 1: return 1; default: return 42; } }", 42);
+exits!(
+    switch_fallthrough,
+    "int main(void) { int x; x = 40; switch (1) { case 1: x++; case 2: x++; break; case 3: x = 0; } return x; }",
+    42
+);
 exits!(nested_blocks, "int main(void) { int x; x = 1; { int x; x = 7; } return x + 41; }", 42);
 
 exits!(short_circuit_and, "int f(void) { return 0; } int main(void) { int x; x = 42; (0 && (x = 1)); return x; }", 42);
