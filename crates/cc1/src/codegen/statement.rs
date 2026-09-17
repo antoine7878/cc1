@@ -1,10 +1,10 @@
 use std::io::Write;
 
 use crate::ast::{
-    ExpressionNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, SelectionStatement,
-    SelectionStatementNode, StatementNode, Visitor,
+    ExpressionNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, JumpStatement,
+    JumpStatementNode, SelectionStatement, SelectionStatementNode, StatementNode, Visitor,
 };
-use crate::codegen::Generator;
+use crate::codegen::{Generator, LlvmName};
 use crate::semantic::Diagnosis;
 
 impl<W: Write> Generator<W> {
@@ -17,21 +17,21 @@ impl<W: Write> Generator<W> {
 
     fn if_statement(
         &mut self,
-        cond: &ExpressionNode,
-        then: &StatementNode,
-        otherwise: &Option<StatementNode>,
+        condition: &ExpressionNode,
+        then_body: &StatementNode,
+        otherwise_body: &Option<StatementNode>,
     ) -> Result<(), Diagnosis> {
-        let cond = self.emit_condition(cond)?;
+        let cond = self.emit_condition(condition)?;
         let then_l = self.b.fresh_label();
         let else_l = self.b.fresh_label();
-        let join_l = if otherwise.is_some() { self.b.fresh_label() } else { else_l };
+        let join_l = if otherwise_body.is_some() { self.b.fresh_label() } else { else_l };
 
         self.b.brc(cond, then_l, else_l);
         self.b.emit_label(then_l);
-        self.visit_statement(then);
+        self.visit_statement(then_body);
         self.b.br(join_l);
 
-        if let Some(otherwise) = otherwise {
+        if let Some(otherwise) = otherwise_body {
             self.b.emit_label(else_l);
             self.visit_statement(otherwise);
             self.b.br(join_l);
@@ -40,7 +40,9 @@ impl<W: Write> Generator<W> {
         Ok(())
     }
 
-    fn switch_statement(&mut self, cond: &ExpressionNode, stmt: &StatementNode) -> Result<(), Diagnosis> {
+    fn switch_statement(&mut self, condition: &ExpressionNode, body: &StatementNode) -> Result<(), Diagnosis> {
+        let _ = body;
+        let _ = condition;
         todo!()
     }
 
@@ -52,44 +54,75 @@ impl<W: Write> Generator<W> {
         }
     }
 
-    fn while_statement(&mut self, cond: &ExpressionNode, stmt: &StatementNode) -> Result<(), Diagnosis> {
-        //   br label %3
-        //
-        // 3:                                                ; preds = %6, %0
-        //   %4 = load i32, ptr %2, align 4
-        //   %5 = icmp slt i32 %4, 10
-        //   br i1 %5, label %6, label %9
-        //
-        // 6:                                                ; preds = %3
-        //   %7 = load i32, ptr %2, align 4
-        //   %8 = add nsw i32 %7, 1
-        //   store i32 %8, ptr %2, align 4
-        //   br label %3
-        //
-        // 9:
-        let cond_l = self.b.fresh_label();
-        let start_l = self.b.fresh_label();
-        let end_l = self.b.fresh_label();
-
-        self.b.br(cond_l);
-        self.b.emit_label(cond_l);
-        let cond = self.emit_condition(cond)?;
-        self.b.brc(cond, start_l, end_l);
-        self.b.emit_label(start_l);
-        self.visit_statement(stmt);
-        self.b.br(cond_l);
-        self.b.emit_label(end_l);
-        Ok(())
+    fn in_loop<R>(&mut self, continue_l: LlvmName, break_l: LlvmName, f: impl FnOnce(&mut Self) -> R) -> R {
+        let saved = (self.continue_label, self.break_label);
+        self.continue_label = continue_l;
+        self.break_label = break_l;
+        let r = f(self);
+        (self.continue_label, self.break_label) = saved;
+        r
     }
 
-    fn do_statement(&mut self, stmt: &StatementNode, cond: &ExpressionNode) -> Result<(), Diagnosis> {
-        todo!()
+    fn while_statement(&mut self, condition: &ExpressionNode, body: &StatementNode) -> Result<(), Diagnosis> {
+        self.emit_loop(false, Some(condition), None, body)
+    }
+
+    fn do_statement(&mut self, body: &StatementNode, condition: &ExpressionNode) -> Result<(), Diagnosis> {
+        self.emit_loop(true, Some(condition), None, body)
     }
 
     fn for_statement(
         &mut self,
         b: &(ExpressionStatementNode, ExpressionStatementNode, Option<ExpressionNode>, StatementNode),
     ) -> Result<(), Diagnosis> {
-        todo!()
+        let (init, cond, action, body) = b;
+        if let Some(init) = &init.expr {
+            self.emit_expression(init)?;
+        }
+        self.emit_loop(false, cond.expr.as_ref(), action.as_ref(), body)
+    }
+
+    fn emit_loop(
+        &mut self,
+        enter_at_body: bool,
+        condition: Option<&ExpressionNode>,
+        action: Option<&ExpressionNode>,
+        body: &StatementNode,
+    ) -> Result<(), Diagnosis> {
+        let cond_l = self.b.fresh_label();
+        let body_l = self.b.fresh_label();
+        let action_l = self.b.fresh_label();
+        let end_l = self.b.fresh_label();
+
+        self.b.br(if enter_at_body { body_l } else { cond_l });
+        self.b.emit_label(cond_l);
+        match condition {
+            Some(cond) => {
+                let cond = self.emit_condition(cond)?;
+                self.b.brc(cond, body_l, end_l);
+            }
+            None => self.b.br(body_l),
+        }
+        self.b.emit_label(body_l);
+        self.in_loop(action_l, end_l, |g| g.visit_statement(body));
+        self.b.br(action_l);
+        self.b.emit_label(action_l);
+        if let Some(action) = action {
+            self.emit_expression(action)?;
+        }
+        self.b.br(cond_l);
+        self.b.emit_label(end_l);
+        Ok(())
+    }
+
+    pub fn jump_statement(&mut self, node: &JumpStatementNode) -> Result<(), Diagnosis> {
+        match &node.stmt {
+            JumpStatement::Return(Some(e)) => self.emit_expression(e).map(|v| self.b.ret(v))?,
+            JumpStatement::Return(None) => self.b.ret_void(),
+            JumpStatement::Break => self.b.br(self.break_label),
+            JumpStatement::Continue => self.b.br(self.continue_label),
+            JumpStatement::Goto(_a) => todo!(),
+        }
+        Ok(())
     }
 }

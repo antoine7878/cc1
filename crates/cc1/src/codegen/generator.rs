@@ -5,8 +5,8 @@ use libft::Span;
 use crate::ast::visit::{walk_compound_statement, walk_statement, walk_translation_unit};
 use crate::ast::{
     BinaryOp, CompoundStatementNode, Expression, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode,
-    IterationStatement, IterationStatementNode, JumpStatement, JumpStatementNode, SelectionStatement,
-    SelectionStatementNode, StatementNode, TranslationUnitNode, UnaryOp, Visitor,
+    IterationStatementNode, JumpStatementNode, SelectionStatementNode, StatementNode, TranslationUnitNode, UnaryOp,
+    Visitor,
 };
 use crate::codegen::{Builder, Globals, LlvmName, LlvmSymbol, Locals};
 use crate::context::ctx;
@@ -28,7 +28,8 @@ pub struct Generator<W: Write> {
     pub locals: Locals,
     pub globals: Globals,
     pub diagnosis: Vec<DiagnosisNode>,
-    pub ret_label: LlvmName,
+    pub break_label: LlvmName,
+    pub continue_label: LlvmName,
 }
 
 impl<W: Write> Generator<W> {
@@ -38,7 +39,8 @@ impl<W: Write> Generator<W> {
             locals: Locals::default(),
             globals: Globals::default(),
             diagnosis: Vec::new(),
-            ret_label: LlvmName::label(0),
+            break_label: LlvmName::label(0),
+            continue_label: LlvmName::label(0),
         }
     }
 
@@ -131,14 +133,8 @@ impl<W: Write> Visitor for Generator<W> {
     }
 
     fn visit_jump_statement(&mut self, node: &JumpStatementNode) {
-        match &node.stmt {
-            JumpStatement::Return(Some(e)) => {
-                let res = self.emit_expression(e).map(|v| self.b.ret(v));
-                self.collect_diag(res, &e.span);
-            }
-            JumpStatement::Return(None) => self.b.ret_void(),
-            _ => todo!(),
-        }
+        let res = self.jump_statement(node);
+        self.collect_diag(res, &node.span);
     }
 
     fn visit_selection_statement(&mut self, node: &SelectionStatementNode) {

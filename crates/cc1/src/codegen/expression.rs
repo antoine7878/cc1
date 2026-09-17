@@ -8,12 +8,6 @@ use crate::semantic::{CastKind, Diagnosis, ImplicitCast, QualifiedType, sema};
 
 impl<W: Write> Generator<W> {
     pub fn emit_expression(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        println!("-----------------------------------------------");
-        let re = &sema().expr_types[node.id];
-        for a in &re.casts {
-            println!("{}", a.kind);
-        }
-        println!("-----------------------------------------------");
         let s = match sema().expr_consts.get(node.id) {
             Some(value) => self.constant(sema().expr_types[node.id].ty, *value),
             None => self.fold_raw(node)?,
@@ -55,7 +49,6 @@ impl<W: Write> Generator<W> {
             CastKind::FloatingConversion => Self::f_to_f(from, to),
             CastKind::PointerToInteger => Some("ptrtoint"),
             CastKind::IntegerToPointer => self.i_to_p(&mut v, from),
-            CastKind::ToBool => todo!(),
         };
         Ok(match conv {
             Some(conv) => self.b.convert(conv, v, to.llvm()),

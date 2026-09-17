@@ -37,7 +37,6 @@ pub enum CastKind {
     PointerToInteger,  // 6.3.4
     IntegerToPointer,  // 6.3.4
     PointerConversion, // 6.3.16.1
-    ToBool,
 }
 
 pub fn lvalue_conversion(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
@@ -303,7 +302,6 @@ impl fmt::Display for CastKind {
             CastKind::PointerToInteger => write!(f, "p->i"),
             CastKind::IntegerToPointer => write!(f, "i->p"),
             CastKind::PointerConversion => write!(f, "p->p"),
-            CastKind::ToBool => write!(f, "->b"),
         }
     }
 }

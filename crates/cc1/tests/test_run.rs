@@ -65,6 +65,8 @@ exits!(while_loop, "int main(void) { int i; i = 0; while (i < 42) i++; return i;
 exits!(do_while, "int main(void) { int i; i = 0; do i++; while (i < 42); return i; }", 42);
 exits!(for_loop, "int main(void) { int i; int s; s = 0; for (i = 0; i < 7; i++) s += 6; return s; }", 42);
 exits!(break_loop, "int main(void) { int i; for (i = 0; ; i++) if (i == 42) break; return i; }", 42);
+exits!(for_no_action, "int main(void) { int i; i = 0; for (; i < 42;) i++; return i; }", 42);
+exits!(for_no_clauses, "int main(void) { int i; i = 0; for (;;) { if (++i == 42) break; } return i; }", 42);
 exits!(
     continue_loop,
     "int main(void) { int i; int s; s = 0; for (i = 0; i < 10; i++) { if (i % 2) continue; s += i; } return s + 22; }",
