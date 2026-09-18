@@ -113,8 +113,9 @@ impl<W: Write> Builder<W> {
         LlvmSymbol::new(ty, r)
     }
 
-    pub fn store(&mut self, src: LlvmSymbol, dst: LlvmSymbol) {
-        self.write_line(format_args!("  store {src}, {dst}"))
+    pub fn store(&mut self, src: LlvmSymbol, dst: LlvmSymbol) -> LlvmSymbol {
+        self.write_line(format_args!("  store {src}, {dst}"));
+        src
     }
 
     pub fn binop(&mut self, op: &'static str, lhs: LlvmSymbol, rhs: LlvmSymbol) -> LlvmSymbol {

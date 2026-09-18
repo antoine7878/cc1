@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::io::Write;
 
 use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, UnaryOp};
-use crate::codegen::{Generator, Invariant, LlvmOperator, LlvmSymbol, LlvmType};
+use crate::codegen::{BitField, Generator, Invariant, LlvmOperator, LlvmSymbol, LlvmType};
 use crate::context::ctx;
 use crate::semantic::{CastKind, Diagnosis, ImplicitCast, QualifiedType, ResolvedType, ResolvedTypeId, sema};
 
@@ -28,19 +28,26 @@ impl<W: Write> Generator<W> {
     fn apply_casts(&mut self, mut s: LlvmSymbol, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
         let re = &sema().expr_types[node.id];
         let mut from = re.ty;
+        let bf = Self::bitfield_of(node);
         for cast in &re.casts {
-            s = self.convert(s, from, cast)?;
+            s = self.convert(s, from, cast, bf)?;
             from = cast.to;
         }
         Ok(s)
     }
 
-    fn convert(&mut self, v: LlvmSymbol, from: QualifiedType, cast: &ImplicitCast) -> Result<LlvmSymbol, Diagnosis> {
+    fn convert(
+        &mut self,
+        v: LlvmSymbol,
+        from: QualifiedType,
+        cast: &ImplicitCast,
+        bf: Option<BitField>,
+    ) -> Result<LlvmSymbol, Diagnosis> {
         let mut v = v;
         let to = cast.to;
         let conv = match cast.kind {
             CastKind::ArrayToPointer | CastKind::FunctionToPointer | CastKind::PointerConversion => return Ok(v),
-            CastKind::LValueToRValue => return Ok(self.b.load(to.llvm(), v)),
+            CastKind::LValueToRValue => return Ok(self.load_place(v, to, bf.as_ref())),
             CastKind::ToVoid => return Ok(LlvmSymbol::void()),
             CastKind::NullPointer => return Ok(LlvmSymbol::null()),
             CastKind::IntegerPromotion | CastKind::IntegerConversion => Self::i_to_i(from, to),
@@ -171,12 +178,12 @@ impl<W: Write> Generator<W> {
         let v_before = self.apply_casts(loc, operand)?;
         let bop = match op {
             UnaryOp::PreInc | UnaryOp::PostInc => BinaryOp::Add,
-            UnaryOp::PreDec | UnaryOp::PostDec => BinaryOp::Sub,
-            _ => return Err(Diagnosis::Invariant("non inc/dec operator in unary_inc_dec")),
+            _ => BinaryOp::Sub,
         };
         let one = LlvmSymbol::one(qty);
         let v_after = self.arithmetic(&bop, v_before, qty, one, QualifiedType::plain(sema().builtins.int))?;
-        self.b.store(v_after, loc);
+        let bf = Self::bitfield_of(operand);
+        let v_after = self.store_place(v_after, loc, bf.as_ref());
         match op {
             UnaryOp::PreDec | UnaryOp::PreInc => Ok(v_after),
             _ => Ok(v_before),
@@ -350,13 +357,12 @@ impl<W: Write> Generator<W> {
             let vl = self.apply_casts(loc, lhs)?;
             vr = self.arithmetic(op, vl, qty, vr, sema().expr_types[rhs.id].casted_ty())?;
             if let Some(cast) = &rl.result_cast {
-                vr = self.convert(vr, qty, cast)?;
+                vr = self.convert(vr, qty, cast, None)?;
             }
         }
-        self.b.store(vr, loc);
-        Ok(vr)
+        let bf = Self::bitfield_of(lhs);
+        Ok(self.store_place(vr, loc, bf.as_ref()))
     }
-
     fn ternary(
         &mut self,
         cond: &ExpressionNode,

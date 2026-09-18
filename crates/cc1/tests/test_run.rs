@@ -395,6 +395,11 @@ exits!(
     42
 );
 exits!(
+    bitfield_unsigned_promotion_is_signed_below_int_width,
+    "struct b { unsigned u : 3; unsigned w : 32; }; int main(void) { struct b v; v.u = 7; v.w = 1; return (-v.u < 0) + (-v.w < 0) * 10 + 41; }",
+    42
+);
+exits!(
     bitfield_signed_arithmetic,
     "struct b { int s : 4; int t : 4; }; int main(void) { struct b v; v.s = -8; v.t = 7; return v.s * v.t + 98; }",
     42

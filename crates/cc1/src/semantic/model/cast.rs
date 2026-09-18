@@ -79,6 +79,7 @@ pub fn promote(sema: &Sema, re: &mut ResolvedExpression) {
         | ResolvedType::UnsignedChar
         | ResolvedType::Short
         | ResolvedType::UnsignedShort => (),
+        ResolvedType::UnsignedInt if re.bit_width.is_some_and(|w| w < (sema.target.int.size * 8) as i32) => (),
         &ResolvedType::Tag(id) if id.resolve_with(sema).kind == ast::Tag::Enum => (),
         _ => return,
     }

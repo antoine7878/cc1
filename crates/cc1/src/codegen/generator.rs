@@ -46,7 +46,9 @@ impl<W: Write> Generator<W> {
         let Some(init) = sym.initializer else { return };
         let qty = sym.ty;
         match init.resolve() {
-            Initializer::Zero => self.b.store(LlvmSymbol::zero(qty), self.locals[id]),
+            Initializer::Zero => {
+                let _ = self.b.store(LlvmSymbol::zero(qty), self.locals[id]);
+            }
             Initializer::Value(v) => {
                 let v = self.constant(qty, *v);
                 self.b.store(v, self.locals[id]);
@@ -56,7 +58,9 @@ impl<W: Write> Generator<W> {
                 self.b.store(a, self.locals[id]);
             }
             Initializer::Expr(e) => {
-                let res = self.emit_expression(e).map(|v| self.b.store(v, self.locals[id]));
+                let res = self.emit_expression(e).map(|v| {
+                    let _ = self.b.store(v, self.locals[id]);
+                });
                 self.collect_diag(res, &e.span);
             }
             Initializer::List(_) => todo!("list init"),
@@ -73,7 +77,7 @@ impl<W: Write> Generator<W> {
                     return self.logical(op, lhs, rhs);
                 }
                 Expression::Unary(UnaryOp::LogicalNot, e) => return self.logic_not(e),
-                _ => {}
+                _ => (),
             }
         }
         let v = self.emit_expression(node)?;

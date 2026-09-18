@@ -8,7 +8,11 @@ pub fn resolve_expression(resolver: &mut SymbolResolver, node: &ExpressionNode) 
         return;
     }
     let resolved = match type_of(resolver, node) {
-        Ok((ty, kind)) => Some(ResolvedExpression::new(ty, kind)),
+        Ok((ty, kind)) => {
+            let mut re = ResolvedExpression::new(ty, kind);
+            re.bit_width = resolver.sema.member_refs.get(node.id).and_then(|r| r.member(resolver.sema).width);
+            Some(re)
+        }
         Err(diag) => {
             resolver.add_diag(Diag::err((), diag), &node.span);
             None

@@ -12,6 +12,7 @@ pub struct ResolvedExpression {
     pub kind: ExpressionKind,
     pub casts: Vec<ImplicitCast>,
     pub result_cast: Option<ImplicitCast>,
+    pub bit_width: Option<i32>,
 }
 
 impl ResolvedExpression {
@@ -20,6 +21,6 @@ impl ResolvedExpression {
     }
 
     pub fn new(ty: QualifiedType, kind: ExpressionKind) -> Self {
-        Self { ty, kind, casts: Vec::new(), result_cast: None }
+        Self { ty, kind, casts: Vec::new(), result_cast: None, bit_width: None }
     }
 }
