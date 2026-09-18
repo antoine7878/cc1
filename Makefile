@@ -26,12 +26,12 @@ $(YACC_RS): $(C_Y)
 
 test: llvm all ## emit LLVM IR for rscs/hello.c to stdout
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
-	cargo run --bin fcc -- -e ./rscs/hello.c -o /dev/stdout
+	cargo run --bin fcc -- -m32 -e ./rscs/hello.c -o /dev/stdout
 	@# ./a.out || echo $$?
 
 ftest: all cc  ## compile and run rscs/hello.c with fcc
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
-	cargo run --bin fcc -- ./rscs/hello.c -o ./rscs/a.out
+	cargo run --bin fcc -- -m32 ./rscs/hello.c -o ./rscs/a.out
 	./rscs/a.out || echo $$?
 
 ctest: all ## run the cc1 test suite

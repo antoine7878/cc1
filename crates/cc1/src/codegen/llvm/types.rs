@@ -58,7 +58,7 @@ impl LlvmType {
         Self::integer(ctx().target.int.size)
     }
 
-    fn integer(i: u32) -> Self {
+    pub fn integer(i: u32) -> Self {
         match i {
             1 => Self::I8,
             2 => Self::I16,

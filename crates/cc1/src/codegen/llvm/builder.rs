@@ -3,7 +3,7 @@ use std::io::Write;
 use std::iter::once;
 
 use crate::ast::{StringConstant, Tag};
-use crate::codegen::{LlvmInit, LlvmName, LlvmSymbol, LlvmType};
+use crate::codegen::{LlvmInit, LlvmName, LlvmSymbol, LlvmType, struct_elements};
 use crate::semantic::{Definition, Linkage, ParamTypes, ResolvedType, SymbolId, TagDef, TagDefId, sema};
 
 #[derive(Debug)]
@@ -37,9 +37,9 @@ impl<W: Write> Builder<W> {
         LlvmName::label(self.label_counter)
     }
 
-    fn write_all(&mut self, str: &[u8]) {
+    fn write_str(&mut self, str: &str) {
         if !self.has_block_ret {
-            let _ = self.w.write_all(str);
+            let _ = self.w.write_all(str.as_bytes());
         }
     }
 
@@ -49,18 +49,18 @@ impl<W: Write> Builder<W> {
         }
     }
 
-    fn line(&mut self, args: fmt::Arguments<'_>) {
+    fn write_line(&mut self, args: fmt::Arguments<'_>) {
         self.write_fmt(args);
-        self.write_all(b"\n");
+        self.blank();
     }
 
     pub fn target(&mut self, datalayout: &str, triple: &str) {
-        self.line(format_args!(r#"target datalayout = "{datalayout}""#));
-        self.line(format_args!(r#"target triple = "{triple}""#));
+        self.write_line(format_args!(r#"target datalayout = "{datalayout}""#));
+        self.write_line(format_args!(r#"target triple = "{triple}""#));
     }
 
     pub fn blank(&mut self) {
-        self.write_all(b"\n");
+        self.write_str("\n");
     }
 
     pub fn define(&mut self, sym_id: SymbolId, parameters: &[LlvmSymbol], is_variadic: bool) {
@@ -71,22 +71,22 @@ impl<W: Write> Builder<W> {
         self.reset(parameters.len());
         self.write_fmt(format_args!("define {} {}", ret.llvm(), LlvmName::Global(sym_id)));
         self.params(parameters, is_variadic);
-        self.line(format_args!(" {{"));
+        self.write_line(format_args!(" {{"));
     }
 
     fn params(&mut self, parameters: &[LlvmSymbol], is_variadic: bool) {
         let mut it = parameters.iter().peekable();
-        self.write_all(b"(");
+        self.write_str("(");
         while let Some(param) = it.next() {
             self.write_fmt(format_args!("{param}"));
             if it.peek().is_some() {
-                self.write_all(b", ");
+                self.write_str(", ");
             }
         }
         if is_variadic {
-            self.write_all(b", ...");
+            self.write_str(", ...");
         }
-        self.write_all(b")");
+        self.write_str(")");
     }
 
     pub fn end_function(&mut self, f: SymbolId) {
@@ -103,61 +103,61 @@ impl<W: Write> Builder<W> {
 
     pub fn alloca(&mut self, ty: LlvmType) -> LlvmSymbol {
         let r = self.fresh();
-        self.line(format_args!("  {r} = alloca {ty}"));
+        self.write_line(format_args!("  {r} = alloca {ty}"));
         LlvmSymbol::ptr(r)
     }
 
     pub fn load(&mut self, ty: LlvmType, slot: LlvmSymbol) -> LlvmSymbol {
         let r = self.fresh();
-        self.line(format_args!("  {r} = load {ty}, {slot}"));
+        self.write_line(format_args!("  {r} = load {ty}, {slot}"));
         LlvmSymbol::new(ty, r)
     }
 
     pub fn store(&mut self, src: LlvmSymbol, dst: LlvmSymbol) {
-        self.line(format_args!("  store {src}, {dst}"))
+        self.write_line(format_args!("  store {src}, {dst}"))
     }
 
     pub fn binop(&mut self, op: &'static str, lhs: LlvmSymbol, rhs: LlvmSymbol) -> LlvmSymbol {
         let r = self.fresh();
-        self.line(format_args!("  {r} = {op} {lhs}, {}", rhs.name));
+        self.write_line(format_args!("  {r} = {op} {lhs}, {}", rhs.name));
         LlvmSymbol::new(lhs.ty, r)
     }
 
     pub fn unop(&mut self, op: &'static str, v: LlvmSymbol) -> LlvmSymbol {
         let r = self.fresh();
-        self.line(format_args!("  {r} = {op} {v}"));
+        self.write_line(format_args!("  {r} = {op} {v}"));
         LlvmSymbol::new(v.ty, r)
     }
 
     pub fn cmp(&mut self, op: &'static str, lhs: LlvmSymbol, rhs: LlvmSymbol) -> LlvmSymbol {
         let r = self.fresh();
-        self.line(format_args!("  {r} = {op} {lhs}, {}", rhs.name));
+        self.write_line(format_args!("  {r} = {op} {lhs}, {}", rhs.name));
         LlvmSymbol::new(LlvmType::bool(), r)
     }
 
     pub fn convert(&mut self, conv: &'static str, from: LlvmSymbol, to: LlvmType) -> LlvmSymbol {
         let r = self.fresh();
-        self.line(format_args!("  {r} = {conv} {from} to {to}"));
+        self.write_line(format_args!("  {r} = {conv} {from} to {to}"));
         LlvmSymbol::new(to, r)
     }
 
     pub fn ret(&mut self, b: LlvmSymbol) {
-        self.line(format_args!("  ret {b}"));
+        self.write_line(format_args!("  ret {b}"));
         self.has_block_ret = true;
     }
 
     pub fn ret_void(&mut self) {
-        self.line(format_args!("  ret void"));
+        self.write_line(format_args!("  ret void"));
         self.has_block_ret = true;
     }
 
     pub fn brc(&mut self, cond: LlvmSymbol, l1: LlvmName, l2: LlvmName) {
-        self.line(format_args!("  br {cond}, label {l1}, label {l2}"));
+        self.write_line(format_args!("  br {cond}, label {l1}, label {l2}"));
         self.has_block_ret = true;
     }
 
     pub fn br(&mut self, l: LlvmName) {
-        self.line(format_args!("  br label {l}"));
+        self.write_line(format_args!("  br label {l}"));
         self.has_block_ret = true;
     }
 
@@ -166,18 +166,18 @@ impl<W: Write> Builder<W> {
         self.blank();
         self.current_block = l;
         match l {
-            LlvmName::Label(i) => self.line(format_args!(".l{i}:")),
-            LlvmName::NamedLabel(s) => self.line(format_args!(".ln.{}:", s.resolve())),
-            LlvmName::BreakLabel(i) => self.line(format_args!(".brk.{}:", usize::from(i))),
-            LlvmName::ContinueLabel(i) => self.line(format_args!(".cnt.{}:", usize::from(i))),
-            LlvmName::CaseLabel(i) => self.line(format_args!(".case.{}:", usize::from(i))),
+            LlvmName::Label(i) => self.write_line(format_args!(".l{i}:")),
+            LlvmName::NamedLabel(s) => self.write_line(format_args!(".ln.{}:", s.resolve())),
+            LlvmName::BreakLabel(i) => self.write_line(format_args!(".brk.{}:", usize::from(i))),
+            LlvmName::ContinueLabel(i) => self.write_line(format_args!(".cnt.{}:", usize::from(i))),
+            LlvmName::CaseLabel(i) => self.write_line(format_args!(".case.{}:", usize::from(i))),
             _ => unimplemented!(),
         }
     }
 
     pub fn phi(&mut self, s1: LlvmSymbol, l1: LlvmName, s2: LlvmSymbol, l2: LlvmName) -> LlvmSymbol {
         let r = self.fresh();
-        self.line(format_args!("  {r} = phi {} [ {}, {l1} ], [ {}, {l2} ]", s1.ty, s1.name, s2.name));
+        self.write_line(format_args!("  {r} = phi {} [ {}, {l1} ], [ {}, {l2} ]", s1.ty, s1.name, s2.name));
         LlvmSymbol::new(s1.ty, r)
     }
 
@@ -205,7 +205,7 @@ impl<W: Write> Builder<W> {
 
     pub fn gep(&mut self, elem: LlvmType, base: LlvmSymbol, idx: LlvmSymbol) -> LlvmSymbol {
         let r = self.fresh();
-        self.line(format_args!("  {r} = getelementptr inbounds {elem}, ptr {}, {idx}", base.name));
+        self.write_line(format_args!("  {r} = getelementptr inbounds {elem}, ptr {}, {idx}", base.name));
         LlvmSymbol::ptr(r)
     }
 
@@ -226,10 +226,10 @@ impl<W: Write> Builder<W> {
         for (i, c) in elems.into_iter().enumerate() {
             self.write_fmt(format_args!("{ty} {c}"));
             if i != len - 1 {
-                self.write_all(b", ");
+                self.write_str(", ");
             }
         }
-        self.write_all(b"]");
+        self.write_str("]");
     }
 
     pub fn type_def(&mut self, id: TagDefId) {
@@ -237,34 +237,30 @@ impl<W: Write> Builder<W> {
         let ty = LlvmType::Tag(id);
         match def.kind {
             Tag::Enum => (),
-            _ if !def.is_complete => self.line(format_args!("{ty} = type opaque")),
+            _ if !def.is_complete => self.write_line(format_args!("{ty} = type opaque")),
             Tag::Struct => self.struct_def(ty, def),
             Tag::Union => self.union_def(ty, def),
         }
     }
 
     fn struct_def(&mut self, ty: LlvmType, def: &TagDef) {
-        self.write_fmt(format_args!("{ty} = type {{ "));
-        let mut it = def.members.iter().peekable();
-        while let Some(member) = it.next() {
-            let sym = member.sym.expect("bitfield in a type definition");
-            self.write_fmt(format_args!("{}", sym.resolve().ty.llvm()));
-            if it.peek().is_some() {
-                self.write_all(b", ");
-            }
+        self.write_fmt(format_args!("{ty} = type <{{ "));
+        for (i, element) in struct_elements(def, ty.size()).iter().enumerate() {
+            let sep = if i == 0 { "" } else { ", " };
+            self.write_fmt(format_args!("{sep}{}", element.ty()));
         }
-        self.line(format_args!(" }}"));
+        self.write_line(format_args!(" }}>"));
     }
 
     fn union_def(&mut self, ty: LlvmType, def: &TagDef) {
         let size = ty.size();
         let members = def.members.iter().filter_map(|member| member.sym).map(|sym| sym.resolve().ty);
         let Some(widest) = members.max_by_key(|qty| sema().layout(&qty.id).align) else {
-            return self.line(format_args!("{ty} = type {{ [{size} x {}] }}", LlvmType::char()));
+            return self.write_line(format_args!("{ty} = type {{ [{size} x {}] }}", LlvmType::char()));
         };
         match size - sema().layout(&widest.id).size {
-            0 => self.line(format_args!("{ty} = type {{ {} }}", widest.llvm())),
-            pad => self.line(format_args!("{ty} = type {{ {}, [{pad} x {}] }}", widest.llvm(), LlvmType::char())),
+            0 => self.write_line(format_args!("{ty} = type {{ {} }}", widest.llvm())),
+            pad => self.write_line(format_args!("{ty} = type {{ {}, [{pad} x {}] }}", widest.llvm(), LlvmType::char())),
         }
     }
 
@@ -275,21 +271,21 @@ impl<W: Write> Builder<W> {
         };
         self.write_fmt(format_args!("declare {} {}(", ret.llvm(), LlvmName::Global(sym_id)));
         match params {
-            ParamTypes::Unspecified => self.write_all(b"..."),
+            ParamTypes::Unspecified => self.write_str("..."),
             ParamTypes::Prototype { params, is_variadic } => {
                 let mut it = params.iter().peekable();
                 while let Some(param) = it.next() {
                     self.write_fmt(format_args!("{}", param.llvm()));
                     if it.peek().is_some() {
-                        self.write_all(b", ");
+                        self.write_str(", ");
                     }
                 }
                 if *is_variadic {
-                    self.write_all(if params.is_empty() { b"..." } else { b", ..." });
+                    self.write_str(if params.is_empty() { "..." } else { ", ..." });
                 }
             }
         }
-        self.line(format_args!(")"));
+        self.write_line(format_args!(")"));
     }
 
     pub fn global(&mut self, sym_id: SymbolId) {
@@ -298,22 +294,22 @@ impl<W: Write> Builder<W> {
         let align = sema().layout(&sym.ty.id).align;
         let kind = if sym.ty.is_const { "constant" } else { "global" };
         if sym.definition == Definition::Declaration {
-            return self.line(format_args!("{name} = external {kind} {}, align {align}", sym.ty.llvm()));
+            return self.write_line(format_args!("{name} = external {kind} {}, align {align}", sym.ty.llvm()));
         }
         let linkage = match sym.linkage {
             Linkage::External => "",
             Linkage::Internal | Linkage::None => "internal ",
         };
         let init = LlvmInit::new(sym.ty, sym.initializer.map(|i| i.resolve()));
-        self.line(format_args!("{name} = {linkage}{kind} {init}, align {align}"));
+        self.write_line(format_args!("{name} = {linkage}{kind} {init}, align {align}"));
     }
 
     pub fn switch(&mut self, condition: LlvmSymbol, cases: &[(LlvmSymbol, LlvmName)], default_l: LlvmName) {
-        self.line(format_args!("  switch {}, label {} [", condition, default_l));
+        self.write_line(format_args!("  switch {}, label {} [", condition, default_l));
         for (value, label) in cases {
-            self.line(format_args!("    {}, label {}", value, label));
+            self.write_line(format_args!("    {}, label {}", value, label));
         }
-        self.line(format_args!("  ]"));
+        self.write_line(format_args!("  ]"));
         self.has_block_ret = true;
     }
 }

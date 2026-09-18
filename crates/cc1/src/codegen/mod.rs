@@ -7,7 +7,7 @@ pub mod statement;
 
 pub use generator::{Generator, generate, generate_to};
 pub use global::Globals;
-pub use llvm::{Builder, LlvmInit, LlvmName, LlvmOperator, LlvmSymbol, LlvmType};
+pub use llvm::{Builder, LlvmElement, LlvmInit, LlvmName, LlvmOperator, LlvmSymbol, LlvmType, struct_elements};
 pub use local::Locals;
 
 use crate::semantic::Diagnosis;

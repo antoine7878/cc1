@@ -250,6 +250,11 @@ exits!(
     42
 );
 exits!(ignore "aggregates", struct_member, "struct s { int a; int b; }; int main(void) { struct s v; v.a = 40; v.b = 2; return v.a + v.b; }", 42);
+exits!(
+    bitfield_type_def,
+    "struct s { char c; int : 4; unsigned u : 5; double d; }; union u { char c; struct s s; }; int main(void) { return sizeof(struct s) + sizeof(union u) + 18; }",
+    42
+);
 exits!(enum_constant, "enum e { A = 40, B }; int main(void) { return B + 1; }", 42);
 
 exits!(short_local, "int main(void) { short s; s = 1000; return s / 24 + 1; }", 42);
@@ -323,6 +328,11 @@ exits!(
     42
 );
 exits!(declare_after_use, "int main(void) { return abs(-42); } int abs(int);", 42);
+exits!(
+    old_style_definition,
+    "int f(a, b) int a; char b; { return a + b; } int g(); int main(void) { return f(40, 2) + g(); } int g() { return 0; }",
+    42
+);
 
 exits!(initializer_evaluated_once, "int main(void) { int x = 40; int y = x++; return x + y; }", 81);
 

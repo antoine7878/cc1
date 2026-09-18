@@ -84,7 +84,7 @@ impl Locals {
 impl Visitor for Locals {
     fn visit_init_declarator(&mut self, node: &InitDeclaratorNode) {
         walk_init_declarator(self, node);
-        let sym_id = sema().declarations[&node.declarator.id];
+        let Some(&sym_id) = sema().declarations.get(&node.declarator.id) else { return };
         let sym = sym_id.resolve();
         if sym.duration != Duration::Automatic {
             return;

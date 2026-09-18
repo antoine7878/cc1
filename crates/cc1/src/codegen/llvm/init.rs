@@ -1,7 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{ConstValue, Fold, StringConstId, Tag};
-use crate::codegen::{LlvmName, LlvmSymbol, LlvmType};
+use crate::codegen::{LlvmElement, LlvmName, LlvmSymbol, LlvmType, struct_elements};
 use crate::semantic::{AddressBase, Initializer, Place, QualifiedType, ResolvedType, TagDef, sema};
 
 pub struct LlvmInit<'a> {
@@ -81,13 +81,17 @@ impl<'a> LlvmInit<'a> {
     }
 
     fn structure(&self, f: &mut Formatter<'_>, def: &TagDef, items: &[Initializer]) -> fmt::Result {
-        write!(f, "{} {{ ", self.ty.llvm())?;
-        for (i, member) in def.members.iter().enumerate() {
-            let sym = member.sym.expect("bitfield in a static initializer");
+        write!(f, "{} <{{ ", self.ty.llvm())?;
+        let size = sema().layout(&self.ty.id).size;
+        for (i, element) in struct_elements(def, size).iter().enumerate() {
             let sep = if i == 0 { "" } else { ", " };
-            write!(f, "{sep}{}", LlvmInit::new(sym.resolve().ty, items.get(i)))?;
+            match element {
+                LlvmElement::Member(index, qty) => write!(f, "{sep}{}", LlvmInit::new(*qty, items.get(*index)))?,
+                LlvmElement::Bits(_) => unimplemented!("bitfield in a static initializer"),
+                LlvmElement::Pad(_) => write!(f, "{sep}{}", element.zero())?,
+            }
         }
-        write!(f, " }}")
+        write!(f, " }}>")
     }
 
     fn union(&self, f: &mut Formatter<'_>, def: &TagDef, items: &[Initializer]) -> fmt::Result {

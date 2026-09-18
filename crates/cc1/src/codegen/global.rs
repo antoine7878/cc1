@@ -62,7 +62,7 @@ impl Globals {
 impl Visitor for Globals {
     fn visit_init_declarator(&mut self, node: &InitDeclaratorNode) {
         walk_init_declarator(self, node);
-        let sym_id = sema().declarations[&node.declarator.id];
+        let Some(&sym_id) = sema().declarations.get(&node.declarator.id) else { return };
         if sym_id.resolve().duration == Duration::Static {
             self.register(sym_id);
         }
