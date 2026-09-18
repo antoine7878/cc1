@@ -18,56 +18,6 @@ impl QualifiedType {
 
 #[derive(Debug, Clone, Copy)]
 pub enum LlvmType {
-    First(LlvmFirstType),
-    Array(usize, ResolvedTypeId),
-    Tag(TagDefId),
-    Function(ResolvedTypeId),
-}
-
-impl LlvmType {
-    pub fn ptr_size() -> Self {
-        LlvmType::First(LlvmFirstType::integer(ctx().target.pointer.size))
-    }
-
-    pub fn ptr() -> Self {
-        LlvmType::First(LlvmFirstType::Ptr)
-    }
-
-    pub fn void() -> Self {
-        LlvmType::First(LlvmFirstType::Void)
-    }
-
-    pub fn bool() -> Self {
-        LlvmType::First(LlvmFirstType::I1)
-    }
-
-    pub fn char() -> Self {
-        LlvmType::First(LlvmFirstType::integer(ctx().target.char.size))
-    }
-
-    pub fn int() -> Self {
-        LlvmType::First(LlvmFirstType::integer(ctx().target.int.size))
-    }
-
-    pub fn size(&self) -> u32 {
-        match self {
-            LlvmType::First(f) => f.size(),
-            LlvmType::Array(len, elem) => *len as u32 * elem.llvm().size(),
-            LlvmType::Tag(id) => {
-                let ty = sema().types.lookup(&ResolvedType::Tag(*id)).expect("unregistered tag type");
-                sema().layout(&ty).size
-            }
-            LlvmType::Function(_) => sema().target.pointer.size,
-        }
-    }
-
-    pub fn is_void(&self) -> bool {
-        matches!(self, LlvmType::First(LlvmFirstType::Void))
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum LlvmFirstType {
     I1,
     I8,
     I16,
@@ -78,9 +28,36 @@ pub enum LlvmFirstType {
     F80,
     Void,
     Ptr,
+    Array(usize, ResolvedTypeId),
+    Tag(TagDefId),
+    Function(ResolvedTypeId),
 }
 
-impl LlvmFirstType {
+impl LlvmType {
+    pub fn ptr_size() -> Self {
+        Self::integer(ctx().target.pointer.size)
+    }
+
+    pub fn ptr() -> Self {
+        LlvmType::Ptr
+    }
+
+    pub fn void() -> Self {
+        LlvmType::Void
+    }
+
+    pub fn bool() -> Self {
+        LlvmType::I1
+    }
+
+    pub fn char() -> Self {
+        Self::integer(ctx().target.char.size)
+    }
+
+    pub fn int() -> Self {
+        Self::integer(ctx().target.int.size)
+    }
+
     fn integer(i: u32) -> Self {
         match i {
             1 => Self::I8,
@@ -102,34 +79,38 @@ impl LlvmFirstType {
 
     pub fn size(&self) -> u32 {
         match self {
-            LlvmFirstType::I1 => 0,
-            LlvmFirstType::I8 => 1,
-            LlvmFirstType::I16 => 2,
-            LlvmFirstType::I32 => 4,
-            LlvmFirstType::I64 => 8,
-            LlvmFirstType::F32 => 4,
-            LlvmFirstType::F64 => 8,
-            LlvmFirstType::F80 => sema().target.long_double.size,
-            LlvmFirstType::Ptr => sema().target.pointer.size,
-            LlvmFirstType::Void => 0,
+            LlvmType::I1 => 0,
+            LlvmType::I8 => 1,
+            LlvmType::I16 => 2,
+            LlvmType::I32 => 4,
+            LlvmType::I64 => 8,
+            LlvmType::F32 => 4,
+            LlvmType::F64 => 8,
+            LlvmType::F80 => sema().target.long_double.size,
+            LlvmType::Ptr => sema().target.pointer.size,
+            LlvmType::Void => 0,
+            LlvmType::Array(len, elem) => *len as u32 * elem.llvm().size(),
+            LlvmType::Tag(id) => {
+                let ty = sema().types.lookup(&ResolvedType::Tag(*id)).expect("unregistered tag type");
+                sema().layout(&ty).size
+            }
+            LlvmType::Function(_) => sema().target.pointer.size,
         }
+    }
+
+    pub fn is_void(&self) -> bool {
+        matches!(self, LlvmType::Void)
     }
 }
 
 impl From<ConstValue> for LlvmType {
     fn from(value: ConstValue) -> Self {
-        LlvmType::First(value.into())
-    }
-}
-
-impl From<ConstValue> for LlvmFirstType {
-    fn from(value: ConstValue) -> Self {
         match value {
-            ConstValue::Int(_) | ConstValue::UnsignedInt(_) => LlvmFirstType::integer(ctx().target.int.size),
-            ConstValue::Long(_) | ConstValue::UnsignedLong(_) => LlvmFirstType::integer(ctx().target.long.size),
-            ConstValue::Float(_) => LlvmFirstType::float(ctx().target.float.size),
-            ConstValue::Double(_) => LlvmFirstType::float(ctx().target.double.size),
-            ConstValue::LongDouble(_) => LlvmFirstType::float(ctx().target.long_double.size),
+            ConstValue::Int(_) | ConstValue::UnsignedInt(_) => LlvmType::integer(ctx().target.int.size),
+            ConstValue::Long(_) | ConstValue::UnsignedLong(_) => LlvmType::integer(ctx().target.long.size),
+            ConstValue::Float(_) => LlvmType::float(ctx().target.float.size),
+            ConstValue::Double(_) => LlvmType::float(ctx().target.double.size),
+            ConstValue::LongDouble(_) => LlvmType::float(ctx().target.long_double.size),
         }
     }
 }
@@ -137,17 +118,6 @@ impl From<ConstValue> for LlvmFirstType {
 impl From<&ResolvedTypeId> for LlvmType {
     fn from(value: &ResolvedTypeId) -> Self {
         match value.resolve() {
-            ResolvedType::Function { .. } => LlvmType::Function(*value),
-            ResolvedType::Array { elem, len } => LlvmType::Array(len.unwrap_or(0), elem.id),
-            ResolvedType::Tag(id) => LlvmType::Tag(*id),
-            _ => LlvmType::First(LlvmFirstType::from(value)),
-        }
-    }
-}
-
-impl From<&ResolvedTypeId> for LlvmFirstType {
-    fn from(ty: &ResolvedTypeId) -> Self {
-        match ty.resolve() {
             ResolvedType::Char
             | ResolvedType::SignedChar
             | ResolvedType::UnsignedChar
@@ -156,30 +126,15 @@ impl From<&ResolvedTypeId> for LlvmFirstType {
             | ResolvedType::Long
             | ResolvedType::UnsignedInt
             | ResolvedType::UnsignedLong
-            | ResolvedType::Int => LlvmFirstType::integer(sema().layout(ty).size),
+            | ResolvedType::Int => LlvmType::integer(sema().layout(value).size),
             ResolvedType::Float | ResolvedType::Double | ResolvedType::LongDouble => {
-                LlvmFirstType::float(sema().layout(ty).size)
+                LlvmType::float(sema().layout(value).size)
             }
-            ResolvedType::Void => LlvmFirstType::Void,
-            ResolvedType::Pointer(_) => LlvmFirstType::Ptr,
-            ResolvedType::Function { .. } | ResolvedType::Tag { .. } | ResolvedType::Array { .. } => unreachable!(),
-        }
-    }
-}
-
-impl fmt::Display for LlvmFirstType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            LlvmFirstType::I1 => write!(f, "i1"),
-            LlvmFirstType::I8 => write!(f, "i8"),
-            LlvmFirstType::I16 => write!(f, "i16"),
-            LlvmFirstType::I32 => write!(f, "i32"),
-            LlvmFirstType::I64 => write!(f, "i64"),
-            LlvmFirstType::F32 => write!(f, "float"),
-            LlvmFirstType::F64 => write!(f, "double"),
-            LlvmFirstType::F80 => write!(f, "x86_fp80"),
-            LlvmFirstType::Ptr => write!(f, "ptr"),
-            LlvmFirstType::Void => write!(f, "void"),
+            ResolvedType::Void => LlvmType::Void,
+            ResolvedType::Pointer(_) => LlvmType::Ptr,
+            ResolvedType::Function { .. } => LlvmType::Function(*value),
+            ResolvedType::Array { elem, len } => LlvmType::Array(len.unwrap_or(0), elem.id),
+            ResolvedType::Tag(id) => LlvmType::Tag(*id),
         }
     }
 }
@@ -187,32 +142,43 @@ impl fmt::Display for LlvmFirstType {
 impl fmt::Display for LlvmType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LlvmType::First(t) => write!(f, "{t}"),
+            LlvmType::I1 => write!(f, "i1"),
+            LlvmType::I8 => write!(f, "i8"),
+            LlvmType::I16 => write!(f, "i16"),
+            LlvmType::I32 => write!(f, "i32"),
+            LlvmType::I64 => write!(f, "i64"),
+            LlvmType::F32 => write!(f, "float"),
+            LlvmType::F64 => write!(f, "double"),
+            LlvmType::F80 => write!(f, "x86_fp80"),
+            LlvmType::Ptr => write!(f, "ptr"),
+            LlvmType::Void => write!(f, "void"),
             LlvmType::Array(len, t) => write!(f, "[{len} x {}]", t.llvm()),
             LlvmType::Tag(id) => tag_name(f, *id),
-            LlvmType::Function(id) => {
-                let ResolvedType::Function { ret, params } = id.resolve() else {
-                    unreachable!("LlvmType::Function on a non-function")
-                };
-                write!(f, "{} (", ret.llvm())?;
-                match params {
-                    ParamTypes::Unspecified => write!(f, "...")?,
-                    ParamTypes::Prototype { params, is_variadic } => {
-                        for (i, p) in params.iter().enumerate() {
-                            if i != 0 {
-                                write!(f, ", ")?;
-                            }
-                            write!(f, "{}", p.llvm())?;
-                        }
-                        if *is_variadic {
-                            write!(f, "{}", if params.is_empty() { "..." } else { ", ..." })?;
-                        }
-                    }
+            LlvmType::Function(id) => function_type(f, *id),
+        }
+    }
+}
+
+fn function_type(f: &mut fmt::Formatter<'_>, id: ResolvedTypeId) -> fmt::Result {
+    let ResolvedType::Function { ret, params } = id.resolve() else {
+        unreachable!("LlvmType::Function on a non-function")
+    };
+    write!(f, "{} (", ret.llvm())?;
+    match params {
+        ParamTypes::Unspecified => write!(f, "...")?,
+        ParamTypes::Prototype { params, is_variadic } => {
+            for (i, p) in params.iter().enumerate() {
+                if i != 0 {
+                    write!(f, ", ")?;
                 }
-                write!(f, ")")
+                write!(f, "{}", p.llvm())?;
+            }
+            if *is_variadic {
+                write!(f, "{}", if params.is_empty() { "..." } else { ", ..." })?;
             }
         }
     }
+    write!(f, ")")
 }
 
 fn tag_name(f: &mut fmt::Formatter<'_>, id: TagDefId) -> fmt::Result {
