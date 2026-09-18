@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::ast::{ConstValue, Fold, StringConstId, Tag};
 use crate::codegen::{LlvmElement, LlvmName, LlvmSymbol, LlvmType, struct_elements};
-use crate::semantic::{AddressBase, Initializer, Place, QualifiedType, ResolvedType, TagDef, sema};
+use crate::semantic::{AddressBase, AdressOffset, Initializer, QualifiedType, ResolvedType, TagDef, sema};
 
 pub struct LlvmInit<'a> {
     pub ty: QualifiedType,
@@ -34,7 +34,7 @@ impl<'a> LlvmInit<'a> {
         write!(f, "{}", LlvmSymbol::cst(self.ty.llvm(), value))
     }
 
-    fn address(&self, f: &mut Formatter<'_>, place: Place) -> fmt::Result {
+    fn address(&self, f: &mut Formatter<'_>, place: AdressOffset) -> fmt::Result {
         let rty = self.ty.id.resolve();
         if rty.is_pointer() {
             return write!(f, "ptr {}", LlvmAddress(place));
@@ -124,7 +124,7 @@ impl Display for LlvmInit<'_> {
     }
 }
 
-struct LlvmAddress(Place);
+struct LlvmAddress(AdressOffset);
 
 impl Display for LlvmAddress {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

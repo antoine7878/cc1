@@ -5,7 +5,7 @@ use crate::ast::visit::Visitor;
 use crate::ast::{ConstValue, Expression, ExpressionNode, InitializerNode, StringConstId, Tag};
 use crate::semantic::resolution::expression;
 use crate::semantic::{
-    AssignmentContext, Diag, DiagCollector, Diagnosis, Duration, Place, QualifiedType, ResolvedType, Sema,
+    AdressOffset, AssignmentContext, Diag, DiagCollector, Diagnosis, Duration, QualifiedType, ResolvedType, Sema,
     SymbolResolver, TagDefId, address, ice,
 };
 use crate::{ast, define_arena};
@@ -16,7 +16,7 @@ define_arena!(Initializer, InitializerArena, InitializerId);
 pub enum Initializer {
     Zero,
     Value(ConstValue),
-    Address(Place),
+    Address(AdressOffset),
     String(StringConstId),
     List(Vec<Initializer>),
     Expr(ExpressionNode),

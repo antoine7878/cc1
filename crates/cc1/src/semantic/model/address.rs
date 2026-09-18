@@ -9,12 +9,12 @@ pub enum AddressBase {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Place {
+pub struct AdressOffset {
     pub base: AddressBase,
     pub offset: i64,
 }
 
-impl Place {
+impl AdressOffset {
     fn at(base: AddressBase, offset: i64) -> Self {
         Self { base, offset }
     }
@@ -24,13 +24,13 @@ impl Place {
     }
 }
 
-pub fn fold(sema: &mut Sema, e: &ExpressionNode) -> Option<Place> {
+pub fn fold(sema: &mut Sema, e: &ExpressionNode) -> Option<AdressOffset> {
     if decays(sema, e) {
         return place(sema, e);
     }
     match e.id.resolve() {
         Expression::ConstantExpression(inner) => fold(sema, inner),
-        Expression::StringLiteral(literal) => Some(Place::at(AddressBase::String(literal.id), 0)),
+        Expression::StringLiteral(literal) => Some(AdressOffset::at(AddressBase::String(literal.id), 0)),
         Expression::Unary(UnaryOp::Addr, inner) => place(sema, inner),
         Expression::Cast(_, inner) => cast(sema, e, inner),
         Expression::Binary(BinaryOp::Add, e1, e2) => match additive(sema, e1, e2, 1) {
@@ -42,11 +42,11 @@ pub fn fold(sema: &mut Sema, e: &ExpressionNode) -> Option<Place> {
     }
 }
 
-fn place(sema: &mut Sema, e: &ExpressionNode) -> Option<Place> {
+fn place(sema: &mut Sema, e: &ExpressionNode) -> Option<AdressOffset> {
     match e.id.resolve() {
         Expression::ConstantExpression(inner) => place(sema, inner),
         Expression::Identifier(_) => object(sema, e),
-        Expression::StringLiteral(literal) => Some(Place::at(AddressBase::String(literal.id), 0)),
+        Expression::StringLiteral(literal) => Some(AdressOffset::at(AddressBase::String(literal.id), 0)),
         Expression::Unary(UnaryOp::Deref, inner) => fold(sema, inner),
         Expression::ArraySubscripting(base, index) => match additive(sema, base, index, 1) {
             Some(at) => Some(at),
@@ -57,11 +57,11 @@ fn place(sema: &mut Sema, e: &ExpressionNode) -> Option<Place> {
     }
 }
 
-fn object(sema: &Sema, e: &ExpressionNode) -> Option<Place> {
+fn object(sema: &Sema, e: &ExpressionNode) -> Option<AdressOffset> {
     let sym_id = sema.expr_bindings.get(e.id).copied()?;
     let sym = sym_id.resolve_with(sema);
     let addressable = sym.duration == Duration::Static || sym.kind == SymbolKind::Function;
-    addressable.then(|| Place::at(AddressBase::Symbol(sym_id), 0))
+    addressable.then(|| AdressOffset::at(AddressBase::Symbol(sym_id), 0))
 }
 
 fn decays(sema: &Sema, e: &ExpressionNode) -> bool {
@@ -69,7 +69,7 @@ fn decays(sema: &Sema, e: &ExpressionNode) -> bool {
     matches!(re.ty.id.resolve_with(sema), ResolvedType::Array { .. } | ResolvedType::Function { .. })
 }
 
-fn member(sema: &mut Sema, node: &ExpressionNode, base: &ExpressionNode, op: MemberOp) -> Option<Place> {
+fn member(sema: &mut Sema, node: &ExpressionNode, base: &ExpressionNode, op: MemberOp) -> Option<AdressOffset> {
     let reference = sema.member_refs.get(node.id).copied()?;
     layout::of_tag(sema, reference.tag)?;
     let offset = reference.member(sema).offset;
@@ -80,14 +80,14 @@ fn member(sema: &mut Sema, node: &ExpressionNode, base: &ExpressionNode, op: Mem
     at.shift(i64::from(offset))
 }
 
-fn additive(sema: &mut Sema, ptr: &ExpressionNode, index: &ExpressionNode, sign: i64) -> Option<Place> {
+fn additive(sema: &mut Sema, ptr: &ExpressionNode, index: &ExpressionNode, sign: i64) -> Option<AdressOffset> {
     let size = pointee_size(sema, ptr)?;
     let count = integer(sema, index)?;
     let at = fold(sema, ptr)?;
     at.shift(count.checked_mul(size)?.checked_mul(sign)?)
 }
 
-fn cast(sema: &mut Sema, node: &ExpressionNode, inner: &ExpressionNode) -> Option<Place> {
+fn cast(sema: &mut Sema, node: &ExpressionNode, inner: &ExpressionNode) -> Option<AdressOffset> {
     if let Some(at) = fold(sema, inner) {
         return Some(at);
     }
@@ -95,7 +95,7 @@ fn cast(sema: &mut Sema, node: &ExpressionNode, inner: &ExpressionNode) -> Optio
     if !ty.is_pointer(sema) {
         return None;
     }
-    Some(Place::at(AddressBase::Absolute, integer(sema, inner)?))
+    Some(AdressOffset::at(AddressBase::Absolute, integer(sema, inner)?))
 }
 
 fn pointee_size(sema: &mut Sema, e: &ExpressionNode) -> Option<i64> {

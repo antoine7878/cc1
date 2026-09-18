@@ -8,7 +8,7 @@ pub mod resolved_type;
 pub mod symbol;
 pub mod tag_def;
 
-pub use address::{AddressBase, Place};
+pub use address::{AddressBase, AdressOffset};
 pub use cast::{AssignmentContext, CastKind, ImplicitCast};
 pub use function_def::{DeclaredParams, FunctionDef, FunctionDefArena, FunctionDefId, ParamInfo, ParamTypes};
 pub use initializer::{Initializer, InitializerArena, InitializerId};
