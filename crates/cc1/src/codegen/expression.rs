@@ -4,7 +4,7 @@ use std::io::Write;
 use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, UnaryOp};
 use crate::codegen::{Generator, Invariant, LlvmOperator, LlvmSymbol, LlvmType};
 use crate::context::ctx;
-use crate::semantic::{CastKind, Diagnosis, ImplicitCast, QualifiedType, ResolvedType, sema};
+use crate::semantic::{CastKind, Diagnosis, ImplicitCast, QualifiedType, ResolvedType, ResolvedTypeId, sema};
 
 impl<W: Write> Generator<W> {
     pub fn emit_expression(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
@@ -106,7 +106,7 @@ impl<W: Write> Generator<W> {
             Expression::Ternary(e, lhs, rhs) => self.ternary(e, lhs, rhs),
             Expression::FunctionCall(f, args) => self.call(f, args),
             Expression::ArraySubscripting(array, idx) => self.array_subscript(array, idx),
-            Expression::Member(_, _, _) => todo!(),
+            Expression::Member(_, tag, _) => self.member(node, tag),
             Expression::Cast(_, e) => self.explicit_cast(node, e),
             Expression::ConstantExpression(_) | Expression::SizeofExpr(_) | Expression::SizeofType(_) => {
                 Err(Diagnosis::Invariant("non folded constant expression"))
@@ -410,6 +410,25 @@ impl<W: Write> Generator<W> {
 
     fn zext_to_int(&mut self, v: LlvmSymbol) -> LlvmSymbol {
         self.b.convert("zext", v, LlvmType::int())
+    }
+
+    fn member(&mut self, node: &ExpressionNode, tag_node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+        let re = &sema().expr_types[tag_node.id];
+        let tag = self.emit_expression(tag_node)?;
+        let ty = re.ty.id;
+        match ty.resolve() {
+            ResolvedType::Tag(_) => self._member(node, tag, ty),
+            ResolvedType::Pointer(qty) => self._member(node, tag, qty.id),
+            _ => unreachable!(),
+        }
+    }
+
+    fn _member(&mut self, node: &ExpressionNode, tag: LlvmSymbol, ty: ResolvedTypeId) -> Result<LlvmSymbol, Diagnosis> {
+        let ResolvedType::Tag(tag_id) = ty.resolve() else { unreachable!() };
+        let tagdef = tag_id.resolve();
+        let member_idx = sema().member_refs[node.id].index;
+        let idx = LlvmSymbol::cst(LlvmType::ptr_size(), ConstValue::Long(tagdef.members[member_idx].offset as i64));
+        Ok(self.b.gep(LlvmType::I8, tag, idx))
     }
 
     fn explicit_cast(&mut self, node: &ExpressionNode, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {

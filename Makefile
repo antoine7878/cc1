@@ -24,7 +24,7 @@ $(YACC_RS): $(C_Y)
 
 # ----- test --------------------
 
-test: llvm all ## emit LLVM IR for rscs/hello.c to stdout
+test: all llvm ## emit LLVM IR for rscs/hello.c to stdout
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
 	cargo run --bin fcc -- -m32 -e ./rscs/hello.c -o /dev/stdout
 	@# ./a.out || echo $$?

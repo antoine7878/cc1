@@ -46,7 +46,11 @@ exits!(signed_remainder_negative, "int main(void) { int a; a = -85; return -(a %
 exits!(arithmetic_shift, "int main(void) { int a; a = -168; return -(a >> 2); }", 42);
 exits!(logical_shift, "int main(void) { unsigned a; a = 0xa8000000u; return a >> 26; }", 42);
 
-exits!(call_in_expression, "int f(void) { return 6; } int g(void) { return 7; } int main(void) { return f() * g(); }", 42);
+exits!(
+    call_in_expression,
+    "int f(void) { return 6; } int g(void) { return 7; } int main(void) { return f() * g(); }",
+    42
+);
 exits!(call_prototype_first, "int f(void); int main(void) { return f(); } int f(void) { return 42; }", 42);
 exits!(call_two_arguments, "int f(int a, int b) { return a * b; } int main(void) { return f(6, 7); }", 42);
 exits!(call_char_argument, "int f(char c) { return c; } int main(void) { return f(42); }", 42);
@@ -249,10 +253,185 @@ exits!(
     "int f(void) { static int a[2] = {2, 40}; return a[0] + a[1]; } int main(void) { return f(); }",
     42
 );
-exits!(ignore "aggregates", struct_member, "struct s { int a; int b; }; int main(void) { struct s v; v.a = 40; v.b = 2; return v.a + v.b; }", 42);
+exits!(
+    struct_member,
+    "struct s { int a; int b; }; int main(void) { struct s v; v.a = 40; v.b = 2; return v.a + v.b; }",
+    42
+);
+exits!(
+    struct_member_nested_arrow,
+    "struct in { int x; int y; }; struct out { char c; struct in i; struct in *p; }; int main(void) { struct out o; struct in n; n.x = 40; o.i.y = 2; o.p = &n; return o.p->x + o.i.y; }",
+    42
+);
+exits!(
+    struct_member_padding_offsets,
+    "struct s { char c; int a; char d; int b; }; int main(void) { struct s v; v.c = 1; v.a = 10; v.d = 1; v.b = 30; return v.c + v.a + v.d + v.b; }",
+    42
+);
+exits!(
+    struct_member_arrow_global,
+    "struct s { int a; int b; } g; int main(void) { struct s *p = &g; p->a = 40; p->b = 2; return g.a + g.b; }",
+    42
+);
+exits!(
+    struct_member_address_of_nested,
+    "struct in { int x; int y; }; struct out { char c; struct in i; }; int main(void) { struct out o; int *p = &o.i.y; *p = 40; o.i.x = 2; return o.i.y + o.i.x; }",
+    42
+);
+exits!(
+    struct_member_of_array_element,
+    "struct s { char c; int a; }; int main(void) { struct s v[3]; v[2].a = 40; v[1].c = 2; return v[2].a + v[1].c; }",
+    42
+);
+exits!(
+    union_member_aliasing,
+    "union u { int i; unsigned char c[4]; }; int main(void) { union u v; v.i = 42; return v.c[0] + v.c[3]; }",
+    42
+);
+exits!(
+    struct_member_arrow_chain,
+    "struct n { int v; struct n *next; }; int main(void) { struct n a; struct n b; a.v = 40; b.v = 2; a.next = &b; b.next = &a; return a.next->v + a.next->next->v; }",
+    42
+);
+exits!(
+    struct_member_inc_dec,
+    "struct s { int a; }; int main(void) { struct s v; struct s *p = &v; p->a = 40; p->a++; ++v.a; return p->a; }",
+    42
+);
+exits!(
+    struct_member_const_pointer_global_init,
+    "struct s { char c; double d; int a; } g = {1, 2.5, 39}; int main(void) { const struct s *p = &g; return p->c + (int) p->d + p->a; }",
+    42
+);
 exits!(
     bitfield_type_def,
     "struct s { char c; int : 4; unsigned u : 5; double d; }; union u { char c; struct s s; }; int main(void) { return sizeof(struct s) + sizeof(union u) + 18; }",
+    42
+);
+exits!(struct_unused_def, "struct b { int a : 3; int b : 5; char c; }; int main(void) { return 42; }", 42);
+exits!(
+    bitfield_init,
+    "struct b { int a : 3; int b : 5; } v = {1, 2}; int main(void) { return *(unsigned char *)&v + 25; }",
+    42
+);
+exits!(
+    bitfield_init_signed_unnamed,
+    "struct b { int a : 3; int s : 4; unsigned : 2; unsigned c : 7; } v = {7, -3, 100}; int main(void) { unsigned char *p = (unsigned char *)&v; return p[1] - p[0] - 47; }",
+    42
+);
+exits!(
+    bitfield_init_unnamed_skips_item,
+    "struct s { char c; int : 4; int x; } v = {1, 41}; int main(void) { return *(int *)((char *)&v + 4) + *(char *)&v; }",
+    42
+);
+exits!(
+    bitfield_init_straddle,
+    "struct t { unsigned a : 3; unsigned b : 6; } v = {5, 37}; int main(void) { unsigned char *p = (unsigned char *)&v; return p[0] - p[1] - 2; }",
+    42
+);
+exits!(
+    bitfield_init_new_unit,
+    "struct u { char c; int a : 4; int b : 30; char d; } v = {3, 9, 12345, 7}; int main(void) { unsigned char *p = (unsigned char *)&v; return p[0] + p[1] + p[4] - p[8] + sizeof(struct u) - 32; }",
+    42
+);
+exits!(
+    bitfield_store_load,
+    "struct b { unsigned a : 3; int s : 4; unsigned : 2; unsigned c : 7; }; int main(void) { struct b v; v.a = 7; v.s = -3; v.c = 100; v.c -= 55; v.a++; return v.a * 10 + v.s + v.c; }",
+    42
+);
+exits!(
+    bitfield_unsigned_wrap,
+    "struct b { unsigned a : 3; }; int main(void) { struct b v; int x; x = 10; v.a = x; return v.a * 21; }",
+    42
+);
+exits!(
+    bitfield_signed_sign_extend,
+    "struct b { unsigned pad : 5; int s : 4; }; int main(void) { struct b v; v.pad = 31; v.s = -3; return v.s + 45; }",
+    42
+);
+exits!(
+    bitfield_store_preserves_neighbors,
+    "struct b { unsigned a : 3; unsigned b : 5; unsigned c : 8; }; int main(void) { struct b v; v.a = 5; v.b = 20; v.c = 200; v.b = 17; return v.a + v.b + v.c - 180; }",
+    42
+);
+exits!(
+    bitfield_straddles_bytes,
+    "struct b { unsigned a : 5; unsigned b : 7; }; int main(void) { struct b v; v.a = 31; v.b = 100; return v.b - v.a - 27; }",
+    42
+);
+exits!(
+    bitfield_arrow_compound_assign,
+    "struct b { unsigned a : 6; }; int main(void) { struct b v; struct b *p = &v; p->a = 6; p->a *= 7; return p->a; }",
+    42
+);
+exits!(
+    bitfield_inc_dec_wrap,
+    "struct b { unsigned a : 4; unsigned b : 4; }; int main(void) { struct b v; v.a = 15; v.b = 0; v.a++; v.b--; return v.a + v.b + 27; }",
+    42
+);
+exits!(
+    bitfield_post_inc_value,
+    "struct b { unsigned a : 3; }; int main(void) { struct b v; int r; v.a = 7; r = v.a++; return r * 6 + v.a; }",
+    42
+);
+exits!(
+    bitfield_pre_dec_value,
+    "struct b { unsigned pad : 9; unsigned a : 3; }; int main(void) { struct b v; v.pad = 511; v.a = 0; return --v.a * 6; }",
+    42
+);
+exits!(
+    bitfield_assign_value_truncated,
+    "struct b { unsigned a : 3; }; int main(void) { struct b v; int x; x = 10; return (v.a = x) + 40; }",
+    42
+);
+exits!(
+    bitfield_second_unit,
+    "struct b { int x; char c; unsigned a : 5; unsigned b : 11; }; int main(void) { struct b v; v.x = 1; v.c = 2; v.a = 31; v.b = 8; return v.x + v.c + v.a + v.b; }",
+    42
+);
+exits!(
+    bitfield_unsigned_promotes_to_int,
+    "struct b { unsigned u : 3; }; int main(void) { struct b v; v.u = 7; return -v.u + 49; }",
+    42
+);
+exits!(
+    bitfield_signed_arithmetic,
+    "struct b { int s : 4; int t : 4; }; int main(void) { struct b v; v.s = -8; v.t = 7; return v.s * v.t + 98; }",
+    42
+);
+exits!(
+    bitfield_global,
+    "struct b { unsigned a : 3; int s : 5; } g; int main(void) { g.a = 5; g.s = -10; g.s += g.a; return g.s + g.a * 10 - 3; }",
+    42
+);
+exits!(
+    bitfield_condition,
+    "struct b { unsigned a : 1; unsigned b : 1; }; int main(void) { struct b v; v.a = 1; v.b = 0; if (v.b) return 1; return v.a && !v.b ? 42 : 7; }",
+    42
+);
+exits!(
+    bitfield_compare,
+    "struct b { unsigned a : 3; unsigned b : 3; int s : 3; }; int main(void) { struct b v; v.a = 3; v.b = 3; v.s = -1; return (v.a == v.b) + (v.s < v.a) + 40; }",
+    42
+);
+exits!(
+    bitfield_array_element,
+    "struct b { unsigned a : 3; unsigned b : 5; }; int main(void) { struct b v[2]; v[0].a = 1; v[1].a = 2; v[0].b = 31; v[1].b = 6; return v[0].a * v[1].a + v[0].b + v[1].b + 3; }",
+    42
+);
+exits!(
+    bitfield_full_unsigned,
+    "struct b { unsigned a : 32; }; int main(void) { struct b v; v.a = 0xffffffffu; return v.a / 0x06185ea6u; }",
+    42
+);
+exits!(
+    bitfield_full_signed,
+    "struct b { int s : 32; }; int main(void) { struct b v; v.s = -85; return v.s / -2; }",
+    42
+);
+exits!(
+    bitfield_nested_member,
+    "struct in { unsigned a : 3; int s : 5; }; struct out { char c; struct in i; }; int main(void) { struct out o; o.c = 21; o.i.a = 7; o.i.s = -16; o.i.s += 30; return o.c + o.i.a + o.i.s; }",
     42
 );
 exits!(enum_constant, "enum e { A = 40, B }; int main(void) { return B + 1; }", 42);

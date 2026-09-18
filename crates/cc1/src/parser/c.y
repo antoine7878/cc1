@@ -3,7 +3,7 @@
 %{
 use crate::ast::{Qualifier, Type, ExpressionNode, Name, DeclarationSpecifier, Initializer, TypeSpecifier, ParameterDeclaration};
 use crate::ast::{DeclarationNode, InitDeclaratorNode, DeclaratorNode, InitializerNode, Storage, FunctionParametersNode, Tag};
-use crate::ast::{StructDeclaration, StructMemberDeclarator, VariantId, EnumId, LabeledStatementNode, StatementNode, Labeled, CompoundStatementNode};
+use crate::ast::{StructDeclaration, StructMemberDeclarator, VariantId, EnumId, LabeledStatementNode, StatementNode, LabeledStatement, CompoundStatementNode};
 use crate::ast::{ExpressionStatementNode, SelectionStatementNode, IterationStatementNode, JumpStatementNode, JumpStatement};
 use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode, ConstValueNode, StringLiteralNode};
 use crate::ast::{BinaryOp, MemberOp, UnaryOp};

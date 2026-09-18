@@ -28,7 +28,9 @@ pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Option<Layout> {
 
 pub fn finalize(sema: &mut Sema) {
     for index in 0..sema.tags.len() {
-        let _ = of_tag(sema, TagDefId::from(index));
+        if let Some(ty) = sema.types.lookup(&ResolvedType::Tag(TagDefId::from(index))) {
+            let _ = of(sema, ty);
+        }
     }
     for index in 0..sema.symbols.len() {
         let ty = sema.symbols.get(SymbolId::from(index)).ty;

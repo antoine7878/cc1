@@ -1,4 +1,5 @@
 use std::fmt::{self, Display, Formatter};
+use std::ops::RangeInclusive;
 
 use crate::ast::{ConstValue, Fold, StringConstId, Tag};
 use crate::codegen::{LlvmElement, LlvmName, LlvmSymbol, LlvmType, struct_elements};
@@ -81,17 +82,60 @@ impl<'a> LlvmInit<'a> {
     }
 
     fn structure(&self, f: &mut Formatter<'_>, def: &TagDef, items: &[Initializer]) -> fmt::Result {
-        write!(f, "{} <{{ ", self.ty.llvm())?;
         let size = sema().layout(&self.ty.id).size;
+        write!(f, "{} <{{ ", self.ty.llvm())?;
         for (i, element) in struct_elements(def, size).iter().enumerate() {
             let sep = if i == 0 { "" } else { ", " };
-            match element {
-                LlvmElement::Member(index, qty) => write!(f, "{sep}{}", LlvmInit::new(*qty, items.get(*index)))?,
-                LlvmElement::Bits(_) => unimplemented!("bitfield in a static initializer"),
-                LlvmElement::Pad(_) => write!(f, "{sep}{}", element.zero())?,
+            write!(f, "{sep}")?;
+            match *element {
+                LlvmElement::Member { index, ty } => {
+                    write!(f, "{}", LlvmInit::new(ty, items.get(item_index(def, index))))?
+                }
+                LlvmElement::Bits { start, bytes, first, last } => {
+                    self.bits(f, def, items, start, bytes, first..=last)?
+                }
+                LlvmElement::Pad(_) => write!(f, "{}", element.zero())?,
             }
         }
         write!(f, " }}>")
+    }
+
+    fn bits(
+        &self,
+        f: &mut Formatter<'_>,
+        def: &TagDef,
+        items: &[Initializer],
+        start: u32,
+        bytes: u32,
+        members: RangeInclusive<usize>,
+    ) -> fmt::Result {
+        let mut value: u64 = 0;
+        for index in members {
+            let member = def.members[index];
+            let (Some(sym), Some(width)) = (member.sym, member.width) else { continue };
+            let field = match items.get(item_index(def, index)) {
+                None | Some(Initializer::Zero) => 0,
+                Some(Initializer::Value(v)) => {
+                    let rty = sym.resolve().ty.id.resolve();
+                    Fold::new(&sema().target).convert(rty, *v).unwrap_or(*v).to_u64()
+                }
+                _ => unreachable!("non-constant bit-field initializer"),
+            };
+            let shift = member.offset * 8 + member.bit_offset - start * 8;
+            let mask = (1u64 << width) - 1;
+            value |= (field & mask) << shift;
+        }
+        match bytes {
+            1 | 2 | 4 | 8 => write!(f, "{} {value}", LlvmElement::bytes_ty(bytes)),
+            n => {
+                write!(f, "{} [", LlvmElement::bytes_ty(n))?;
+                for i in 0..n {
+                    let sep = if i == 0 { "" } else { ", " };
+                    write!(f, "{sep}{} {}", LlvmType::char(), (value >> (8 * i)) & 0xff)?;
+                }
+                write!(f, "]")
+            }
+        }
     }
 
     fn union(&self, f: &mut Formatter<'_>, def: &TagDef, items: &[Initializer]) -> fmt::Result {
@@ -139,4 +183,8 @@ impl Display for LlvmAddress {
             _ => write!(f, "getelementptr ({}, ptr {base}, {offset})", LlvmType::char()),
         }
     }
+}
+
+fn item_index(def: &TagDef, index: usize) -> usize {
+    def.members[..index].iter().filter(|member| member.sym.is_some()).count()
 }
