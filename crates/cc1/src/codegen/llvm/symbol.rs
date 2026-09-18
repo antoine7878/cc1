@@ -48,6 +48,14 @@ impl LlvmSymbol {
             Self::cst(qty.llvm(), ConstValue::Int(0))
         }
     }
+
+    pub fn one(qty: QualifiedType) -> Self {
+        if qty.is_floating(sema()) {
+            Self::cst(qty.llvm(), ConstValue::Double(1.0))
+        } else {
+            Self::cst(LlvmType::int(), ConstValue::Int(1))
+        }
+    }
 }
 
 impl From<ConstValue> for LlvmSymbol {

@@ -174,7 +174,7 @@ impl<W: Write> Generator<W> {
             UnaryOp::PreDec | UnaryOp::PostDec => BinaryOp::Sub,
             _ => return Err(Diagnosis::Invariant("non inc/dec operator in unary_inc_dec")),
         };
-        let one = LlvmSymbol::from(1);
+        let one = LlvmSymbol::one(qty);
         let v_after = self.arithmetic(&bop, v_before, qty, one, QualifiedType::plain(sema().builtins.int))?;
         self.b.store(v_after, loc);
         match op {

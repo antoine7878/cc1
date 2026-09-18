@@ -134,6 +134,11 @@ exits!(
     "int main(void) { int x; x = 40; switch (1) { case 1: x++; case 2: x++; break; case 3: x = 0; } return x; }",
     42
 );
+exits!(
+    switch_long_control,
+    "int main(void) { long l; unsigned u; l = 3; u = 40; switch (l) { case 3: u += 2; break; default: u = 0; } switch (u) { case 42: return 42; } return 0; }",
+    42
+);
 exits!(nested_blocks, "int main(void) { int x; x = 1; { int x; x = 7; } return x + 41; }", 42);
 
 exits!(short_circuit_and, "int f(void) { return 0; } int main(void) { int x; x = 42; (0 && (x = 1)); return x; }", 42);
@@ -272,6 +277,11 @@ exits!(
     42
 );
 exits!(pointer_increment, "int main(void) { int a[2]; int *p; a[0] = 1; a[1] = 42; p = a; p++; return *p; }", 42);
+exits!(
+    inc_dec_floating_pointer,
+    "int main(void) { double d; float f; int a[3]; int *p; d = 40.5; d++; f = 1.0f; f--; p = a; a[1] = 42; p++; return (int) (d + f) + *p - 41; }",
+    42
+);
 
 exits!(array_index, "int main(void) { int a[3]; a[0] = 40; a[1] = 2; a[2] = a[0] + a[1]; return a[2]; }", 42);
 exits!(array_variable_index, "int main(void) { int a[3]; int i; i = 1; a[1] = 42; return a[i]; }", 42);
