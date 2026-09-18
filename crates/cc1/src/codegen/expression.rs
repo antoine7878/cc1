@@ -4,7 +4,7 @@ use std::io::Write;
 use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, UnaryOp};
 use crate::codegen::{Generator, Invariant, LlvmOperator, LlvmSymbol, LlvmType};
 use crate::context::ctx;
-use crate::semantic::{CastKind, Diagnosis, ImplicitCast, QualifiedType, sema};
+use crate::semantic::{CastKind, Diagnosis, ImplicitCast, QualifiedType, ResolvedType, sema};
 
 impl<W: Write> Generator<W> {
     pub fn emit_expression(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
@@ -385,9 +385,14 @@ impl<W: Write> Generator<W> {
     }
 
     fn call(&mut self, f: &ExpressionNode, args: &[ExpressionNode]) -> Result<LlvmSymbol, Diagnosis> {
+        let qty = sema().expr_types[f.id].casted_ty().id.resolve().pointee().invariant("call through non-pointer")?;
+        let fty = LlvmType::Function(qty.id);
+        let ResolvedType::Function { ret, .. } = qty.id.resolve() else {
+            return Err(Diagnosis::Invariant("call of non-function"));
+        };
         let f = self.emit_expression(f)?;
-        let args = args.iter().map(|e| self.emit_expression(e)).collect::<Result<Vec<_>, Diagnosis>>()?;
-        Ok(self.b.call(f, args.as_slice()))
+        let parameters = args.iter().map(|e| self.emit_expression(e)).collect::<Result<Vec<_>, Diagnosis>>()?;
+        Ok(self.b.call(fty, ret.llvm(), f, parameters.as_slice()))
     }
 
     fn array_subscript(&mut self, array: &ExpressionNode, idx: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {

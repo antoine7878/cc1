@@ -60,13 +60,16 @@ impl<W: Write> Builder<W> {
     }
 
     pub fn blank(&mut self) {
-        self.line(format_args!(""));
+        self.write_all(b"\n");
     }
 
-    pub fn define(&mut self, binding: LlvmSymbol, parameters: &[LlvmSymbol], is_variadic: bool) {
+    pub fn define(&mut self, sym_id: SymbolId, parameters: &[LlvmSymbol], is_variadic: bool) {
+        let ResolvedType::Function { ret, .. } = sym_id.resolve().ty.id.resolve() else {
+            unreachable!("define on a non-function")
+        };
         self.blank();
         self.reset(parameters.len());
-        self.write_fmt(format_args!("define {}", binding));
+        self.write_fmt(format_args!("define {} {}", ret.llvm(), LlvmName::Global(sym_id)));
         self.params(parameters, is_variadic);
         self.line(format_args!(" {{"));
     }
@@ -178,26 +181,26 @@ impl<W: Write> Builder<W> {
         LlvmSymbol::new(s1.ty, r)
     }
 
-    pub fn call(&mut self, f: LlvmSymbol, parameters: &[LlvmSymbol]) -> LlvmSymbol {
-        match f.ty.is_void() {
-            true => self.call_void(f, parameters),
-            false => self.call_ret(f, parameters),
+    pub fn call(&mut self, fty: LlvmType, ret: LlvmType, f: LlvmSymbol, parameters: &[LlvmSymbol]) -> LlvmSymbol {
+        match ret.is_void() {
+            true => self.call_void(fty, f.name, parameters),
+            false => self.call_ret(fty, ret, f.name, parameters),
         }
     }
 
-    fn call_void(&mut self, f: LlvmSymbol, parameters: &[LlvmSymbol]) -> LlvmSymbol {
-        self.write_fmt(format_args!("  call {f}"));
+    fn call_void(&mut self, fty: LlvmType, f_name: LlvmName, parameters: &[LlvmSymbol]) -> LlvmSymbol {
+        self.write_fmt(format_args!("  call {fty} {f_name}"));
         self.params(parameters, false);
-        self.line(format_args!(""));
+        self.blank();
         LlvmSymbol::void()
     }
 
-    fn call_ret(&mut self, f: LlvmSymbol, parameters: &[LlvmSymbol]) -> LlvmSymbol {
+    fn call_ret(&mut self, fty: LlvmType, ret: LlvmType, f_name: LlvmName, parameters: &[LlvmSymbol]) -> LlvmSymbol {
         let r = self.fresh();
-        self.write_fmt(format_args!("  {r} = call {f}"));
+        self.write_fmt(format_args!("  {r} = call {fty} {f_name}"));
         self.params(parameters, false);
-        self.line(format_args!(""));
-        LlvmSymbol::new(f.ty, r)
+        self.blank();
+        LlvmSymbol::new(ret, r)
     }
 
     pub fn gep(&mut self, elem: LlvmType, base: LlvmSymbol, idx: LlvmSymbol) -> LlvmSymbol {

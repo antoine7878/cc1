@@ -44,7 +44,7 @@ impl Globals {
         let qty = sym_id.resolve().ty;
         let name = LlvmName::Global(sym_id);
         if qty.is_function(sema()) {
-            self.map.insert(sym_id, LlvmSymbol::new(qty.llvm(), name));
+            self.map.insert(sym_id, LlvmSymbol::ptr(name));
             self.functions.push(sym_id);
             return;
         }

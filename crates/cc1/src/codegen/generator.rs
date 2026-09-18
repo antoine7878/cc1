@@ -121,9 +121,8 @@ impl<W: Write> Visitor for Generator<W> {
 
     fn visit_function_definition(&mut self, node: &FunctionDefinitionNode) {
         let sym = sema().declarations[&node.declarator.id];
-        let f = self.globals.get_symbol(sym).unwrap();
         self.locals.collect_locals(node);
-        self.b.define(*f, self.locals.parameters(), self.locals.is_variadic());
+        self.b.define(sym, self.locals.parameters(), self.locals.is_variadic());
         self.locals.emit_decl(&mut self.b);
         self.visit_compound_statement(&node.body);
         self.b.end_function(sym);

@@ -1,10 +1,8 @@
 use std::fmt;
 
-use crate::{
-    ast::{ConstValue, Tag},
-    context::ctx,
-    semantic::{QualifiedType, ResolvedType, ResolvedTypeId, TagDefId, sema},
-};
+use crate::ast::{ConstValue, Tag};
+use crate::context::ctx;
+use crate::semantic::{ParamTypes, QualifiedType, ResolvedType, ResolvedTypeId, TagDefId, sema};
 
 impl ResolvedTypeId {
     pub fn llvm(&self) -> LlvmType {
@@ -23,6 +21,7 @@ pub enum LlvmType {
     First(LlvmFirstType),
     Array(usize, ResolvedTypeId),
     Tag(TagDefId),
+    Function(ResolvedTypeId),
 }
 
 impl LlvmType {
@@ -58,6 +57,7 @@ impl LlvmType {
                 let ty = sema().types.lookup(&ResolvedType::Tag(*id)).expect("unregistered tag type");
                 sema().layout(&ty).size
             }
+            LlvmType::Function(_) => sema().target.pointer.size,
         }
     }
 
@@ -137,7 +137,7 @@ impl From<ConstValue> for LlvmFirstType {
 impl From<&ResolvedTypeId> for LlvmType {
     fn from(value: &ResolvedTypeId) -> Self {
         match value.resolve() {
-            ResolvedType::Function { ret, .. } => ret.llvm(),
+            ResolvedType::Function { .. } => LlvmType::Function(*value),
             ResolvedType::Array { elem, len } => LlvmType::Array(len.unwrap_or(0), elem.id),
             ResolvedType::Tag(id) => LlvmType::Tag(*id),
             _ => LlvmType::First(LlvmFirstType::from(value)),
@@ -190,6 +190,27 @@ impl fmt::Display for LlvmType {
             LlvmType::First(t) => write!(f, "{t}"),
             LlvmType::Array(len, t) => write!(f, "[{len} x {}]", t.llvm()),
             LlvmType::Tag(id) => tag_name(f, *id),
+            LlvmType::Function(id) => {
+                let ResolvedType::Function { ret, params } = id.resolve() else {
+                    unreachable!("LlvmType::Function on a non-function")
+                };
+                write!(f, "{} (", ret.llvm())?;
+                match params {
+                    ParamTypes::Unspecified => write!(f, "...")?,
+                    ParamTypes::Prototype { params, is_variadic } => {
+                        for (i, p) in params.iter().enumerate() {
+                            if i != 0 {
+                                write!(f, ", ")?;
+                            }
+                            write!(f, "{}", p.llvm())?;
+                        }
+                        if *is_variadic {
+                            write!(f, "{}", if params.is_empty() { "..." } else { ", ..." })?;
+                        }
+                    }
+                }
+                write!(f, ")")
+            }
         }
     }
 }
@@ -210,22 +231,3 @@ fn tag_name(f: &mut fmt::Formatter<'_>, id: TagDefId) -> fmt::Result {
         false => write!(f, "%{kind}.{}", name.id.resolve()),
     }
 }
-
-// #[derive(Debug, Clone, Copy)]
-// pub struct LlvmType {
-//     pub ty: &'static ResolvedType,
-// }
-//
-// impl LlvmType {
-//     pub fn bool() -> Self {
-//         Self { ty: &ResolvedType::Bool }
-//     }
-//
-//     pub fn char() -> Self {
-//         Self { ty: &ResolvedType::Char }
-//     }
-//
-//     pub fn int() -> Self {
-//         Self { ty: &ResolvedType::Int }
-//     }
-// }

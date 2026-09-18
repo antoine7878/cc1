@@ -46,12 +46,22 @@ exits!(signed_remainder_negative, "int main(void) { int a; a = -85; return -(a %
 exits!(arithmetic_shift, "int main(void) { int a; a = -168; return -(a >> 2); }", 42);
 exits!(logical_shift, "int main(void) { unsigned a; a = 0xa8000000u; return a >> 26; }", 42);
 
-exits!(ignore "call ptr instead of call <ret ty>", call_in_expression, "int f(void) { return 6; } int g(void) { return 7; } int main(void) { return f() * g(); }", 42);
-exits!(ignore "call ptr instead of call <ret ty>", call_prototype_first, "int f(void); int main(void) { return f(); } int f(void) { return 42; }", 42);
-exits!(ignore "call arguments", call_two_arguments, "int f(int a, int b) { return a * b; } int main(void) { return f(6, 7); }", 42);
-exits!(ignore "call arguments", call_char_argument, "int f(char c) { return c; } int main(void) { return f(42); }", 42);
-exits!(ignore "call arguments", call_short_argument, "int f(short s) { return s; } int main(void) { return f(42); }", 42);
-exits!(ignore "call arguments", recursion, "int fact(int n) { return n ? n * fact(n - 1) : 1; } int main(void) { return fact(5) - 78; }", 42);
+exits!(call_in_expression, "int f(void) { return 6; } int g(void) { return 7; } int main(void) { return f() * g(); }", 42);
+exits!(call_prototype_first, "int f(void); int main(void) { return f(); } int f(void) { return 42; }", 42);
+exits!(call_two_arguments, "int f(int a, int b) { return a * b; } int main(void) { return f(6, 7); }", 42);
+exits!(call_char_argument, "int f(char c) { return c; } int main(void) { return f(42); }", 42);
+exits!(call_short_argument, "int f(short s) { return s; } int main(void) { return f(42); }", 42);
+exits!(recursion, "int fact(int n) { return n ? n * fact(n - 1) : 1; } int main(void) { return fact(5) - 78; }", 42);
+exits!(
+    function_pointer_call,
+    "int add(int a, int b) { return a + b; } int main(void) { int (*fp)(int, int); fp = add; return (*fp)(40, 2) - fp(0, 0); }",
+    42
+);
+exits!(
+    variadic_call_double,
+    "int sprintf(char *, const char *, ...); int atoi(const char *); int main(void) { char b[32]; sprintf(b, \"%d %.1f\", 4, 2.0); return atoi(b) * 10 + (b[2] - 0x30); }",
+    42
+);
 
 exits!(if_true, "int main(void) { if (1) return 42; return 7; }", 42);
 exits!(if_false, "int main(void) { if (0) return 7; return 42; }", 42);
