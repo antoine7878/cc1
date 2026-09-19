@@ -84,6 +84,13 @@ impl ResolvedType {
         matches!(self, ResolvedType::Tag(_))
     }
 
+    pub fn is_record(&self, sema: &Sema) -> bool {
+        match self {
+            ResolvedType::Tag(id) => (*id).resolve_with(sema).kind != Tag::Enum,
+            _ => false,
+        }
+    }
+
     pub fn is_char(&self) -> bool {
         matches!(self, ResolvedType::Char | ResolvedType::UnsignedChar | ResolvedType::SignedChar)
     }
@@ -355,6 +362,10 @@ impl QualifiedType {
 
     pub fn is_tag(&self, sema: &Sema) -> bool {
         self.id.resolve_with(sema).is_tag()
+    }
+
+    pub fn is_record(&self, sema: &Sema) -> bool {
+        self.id.resolve_with(sema).is_record(sema)
     }
 
     pub fn is_integral(&self, sema: &Sema) -> bool {

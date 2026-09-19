@@ -5,11 +5,9 @@ use std::ops::Index;
 use std::vec::IntoIter;
 
 use crate::ast::visit::{walk_expression, walk_init_declarator};
-use crate::ast::{
-    Expression, ExpressionId, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, MemberOp, Visitor,
-};
+use crate::ast::{Expression, ExpressionId, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, Visitor};
 use crate::codegen::{Builder, LlvmName, LlvmSymbol, LlvmType};
-use crate::semantic::{DeclaredParams, Duration, ExpressionKind, FunctionHeader, SymbolId, sema};
+use crate::semantic::{DeclaredParams, Duration, FunctionHeader, SymbolId, sema};
 
 #[derive(Debug, Default)]
 pub struct Locals {
@@ -109,9 +107,9 @@ impl Visitor for Locals {
 
     fn visit_expression(&mut self, node: &ExpressionNode) {
         walk_expression(self, node);
-        let Expression::Member(MemberOp::Dot, base, _) = node.id.resolve() else { return };
-        let Some(re) = sema().expr_types.get(base.id) else { return };
-        if re.kind != ExpressionKind::RValue {
+        let Expression::FunctionCall(_, _) = node.id.resolve() else { return };
+        let Some(re) = sema().expr_types.get(node.id) else { return };
+        if !re.ty.is_record(sema()) {
             return;
         }
         self.spill_order.push((node.id, re.ty.llvm()));

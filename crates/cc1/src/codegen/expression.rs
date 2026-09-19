@@ -50,6 +50,7 @@ impl<W: Write> Generator<W> {
         let to = cast.to;
         let conv = match cast.kind {
             CastKind::ArrayToPointer | CastKind::FunctionToPointer | CastKind::PointerConversion => return Ok(v),
+            CastKind::LValueToRValue if to.is_record(sema()) => return Ok(v),
             CastKind::LValueToRValue => return Ok(self.load_place(v, to, bf.as_ref())),
             CastKind::ToVoid => return Ok(LlvmSymbol::void()),
             CastKind::NullPointer => return Ok(LlvmSymbol::null()),
@@ -114,7 +115,7 @@ impl<W: Write> Generator<W> {
             Expression::Assign(op, lhs, rhs) => self.assign(op, lhs, rhs),
             Expression::List(lst) => self.list(lst),
             Expression::Ternary(e, lhs, rhs) => self.ternary(e, lhs, rhs),
-            Expression::FunctionCall(f, args) => self.call(f, args),
+            Expression::FunctionCall(f, args) => self.call(node, f, args),
             Expression::ArraySubscripting(array, idx) => self.array_subscript(array, idx),
             Expression::Member(_, tag, _) => self.member(node, tag),
             Expression::Cast(_, e) => self.explicit_cast(node, e),
@@ -356,9 +357,9 @@ impl<W: Write> Generator<W> {
         let qty = rl.casted_ty();
 
         let loc = self.fold_raw(lhs)?;
-        match qty.id.resolve() {
-            ResolvedType::Tag(_) => self.copy_aggregate(loc, rhs, qty),
-            _ => self.copy_scalar(op, loc, lhs, rhs, rl),
+        match qty.is_record(sema()) {
+            true => self.copy_aggregate(loc, rhs, qty),
+            false => self.copy_scalar(op, loc, lhs, rhs, rl),
         }
     }
 
@@ -389,17 +390,9 @@ impl<W: Write> Generator<W> {
         rhs: &ExpressionNode,
         qty: QualifiedType,
     ) -> Result<LlvmSymbol, Diagnosis> {
-        match sema().expr_types[rhs.id].kind {
-            ExpressionKind::LValue => {
-                let src = self.fold_raw(rhs)?;
-                self.b.memcpy(loc.name, src.name, sema().layout(&qty.id));
-                Ok(self.b.load(qty.llvm(), loc))
-            }
-            ExpressionKind::RValue => {
-                let v = self.emit_expression(rhs)?;
-                Ok(self.b.store(v, loc))
-            }
-        }
+        let src = self.emit_expression(rhs)?;
+        self.b.memcpy(loc.name, src.name, sema().layout(&qty.id));
+        Ok(loc)
     }
 
     fn ternary(
@@ -429,15 +422,40 @@ impl<W: Write> Generator<W> {
         }
     }
 
-    fn call(&mut self, f: &ExpressionNode, args: &[ExpressionNode]) -> Result<LlvmSymbol, Diagnosis> {
-        let qty = sema().expr_types[f.id].casted_ty().id.resolve().pointee().invariant("call through non-pointer")?;
+    fn call(
+        &mut self,
+        node: &ExpressionNode,
+        f: &ExpressionNode,
+        args: &[ExpressionNode],
+    ) -> Result<LlvmSymbol, Diagnosis> {
+        let qty =
+            sema().expr_types[f.id].casted_ty().id.resolve().pointee().invariant("call of non-pointer function")?;
         let fty = LlvmType::Function(qty.id);
         let ResolvedType::Function { ret, .. } = qty.id.resolve() else {
             return Err(Diagnosis::Invariant("call of non-function"));
         };
         let f = self.emit_expression(f)?;
-        let parameters = args.iter().map(|e| self.emit_expression(e)).collect::<Result<Vec<_>, Diagnosis>>()?;
-        Ok(self.b.call(fty, ret.llvm(), f, parameters.as_slice()))
+        let parameters = args.iter().map(|e| self.emit_argument(e)).collect::<Result<Vec<_>, Diagnosis>>()?;
+        let v = self.b.call(fty, ret.llvm(), f, parameters.as_slice());
+        if !ret.is_record(sema()) {
+            return Ok(v);
+        }
+        let slot = self.locals.spill(node.id);
+        self.b.store(v, slot);
+        Ok(slot)
+    }
+
+    fn emit_argument(&mut self, e: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+        let qty = sema().expr_types[e.id].casted_ty();
+        let v = self.emit_expression(e)?;
+        Ok(self.load_aggregate(v, qty))
+    }
+
+    pub fn load_aggregate(&mut self, v: LlvmSymbol, qty: QualifiedType) -> LlvmSymbol {
+        match qty.is_record(sema()) {
+            true => self.b.load(qty.llvm(), v),
+            false => v,
+        }
     }
 
     fn array_subscript(&mut self, array: &ExpressionNode, idx: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
@@ -461,26 +479,16 @@ impl<W: Write> Generator<W> {
         let re = &sema().expr_types[tag_node.id];
         let tag = self.emit_expression(tag_node)?;
         let ty = re.ty.id;
-        match ty.resolve() {
-            ResolvedType::Pointer(qty) => self.get_member(node, tag, qty.id),
-            ResolvedType::Tag(_) if re.kind == ExpressionKind::LValue => self.get_member(node, tag, ty),
-            ResolvedType::Tag(_) => self.get_r_member(node, tag, ty),
+        let place = match ty.resolve() {
+            ResolvedType::Pointer(qty) => self.get_member(node, tag, qty.id)?,
+            ResolvedType::Tag(_) => self.get_member(node, tag, ty)?,
             _ => unreachable!(),
-        }
-    }
-
-    fn get_r_member(
-        &mut self,
-        node: &ExpressionNode,
-        value: LlvmSymbol,
-        ty: ResolvedTypeId,
-    ) -> Result<LlvmSymbol, Diagnosis> {
-        let slot = self.locals.spill(node.id);
-        self.b.store(value, slot);
-        let place = self.get_member(node, slot, ty)?;
+        };
         let qty = sema().expr_types[node.id].ty;
-        let bf = Self::bitfield_of(node);
-        Ok(self.load_place(place, qty, bf.as_ref()))
+        match re.kind == ExpressionKind::RValue && qty.is_scalar(sema()) {
+            true => Ok(self.load_place(place, qty, Self::bitfield_of(node).as_ref())),
+            false => Ok(place),
+        }
     }
 
     fn get_member(

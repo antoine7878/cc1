@@ -138,7 +138,12 @@ impl<W: Write> Generator<W> {
 
     pub fn jump_statement(&mut self, id: StatementId, node: &JumpStatementNode) -> Result<(), Diagnosis> {
         match &node.stmt {
-            JumpStatement::Return(Some(e)) => self.emit_expression(e).map(|v| self.b.ret(v))?,
+            JumpStatement::Return(Some(e)) => {
+                let qty = sema().expr_types[e.id].casted_ty();
+                let v = self.emit_expression(e)?;
+                let v = self.load_aggregate(v, qty);
+                self.b.ret(v);
+            }
             JumpStatement::Return(None) => self.b.ret_void(),
             JumpStatement::Break => {
                 let &ResolvedStatement::Break(target) = &sema().stmts[id] else {

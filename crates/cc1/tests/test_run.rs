@@ -26,6 +26,8 @@ exits!(comma, "int main(void) { return (7, 42); }", 42);
 exits!(local_variable, "int main(void) { int x; x = 42; return x; }", 42);
 exits!(local_arithmetic, "int main(void) { int a; int b; a = 6; b = 7; return a * b; }", 42);
 exits!(compound_assign, "int main(void) { int x; x = 40; x += 2; return x; }", 42);
+exits!(enum_assign, "enum e { A = 40, B }; int main(void) { enum e x; x = B; x = x; return x + 1; }", 42);
+exits!(enum_init_from_lvalue, "enum e { A = 40, B }; enum e g = B; int main(void) { enum e x = g; return x + 1; }", 42);
 exits!(compound_assign_promoted_lhs, "int main(void) { unsigned char c; c = 198; c += 100; return c; }", 42);
 exits!(
     compound_assign_all,
@@ -696,14 +698,34 @@ emits!(
     "@llvm.memcpy"
 );
 emits!(
-    not struct_assign_from_rvalue_stores_value,
+    struct_assign_from_call_spills_then_memcpy,
     "struct s { int a; }; struct s mk(void) { struct s v; v.a = 42; return v; } int main(void) { struct s w; w = mk(); return w.a; }",
     "@llvm.memcpy"
 );
 emits!(
-    struct_assign_from_rvalue_stores_value_store,
+    struct_assign_from_call_stores_result,
     "struct s { int a; }; struct s mk(void) { struct s v; v.a = 42; return v; } int main(void) { struct s w; w = mk(); return w.a; }",
     "store %struct.s"
+);
+emits!(
+    not struct_lvalue_is_not_loaded,
+    "struct s { int a; }; int main(void) { struct s v; struct s w; v.a = 42; w = v; return w.a; }",
+    "load %struct.s"
+);
+exits!(
+    struct_assign_from_ternary,
+    "struct s { int a; }; int main(void) { struct s u; struct s v; struct s w; u.a = 42; v.a = 7; w = 1 ? u : v; return w.a; }",
+    42
+);
+exits!(
+    struct_param_from_call_result,
+    "struct s { int a; int b; }; struct s mk(void) { struct s v; v.a = 40; v.b = 2; return v; } int sum(struct s v) { return v.a + v.b; } int main(void) { return sum(mk()); }",
+    42
+);
+exits!(
+    struct_return_assignment_result,
+    "struct s { int a; }; struct s g; struct s set(int n) { struct s v; v.a = n; return g = v; } int main(void) { return set(42).a; }",
+    42
 );
 exits!(
     struct_assign_chain,
