@@ -66,6 +66,15 @@ macro_rules! exits {
 }
 
 #[macro_export]
+macro_rules! exits_linked {
+    ($name:ident, $src:expr, $helper:expr, $expected:expr) => {
+        test_case!($name, {
+            $crate::common::run_exit_linked(stringify!($name), $src, $helper, $expected);
+        });
+    };
+}
+
+#[macro_export]
 macro_rules! emits {
     ($name:ident, $src:expr, $needle:literal) => {
         test_case!($name, {

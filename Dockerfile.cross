@@ -1,0 +1,11 @@
+FROM ubuntu:24.04
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    gcc-i686-linux-gnu \
+    libc6-dev-i386-cross \
+    clang \
+    qemu-user \
+    && rm -rf /var/lib/apt/lists/*
+
+CMD ["sleep", "infinity"]

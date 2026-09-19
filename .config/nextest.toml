@@ -3,3 +3,7 @@ status-level = "fail"
 final-status-level = "none"
 failure-output = "immediate"
 fail-fast = false
+
+[[profile.default.overrides]]
+filter = 'test(test_run)'
+priority = -10
