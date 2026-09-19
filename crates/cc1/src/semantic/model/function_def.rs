@@ -62,6 +62,20 @@ impl ParamTypes {
             }
         }
     }
+
+    pub fn as_slice(&self) -> &[QualifiedType] {
+        match self {
+            ParamTypes::Prototype { params, .. } => params.as_slice(),
+            ParamTypes::Unspecified => &[],
+        }
+    }
+
+    pub fn is_variadic(&self) -> bool {
+        match self {
+            ParamTypes::Prototype { is_variadic, .. } => *is_variadic,
+            ParamTypes::Unspecified => true,
+        }
+    }
 }
 
 fn promoted(sema: &Sema, ty: QualifiedType) -> QualifiedType {

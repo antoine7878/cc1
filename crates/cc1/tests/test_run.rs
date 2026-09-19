@@ -703,9 +703,9 @@ emits!(
     "@llvm.memcpy"
 );
 emits!(
-    struct_assign_from_call_stores_result,
+    struct_assign_from_call_writes_temporary_through_sret,
     "struct s { int a; }; struct s mk(void) { struct s v; v.a = 42; return v; } int main(void) { struct s w; w = mk(); return w.a; }",
-    "store %struct.s"
+    "call void (ptr) @mk(ptr sret(%struct.s) align 4 %"
 );
 emits!(
     not struct_lvalue_is_not_loaded,
@@ -804,7 +804,7 @@ emits!(
 emits!(
     sret_call,
     "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int main(void) { return gmk(42).a; }",
-    "call void @gmk(ptr sret(%struct.big) align 4 %"
+    "call void (ptr, i32) @gmk(ptr sret(%struct.big) align 4 %"
 );
 emits!(
     sret_align_follows_layout,
@@ -829,7 +829,7 @@ emits!(
 emits!(
     byval_call,
     "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; v.a = 42; return gsum(v); }",
-    "call i32 @gsum(ptr byval(%struct.big) align 4 %"
+    "call i32 (ptr) @gsum(ptr byval(%struct.big) align 4 %"
 );
 emits!(
     not byval_call_does_not_load,
@@ -849,7 +849,7 @@ emits!(
 emits!(
     sret_then_byval_share_temporary,
     "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n); int sum(struct big v); int main(void) { return sum(mk(42)); }",
-    "call i32 @sum(ptr byval(%struct.big) align 4 %"
+    "call i32 (ptr) @sum(ptr byval(%struct.big) align 4 %"
 );
 
 exits_linked!(
@@ -928,5 +928,124 @@ exits_linked!(
     abi_long_double_struct_byval_and_sret,
     "struct x { char c; long double d; }; struct x gmx(void); int gsx(struct x v); int main(void) { struct x v; v = gmx(); return gsx(v) + v.c; }",
     "struct x { char c; long double d; }; struct x gmx(void) { struct x r; r.c = 2; r.d = 2.5L; return r; } int gsx(struct x v) { return (int) (v.d * 16); }",
+    42
+);
+
+exits!(
+    abi_sret_and_byval_in_module,
+    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int sum(struct big v) { return v.a + v.b + v.c + v.d + v.e; } int main(void) { return sum(mk(21)); }",
+    42
+);
+exits!(
+    abi_sret_scalar_param_reaches_body,
+    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n, int m) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = m; return r; } int main(void) { return mk(40, 2).a + mk(40, 2).e; }",
+    42
+);
+exits!(
+    abi_byval_callee_writes_its_copy,
+    "struct s { int x; int y; }; int poke(struct s a) { a.x = 100; return a.x; } int main(void) { struct s v; v.x = 40; v.y = 2; poke(v); return v.x + v.y; }",
+    42
+);
+exits!(
+    abi_byval_param_returned_through_sret,
+    "struct s { char c[5]; }; struct s id(struct s a) { return a; } int main(void) { struct s v; struct s w; v.c[0] = 1; v.c[4] = 41; w = id(v); return w.c[0] + w.c[4]; }",
+    42
+);
+exits!(
+    abi_byval_param_passed_again,
+    "struct s { int x; int y; }; int inner(struct s a) { return a.x + a.y; } int outer(struct s a) { return inner(a); } int main(void) { struct s v; v.x = 40; v.y = 2; return outer(v); }",
+    42
+);
+exits!(
+    abi_two_byval_params,
+    "struct s { int x; int y; }; int both(struct s a, struct s b) { return a.x + b.y; } int main(void) { struct s v; struct s w; v.x = 40; v.y = 0; w.x = 0; w.y = 2; return both(v, w); }",
+    42
+);
+exits!(
+    abi_sret_assign_to_byval_source,
+    "struct s { int x; int y; }; struct s bump(struct s a) { a.x = a.x + 1; a.y = a.y + 1; return a; } int main(void) { struct s v; v.x = 39; v.y = 1; v = bump(v); return v.x + v.y; }",
+    42
+);
+exits!(
+    abi_return_sret_call_result,
+    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } struct big wrap(int n) { return mk(n); } int main(void) { struct big v; v = wrap(21); return v.a + v.e; }",
+    42
+);
+exits!(
+    abi_return_ternary_place,
+    "struct s { int x; }; struct s pick(int c) { struct s a; struct s b; a.x = 42; b.x = 7; return c ? a : b; } int main(void) { return pick(1).x + pick(0).x - 7; }",
+    42
+);
+exits!(
+    abi_sret_through_function_pointer,
+    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int sum(struct big v) { return v.a + v.b + v.c + v.d + v.e; } int main(void) { struct big (*fp)(int); int (*sp)(struct big); fp = mk; sp = sum; return sp((*fp)(21)); }",
+    42
+);
+exits!(
+    abi_sret_nested_record,
+    "struct in { char c; int v; }; struct out { char pad; struct in i; }; struct out mk(int n) { struct out r; r.pad = 1; r.i.c = 2; r.i.v = n; return r; } int get(struct out o) { return o.pad + o.i.c + o.i.v; } int main(void) { return get(mk(39)); }",
+    42
+);
+exits!(
+    abi_sret_unprototyped_call,
+    "struct big { int a; int b; int c; int d; int e; }; struct big mk(); int main(void) { struct big v; v = mk(21); return v.a + v.e; } struct big mk(n) int n; { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; }",
+    42
+);
+exits!(
+    abi_byval_unprototyped_call,
+    "struct big { int a; int b; int c; int d; int e; }; int sum(); int main(void) { struct big v; v.a = 40; v.b = v.c = v.d = 0; v.e = 2; return sum(v); } int sum(v) struct big v; { return v.a + v.b + v.c + v.d + v.e; }",
+    42
+);
+emits!(
+    sret_unprototyped_declare,
+    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(); int main(void) { return gmk(42).a; }",
+    "declare void @gmk(ptr sret(%struct.big) align 4, ...)"
+);
+emits!(
+    sret_unprototyped_call,
+    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(); int main(void) { return gmk(42).a; }",
+    "call void (ptr, ...) @gmk(ptr sret(%struct.big) align 4 %"
+);
+emits!(
+    byval_unprototyped_call,
+    "struct big { int a; int b; int c; int d; int e; }; int gsum(); int main(void) { struct big v; v.a = 42; return gsum(v); }",
+    "call i32 (...) @gsum(ptr byval(%struct.big) align 4 %"
+);
+emits!(
+    sret_variadic_declare,
+    "struct big { int a; int b; int c; int d; int e; }; struct big gfmt(int n, ...); int main(void) { return gfmt(42, 1).a; }",
+    "declare void @gfmt(ptr sret(%struct.big) align 4, i32, ...)"
+);
+emits!(
+    sret_falls_off_end_returns_void,
+    "struct big { int a; int b; int c; int d; int e; }; struct big mk(void) { } int main(void) { struct big v; v = mk(); return 42; }",
+    "  ret void\n}"
+);
+emits!(
+    byval_param_is_not_spilled,
+    "struct big { int a; int b; int c; int d; int e; }; int sum(struct big v) { return v.a; } int main(void) { struct big v; v.a = 42; return sum(v); }",
+    "define i32 @sum(ptr byval(%struct.big) align 4 %0) {\n  %2 = getelementptr inbounds i8, ptr %0, i32 0"
+);
+emits!(
+    sret_return_memcpy_into_hidden_pointer,
+    "struct big { int a; int b; int c; int d; int e; }; struct big mk(void) { struct big r; r.a = 42; return r; } int main(void) { return mk().a; }",
+    "call void @llvm.memcpy.p0.p0.i32(ptr align 4 %0, ptr align 4 %"
+);
+exits_linked!(
+    abi_unprototyped_sret_from_gcc,
+    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(); int gsum(); int main(void) { struct big v; v = gmk(21); return gsum(v); }",
+    BIG_HELPER,
+    42
+);
+exits_linked!(
+    abi_byval_param_forwarded_to_gcc,
+    "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int fwd(struct big v) { return gsum(v); } int main(void) { struct big v; v.a = 40; v.b = v.c = v.d = 0; v.e = 2; return fwd(v); }",
+    BIG_HELPER,
+    42
+);
+exits_linked!(
+    abi_sret_forwarded_from_gcc,
+    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); struct big fwd(int n) { return gmk(n); } int gsum(struct big v); int main(void) { return gsum(fwd(21)); }",
+    BIG_HELPER,
     42
 );

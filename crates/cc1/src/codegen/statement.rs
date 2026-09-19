@@ -146,12 +146,7 @@ impl<W: Write> Generator<W> {
 
     pub fn emit_jump_statement(&mut self, id: StatementId, node: &JumpStatementNode) -> Result<(), Diagnostic> {
         match &node.stmt {
-            JumpStatement::Return(Some(e)) => {
-                let qty = sema().expressions[e.id].casted_ty();
-                let v = self.emit_expression(e)?;
-                let v = self.emit_load_aggregate(v, qty);
-                self.builder.ret(v);
-            }
+            JumpStatement::Return(Some(e)) => self.return_(e)?,
             JumpStatement::Return(None) => self.builder.ret_void(),
             JumpStatement::Break => {
                 let &ResolvedStatement::Break(target) = &sema().statements[id] else {
@@ -166,6 +161,21 @@ impl<W: Write> Generator<W> {
                 self.builder.br(LlvmName::ContinueLabel(target));
             }
             JumpStatement::Goto(a) => self.builder.br(LlvmName::NamedLabel(a.id)),
+        }
+        Ok(())
+    }
+
+    fn return_(&mut self, node: &ExpressionNode) -> Result<(), Diagnostic> {
+        let qty = sema().expressions[node.id].casted_ty();
+        match self.locals.sret {
+            Some(dst) => {
+                self.emit_copy_aggregate(dst, node, qty)?;
+                self.builder.ret_void();
+            }
+            None => {
+                let v = self.emit_expression(node)?;
+                self.builder.ret(v);
+            }
         }
         Ok(())
     }

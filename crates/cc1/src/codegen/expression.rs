@@ -2,7 +2,10 @@ use std::cmp::Ordering;
 use std::io::Write;
 
 use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, UnaryOp};
-use crate::codegen::{BitField, Generator, Invariant, LlvmOperator, LlvmSymbol, LlvmType};
+use crate::codegen::{
+    BitField, Generator, Invariant, LlvmOperator, LlvmParam, LlvmSymbol, LlvmType, ParamAttr, ReturnAttr,
+    classify_param,
+};
 use crate::context::ctx;
 use crate::semantic::{
     CastKind, Diagnostic, ImplicitCast, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId, ValueCategory,
@@ -434,28 +437,29 @@ impl<W: Write> Generator<W> {
         let ResolvedType::Function { ret, .. } = qty.id.resolve() else {
             return Err(Diagnostic::Invariant("call of non-function"));
         };
+        let ret_attr = ReturnAttr::classify_return(*ret);
         let f = self.emit_expression(f)?;
-        let params = args.iter().map(|e| self.emit_argument(e)).collect::<Result<Vec<_>, Diagnostic>>()?;
-        let v = self.builder.call(fty, ret.llvm(), f, params.as_slice());
-        if !ret.is_record(sema()) {
-            return Ok(v);
+        let mut params: Vec<LlvmParam> = vec![];
+
+        if let ReturnAttr::Sret { ty, align } = ret_attr {
+            let slot = self.locals.spill(node.id);
+            params.push(LlvmParam { sym: slot, attr: ParamAttr::SRet { ty, align } })
         }
-        let slot = self.locals.spill(node.id);
-        self.builder.store(v, slot);
-        Ok(slot)
+        for e in args {
+            params.push(self.emit_argument(e)?);
+        }
+        let v = self.builder.call(fty, ret_attr, f, params.as_slice());
+        match ret_attr {
+            ReturnAttr::Void | ReturnAttr::Direct(_) => Ok(v),
+            ReturnAttr::Sret { .. } => Ok(self.locals.spill(node.id)),
+        }
     }
 
-    fn emit_argument(&mut self, e: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
+    fn emit_argument(&mut self, e: &ExpressionNode) -> Result<LlvmParam, Diagnostic> {
         let qty = sema().expressions[e.id].casted_ty();
         let v = self.emit_expression(e)?;
-        Ok(self.emit_load_aggregate(v, qty))
-    }
-
-    pub fn emit_load_aggregate(&mut self, v: LlvmSymbol, qty: QualifiedType) -> LlvmSymbol {
-        match qty.is_record(sema()) {
-            true => self.builder.load(qty.llvm(), v),
-            false => v,
-        }
+        let (_, attr) = classify_param(qty);
+        Ok(LlvmParam::new(v, attr))
     }
 
     fn array_subscript(&mut self, array: &ExpressionNode, idx: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {

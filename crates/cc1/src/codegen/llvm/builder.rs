@@ -3,9 +3,11 @@ use std::io::Write;
 use std::iter::once;
 
 use crate::ast::{StringConstant, Tag};
-use crate::codegen::{LlvmInit, LlvmName, LlvmSymbol, LlvmType, struct_elements};
+use crate::codegen::{
+    LlvmInit, LlvmName, LlvmParam, LlvmSymbol, LlvmType, ParamAttr, ReturnAttr, classify_param, struct_elements,
+};
 use crate::semantic::{
-    DefinitionState, Initializer, Linkage, ParamTypes, QualifiedType, ResolvedType, SymbolId, TagDef, TagDefId, sema,
+    DefinitionState, Initializer, Linkage, QualifiedType, ResolvedType, SymbolId, TagDef, TagDefId, sema,
 };
 use crate::target::Layout;
 
@@ -66,39 +68,36 @@ impl<W: Write> Builder<W> {
         self.write_str("\n");
     }
 
-    pub fn define_function(&mut self, sym_id: SymbolId, params: &[LlvmSymbol], is_variadic: bool) {
+    pub fn define_function(&mut self, sym_id: SymbolId, params: &[LlvmParam], is_variadic: bool) {
         let ResolvedType::Function { ret, .. } = sym_id.resolve().ty.id.resolve() else {
             unreachable!("define on a non-function")
         };
+        let ret_attr = ReturnAttr::classify_return(*ret);
         self.blank();
         self.reset(params.len());
-        self.write_fmt(format_args!("define {} {}", ret.llvm(), LlvmName::Global(sym_id)));
+        self.write_fmt(format_args!("define {} {}", ret_attr.ret_llvm(), LlvmName::Global(sym_id)));
         self.params(params, is_variadic);
         self.write_line(format_args!(" {{"));
     }
 
-    fn params(&mut self, params: &[LlvmSymbol], is_variadic: bool) {
-        let mut it = params.iter().peekable();
+    fn params(&mut self, params: &[LlvmParam], is_variadic: bool) {
         self.write_str("(");
-        while let Some(param) = it.next() {
-            self.write_fmt(format_args!("{param}"));
-            if it.peek().is_some() {
-                self.write_str(", ");
-            }
+        for (i, param) in params.iter().enumerate() {
+            self.write_fmt(format_args!("{}{param}", if i == 0 { "" } else { ", " }));
         }
         if is_variadic {
-            self.write_str(", ...");
+            self.write_fmt(format_args!("{}...", if params.is_empty() { "" } else { ", " }));
         }
         self.write_str(")");
     }
 
     pub fn end_function(&mut self, f: SymbolId) {
-        let sym = f.resolve();
         if !self.has_block_ret {
-            let ResolvedType::Function { ret, .. } = sym.ty.id.resolve() else { unreachable!() };
-            match ret.is_void(sema()) {
-                true => self.ret_void(),
-                false => self.ret(LlvmSymbol::zero(*ret)),
+            let sym = f.resolve();
+            let &ResolvedType::Function { ret, .. } = sym.ty.id.resolve() else { unreachable!() };
+            match ReturnAttr::classify_return(ret) {
+                ReturnAttr::Void | ReturnAttr::Sret { .. } => self.ret_void(),
+                ReturnAttr::Direct(_) => self.ret(LlvmSymbol::zero(ret)),
             }
         }
         let _ = self.w.write_all(b"}\n");
@@ -185,21 +184,21 @@ impl<W: Write> Builder<W> {
         LlvmSymbol::new(s1.ty, r)
     }
 
-    pub fn call(&mut self, fty: LlvmType, ret: LlvmType, f: LlvmSymbol, params: &[LlvmSymbol]) -> LlvmSymbol {
-        match ret.is_void() {
-            true => self.call_void(fty, f.name, params),
-            false => self.call_ret(fty, ret, f.name, params),
+    pub fn call(&mut self, fty: LlvmType, ret_attr: ReturnAttr, f: LlvmSymbol, params: &[LlvmParam]) -> LlvmSymbol {
+        match ret_attr {
+            ReturnAttr::Void | ReturnAttr::Sret { .. } => self.call_void(fty, f.name, params),
+            ReturnAttr::Direct(ty) => self.call_ret(fty, ty, f.name, params),
         }
     }
 
-    fn call_void(&mut self, fty: LlvmType, f_name: LlvmName, params: &[LlvmSymbol]) -> LlvmSymbol {
+    fn call_void(&mut self, fty: LlvmType, f_name: LlvmName, params: &[LlvmParam]) -> LlvmSymbol {
         self.write_fmt(format_args!("  call {fty} {f_name}"));
         self.params(params, false);
         self.blank();
         LlvmSymbol::void()
     }
 
-    fn call_ret(&mut self, fty: LlvmType, ret: LlvmType, f_name: LlvmName, params: &[LlvmSymbol]) -> LlvmSymbol {
+    fn call_ret(&mut self, fty: LlvmType, ret: LlvmType, f_name: LlvmName, params: &[LlvmParam]) -> LlvmSymbol {
         let r = self.fresh();
         self.write_fmt(format_args!("  {r} = call {fty} {f_name}"));
         self.params(params, false);
@@ -279,23 +278,21 @@ impl<W: Write> Builder<W> {
         let ResolvedType::Function { ret, params } = sym.ty.id.resolve() else {
             unreachable!("declare on a non-function")
         };
-        self.write_fmt(format_args!("declare {} {}(", ret.llvm(), LlvmName::Global(sym_id)));
-        match params {
-            ParamTypes::Unspecified => self.write_str("..."),
-            ParamTypes::Prototype { params, is_variadic } => {
-                let mut it = params.iter().peekable();
-                while let Some(param) = it.next() {
-                    self.write_fmt(format_args!("{}", param.llvm()));
-                    if it.peek().is_some() {
-                        self.write_str(", ");
-                    }
-                }
-                if *is_variadic {
-                    self.write_str(if params.is_empty() { "..." } else { ", ..." });
-                }
-            }
-        }
-        self.write_line(format_args!(")"));
+        let ret_attr = ReturnAttr::classify_return(*ret);
+        let args = ret_attr
+            .params(
+                params,
+                |&ty, &align| LlvmParam::unnamed(LlvmType::Ptr, ParamAttr::SRet { ty, align }),
+                |p| {
+                    let (ty, attr) = classify_param(*p);
+                    LlvmParam::unnamed(ty, attr)
+                },
+            )
+            .collect::<Vec<_>>();
+
+        self.write_fmt(format_args!("declare {} {}", ret_attr.ret_llvm(), LlvmName::Global(sym_id)));
+        self.params(args.as_slice(), params.is_variadic());
+        self.blank();
     }
 
     pub fn define_global(&mut self, sym_id: SymbolId) {

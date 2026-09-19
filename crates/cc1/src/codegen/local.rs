@@ -6,7 +6,7 @@ use std::vec::IntoIter;
 
 use crate::ast::visit::{walk_expression, walk_init_declarator};
 use crate::ast::{Expression, ExpressionId, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, Visitor};
-use crate::codegen::{Builder, LlvmName, LlvmSymbol, LlvmType};
+use crate::codegen::{Builder, LlvmName, LlvmParam, LlvmSymbol, LlvmType, ParamAttr, ReturnAttr, classify_param};
 use crate::semantic::{DeclaredParams, Duration, FunctionHeader, SymbolId, sema};
 
 #[derive(Debug, Default)]
@@ -16,7 +16,8 @@ pub struct Locals {
     spills: HashMap<ExpressionId, LlvmSymbol>,
     spill_order: Vec<(ExpressionId, LlvmType)>,
     header: FunctionHeader,
-    pub params: Vec<LlvmSymbol>,
+    pub params: Vec<LlvmParam>,
+    pub sret: Option<LlvmSymbol>,
 }
 
 impl Index<SymbolId> for Locals {
@@ -46,6 +47,7 @@ impl Locals {
         self.spills.clear();
         self.spill_order.clear();
         self.params.clear();
+        self.sret = None;
     }
 
     pub fn collect_locals(&mut self, node: &FunctionDefinitionNode) {
@@ -56,10 +58,24 @@ impl Locals {
     pub fn collect_params(&mut self, node: &FunctionDefinitionNode) {
         self.clear();
         self.header = sema().headers[&node.declarator.id].clone();
-        for (i, param) in self.header.id.resolve().params.iter().enumerate() {
-            self.order.push(*param);
-            let v = LlvmSymbol::new(param.resolve().ty.llvm(), LlvmName::SSA(i));
-            self.params.push(v);
+        let def = self.header.id.resolve();
+        let mut next = 0;
+
+        if let ReturnAttr::Sret { ty, align } = ReturnAttr::classify_return(def.return_ty) {
+            next = 1;
+            let slot = LlvmSymbol::ptr(LlvmName::SSA(0));
+            self.sret = Some(slot);
+            self.params.push(LlvmParam::new(slot, ParamAttr::SRet { ty, align }));
+        }
+        for &sym in &def.params {
+            self.order.push(sym);
+            let (ty, attr) = classify_param(sym.resolve().ty);
+            let v = LlvmSymbol::new(ty, LlvmName::SSA(next));
+            if matches!(attr, ParamAttr::ByVal { .. }) {
+                self.symbols.insert(sym, v);
+            }
+            self.params.push(LlvmParam::new(v, attr));
+            next += 1;
         }
     }
 
@@ -67,7 +83,7 @@ impl Locals {
         self.visit_compound_statement(&node.body);
     }
 
-    pub fn params(&self) -> &[LlvmSymbol] {
+    pub fn params(&self) -> &[LlvmParam] {
         &self.params
     }
 
@@ -77,6 +93,9 @@ impl Locals {
 
     pub fn emit_decl<W: Write>(&mut self, builder: &mut Builder<W>) {
         for id in &self.order {
+            if self.symbols.contains_key(id) {
+                continue;
+            }
             let qty = id.resolve().ty;
             let slot = builder.alloca(qty.llvm());
             self.symbols.insert(*id, slot);
@@ -87,9 +106,12 @@ impl Locals {
             self.spills.insert(*id, slot);
         }
 
-        for (param, id) in iter::zip(&self.params, &self.order) {
-            let local = self.symbols[id];
-            builder.store(*param, local);
+        let params = self.params.iter().skip(self.sret.is_some() as usize);
+        for (param, id) in iter::zip(params, &self.order) {
+            if let ParamAttr::Direct = param.attr {
+                let local = self.symbols[id];
+                builder.store(param.sym, local);
+            }
         }
     }
 }

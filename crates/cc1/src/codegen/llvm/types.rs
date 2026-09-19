@@ -1,8 +1,9 @@
 use std::fmt;
 
 use crate::ast::{ConstValue, Tag};
+use crate::codegen::{ReturnAttr, classify_param};
 use crate::context::ctx;
-use crate::semantic::{ParamTypes, QualifiedType, ResolvedType, ResolvedTypeId, TagDefId, sema};
+use crate::semantic::{QualifiedType, ResolvedType, ResolvedTypeId, TagDefId, sema};
 
 impl ResolvedTypeId {
     pub fn llvm(&self) -> LlvmType {
@@ -163,20 +164,17 @@ fn function_type(f: &mut fmt::Formatter<'_>, id: ResolvedTypeId) -> fmt::Result 
     let ResolvedType::Function { ret, params } = id.resolve() else {
         unreachable!("LlvmType::Function on a non-function")
     };
-    write!(f, "{} (", ret.llvm())?;
-    match params {
-        ParamTypes::Unspecified => write!(f, "...")?,
-        ParamTypes::Prototype { params, is_variadic } => {
-            for (i, p) in params.iter().enumerate() {
-                if i != 0 {
-                    write!(f, ", ")?;
-                }
-                write!(f, "{}", p.llvm())?;
-            }
-            if *is_variadic {
-                write!(f, "{}", if params.is_empty() { "..." } else { ", ..." })?;
-            }
-        }
+    let ret_attr = ReturnAttr::classify_return(*ret);
+
+    let mut has_param = false;
+
+    write!(f, "{} (", ret_attr.ret_llvm())?;
+    for p in ret_attr.params(params, |_, _| LlvmType::Ptr, |&p| classify_param(p).0) {
+        write!(f, "{}{p}", if has_param { ", " } else { "" })?;
+        has_param = true;
+    }
+    if params.is_variadic() {
+        write!(f, "{}", if has_param { ", ..." } else { "..." })?;
     }
     write!(f, ")")
 }
