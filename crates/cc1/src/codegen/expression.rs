@@ -4,7 +4,9 @@ use std::io::Write;
 use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, UnaryOp};
 use crate::codegen::{BitField, Generator, Invariant, LlvmOperator, LlvmSymbol, LlvmType};
 use crate::context::ctx;
-use crate::semantic::{CastKind, Diagnosis, ImplicitCast, QualifiedType, ResolvedType, ResolvedTypeId, sema};
+use crate::semantic::{
+    CastKind, Diagnosis, ExpressionKind, ImplicitCast, QualifiedType, ResolvedType, ResolvedTypeId, sema,
+};
 
 impl<W: Write> Generator<W> {
     pub fn emit_expression(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
@@ -423,13 +425,33 @@ impl<W: Write> Generator<W> {
         let tag = self.emit_expression(tag_node)?;
         let ty = re.ty.id;
         match ty.resolve() {
-            ResolvedType::Tag(_) => self._member(node, tag, ty),
-            ResolvedType::Pointer(qty) => self._member(node, tag, qty.id),
+            ResolvedType::Pointer(qty) => self.get_member(node, tag, qty.id),
+            ResolvedType::Tag(_) if re.kind == ExpressionKind::LValue => self.get_member(node, tag, ty),
+            ResolvedType::Tag(_) => self.get_r_member(node, tag, ty),
             _ => unreachable!(),
         }
     }
 
-    fn _member(&mut self, node: &ExpressionNode, tag: LlvmSymbol, ty: ResolvedTypeId) -> Result<LlvmSymbol, Diagnosis> {
+    fn get_r_member(
+        &mut self,
+        node: &ExpressionNode,
+        value: LlvmSymbol,
+        ty: ResolvedTypeId,
+    ) -> Result<LlvmSymbol, Diagnosis> {
+        let slot = self.locals.spill(node.id);
+        self.b.store(value, slot);
+        let place = self.get_member(node, slot, ty)?;
+        let qty = sema().expr_types[node.id].ty;
+        let bf = Self::bitfield_of(node);
+        Ok(self.load_place(place, qty, bf.as_ref()))
+    }
+
+    fn get_member(
+        &mut self,
+        node: &ExpressionNode,
+        tag: LlvmSymbol,
+        ty: ResolvedTypeId,
+    ) -> Result<LlvmSymbol, Diagnosis> {
         let ResolvedType::Tag(tag_id) = ty.resolve() else { unreachable!() };
         let tagdef = tag_id.resolve();
         let member_idx = sema().member_refs[node.id].index;

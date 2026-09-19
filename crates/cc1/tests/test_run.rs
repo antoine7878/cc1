@@ -640,3 +640,82 @@ exits!(
     "struct s { char c; long double d; int n; }; int main(void) { struct s v = {2, 1.5L, 40}; return v.c + v.n + (int) v.d - 1; }",
     42
 );
+
+/* 14a. member access on rvalue aggregate */
+exits!(
+    struct_member_of_call_result,
+    "struct s { int a; char c; }; struct s mk(void) { struct s v; v.a = 40; v.c = 2; return v; } int main(void) { return mk().a + mk().c; }",
+    42
+);
+exits!(
+    bitfield_member_of_call_result,
+    "struct s { int a : 3; int b : 5; }; struct s v = {-1, 15}; struct s mk(void) { return v; } int main(void) { return mk().b + mk().a + 28; }",
+    42
+);
+exits!(
+    nested_member_of_call_result,
+    "struct in { int x; int y; }; struct s { char c; struct in i; }; struct s v = {1, {40, 2}}; struct s mk(void) { return v; } int main(void) { return mk().i.x + mk().i.y; }",
+    42
+);
+exits!(
+    member_of_assignment_result,
+    "struct s { int a; int b; }; struct s v = {40, 2}; struct s w; int main(void) { return (w = v).a + (w = v).b; }",
+    42
+);
+exits!(
+    member_of_call_result_in_loop,
+    "struct s { int a; }; struct s mk(int n) { struct s v; v.a = n; return v; } int main(void) { int i; int s; s = 0; for (i = 0; i < 1000; i++) s += mk(i).a; return s % 1000 + 42 - 500; }",
+    42
+);
+exits!(
+    member_of_call_result_in_loop_does_not_grow_stack,
+    "struct s { int a; char pad[4092]; }; struct s mk(int n) { struct s v; v.a = n; return v; } int main(void) { int i; int s; s = 0; for (i = 0; i < 4096; i++) s += mk(i).a; return s % 1000 + 42 - 560; }",
+    42
+);
+
+/* 14. aggregate copies */
+exits!(
+    struct_assign_copies_all_members,
+    "struct s { char c; int a; }; int main(void) { struct s v; struct s w; v.c = 2; v.a = 40; w = v; v.a = 0; return w.c + w.a; }",
+    42
+);
+exits!(
+    struct_init_from_value_is_a_copy,
+    "struct s { char c; int a; }; int main(void) { struct s v; v.c = 2; v.a = 40; { struct s w = v; v.c = 0; return w.c + w.a; } }",
+    42
+);
+exits!(
+    struct_assign_through_pointer_deref,
+    "struct s { double d; char c; }; struct s *p(struct s *v) { return v; } int main(void) { struct s v; struct s w; v.d = 1.5; v.c = 39; w = *p(&v); return (int) (w.d * 2) + w.c; }",
+    42
+);
+exits!(
+    struct_copy_by_value_param_and_return,
+    "struct s { int a; char c; long l; }; struct s cp(struct s v) { struct s w; w = v; return w; } int main(void) { struct s v; struct s r; v.a = 40; v.c = 2; v.l = 7; r = cp(v); return r.a + r.c; }",
+    42
+);
+exits!(
+    struct_copy_global_to_local,
+    "struct s { char c[3]; }; struct s g; struct s cp(struct s v) { return v; } int main(void) { struct s l; g.c[0] = 40; g.c[2] = 2; l = cp(g); return l.c[0] + l.c[1] + l.c[2]; }",
+    42
+);
+exits!(
+    union_assign_keeps_alternate_member,
+    "union u { int i; char c[8]; }; int main(void) { union u a; union u b; a.i = 1; a.c[5] = 42; b = a; return b.c[5]; }",
+    42
+);
+exits!(
+    union_assign_keeps_bytes_past_first_member,
+    "struct s { int a; char c; long l; }; union u { int i; char c[8]; }; int main(void) { struct s v; struct s w; union u a; union u b; v.a = 40; v.c = 2; v.l = 7; w = v; a.c[5] = 9; a.c[1] = 33; b = a; return w.a + w.c + b.c[5] + b.c[1] - 42; }",
+    42
+);
+exits!(
+    union_return_keeps_alternate_member,
+    "union u { char c[3]; short s; }; union u mk(void) { union u v; v.c[0] = 1; v.c[1] = 2; v.c[2] = 39; return v; } int main(void) { union u w; w = mk(); return w.c[0] + w.c[1] + w.c[2]; }",
+    42
+);
+exits!(
+    struct_and_union_copies_todo_14,
+    "struct s { int a; char c; long l; }; union u { int i; char c[8]; }; struct s cp(struct s v) { struct s w; w = v; return w; } int main(void) { struct s v; union u a; union u b; v.a = 40; v.c = 2; v.l = 7; a.c[5] = 9; b = a; return cp(v).a + cp(v).c + b.c[5] - 9; }",
+    42
+);

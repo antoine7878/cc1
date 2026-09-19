@@ -4,15 +4,19 @@ use std::iter;
 use std::ops::Index;
 use std::vec::IntoIter;
 
-use crate::ast::visit::walk_init_declarator;
-use crate::ast::{FunctionDefinitionNode, InitDeclaratorNode, Visitor};
-use crate::codegen::{Builder, LlvmName, LlvmSymbol};
-use crate::semantic::{DeclaredParams, Duration, FunctionHeader, SymbolId, sema};
+use crate::ast::visit::{walk_expression, walk_init_declarator};
+use crate::ast::{
+    Expression, ExpressionId, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, MemberOp, Visitor,
+};
+use crate::codegen::{Builder, LlvmName, LlvmSymbol, LlvmType};
+use crate::semantic::{DeclaredParams, Duration, ExpressionKind, FunctionHeader, SymbolId, sema};
 
 #[derive(Debug, Default)]
 pub struct Locals {
     map: HashMap<SymbolId, LlvmSymbol>,
     pub order: Vec<SymbolId>,
+    spills: HashMap<ExpressionId, LlvmSymbol>,
+    spill_order: Vec<(ExpressionId, LlvmType)>,
     f: FunctionHeader,
     pub parameters: Vec<LlvmSymbol>,
 }
@@ -34,9 +38,15 @@ impl Locals {
         self.order.clone().into_iter()
     }
 
+    pub fn spill(&self, id: ExpressionId) -> LlvmSymbol {
+        self.spills[&id]
+    }
+
     fn clear(&mut self) {
         self.map.clear();
         self.order.clear();
+        self.spills.clear();
+        self.spill_order.clear();
         self.parameters.clear();
     }
 
@@ -74,6 +84,11 @@ impl Locals {
             self.map.insert(*id, slot);
         }
 
+        for (id, ty) in &self.spill_order {
+            let slot = b.alloca(*ty);
+            self.spills.insert(*id, slot);
+        }
+
         for (param, id) in iter::zip(&self.parameters, &self.order) {
             let local = self.map[id];
             b.store(*param, local);
@@ -90,5 +105,15 @@ impl Visitor for Locals {
             return;
         }
         self.order.push(sym_id);
+    }
+
+    fn visit_expression(&mut self, node: &ExpressionNode) {
+        walk_expression(self, node);
+        let Expression::Member(MemberOp::Dot, base, _) = node.id.resolve() else { return };
+        let Some(re) = sema().expr_types.get(base.id) else { return };
+        if re.kind != ExpressionKind::RValue {
+            return;
+        }
+        self.spill_order.push((node.id, re.ty.llvm()));
     }
 }
