@@ -18,7 +18,7 @@ impl<Id: ArenaKey, Val> Default for Interner<Id, Val> {
 }
 
 impl<Id: ArenaKey, Val: Clone + Hash + Eq> Interner<Id, Val> {
-    pub fn alloc(&mut self, value: Val) -> Id {
+    pub fn intern(&mut self, value: Val) -> Id {
         if let Some(&id) = self.canonical.get(&value) {
             return id;
         }

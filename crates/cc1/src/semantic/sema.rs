@@ -3,14 +3,15 @@ use std::collections::HashMap;
 
 use libft::Span;
 
-use crate::arena::{Global, Has, HasMut, HasTable, Owned, SideTable};
+use crate::arena::{Has, HasMut, HasTable, Installed, Owned, SideTable};
 use crate::ast::statement::StatementId;
-use crate::ast::{AstArenas, ConstValue, DeclaratorId, ExpressionId, StringId};
+use crate::ast::{AstArenas, ConstValue, DeclaratorId, ExpressionId, NameId};
 use crate::semantic::declaration::FunctionHeader;
 use crate::semantic::{
-    Builtins, Definition, Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDef, FunctionDefArena, FunctionDefId,
-    Initializer, InitializerArena, InitializerId, Linkage, MemberRef, ResolvedExpression, ResolvedStatement,
-    ResolvedType, ResolvedTypeArena, ResolvedTypeId, Symbol, SymbolArena, SymbolId, TagDef, TagDefArena, TagDefId,
+    Builtins, DefinitionState, Diag, Diagnostic, DiagnosticNode, DiagnosticSink, FunctionDef, FunctionDefArena,
+    FunctionDefId, Initializer, InitializerArena, InitializerId, Linkage, MemberRef, ResolvedExpression,
+    ResolvedStatement, ResolvedType, ResolvedTypeId, ResolvedTypeInterner, Symbol, SymbolArena, SymbolId, TagDef,
+    TagDefArena, TagDefId,
 };
 use crate::target::{Layout, Target};
 
@@ -25,7 +26,7 @@ thread_local! {
     static SEMA: Cell<Option<&'static Sema>> = const { Cell::new(None) };
 }
 
-pub fn install(sema: Sema) -> &'static Sema {
+pub fn install_sema(sema: Sema) -> &'static Sema {
     let sema = Box::leak(Box::new(sema));
     SEMA.set(Some(sema));
     sema
@@ -37,24 +38,24 @@ pub fn sema() -> &'static Sema {
 
 #[derive(Debug)]
 pub struct Sema {
-    pub diagnosis: Vec<DiagnosisNode>,
+    pub diagnostics: Vec<DiagnosticNode>,
 
     pub symbols: SymbolArena,
-    pub types: ResolvedTypeArena,
+    pub types: ResolvedTypeInterner,
     pub builtins: Builtins,
     pub tags: TagDefArena,
     pub functions: FunctionDefArena,
-    pub inits: InitializerArena,
+    pub initializers: InitializerArena,
 
-    pub expr_types: SideTable<ExpressionId, ResolvedExpression>,
+    pub expressions: SideTable<ExpressionId, ResolvedExpression>,
     pub expr_bindings: SideTable<ExpressionId, SymbolId>,
     pub expr_consts: SideTable<ExpressionId, ConstValue>,
     pub member_refs: SideTable<ExpressionId, MemberRef>,
     pub declarations: HashMap<DeclaratorId, SymbolId>,
-    pub externals: HashMap<StringId, External>,
-    pub stmts: SideTable<StatementId, ResolvedStatement>,
+    pub externals: HashMap<NameId, External>,
+    pub statements: SideTable<StatementId, ResolvedStatement>,
 
-    pub function_defs: HashMap<DeclaratorId, FunctionHeader>,
+    pub headers: HashMap<DeclaratorId, FunctionHeader>,
     pub layouts: HashMap<ResolvedTypeId, Layout>,
     pub target: Target,
 }
@@ -67,25 +68,25 @@ impl Default for Sema {
 
 impl Sema {
     pub fn new(target: Target) -> Self {
-        let mut types = ResolvedTypeArena::default();
+        let mut types = ResolvedTypeInterner::default();
         let builtins = Builtins::new(&mut types, &target);
 
         Self {
-            diagnosis: Vec::new(),
+            diagnostics: Vec::new(),
             symbols: SymbolArena::default(),
             types,
             builtins,
             tags: TagDefArena::default(),
             functions: FunctionDefArena::default(),
-            inits: InitializerArena::default(),
+            initializers: InitializerArena::default(),
 
-            expr_types: SideTable::default(),
+            expressions: SideTable::default(),
             expr_bindings: SideTable::default(),
             expr_consts: SideTable::default(),
             member_refs: SideTable::default(),
-            stmts: SideTable::default(),
+            statements: SideTable::default(),
 
-            function_defs: HashMap::default(),
+            headers: HashMap::default(),
             declarations: HashMap::default(),
             externals: HashMap::default(),
 
@@ -95,8 +96,8 @@ impl Sema {
     }
 }
 
-impl Global for Sema {
-    fn global() -> &'static Self {
+impl Installed for Sema {
+    fn installed() -> &'static Self {
         sema()
     }
 }
@@ -161,13 +162,13 @@ impl Owned for FunctionDef {
 
 impl Has<Initializer> for Sema {
     fn get(&self, id: InitializerId) -> &Initializer {
-        self.inits.get(id)
+        self.initializers.get(id)
     }
 }
 
 impl HasMut<Initializer> for Sema {
     fn get_mut(&mut self, id: InitializerId) -> &mut Initializer {
-        self.inits.get_mut(id)
+        self.initializers.get_mut(id)
     }
 }
 
@@ -177,19 +178,19 @@ impl Owned for Initializer {
 
 impl HasTable<StatementId, ResolvedStatement> for Sema {
     fn table(&mut self) -> &mut SideTable<StatementId, ResolvedStatement> {
-        &mut self.stmts
+        &mut self.statements
     }
 }
 
 impl HasTable<ExpressionId, ResolvedExpression> for Sema {
     fn table(&mut self) -> &mut SideTable<ExpressionId, ResolvedExpression> {
-        &mut self.expr_types
+        &mut self.expressions
     }
 }
 
-impl DiagCollector for Sema {
-    fn diagnosis(&mut self) -> &mut Vec<DiagnosisNode> {
-        &mut self.diagnosis
+impl DiagnosticSink for Sema {
+    fn diagnostics(&mut self) -> &mut Vec<DiagnosticNode> {
+        &mut self.diagnostics
     }
 }
 
@@ -198,15 +199,15 @@ impl Sema {
 
     pub fn size_tables(&mut self, arenas: &AstArenas) {
         let len = arenas.expressions.len();
-        self.expr_types.resize(len);
+        self.expressions.resize(len);
         self.expr_bindings.resize(len);
         self.expr_consts.resize(len);
         self.member_refs.resize(len);
-        self.stmts.resize(arenas.statements.len());
+        self.statements.resize(arenas.statements.len());
     }
     // ----- Externals ---------------------
 
-    pub fn linkage_of_name(&self, name: StringId) -> Option<Linkage> {
+    pub fn linkage_of_name(&self, name: NameId) -> Option<Linkage> {
         let id = self.externals.get(&name)?.symbol;
         Some(id.resolve_with(self).linkage)
     }
@@ -220,9 +221,9 @@ impl Sema {
         let Some(entry) = self.externals.get(&name.id) else {
             let id = lexical.unwrap_or_else(|| self.symbols.alloc(sym));
             let (defined, tentative) = match definition {
-                Definition::Definition => (Some(*span), None),
-                Definition::Tentative => (None, Some(*span)),
-                Definition::Declaration => (None, None),
+                DefinitionState::Defined => (Some(*span), None),
+                DefinitionState::Tentative => (None, Some(*span)),
+                DefinitionState::Declared => (None, None),
             };
             self.externals.insert(name.id, External { symbol: id, defined, tentative });
             return id;
@@ -231,7 +232,7 @@ impl Sema {
         let entry_linkage = entry_symbol.resolve_with(self).linkage;
 
         if entry_linkage != linkage {
-            self.add_diag(Diag::err((), Diagnosis::ConflictingLinkage(name)), span);
+            self.add_diag(Diag::err((), Diagnostic::ConflictingLinkage(name)), span);
         }
 
         let old_ty = entry_symbol.resolve_with(self).ty;
@@ -244,8 +245,8 @@ impl Sema {
 
         let entry = self.externals.get_mut(&name.id).unwrap();
         match definition {
-            Definition::Definition if entry.defined.is_none() => entry.defined = Some(*span),
-            Definition::Tentative if entry.tentative.is_none() => entry.tentative = Some(*span),
+            DefinitionState::Defined if entry.defined.is_none() => entry.defined = Some(*span),
+            DefinitionState::Tentative if entry.tentative.is_none() => entry.tentative = Some(*span),
             _ => (),
         }
 
@@ -258,14 +259,14 @@ impl Sema {
     }
 }
 
-fn definition_rank(definition: Definition) -> u8 {
+fn definition_rank(definition: DefinitionState) -> u8 {
     match definition {
-        Definition::Declaration => 0,
-        Definition::Tentative => 1,
-        Definition::Definition => 2,
+        DefinitionState::Declared => 0,
+        DefinitionState::Tentative => 1,
+        DefinitionState::Defined => 2,
     }
 }
 
-fn promote_definition(a: Definition, b: Definition) -> Definition {
+fn promote_definition(a: DefinitionState, b: DefinitionState) -> DefinitionState {
     if definition_rank(b) > definition_rank(a) { b } else { a }
 }

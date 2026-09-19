@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 
-use crate::ast::{DeclarationSpecifier, Name, Storage, StringId};
+use crate::ast::{DeclarationSpecifier, Name, NameId, Storage};
 use crate::parser::YYToken;
 use crate::semantic::SymbolKind;
 
 #[derive(Debug)]
 pub struct ParseState {
-    typedefs: Vec<HashMap<StringId, SymbolKind>>,
+    typedefs: Vec<HashMap<NameId, SymbolKind>>,
     in_typedef: bool,
     in_typedef_stack: Vec<bool>,
     struct_depth: usize,
-    stashed: Option<HashMap<StringId, SymbolKind>>,
+    stashed: Option<HashMap<NameId, SymbolKind>>,
     type_name_id: usize,
     identifier_id: usize,
     type_name_ok: bool,
@@ -51,9 +51,9 @@ impl ParseState {
         }
     }
 
-    pub fn note_specifiers(&mut self, specs: Vec<DeclarationSpecifier>) -> Vec<DeclarationSpecifier> {
-        self.in_typedef = specs.contains(&DeclarationSpecifier::Storage(Storage::Typedef));
-        specs
+    pub fn note_specifiers(&mut self, specifiers: Vec<DeclarationSpecifier>) -> Vec<DeclarationSpecifier> {
+        self.in_typedef = specifiers.contains(&DeclarationSpecifier::Storage(Storage::Typedef));
+        specifiers
     }
 
     pub fn recover_to_file_scope(&mut self) {
@@ -72,7 +72,7 @@ impl ParseState {
         self.struct_depth -= 1;
     }
 
-    pub fn add_symbol(&mut self, id: StringId) {
+    pub fn add_symbol(&mut self, id: NameId) {
         if self.struct_depth > 0 {
             return;
         }
@@ -85,7 +85,7 @@ impl ParseState {
         self.identifier_ok = accepts(self.identifier_id);
     }
 
-    pub fn check_type(&mut self, name: Name) -> YYToken {
+    pub fn classify_identifier(&mut self, name: Name) -> YYToken {
         match (self.type_name_ok, self.identifier_ok) {
             (false, _) => YYToken::IDENTIFIER(name),
             (true, false) => YYToken::TYPE_NAME(name),

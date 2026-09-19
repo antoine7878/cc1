@@ -6,7 +6,7 @@ use crate::ast::escape;
 use crate::semantic::{Builtins, Diag, QualifiedType, ResolvedTypeId, Sema};
 use crate::{ast_node, define_interner};
 
-define_interner!(StringConstant, StringPool, StringConstId);
+define_interner!(StringConstant, StringConstInterner, StringConstId);
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct StringConstant {
@@ -59,13 +59,13 @@ impl StringLiteralNode {
     }
 }
 
-impl StringPool {
+impl StringConstInterner {
     pub fn literal(&mut self, text: &str, span: Span) -> Diag<StringLiteralNode> {
         let is_wide = text.starts_with('L');
         let start = if is_wide { 2 } else { 1 };
-        let Diag { res: units, diagnosis } = escape::decode(&text[start..text.len() - 1], is_wide);
-        let id = self.alloc(StringConstant { units, is_wide });
-        Diag::new(StringLiteralNode::new(id, span), diagnosis)
+        let Diag { res: units, diagnostic } = escape::decode(&text[start..text.len() - 1], is_wide);
+        let id = self.intern(StringConstant { units, is_wide });
+        Diag::new(StringLiteralNode::new(id, span), diagnostic)
     }
 
     pub fn concat(&mut self, lhs: StringLiteralNode, rhs: StringLiteralNode, span: Span) -> StringLiteralNode {
@@ -73,7 +73,7 @@ impl StringPool {
         let tail = self.get(rhs.id).clone();
         let mut units = head.units;
         units.extend(tail.units);
-        let id = self.alloc(StringConstant { units, is_wide: head.is_wide || tail.is_wide });
+        let id = self.intern(StringConstant { units, is_wide: head.is_wide || tail.is_wide });
         StringLiteralNode::new(id, span)
     }
 }

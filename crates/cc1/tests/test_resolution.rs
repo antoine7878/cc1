@@ -1,4 +1,4 @@
-use cc1::semantic::{Diagnosis, FunctionDefId, SymbolKind};
+use cc1::semantic::{Diagnostic, FunctionDefId, SymbolKind};
 
 use crate::common::{Ty, Unit, accepted, folded};
 
@@ -45,7 +45,7 @@ folds!(fold_ternary, "enum E { A = 1 ? 2 : 3, B = 0 ? 2 : 3 };", ["Int(2)", "Int
 folds!(fold_ternary_converts_to_common_type, "enum E { A = 1 ? 2 : 3u };", ["UnsignedInt(2)"]);
 folds!(fold_character_constant, "enum E { A = 'a' };", ["Int(97)"]);
 folds!(fold_overflow_wraps, "enum E { A = 2147483647 + 1 };", ["Int(-2147483648)"]);
-folds!(fold_variant_reference, "enum E { A = 1, B = A + 1 };", ["Int(1)", "Int(2)"]);
+folds!(fold_enumerator_reference, "enum E { A = 1, B = A + 1 };", ["Int(1)", "Int(2)"]);
 // `sizeof` is folded to a constant at typing time (so nested uses see it too), which is why
 // both the `sizeof` node and the constant-expression node wrapping it appear here.
 folds!(fold_sizeof_type, "enum E { A = sizeof(int) };", ["UnsignedInt(4)", "UnsignedInt(4)"]);
@@ -60,7 +60,7 @@ folds!(fold_bit_field_width, "struct S { int a : 2 + 1; };", ["Int(3)"]);
 folds!(fold_array_size, "int a[2 + 3];", ["Int(5)"]);
 folds!(fold_logical_short_circuits, "enum E { A = 1 || 1 / 0, B = 0 && 1 / 0 };", ["Int(1)", "Int(0)"]);
 folds!(fold_cast_of_a_floating_constant, "enum E { A = (int)1.5 };", ["Int(1)"]);
-// gcc: `1L << 31` is -2147483648 on i386, where a long is 32 bits, so it fits an enum variant.
+// gcc: `1L << 31` is -2147483648 on i386, where a long is 32 bits, so it fits an enum enumerator.
 folds!(fold_long_shift_narrows_to_the_target_width, "enum E { A = 1L << 31 };", ["Long(-2147483648)"]);
 
 #[test]
@@ -107,9 +107,9 @@ fn an_identifier_binds_to_a_parameter() {
 }
 
 #[test]
-fn an_identifier_binds_to_an_enumeration_variant() {
+fn an_identifier_binds_to_an_enumerator() {
     let unit = accepted("enum E { A }; int f(void) { return A; }");
-    assert_eq!(unit.symbols()[0].1, "variant");
+    assert_eq!(unit.symbols()[0].1, "enumerator");
     assert_eq!(unit.bindings(), vec![("A".to_string(), Some(0))]);
 }
 
@@ -245,7 +245,7 @@ fn a_function_definition_records_its_parameters_in_order() {
         .functions
         .iter()
         .map(|def| {
-            let parameters: Vec<_> = def.parameters.iter().map(|&id| id.resolve().name.id.resolve().clone()).collect();
+            let parameters: Vec<_> = def.params.iter().map(|&id| id.resolve().name.id.resolve().clone()).collect();
             (def.sym.resolve().name.id.resolve().clone(), parameters)
         })
         .collect();
@@ -264,7 +264,7 @@ fn a_function_definition_records_its_return_type() {
 fn an_old_style_definition_records_its_parameters_in_declarator_order() {
     let unit = accepted("int f(a, b) char b; { return a; }");
     let def = unit.sema.functions.iter().next().expect("function definition");
-    let parameters: Vec<_> = def.parameters.iter().map(|&id| id.resolve().name.id.resolve().clone()).collect();
+    let parameters: Vec<_> = def.params.iter().map(|&id| id.resolve().name.id.resolve().clone()).collect();
     assert_eq!(parameters, ["a", "b"]);
 }
 
@@ -287,28 +287,28 @@ fn symbols_are_recorded_in_declaration_order_with_their_kind() {
 
 // ---- 6.4 a failed constant expression names why it failed ----------------
 
-recover!(array_size_is_not_constant, "int x; int a[x];", [Diagnosis::NonConstantExpression], &[]);
+recover!(array_size_is_not_constant, "int x; int a[x];", [Diagnostic::NonConstantExpression], &[]);
 
 // 6.5.4.2 The expression delimited by [ and ] (which specifies the size of an array) shall be an
 // integral constant expression that has a value greater than zero.
 // gcc: `int a[-1];` is "declared as an array with a negative size", `int a[0];` is rejected under
 // -pedantic-errors as a zero-length array extension.
-recover!(array_size_is_negative, "int a[-1];", [Diagnosis::NegativeArraySize], &[]);
+recover!(array_size_is_negative, "int a[-1];", [Diagnostic::NegativeArraySize], &[]);
 
-recover!(array_size_folds_to_a_negative_value, "int a[1 - 2];", [Diagnosis::NegativeArraySize], &[]);
+recover!(array_size_folds_to_a_negative_value, "int a[1 - 2];", [Diagnostic::NegativeArraySize], &[]);
 
-recover!(array_size_is_zero, "int a[0];", [Diagnosis::ZeroArraySize], &[]);
+recover!(array_size_is_zero, "int a[0];", [Diagnostic::ZeroArraySize], &[]);
 
-recover!(a_member_array_size_is_zero, "struct S { int a[0]; };", [Diagnosis::ZeroArraySize], &[]);
+recover!(a_member_array_size_is_zero, "struct S { int a[0]; };", [Diagnostic::ZeroArraySize], &[]);
 
-recover!(an_inner_array_size_is_zero, "int a[1][0];", [Diagnosis::ZeroArraySize], &[]);
+recover!(an_inner_array_size_is_zero, "int a[1][0];", [Diagnostic::ZeroArraySize], &[]);
 
 // An abstract declarator carries the same constraint; the size it could not take leaves the array
 // incomplete, which is what the sizeof then reports.
 recover!(
     an_abstract_array_size_is_zero,
     "enum E { A = sizeof(int[0]) };",
-    [Diagnosis::ZeroArraySize, Diagnosis::SizeofIncomplete(_)],
+    [Diagnostic::ZeroArraySize, Diagnostic::SizeofIncomplete(_)],
     &[]
 );
 
@@ -317,11 +317,11 @@ recover!(
 recover!(
     a_rejected_array_size_leaves_no_layout_to_compute,
     "int a[-1]; int b = sizeof(a);",
-    [Diagnosis::NegativeArraySize, Diagnosis::SizeofIncomplete(_)],
+    [Diagnostic::NegativeArraySize, Diagnostic::SizeofIncomplete(_)],
     &[]
 );
 
-recover!(array_size_is_not_an_integer, "int a[1.5];", [Diagnosis::NonIntArraySize], &[]);
+recover!(array_size_is_not_an_integer, "int a[1.5];", [Diagnostic::NonIntArraySize], &[]);
 
 // 6.4 An integral constant expression shall only have operands that are integer, enumeration
 // or character constants, sizeof expressions, and floating constants that are the immediate
@@ -359,45 +359,45 @@ value!(
 recover!(
     sizeof_of_an_incomplete_tag,
     "struct S; enum E { A = sizeof(struct S) };",
-    [Diagnosis::SizeofIncomplete(_)],
+    [Diagnostic::SizeofIncomplete(_)],
     &[]
 );
 
-recover!(sizeof_of_void, "enum E { A = sizeof(void) };", [Diagnosis::SizeofVoid], &[]);
+recover!(sizeof_of_void, "enum E { A = sizeof(void) };", [Diagnostic::SizeofVoid], &[]);
 
-recover!(a_division_by_zero_is_not_constant, "enum E { A = 1 / 0 };", [Diagnosis::DivisionByZero], &[]);
+recover!(a_division_by_zero_is_not_constant, "enum E { A = 1 / 0 };", [Diagnostic::DivisionByZero], &[]);
 
-recover!(a_modulo_by_zero_is_not_constant, "enum E { A = 1 % 0 };", [Diagnosis::ModuloByZero], &[]);
+recover!(a_modulo_by_zero_is_not_constant, "enum E { A = 1 % 0 };", [Diagnostic::ModuloByZero], &[]);
 
 // 6.3.5 The result shall be representable in the type of the operands.
 recover!(
     a_quotient_outside_the_type_of_its_operands,
     "enum E { A = (-2147483647 - 1) / -1 };",
-    [Diagnosis::ConstantOverflow],
+    [Diagnostic::ConstantOverflow],
     &[]
 );
 
 // 6.4 A constant expression shall not contain assignment, increment, decrement, function-call,
 // or comma operators, except when they are contained within the operand of a sizeof operator.
-recover!(an_assignment_is_not_constant, "int x; enum E { A = (x = 1) };", [Diagnosis::NonConstantExpression], &[]);
+recover!(an_assignment_is_not_constant, "int x; enum E { A = (x = 1) };", [Diagnostic::NonConstantExpression], &[]);
 
-recover!(a_comma_operator_is_not_constant, "enum E { A = (1, 2) };", [Diagnosis::NonConstantExpression], &[]);
+recover!(a_comma_operator_is_not_constant, "enum E { A = (1, 2) };", [Diagnostic::NonConstantExpression], &[]);
 
-recover!(a_function_call_is_not_constant, "int f(void); enum E { A = f() };", [Diagnosis::NonConstantExpression], &[]);
+recover!(a_function_call_is_not_constant, "int f(void); enum E { A = f() };", [Diagnostic::NonConstantExpression], &[]);
 
-recover!(a_subscript_is_not_constant, "int a[2]; enum E { A = a[0] };", [Diagnosis::NonConstantExpression], &[]);
+recover!(a_subscript_is_not_constant, "int a[2]; enum E { A = a[0] };", [Diagnostic::NonConstantExpression], &[]);
 
 recover!(
     a_string_literal_subscript_is_not_constant,
     "enum E { A = \"abc\"[0] };",
-    [Diagnosis::NonConstantExpression],
+    [Diagnostic::NonConstantExpression],
     &[]
 );
 
 recover!(
     a_member_access_is_not_constant,
     "struct S { int x; } s; enum E { A = s.x };",
-    [Diagnosis::NonConstantExpression],
+    [Diagnostic::NonConstantExpression],
     &[]
 );
 
@@ -406,31 +406,31 @@ recover!(
 recover!(
     a_cast_of_a_floating_expression_is_not_constant,
     "enum E { A = (int)(1.5 + 1) };",
-    [Diagnosis::NonConstantExpression],
+    [Diagnostic::NonConstantExpression],
     &[]
 );
 
 // 6.4 A constant expression shall not contain increment or decrement operators.
-recover!(an_increment_is_not_constant, "int x; enum E { A = ++x };", [Diagnosis::NonConstantExpression], &[]);
+recover!(an_increment_is_not_constant, "int x; enum E { A = ++x };", [Diagnostic::NonConstantExpression], &[]);
 
-recover!(a_decrement_is_not_constant, "int x; enum E { A = x-- };", [Diagnosis::NonConstantExpression], &[]);
+recover!(a_decrement_is_not_constant, "int x; enum E { A = x-- };", [Diagnostic::NonConstantExpression], &[]);
 
 // 6.4 An integral constant expression shall have integral type: an address is not one.
-recover!(an_address_is_not_an_integral_constant, "int x; enum E { A = &x };", [Diagnosis::NonConstantExpression], &[]);
+recover!(an_address_is_not_an_integral_constant, "int x; enum E { A = &x };", [Diagnostic::NonConstantExpression], &[]);
 
-recover!(an_indirection_is_not_constant, "int *p; enum E { A = *p };", [Diagnosis::NonConstantExpression], &[]);
+recover!(an_indirection_is_not_constant, "int *p; enum E { A = *p };", [Diagnostic::NonConstantExpression], &[]);
 
 recover!(
     sizeof_of_a_bit_field,
     "struct S { int a : 3; } s; enum E { A = sizeof s.a };",
-    [Diagnosis::SizeofBitfield],
+    [Diagnostic::SizeofBitfield],
     &[]
 );
 
 recover!(
     cast_to_a_non_scalar_type,
     "struct S { int a; }; enum E { A = (struct S)1 };",
-    [Diagnosis::CastToNonScalar],
+    [Diagnostic::CastToNonScalar],
     &[]
 );
 
@@ -512,19 +512,19 @@ accept!(internal_linkage_tentative_definition, "static int x; void f(void){ x = 
 recover!(
     shift_count_out_of_range_is_a_warning,
     "void f(void){ int i = 1; i = i << 32; }",
-    [Diagnosis::ShiftCountOutOfRange],
+    [Diagnostic::ShiftCountOutOfRange],
     &[]
 );
 recover!(
     shift_count_negative_is_a_warning,
     "void f(void){ int i = 1; i = i << -1; }",
-    [Diagnosis::ShiftCountNegative],
+    [Diagnostic::ShiftCountNegative],
     &[]
 );
 recover!(
     compound_shift_count_out_of_range_is_a_warning,
     "void f(void){ int i = 1; i <<= 33; }",
-    [Diagnosis::ShiftCountOutOfRange],
+    [Diagnostic::ShiftCountOutOfRange],
     &[]
 );
 accept!(shift_count_in_range, "void f(void){ int i = 1; i <<= 31; }");

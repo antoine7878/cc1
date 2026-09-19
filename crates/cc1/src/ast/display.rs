@@ -3,8 +3,9 @@ use std::fmt::Display;
 use libft::{BLUE, RESET};
 
 use crate::ast::{
-    BinaryOp, DeclarationSpecifier, Declarator, Enum, Expression, FunctionParameters, Initializer, IterationStatement,
-    JumpStatement, LabeledStatement, MemberOp, Qualifier, SelectionStatement, Storage, Type, TypeSpecifier, UnaryOp, Variant,
+    BinaryOp, DeclarationSpecifier, Declarator, Enum, Enumerator, Expression, FunctionParameters, Initializer,
+    IterationStatement, JumpStatement, LabeledStatement, MemberOp, Qualifier, SelectionStatement, Storage, TypeName,
+    TypeSpecifier, UnaryOp,
 };
 
 impl Display for UnaryOp {
@@ -147,9 +148,9 @@ impl Display for Initializer {
     }
 }
 
-impl Display for Type {
+impl Display for TypeName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Type")
+        write!(f, "TypeName")
     }
 }
 
@@ -237,8 +238,8 @@ impl Display for Enum {
     }
 }
 
-impl Display for Variant {
+impl Display for Enumerator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{BLUE}Variant{RESET} {}", self.span)
+        write!(f, "{BLUE}Enumerator{RESET} {}", self.span)
     }
 }

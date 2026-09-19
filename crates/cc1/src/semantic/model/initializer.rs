@@ -5,8 +5,8 @@ use crate::ast::visit::Visitor;
 use crate::ast::{ConstValue, Expression, ExpressionNode, InitializerNode, StringConstId, Tag};
 use crate::semantic::resolution::expression;
 use crate::semantic::{
-    AdressOffset, AssignmentContext, Diag, DiagCollector, Diagnosis, Duration, QualifiedType, ResolvedType, Sema,
-    SymbolResolver, TagDefId, address, ice,
+    AddressOffset, AssignmentContext, Diag, Diagnostic, DiagnosticSink, Duration, QualifiedType, ResolvedType,
+    Resolver, Sema, TagDefId, address, fold,
 };
 use crate::{ast, define_arena};
 
@@ -16,7 +16,7 @@ define_arena!(Initializer, InitializerArena, InitializerId);
 pub enum Initializer {
     Zero,
     Value(ConstValue),
-    Address(AdressOffset),
+    Address(AddressOffset),
     String(StringConstId),
     List(Vec<Initializer>),
     Expr(ExpressionNode),
@@ -37,12 +37,7 @@ impl Initializer {
 }
 
 type Cursor<'a> = Peekable<Iter<'a, InitializerNode>>;
-pub fn resolve(
-    resolver: &mut SymbolResolver,
-    ty: QualifiedType,
-    node: &InitializerNode,
-    duration: Duration,
-) -> Initializer {
+pub fn resolve(resolver: &mut Resolver, ty: QualifiedType, node: &InitializerNode, duration: Duration) -> Initializer {
     let constant = duration == Duration::Static;
     match &node.init {
         ast::Initializer::Single(e) => single(resolver, ty, e, constant),
@@ -50,7 +45,7 @@ pub fn resolve(
     }
 }
 
-fn single(resolver: &mut SymbolResolver, ty: QualifiedType, e: &ExpressionNode, constant: bool) -> Initializer {
+fn single(resolver: &mut Resolver, ty: QualifiedType, e: &ExpressionNode, constant: bool) -> Initializer {
     if let Some(init) = string(resolver, ty, e) {
         return init;
     }
@@ -62,17 +57,17 @@ fn single(resolver: &mut SymbolResolver, ty: QualifiedType, e: &ExpressionNode, 
     if !constant {
         return Initializer::Expr(e.clone());
     }
-    if let Some(value) = ice::try_fold(resolver.sema, e) {
+    if let Some(value) = fold::try_fold(resolver.sema, e) {
         return Initializer::Value(value);
     }
-    if let Some(at) = address::fold(resolver.sema, e) {
+    if let Some(at) = address::address_constant(resolver.sema, e) {
         return Initializer::Address(at);
     }
-    resolver.add_diag(Diag::err((), Diagnosis::NonConstantInitializer), &e.span);
+    resolver.add_diag(Diag::err((), Diagnostic::NonConstantInitializer), &e.span);
     Initializer::Zero
 }
 
-fn braced(resolver: &mut SymbolResolver, ty: QualifiedType, items: &[InitializerNode], constant: bool) -> Initializer {
+fn braced(resolver: &mut Resolver, ty: QualifiedType, items: &[InitializerNode], constant: bool) -> Initializer {
     let mut cursor = items.iter().peekable();
     let value = match string_at(resolver, ty, &mut cursor) {
         Some(init) => init,
@@ -85,14 +80,14 @@ fn braced(resolver: &mut SymbolResolver, ty: QualifiedType, items: &[Initializer
     value
 }
 
-fn string_at(resolver: &mut SymbolResolver, ty: QualifiedType, cursor: &mut Cursor) -> Option<Initializer> {
+fn string_at(resolver: &mut Resolver, ty: QualifiedType, cursor: &mut Cursor) -> Option<Initializer> {
     let ast::Initializer::Single(e) = &cursor.peek()?.init else { return None };
     let init = string(resolver, ty, e)?;
     cursor.next();
     Some(init)
 }
 
-fn fill(resolver: &mut SymbolResolver, ty: QualifiedType, cursor: &mut Cursor, constant: bool) -> Initializer {
+fn fill(resolver: &mut Resolver, ty: QualifiedType, cursor: &mut Cursor, constant: bool) -> Initializer {
     let mut values = Vec::new();
     match ty.id.resolve_with(resolver.sema).clone() {
         ResolvedType::Array { elem, len } => {
@@ -118,7 +113,7 @@ fn fill(resolver: &mut SymbolResolver, ty: QualifiedType, cursor: &mut Cursor, c
     Initializer::List(values)
 }
 
-fn walk(resolver: &mut SymbolResolver, ty: QualifiedType, cursor: &mut Cursor, constant: bool) -> Initializer {
+fn walk(resolver: &mut Resolver, ty: QualifiedType, cursor: &mut Cursor, constant: bool) -> Initializer {
     if let Some(init) = string_at(resolver, ty, cursor) {
         return init;
     }
@@ -143,7 +138,7 @@ fn walk(resolver: &mut SymbolResolver, ty: QualifiedType, cursor: &mut Cursor, c
     }
 }
 
-fn string(resolver: &mut SymbolResolver, ty: QualifiedType, e: &ExpressionNode) -> Option<Initializer> {
+fn string(resolver: &mut Resolver, ty: QualifiedType, e: &ExpressionNode) -> Option<Initializer> {
     let &ResolvedType::Array { elem, len } = ty.id.resolve_with(resolver.sema) else {
         return None;
     };
@@ -159,14 +154,14 @@ fn string(resolver: &mut SymbolResolver, ty: QualifiedType, e: &ExpressionNode) 
     let id = literal.id;
     resolver.visit_expression(e);
     if len.is_some_and(|len| len < literal.len()) {
-        resolver.add_diag(Diag::err((), Diagnosis::ArrayInitTooLong), &e.span);
+        resolver.add_diag(Diag::err((), Diagnostic::ArrayInitTooLong), &e.span);
     }
     Some(Initializer::String(id))
 }
 
-fn excess(resolver: &mut SymbolResolver, cursor: &mut Cursor) {
+fn excess(resolver: &mut Resolver, cursor: &mut Cursor) {
     if let Some(node) = cursor.next() {
-        resolver.add_diag(Diag::err((), Diagnosis::ArrayInitTooLong), &node.span);
+        resolver.add_diag(Diag::err((), Diagnostic::ArrayInitTooLong), &node.span);
     }
 }
 
@@ -180,7 +175,7 @@ fn is_aggregate(sema: &Sema, ty: QualifiedType) -> bool {
 
 fn member_types(sema: &Sema, id: TagDefId) -> Vec<QualifiedType> {
     let tag = id.resolve_with(sema);
-    let named = tag.members.iter().filter_map(|member| member.sym).map(|sym| sym.resolve_with(sema).ty);
+    let named = tag.members.iter().filter_map(|member| member.symbol).map(|sym| sym.resolve_with(sema).ty);
     match tag.kind {
         Tag::Union => named.take(1).collect(),
         _ => named.collect(),

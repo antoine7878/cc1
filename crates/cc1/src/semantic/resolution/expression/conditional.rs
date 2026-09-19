@@ -1,15 +1,15 @@
 use crate::arena::OptionPoisoned;
 use crate::ast::ExpressionNode;
-use crate::semantic::ExpressionKind::RValue;
+use crate::semantic::ValueCategory::RValue;
 use crate::semantic::resolution::expression::*;
-use crate::semantic::{Diagnosis, QualifiedType, Sema, cast};
+use crate::semantic::{Diagnostic, QualifiedType, Sema, cast};
 
-pub fn conditional(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode, e3: &ExpressionNode) -> R {
+pub fn conditional(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode, e3: &ExpressionNode) -> ExprResult {
     let null2 = is_null_pointer_constant(sema, e2);
     let null3 = is_null_pointer_constant(sema, e3);
     with_converted(sema, [e1, e2, e3], |sema, [condition, lhs, rhs]| {
         if !condition.casted_ty().is_scalar(sema) {
-            return Err(Diagnosis::NotScalar(condition.ty));
+            return Err(Diagnostic::NotScalar(condition.ty));
         }
         let l_ty = lhs.casted_ty();
         let r_ty = rhs.casted_ty();
@@ -33,8 +33,8 @@ pub fn conditional(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode, e3
                 let ty = sema.types.pointer(inner);
                 Ok((QualifiedType::plain(ty), RValue))
             }
-            None if were_pointers => Err(Diagnosis::PointerMismatch(lhs.ty, rhs.ty)),
-            None => Err(Diagnosis::IncompatibleOperands(lhs.ty, rhs.ty)),
+            None if were_pointers => Err(Diagnostic::PointerMismatch(lhs.ty, rhs.ty)),
+            None => Err(Diagnostic::IncompatibleOperands(lhs.ty, rhs.ty)),
         }
     })
 }

@@ -3,7 +3,7 @@ mod common;
 
 mod test_arena;
 mod test_cast;
-mod test_constrain;
+mod test_constraints;
 mod test_diagnostic;
 mod test_f80;
 mod test_facts;

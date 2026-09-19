@@ -1,33 +1,33 @@
-use crate::arena::{Global, Has, HasMut, Owned};
+use crate::arena::{Has, HasMut, Installed, Owned};
 use crate::ast::statement::StatementId;
 use crate::ast::{
-    Declarator, DeclaratorArena, DeclaratorId, Enum, EnumArena, EnumId, Expression, ExpressionArena, ExpressionId,
-    Statement, StatementArena, StringArena, StringConstId, StringConstant, StringId, StringPool, Struct, StructArena,
-    StructId, Union, UnionArena, UnionId, Variant, VariantArena, VariantId,
+    Declarator, DeclaratorArena, DeclaratorId, Enum, EnumArena, EnumId, Enumerator, EnumeratorArena, EnumeratorId,
+    Expression, ExpressionArena, ExpressionId, NameId, NameInterner, Statement, StatementArena, StringConstId,
+    StringConstInterner, StringConstant, Struct, StructArena, StructId, Union, UnionArena, UnionId,
 };
 use crate::context::ctx;
 
 #[derive(Debug, Default)]
 pub struct AstArenas {
-    pub names: StringArena,
-    pub strings: StringPool,
+    pub names: NameInterner,
+    pub strings: StringConstInterner,
     pub structs: StructArena,
     pub enums: EnumArena,
     pub unions: UnionArena,
-    pub variants: VariantArena,
+    pub enumerators: EnumeratorArena,
     pub expressions: ExpressionArena,
     pub declarators: DeclaratorArena,
     pub statements: StatementArena,
 }
 
-impl Global for AstArenas {
-    fn global() -> &'static Self {
+impl Installed for AstArenas {
+    fn installed() -> &'static Self {
         &ctx().arenas
     }
 }
 
 impl Has<String> for AstArenas {
-    fn get(&self, id: StringId) -> &String {
+    fn get(&self, id: NameId) -> &String {
         self.names.get(id)
     }
 }
@@ -94,19 +94,19 @@ impl Owned for Union {
     type Holder = AstArenas;
 }
 
-impl Has<Variant> for AstArenas {
-    fn get(&self, id: VariantId) -> &Variant {
-        self.variants.get(id)
+impl Has<Enumerator> for AstArenas {
+    fn get(&self, id: EnumeratorId) -> &Enumerator {
+        self.enumerators.get(id)
     }
 }
 
-impl HasMut<Variant> for AstArenas {
-    fn get_mut(&mut self, id: VariantId) -> &mut Variant {
-        self.variants.get_mut(id)
+impl HasMut<Enumerator> for AstArenas {
+    fn get_mut(&mut self, id: EnumeratorId) -> &mut Enumerator {
+        self.enumerators.get_mut(id)
     }
 }
 
-impl Owned for Variant {
+impl Owned for Enumerator {
     type Holder = AstArenas;
 }
 

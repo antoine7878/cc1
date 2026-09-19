@@ -11,12 +11,12 @@ use crate::semantic::{DeclaredParams, Duration, FunctionHeader, SymbolId, sema};
 
 #[derive(Debug, Default)]
 pub struct Locals {
-    map: HashMap<SymbolId, LlvmSymbol>,
+    symbols: HashMap<SymbolId, LlvmSymbol>,
     pub order: Vec<SymbolId>,
     spills: HashMap<ExpressionId, LlvmSymbol>,
     spill_order: Vec<(ExpressionId, LlvmType)>,
-    f: FunctionHeader,
-    pub parameters: Vec<LlvmSymbol>,
+    header: FunctionHeader,
+    pub params: Vec<LlvmSymbol>,
 }
 
 impl Index<SymbolId> for Locals {
@@ -29,7 +29,7 @@ impl Index<SymbolId> for Locals {
 
 impl Locals {
     pub fn get(&self, sym_id: SymbolId) -> Option<&LlvmSymbol> {
-        self.map.get(&sym_id)
+        self.symbols.get(&sym_id)
     }
 
     pub fn order_iter(&self) -> IntoIter<SymbolId> {
@@ -41,11 +41,11 @@ impl Locals {
     }
 
     fn clear(&mut self) {
-        self.map.clear();
+        self.symbols.clear();
         self.order.clear();
         self.spills.clear();
         self.spill_order.clear();
-        self.parameters.clear();
+        self.params.clear();
     }
 
     pub fn collect_locals(&mut self, node: &FunctionDefinitionNode) {
@@ -55,11 +55,11 @@ impl Locals {
 
     pub fn collect_params(&mut self, node: &FunctionDefinitionNode) {
         self.clear();
-        self.f = sema().function_defs[&node.declarator.id].clone();
-        for (i, param) in self.f.id.resolve().parameters.iter().enumerate() {
+        self.header = sema().headers[&node.declarator.id].clone();
+        for (i, param) in self.header.id.resolve().params.iter().enumerate() {
             self.order.push(*param);
             let v = LlvmSymbol::new(param.resolve().ty.llvm(), LlvmName::SSA(i));
-            self.parameters.push(v);
+            self.params.push(v);
         }
     }
 
@@ -67,29 +67,29 @@ impl Locals {
         self.visit_compound_statement(&node.body);
     }
 
-    pub fn parameters(&self) -> &[LlvmSymbol] {
-        &self.parameters
+    pub fn params(&self) -> &[LlvmSymbol] {
+        &self.params
     }
 
     pub fn is_variadic(&self) -> bool {
-        matches!(self.f.params, DeclaredParams::Prototype { is_variadic: true, .. })
+        matches!(self.header.params, DeclaredParams::Prototype { is_variadic: true, .. })
     }
 
-    pub fn emit_decl<W: Write>(&mut self, b: &mut Builder<W>) {
+    pub fn emit_decl<W: Write>(&mut self, builder: &mut Builder<W>) {
         for id in &self.order {
             let qty = id.resolve().ty;
-            let slot = b.alloca(qty.llvm());
-            self.map.insert(*id, slot);
+            let slot = builder.alloca(qty.llvm());
+            self.symbols.insert(*id, slot);
         }
 
         for (id, ty) in &self.spill_order {
-            let slot = b.alloca(*ty);
+            let slot = builder.alloca(*ty);
             self.spills.insert(*id, slot);
         }
 
-        for (param, id) in iter::zip(&self.parameters, &self.order) {
-            let local = self.map[id];
-            b.store(*param, local);
+        for (param, id) in iter::zip(&self.params, &self.order) {
+            let local = self.symbols[id];
+            builder.store(*param, local);
         }
     }
 }
@@ -108,7 +108,7 @@ impl Visitor for Locals {
     fn visit_expression(&mut self, node: &ExpressionNode) {
         walk_expression(self, node);
         let Expression::FunctionCall(_, _) = node.id.resolve() else { return };
-        let Some(re) = sema().expr_types.get(node.id) else { return };
+        let Some(re) = sema().expressions.get(node.id) else { return };
         if !re.ty.is_record(sema()) {
             return;
         }

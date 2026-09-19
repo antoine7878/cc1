@@ -4,7 +4,7 @@ use std::ops::{Index, IndexMut};
 
 use crate::arena::ArenaKey;
 use crate::arena::store::{not_known, out_of_bounds};
-use crate::semantic::Diagnosis;
+use crate::semantic::Diagnostic;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Slot<T> {
@@ -41,7 +41,7 @@ impl<Id: ArenaKey, Val> SideTable<Id, Val> {
         self.slots.is_empty()
     }
 
-    pub fn seen(&self, id: Id) -> bool {
+    pub fn contains(&self, id: Id) -> bool {
         !matches!(self.slots.get(id.into()), None | Some(Slot::Unknown))
     }
 
@@ -81,7 +81,7 @@ impl<Id: ArenaKey, Val> SideTable<Id, Val> {
         }
     }
 
-    pub fn give(&mut self, id: Id, value: Val) {
+    pub fn insert(&mut self, id: Id, value: Val) {
         *self.slot_mut(id) = Slot::Known(value);
     }
 
@@ -139,7 +139,7 @@ impl<'h, H: HasTable<Id, Val>, Id: ArenaKey, Val, const N: usize> Loan<'h, H, Id
         if taken.iter().any(Option::is_none) {
             for (id, val) in zip(ids, &mut taken) {
                 if let Some(val) = val.take() {
-                    holder.table().give(id, val);
+                    holder.table().insert(id, val);
                 }
             }
             return None;
@@ -155,17 +155,17 @@ impl<'h, H: HasTable<Id, Val>, Id: ArenaKey, Val, const N: usize> Loan<'h, H, Id
 impl<H: HasTable<Id, Val>, Id: ArenaKey, Val, const N: usize> Drop for Loan<'_, H, Id, Val, N> {
     fn drop(&mut self) {
         for (id, val) in zip(self.ids, self.values.take().unwrap()) {
-            self.holder.table().give(id, val);
+            self.holder.table().insert(id, val);
         }
     }
 }
 
 pub trait OptionPoisoned<T> {
-    fn ok_poisoned(self) -> Result<T, Diagnosis>;
+    fn ok_poisoned(self) -> Result<T, Diagnostic>;
 }
 
 impl<T> OptionPoisoned<T> for Option<T> {
-    fn ok_poisoned(self) -> Result<T, Diagnosis> {
-        self.ok_or(Diagnosis::Poisoned)
+    fn ok_poisoned(self) -> Result<T, Diagnostic> {
+        self.ok_or(Diagnostic::Poisoned)
     }
 }

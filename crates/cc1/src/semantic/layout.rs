@@ -9,11 +9,11 @@ fn round_up(value: u64, multiple: u64) -> u64 {
     }
 }
 
-pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Option<Layout> {
-    if let Some(&layout) = sema.layouts.get(&qualified_type) {
+pub fn of(sema: &mut Sema, id: ResolvedTypeId) -> Option<Layout> {
+    if let Some(&layout) = sema.layouts.get(&id) {
         return Some(layout);
     }
-    let layout = match qualified_type.resolve_with(sema) {
+    let layout = match id.resolve_with(sema) {
         ResolvedType::Tag(id) => of_tag(sema, *id)?,
         ResolvedType::Array { elem, len } => {
             let len = *len;
@@ -22,7 +22,7 @@ pub fn of(sema: &mut Sema, qualified_type: ResolvedTypeId) -> Option<Layout> {
         }
         ty => sema.target.layout(ty)?,
     };
-    sema.layouts.insert(qualified_type, layout);
+    sema.layouts.insert(id, layout);
     Some(layout)
 }
 
@@ -54,7 +54,7 @@ pub fn of_tag(sema: &mut Sema, id: TagDefId) -> Option<Layout> {
 
 fn member(sema: &mut Sema, mem: Member) -> Option<(Layout, Option<u64>)> {
     let width = mem.width.map(|width| width.max(0) as u64);
-    match mem.sym {
+    match mem.symbol {
         Some(id) => {
             let ty = id.resolve_with(sema).ty;
             Some((of(sema, ty.id)?, width))
@@ -81,7 +81,7 @@ fn struct_layout(sema: &mut Sema, members: &mut [Member]) -> Option<Layout> {
     for m in members.iter_mut() {
         let (layout, width) = member(sema, *m)?;
         let unit = u64::from(layout.align) * 8;
-        if m.sym.is_some() {
+        if m.symbol.is_some() {
             align = align.max(layout.align);
         }
         match width {
@@ -115,7 +115,7 @@ fn union_layout(sema: &mut Sema, members: &mut [Member]) -> Option<Layout> {
 
     for m in members.iter_mut() {
         let (layout, width) = member(sema, *m)?;
-        if m.sym.is_some() {
+        if m.symbol.is_some() {
             align = align.max(layout.align);
         }
         size = size.max(width.map_or(u64::from(layout.size), |width| width.div_ceil(8)));

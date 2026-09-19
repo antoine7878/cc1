@@ -8,17 +8,17 @@ use crate::ast::visit::{
 };
 use crate::ast::{
     CompoundStatementNode, ConstValue, DeclarationNode, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode,
-    Name, Statement, StatementNode, StringId, Tag,
+    Name, NameId, Statement, StatementNode, Tag,
 };
 use crate::context::ctx;
 use crate::semantic::resolution::{expression, statement};
 use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, DiagnosisNode, FunctionDefId, Linkage, QualifiedType, ScopeKind, Sema,
-    StatementScopes, Symbol, SymbolId, SymbolKind, SymbolScopes, TagDefId, constrain, declaration, ice,
+    Diag, Diagnostic, DiagnosticNode, DiagnosticSink, FunctionDefId, Linkage, QualifiedType, ScopeKind, Sema,
+    StatementScopes, Symbol, SymbolId, SymbolKind, SymbolScopes, TagDefId, constraints, declaration, fold,
 };
 
 #[derive(Debug)]
-pub struct SymbolResolver<'a> {
+pub struct Resolver<'a> {
     pub sema: &'a mut Sema,
     sym_scopes: SymbolScopes,
     stmt_scopes: StatementScopes,
@@ -26,13 +26,13 @@ pub struct SymbolResolver<'a> {
     gotos: Vec<Name>,
 }
 
-impl DiagCollector for SymbolResolver<'_> {
-    fn diagnosis(&mut self) -> &mut Vec<DiagnosisNode> {
-        &mut self.sema.diagnosis
+impl DiagnosticSink for Resolver<'_> {
+    fn diagnostics(&mut self) -> &mut Vec<DiagnosticNode> {
+        &mut self.sema.diagnostics
     }
 }
 
-impl<'a> SymbolResolver<'a> {
+impl<'a> Resolver<'a> {
     pub fn new(sema: &'a mut Sema) -> Self {
         Self {
             sema,
@@ -44,7 +44,7 @@ impl<'a> SymbolResolver<'a> {
     }
 
     pub fn resolve_unit(sema: &mut Sema) {
-        let mut resolver = SymbolResolver::new(sema);
+        let mut resolver = Resolver::new(sema);
         resolver.enter_file();
         walk_translation_unit(&mut resolver, &ctx().ast);
         resolver.leave_scope();
@@ -55,7 +55,7 @@ impl<'a> SymbolResolver<'a> {
 
 // ----- Symbol scopes ---------------------
 
-impl SymbolResolver<'_> {
+impl Resolver<'_> {
     pub fn scope_kind(&self) -> ScopeKind {
         self.sym_scopes.kind()
     }
@@ -79,18 +79,18 @@ impl SymbolResolver<'_> {
         self.sym_scopes.pop();
     }
 
-    pub fn lookup_ordinary(&self, name: StringId) -> Option<SymbolId> {
+    pub fn lookup_ordinary(&self, name: NameId) -> Option<SymbolId> {
         self.sym_scopes.lookup_ordinary(name)
     }
 
-    pub fn current(&self, name: StringId) -> Option<SymbolId> {
-        self.sym_scopes.current(name)
+    pub fn lookup_current(&self, name: NameId) -> Option<SymbolId> {
+        self.sym_scopes.lookup_current(name)
     }
 }
 
 // ----- Statement scopes ------------------
 
-impl SymbolResolver<'_> {
+impl Resolver<'_> {
     pub fn enter_loop(&mut self, stmt: StatementId) {
         self.stmt_scopes.push_loop(stmt);
     }
@@ -102,34 +102,34 @@ impl SymbolResolver<'_> {
     pub fn leave_stmt(&mut self) {
         let scope = self.stmt_scopes.pop().expect("a statement scope to leave");
         if let (id, Some(resolved)) = scope.into_resolved() {
-            self.sema.stmts.set(id, Some(resolved));
+            self.sema.statements.set(id, Some(resolved));
         }
     }
 
-    pub fn breakable(&self) -> Option<StatementId> {
-        self.stmt_scopes.breakable()
+    pub fn break_target(&self) -> Option<StatementId> {
+        self.stmt_scopes.break_target()
     }
 
-    pub fn nearest_loop(&self) -> Option<StatementId> {
-        self.stmt_scopes.nearest_loop()
+    pub fn continue_target(&self) -> Option<StatementId> {
+        self.stmt_scopes.continue_target()
     }
 
     pub fn switch_control(&self) -> Option<QualifiedType> {
         self.stmt_scopes.switch_control()
     }
 
-    pub fn record_case(&mut self, value: ConstValue, id: StatementId) -> Result<StatementId, Diagnosis> {
+    pub fn record_case(&mut self, value: ConstValue, id: StatementId) -> Result<StatementId, Diagnostic> {
         self.stmt_scopes.record_case(value, id)
     }
 
-    pub fn record_default(&mut self, id: StatementId) -> Result<StatementId, Diagnosis> {
+    pub fn record_default(&mut self, id: StatementId) -> Result<StatementId, Diagnostic> {
         self.stmt_scopes.record_default(id)
     }
 }
 
 // ----- Binding ---------------------------
 
-impl SymbolResolver<'_> {
+impl Resolver<'_> {
     pub fn resolve_typedef(
         &mut self,
         name: Name,
@@ -140,11 +140,11 @@ impl SymbolResolver<'_> {
         let sym_id = self.sym_scopes.lookup_ordinary(name.id)?;
         let sym = sym_id.resolve_with(self.sema);
         if sym.kind != SymbolKind::Typedef {
-            return self.add_diag(Diag::err(None, Diagnosis::UndeclaredIdentifier(name)), span);
+            return self.add_diag(Diag::err(None, Diagnostic::UndeclaredIdentifier(name)), span);
         }
         let base = sym.ty;
         if (is_const && base.is_const) || (is_volatile && base.is_volatile) {
-            self.add_diag(Diag::err((), Diagnosis::DuplicateTypeQualifiers), span)
+            self.add_diag(Diag::err((), Diagnostic::DuplicateTypeQualifiers), span)
         }
         Some(QualifiedType::new(base.id, base.is_const || is_const, base.is_volatile || is_volatile))
     }
@@ -155,7 +155,7 @@ impl SymbolResolver<'_> {
         if let Some(id) = self.sym_scopes.lookup_tag(name.id, is_definition) {
             let def = id.resolve_with(self.sema);
             if def.kind != kind || (is_definition && def.is_complete) {
-                self.add_diag(Diag::err((), Diagnosis::DuplicateDeclaration(def.kind(), name)), span)
+                self.add_diag(Diag::err((), Diagnostic::DuplicateDeclaration(def.kind.symbol_kind(), name)), span)
             }
             return id;
         }
@@ -173,32 +173,32 @@ impl SymbolResolver<'_> {
         } else {
             lexical.unwrap_or_else(|| self.sema.symbols.alloc(sym))
         };
-        self.sym_scopes.insert(name.id, sym_id);
+        self.sym_scopes.insert_ordinary(name.id, sym_id);
         sym_id
     }
 
     fn dedup(&mut self, sym: &Symbol, span: &Span) -> Option<SymbolId> {
-        let old_id = self.sym_scopes.current(sym.name.id)?;
+        let old_id = self.sym_scopes.lookup_current(sym.name.id)?;
         let old_symbol = old_id.resolve_with(self.sema);
         if sym.kind != SymbolKind::Typedef
             && (self.sym_scopes.kind() == ScopeKind::File
                 || (sym.linkage != Linkage::None && old_symbol.linkage != Linkage::None))
             && old_symbol.is_compatible(self.sema, sym)
-            && !(sym.is_init && old_symbol.is_init)
+            && !(sym.has_initializer && old_symbol.has_initializer)
         {
             return Some(old_id);
         }
-        self.add_diag(Diag::err(Some(old_id), Diagnosis::DuplicateDeclaration(sym.kind, sym.name)), span)
+        self.add_diag(Diag::err(Some(old_id), Diagnostic::DuplicateDeclaration(sym.kind, sym.name)), span)
     }
 }
 
 // ----- Labels ----------------------------
 
-impl SymbolResolver<'_> {
+impl Resolver<'_> {
     pub fn define_label(&mut self, name: Name, span: &Span) {
         let f = self.current_function.expect("a label inside a function");
         if self.labels(f).any(|label| label == name.id) {
-            return self.add_diag(Diag::err((), Diagnosis::DuplicateLabel(name)), span);
+            return self.add_diag(Diag::err((), Diagnostic::DuplicateLabel(name)), span);
         }
         self.sema.functions.get_mut(f).labels.push(name);
     }
@@ -211,15 +211,15 @@ impl SymbolResolver<'_> {
         self.gotos.push(name);
     }
 
-    fn labels(&self, f: FunctionDefId) -> impl Iterator<Item = StringId> {
+    fn labels(&self, f: FunctionDefId) -> impl Iterator<Item = NameId> {
         self.sema.functions.get(f).labels.iter().map(|label| label.id)
     }
 
     fn resolve_gotos(&mut self, f: FunctionDefId) {
-        let defined: Vec<StringId> = self.labels(f).collect();
+        let defined: Vec<NameId> = self.labels(f).collect();
         for goto in take(&mut self.gotos) {
             if !defined.contains(&goto.id) {
-                self.add_diag(Diag::err((), Diagnosis::UndefinedLabel(goto)), &goto.span);
+                self.add_diag(Diag::err((), Diagnostic::UndefinedLabel(goto)), &goto.span);
             }
         }
     }
@@ -227,36 +227,36 @@ impl SymbolResolver<'_> {
 
 // ----- Resolution ------------------------
 
-impl SymbolResolver<'_> {
+impl Resolver<'_> {
     pub fn eval_constant(&mut self, expr: &ExpressionNode) -> Option<ConstValue> {
-        if self.sema.expr_consts.seen(expr.id) {
+        if self.sema.expr_consts.contains(expr.id) {
             return self.sema.expr_consts.get(expr.id).copied();
         }
         self.visit_expression(expr);
-        ice::eval_constant(self.sema, expr)
+        fold::eval_constant(self.sema, expr)
     }
 }
 
-impl Visitor for SymbolResolver<'_> {
+impl Visitor for Resolver<'_> {
     fn visit_function_definition(&mut self, node: &FunctionDefinitionNode) {
         let Some(header) = declaration::define_function(self, node) else { return };
         let f = header.id;
         self.current_function = Some(f);
-        declaration::bind_function_parameters(self, node, &header);
+        declaration::bind_function_params(self, node, &header);
         self.visit_compound_statement(&node.body);
         self.resolve_gotos(f);
         self.current_function = None;
 
         let sym_id = header.id.resolve_with(self.sema).sym;
         self.sema.declarations.insert(node.declarator.id, sym_id);
-        self.sema.function_defs.insert(node.declarator.id, header);
+        self.sema.headers.insert(node.declarator.id, header);
     }
 
     fn visit_declaration(&mut self, node: &DeclarationNode) {
         let specifiers = &node.specifiers;
         let span = &node.span;
         declaration::check_declaration(self, node);
-        let declared_storage = constrain::specifier::get_storage(specifiers).collect(self, span);
+        let declared_storage = constraints::specifier::storage_of(specifiers).collect(self, span);
         let qualif = declaration::base_type(self, specifiers, span);
         for init_declarator in &node.init_declarators {
             declaration::declare_init_declarator(self, init_declarator, qualif, declared_storage);

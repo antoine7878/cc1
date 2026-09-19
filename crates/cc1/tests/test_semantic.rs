@@ -1,4 +1,4 @@
-use cc1::semantic::Diagnosis;
+use cc1::semantic::Diagnostic;
 
 // ---- 6.5.2.3 tags name one type across all their mentions ----------------
 
@@ -72,56 +72,56 @@ reject!(qualifier_volatile_conflicting_redeclaration, "volatile int x; int x;");
 
 reject!(qualifier_duplicate_const, "const const int x;");
 
-accept!(enum_variant_implicit_increment, "enum e { A, B, C }; int f(void) { return C; }");
+accept!(enumerator_implicit_increment, "enum e { A, B, C }; int f(void) { return C; }");
 
-accept!(enum_variant_references_previous, "enum e { A = 1, B = A + 1, C = B * 2 + A };");
+accept!(enumerator_references_previous, "enum e { A = 1, B = A + 1, C = B * 2 + A };");
 
-accept!(enum_variant_negative_start, "enum e { A = -1, B, C };");
+accept!(enumerator_negative_start, "enum e { A = -1, B, C };");
 
-accept!(enum_variant_char_constant, "enum e { A = 'a', B };");
+accept!(enumerator_char_constant, "enum e { A = 'a', B };");
 
-accept!(enum_variant_parenthesized, "enum e { A = (1 + 2) * 3 };");
+accept!(enumerator_parenthesized, "enum e { A = (1 + 2) * 3 };");
 
-accept!(enum_variant_int_max, "enum e { M = 2147483647 };");
+accept!(enumerator_int_max, "enum e { M = 2147483647 };");
 
-accept!(enum_variant_sizeof_type, "enum e { A = sizeof(int), B };");
+accept!(enumerator_sizeof_type, "enum e { A = sizeof(int), B };");
 
 accept!(enum_tag_complete_after_definition, "enum e { A = 1 }; enum e v;");
 
-accept!(enum_variant_used_in_function, "enum e { A = 1 }; int f(void) { int x; x = A; return x; }");
+accept!(enumerator_used_in_function, "enum e { A = 1 }; int f(void) { int x; x = A; return x; }");
 
-accept!(enum_variant_shadowed_in_inner_scope, "enum e { A = 1 }; int f(void) { int A; A = 2; return A; }");
+accept!(enumerator_shadowed_in_inner_scope, "enum e { A = 1 }; int f(void) { int A; A = 2; return A; }");
 
-reject!(enum_variant_undeclared_reference, "enum e { A = Z };");
+reject!(enumerator_undeclared_reference, "enum e { A = Z };");
 
-reject!(enum_variant_references_object, "int x; enum e { A = x };");
+reject!(enumerator_references_object, "int x; enum e { A = x };");
 
-reject!(enum_variant_non_integer_constant, "enum e { A = 1.5 };");
+reject!(enumerator_non_integer_constant, "enum e { A = 1.5 };");
 
-reject!(enum_variant_exceeds_int_range, "enum e { M = 2147483647, N };");
+reject!(enumerator_exceeds_int_range, "enum e { M = 2147483647, N };");
 
 reject!(identifier_undeclared_in_expression, "int f(void) { return undeclared_thing; }");
 
 reject!(identifier_used_before_declaration, "int f(void) { return v; }");
 
 recover!(
-    enum_recovers_after_undeclared_variant,
+    enum_recovers_after_undeclared_enumerator,
     "enum e { A = Z, B = 2, C = B + 1 }; enum e v; int f(void) { return B + C; }",
-    [Diagnosis::UndeclaredIdentifier(_), Diagnosis::NonConstantExpression],
+    [Diagnostic::UndeclaredIdentifier(_), Diagnostic::NonConstantExpression],
     &["B", "C"]
 );
 
 recover!(
-    enum_recovers_after_non_integer_variant,
+    enum_recovers_after_non_integer_enumerator,
     "enum g { P = 1.5, Q = 2, R = 3 }; int f(void) { return Q + R; }",
-    [Diagnosis::NonIntegerConstantExpression],
+    [Diagnostic::NonIntegerConstantExpression],
     &["Q", "R"]
 );
 
 recover!(
-    enum_recovers_after_out_of_range_variant,
+    enum_recovers_after_out_of_range_enumerator,
     "enum h { M = 2147483647, N, O = 5 }; int g(void) { return O; }",
-    [Diagnosis::VariantBadValue],
+    [Diagnostic::EnumeratorBadValue],
     &["O"]
 );
 
@@ -441,13 +441,13 @@ accept!(unsized_array_completed_by_initializer, "int a[] = { 1, 2 };");
 recover!(
     two_dimensional_array_reports_element_incompleteness_once,
     "struct S; struct S a[2][3];",
-    [Diagnosis::InvalidElementType(_)],
+    [Diagnostic::InvalidElementType(_)],
     &[]
 );
 
 recover!(
     incomplete_member_reports_once_without_tag_without_member,
     "struct S; struct T { struct S s; };",
-    [Diagnosis::InvalidMemberType(_)],
+    [Diagnostic::InvalidMemberType(_)],
     &[]
 );

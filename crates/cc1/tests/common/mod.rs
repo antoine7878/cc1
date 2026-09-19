@@ -2,12 +2,12 @@
 mod macros;
 mod exec;
 mod facts;
-mod ty;
+mod types;
 mod unit;
 
 pub use exec::{run_emits, run_exit};
 pub use facts::run_facts;
-pub use ty::{Shape, Ty, ints, lv, none, rv};
+pub use types::{Shape, Ty, ints, lv, none, rv};
 pub use unit::{
     Unit, accepted, assert_unmentioned, fold_values, folded, repr, run_accept, run_bits, run_initializers, run_labels,
     run_literal, run_member_refs, run_offsets, run_placements, run_pool, run_reject, run_size, run_statements,

@@ -1,25 +1,25 @@
 use crate::ast::{DeclarationSpecifier, InitDeclaratorNode, Qualifier, Storage, TypeSpecifier};
-use crate::semantic::diagnosis::{Diag, Diagnosis};
+use crate::semantic::diagnostic::{Diag, Diagnostic};
 use crate::semantic::{Linkage, ResolvedType, ScopeKind};
 
-pub fn get_storage(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>> {
+pub fn storage_of(specifiers: &[DeclarationSpecifier]) -> Diag<Option<Storage>> {
     let mut storages = specifiers.iter().filter_map(|s| match s {
         DeclarationSpecifier::Storage(s) => Some(s),
         _ => None,
     });
     let ret = storages.next().cloned();
-    if storages.next().is_some() { Diag::err(ret, Diagnosis::MultipleStorageSpecifiers) } else { Diag::ok(ret) }
+    if storages.next().is_some() { Diag::err(ret, Diagnostic::MultipleStorageSpecifiers) } else { Diag::ok(ret) }
 }
 
-pub fn get_qualifier(specifiers: &[DeclarationSpecifier]) -> Diag<(bool, bool)> {
+pub fn qualifiers_of(specifiers: &[DeclarationSpecifier]) -> Diag<(bool, bool)> {
     let a = specifiers.iter().filter_map(|s| match s {
         &DeclarationSpecifier::Qualifier(q) => Some(q),
         _ => None,
     });
-    check_qualifier(a)
+    check_qualifiers(a)
 }
 
-pub fn check_qualifier<I>(qualifiers: I) -> Diag<(bool, bool)>
+pub fn check_qualifiers<I>(qualifiers: I) -> Diag<(bool, bool)>
 where
     I: IntoIterator<Item = Qualifier>,
 {
@@ -33,7 +33,7 @@ where
     }
     let ret = (const_count >= 1, volatile_count >= 1);
     if const_count > 1 || volatile_count > 1 {
-        return Diag::err(ret, Diagnosis::DuplicateTypeQualifiers);
+        return Diag::err(ret, Diagnostic::DuplicateTypeQualifiers);
     }
     Diag::ok(ret)
 }
@@ -77,29 +77,29 @@ fn same_set(types: &[&TypeSpecifier], set: &[TypeSpecifier]) -> bool {
 pub fn basic_type(types: &[&TypeSpecifier]) -> Diag<Option<ResolvedType>> {
     match BASIC_TYPES.iter().find(|(set, _)| same_set(types, set)) {
         Some((_, ty)) => Diag::ok(Some(ty.clone())),
-        None => Diag::err(None, Diagnosis::InvalidTypeSpecifier),
+        None => Diag::err(None, Diagnostic::InvalidTypeSpecifier),
     }
 }
 
 pub fn check_external_specifiers(specifiers: &[DeclarationSpecifier]) -> Diag<()> {
     if specifiers.iter().any(|s| matches!(s, DeclarationSpecifier::Storage(Storage::Auto | Storage::Register))) {
-        return Diag::err((), Diagnosis::AutoRegisterExternal);
+        return Diag::err((), Diagnostic::AutoRegisterExternal);
     }
     Diag::ok(())
 }
 
-pub fn extern_function_only(scope_type: ScopeKind, storage: Storage) -> Diag<()> {
+pub fn check_block_extern_function(scope_type: ScopeKind, storage: Storage) -> Diag<()> {
     if matches!(scope_type, ScopeKind::Block | ScopeKind::Function) && storage != Storage::Extern {
-        Diag::err((), Diagnosis::BlockScopeNotExtern)
+        Diag::err((), Diagnostic::BlockScopeNotExtern)
     } else {
         Diag::ok(())
     }
 }
 
-pub fn check_block_scope_initializer(scope: ScopeKind, linkage: Linkage, is_init: bool) -> Diag<()> {
+pub fn check_block_scope_initializer(scope: ScopeKind, linkage: Linkage, has_initializer: bool) -> Diag<()> {
     let block = matches!(scope, ScopeKind::Block | ScopeKind::Function);
-    match block && linkage != Linkage::None && is_init {
-        true => Diag::err((), Diagnosis::BlockScopeLinkageInitializer),
+    match block && linkage != Linkage::None && has_initializer {
+        true => Diag::err((), Diagnostic::BlockScopeLinkageInitializer),
         false => Diag::ok(()),
     }
 }
@@ -107,7 +107,7 @@ pub fn check_block_scope_initializer(scope: ScopeKind, linkage: Linkage, is_init
 pub fn check_function_storage(storage: Storage) -> Diag<()> {
     match storage {
         Storage::Static | Storage::Extern => Diag::ok(()),
-        _ => Diag::err((), Diagnosis::FunctionAutoExtern),
+        _ => Diag::err((), Diagnostic::FunctionAutoExtern),
     }
 }
 

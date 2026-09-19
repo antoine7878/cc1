@@ -1,9 +1,9 @@
 use std::fmt::{self, Display, Formatter};
 use std::ops::RangeInclusive;
 
-use crate::ast::{ConstValue, Fold, StringConstId, Tag};
+use crate::ast::{ConstFolder, ConstValue, StringConstId, Tag};
 use crate::codegen::{LlvmElement, LlvmName, LlvmSymbol, LlvmType, struct_elements};
-use crate::semantic::{AddressBase, AdressOffset, Initializer, QualifiedType, ResolvedType, TagDef, sema};
+use crate::semantic::{AddressBase, AddressOffset, Initializer, QualifiedType, ResolvedType, TagDef, sema};
 
 pub struct LlvmInit<'a> {
     pub ty: QualifiedType,
@@ -31,11 +31,11 @@ impl<'a> LlvmInit<'a> {
             ResolvedType::Tag(id) if id.resolve().is_enum() => &ResolvedType::Int,
             rty => rty,
         };
-        let value = Fold::new(&sema().target).convert(rty, value).unwrap_or(value);
+        let value = ConstFolder::new(&sema().target).convert(rty, value).unwrap_or(value);
         write!(f, "{}", LlvmSymbol::cst(self.ty.llvm(), value))
     }
 
-    fn address(&self, f: &mut Formatter<'_>, place: AdressOffset) -> fmt::Result {
+    fn address(&self, f: &mut Formatter<'_>, place: AddressOffset) -> fmt::Result {
         let rty = self.ty.id.resolve();
         if rty.is_pointer() {
             return write!(f, "ptr {}", LlvmAddress(place));
@@ -112,12 +112,12 @@ impl<'a> LlvmInit<'a> {
         let mut value: u64 = 0;
         for index in members {
             let member = def.members[index];
-            let (Some(sym), Some(width)) = (member.sym, member.width) else { continue };
+            let (Some(sym), Some(width)) = (member.symbol, member.width) else { continue };
             let field = match items.get(item_index(def, index)) {
                 None | Some(Initializer::Zero) => 0,
                 Some(Initializer::Value(v)) => {
                     let rty = sym.resolve().ty.id.resolve();
-                    Fold::new(&sema().target).convert(rty, *v).unwrap_or(*v).to_u64()
+                    ConstFolder::new(&sema().target).convert(rty, *v).unwrap_or(*v).to_u64()
                 }
                 _ => unreachable!("non-constant bit-field initializer"),
             };
@@ -126,9 +126,9 @@ impl<'a> LlvmInit<'a> {
             value |= (field & mask) << shift;
         }
         match bytes {
-            1 | 2 | 4 | 8 => write!(f, "{} {value}", LlvmElement::bytes_ty(bytes)),
+            1 | 2 | 4 | 8 => write!(f, "{} {value}", LlvmElement::bytes_type(bytes)),
             n => {
-                write!(f, "{} [", LlvmElement::bytes_ty(n))?;
+                write!(f, "{} [", LlvmElement::bytes_type(n))?;
                 for i in 0..n {
                     let sep = if i == 0 { "" } else { ", " };
                     write!(f, "{sep}{} {}", LlvmType::char(), (value >> (8 * i)) & 0xff)?;
@@ -139,7 +139,7 @@ impl<'a> LlvmInit<'a> {
     }
 
     fn union(&self, f: &mut Formatter<'_>, def: &TagDef, items: &[Initializer]) -> fmt::Result {
-        let Some(first) = def.members.iter().find_map(|member| member.sym) else {
+        let Some(first) = def.members.iter().find_map(|member| member.symbol) else {
             return self.zero(f);
         };
         let first = first.resolve().ty;
@@ -168,7 +168,7 @@ impl Display for LlvmInit<'_> {
     }
 }
 
-struct LlvmAddress(AdressOffset);
+struct LlvmAddress(AddressOffset);
 
 impl Display for LlvmAddress {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -186,5 +186,5 @@ impl Display for LlvmAddress {
 }
 
 fn item_index(def: &TagDef, index: usize) -> usize {
-    def.members[..index].iter().filter(|member| member.sym.is_some()).count()
+    def.members[..index].iter().filter(|member| member.symbol.is_some()).count()
 }

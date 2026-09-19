@@ -27,7 +27,7 @@ impl Visitor for FactChecker<'_> {
         let sema = self.sema;
         let id = node.id;
         let at = usize::from(id);
-        self.require(sema.expr_types.get(id).is_some(), "type of expression", at);
+        self.require(sema.expressions.get(id).is_some(), "type of expression", at);
 
         match id.resolve() {
             Expression::Identifier(_) => {
@@ -43,7 +43,7 @@ impl Visitor for FactChecker<'_> {
         walk_statement(self, node);
 
         let at = usize::from(node.id);
-        let recorded = self.sema.stmts.get(node.id).is_some();
+        let recorded = self.sema.statements.get(node.id).is_some();
         match node.id.resolve() {
             Statement::Jump(inner) => match inner.stmt {
                 cc1::ast::JumpStatement::Break | cc1::ast::JumpStatement::Continue => {
@@ -73,6 +73,6 @@ pub fn run_facts(name: &str, src: &str) {
     let unit = Unit::compile(src);
 
     assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
-    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{src}\n{}", unit.render());
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{src}");
 }

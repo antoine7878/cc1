@@ -5,12 +5,12 @@ use libft::{BLUE, RESET, Span};
 use crate::ast::Node;
 use crate::define_interner;
 
-define_interner!(String, StringArena, StringId);
+define_interner!(String, NameInterner, NameId);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct Name {
     pub span: Span,
-    pub id: StringId,
+    pub id: NameId,
 }
 
 impl fmt::Display for Name {
@@ -20,7 +20,7 @@ impl fmt::Display for Name {
 }
 
 impl Name {
-    pub fn new(id: StringId, span: Span) -> Self {
+    pub fn new(id: NameId, span: Span) -> Self {
         Self { id, span }
     }
 }
@@ -30,8 +30,8 @@ impl Node for Name {
     }
 }
 
-impl StringArena {
+impl NameInterner {
     pub fn add(&mut self, name: String, span: Span) -> Name {
-        Name::new(self.alloc(name), span)
+        Name::new(self.intern(name), span)
     }
 }

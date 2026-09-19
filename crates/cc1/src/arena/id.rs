@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use crate::arena::{Global, Has, HasMut, Owned};
+use crate::arena::{Has, HasMut, Installed, Owned};
 
 pub trait ArenaKey: From<usize> + Into<usize> + Copy + Debug + PartialEq + Eq {}
 
@@ -23,7 +23,7 @@ impl<T> ArenaId<T> {
 
 impl<T: Owned> ArenaId<T> {
     pub fn resolve(self) -> &'static T {
-        T::Holder::global().get(self)
+        T::Holder::installed().get(self)
     }
 }
 

@@ -26,8 +26,8 @@ ast_node! {
 }
 
 impl DeclaratorNode {
-    pub fn ident(&self) -> Option<Name> {
-        self.id.resolve().ident()
+    pub fn name(&self) -> Option<Name> {
+        self.id.resolve().name()
     }
 
     pub fn is_abstract(&self) -> bool {
@@ -45,13 +45,13 @@ pub enum Declarator {
 }
 
 impl Declarator {
-    pub fn ident(&self) -> Option<Name> {
+    pub fn name(&self) -> Option<Name> {
         match self {
             Declarator::Ident(n) => Some(*n),
             Declarator::Abstract => None,
             Declarator::Pointer { inner: declarator, .. }
             | Declarator::Array { declarator, .. }
-            | Declarator::Function { declarator, .. } => declarator.ident(),
+            | Declarator::Function { declarator, .. } => declarator.name(),
         }
     }
 }
@@ -77,7 +77,7 @@ impl DeclaratorArena {
         self.add(Declarator::Abstract, span)
     }
 
-    pub fn ident(&mut self, ident: Name, span: Span) -> DeclaratorNode {
+    pub fn identifier(&mut self, ident: Name, span: Span) -> DeclaratorNode {
         self.add(Declarator::Ident(ident), span)
     }
 

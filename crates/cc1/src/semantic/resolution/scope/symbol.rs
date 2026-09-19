@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::StringId;
+use crate::ast::NameId;
 use crate::semantic::{SymbolId, TagDefId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -13,8 +13,8 @@ pub enum ScopeKind {
 
 #[derive(Debug)]
 pub struct SymbolScope {
-    tags: HashMap<StringId, TagDefId>,
-    ordinaries: HashMap<StringId, SymbolId>,
+    tags: HashMap<NameId, TagDefId>,
+    ordinaries: HashMap<NameId, SymbolId>,
     pub kind: ScopeKind,
 }
 
@@ -56,26 +56,26 @@ impl SymbolScopes {
         self.last_mut().kind = kind;
     }
 
-    pub fn lookup_ordinary(&self, name: StringId) -> Option<SymbolId> {
+    pub fn lookup_ordinary(&self, name: NameId) -> Option<SymbolId> {
         self.0.iter().rev().find_map(|s| s.ordinaries.get(&name)).copied()
     }
 
-    pub fn lookup_tag(&self, name: StringId, current_only: bool) -> Option<TagDefId> {
+    pub fn lookup_tag(&self, name: NameId, current_only: bool) -> Option<TagDefId> {
         if current_only {
             return self.last().tags.get(&name).copied();
         }
         self.0.iter().rev().find_map(|s| s.tags.get(&name)).copied()
     }
 
-    pub fn current(&self, name: StringId) -> Option<SymbolId> {
+    pub fn lookup_current(&self, name: NameId) -> Option<SymbolId> {
         self.last().ordinaries.get(&name).copied()
     }
 
-    pub fn insert(&mut self, name: StringId, id: SymbolId) {
+    pub fn insert_ordinary(&mut self, name: NameId, id: SymbolId) {
         self.last_mut().ordinaries.insert(name, id);
     }
 
-    pub fn insert_tag(&mut self, name: StringId, id: TagDefId) {
+    pub fn insert_tag(&mut self, name: NameId, id: TagDefId) {
         self.last_mut().tags.insert(name, id);
     }
 }

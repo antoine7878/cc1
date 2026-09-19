@@ -21,11 +21,11 @@ pub use declaration::{
     DeclarationNode, Declarator, DeclaratorArena, DeclaratorId, DeclaratorNode, InitDeclaratorNode, Initializer,
     InitializerNode,
 };
-pub use expression::{Expression, ExpressionArena, ExpressionId, ExpressionNode, Type};
+pub use expression::{Expression, ExpressionArena, ExpressionId, ExpressionNode, TypeName};
 pub use f80::F80;
 pub use function::{FunctionParameters, FunctionParametersNode, ParameterDeclaration};
-pub use literal::{StringConstId, StringConstant, StringLiteralNode, StringPool};
-pub use name::{Name, StringArena, StringId};
+pub use literal::{StringConstId, StringConstInterner, StringConstant, StringLiteralNode};
+pub use name::{Name, NameId, NameInterner};
 pub use operator::{BinaryOp, MemberOp, UnaryOp};
 pub use statement::{
     CompoundStatementNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, JumpStatement,
@@ -33,12 +33,12 @@ pub use statement::{
     StatementArena, StatementNode,
 };
 pub use tag::{
-    Enum, EnumArena, EnumId, Struct, StructArena, StructDeclaration, StructId, StructMemberDeclarator, Tag, Union,
-    UnionArena, UnionId, Variant, VariantArena, VariantId,
+    Enum, EnumArena, EnumId, Enumerator, EnumeratorArena, EnumeratorId, Struct, StructArena, StructDeclaration,
+    StructId, StructMemberDeclarator, Tag, Union, UnionArena, UnionId,
 };
 pub use type_specifier::{DeclarationSpecifier, Qualifier, Storage, TypeSpecifier};
 pub use unit::{ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode};
-pub use value::{ConstValue, ConstValueNode, Fold};
+pub use value::{ConstFolder, ConstValue, ConstValueNode};
 pub use visit::Visitor;
 
 pub trait Node {

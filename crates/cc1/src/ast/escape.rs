@@ -1,6 +1,6 @@
 use libft::simple_escape;
 
-use crate::semantic::{Diag, Diagnosis};
+use crate::semantic::{Diag, Diagnostic};
 
 pub fn next(bytes: &[u8], i: &mut usize) -> u32 {
     let c = bytes[*i];
@@ -40,14 +40,14 @@ fn octal(bytes: &[u8], i: &mut usize, first: u8) -> u32 {
 pub fn decode(body: &str, is_wide: bool) -> Diag<Vec<u32>> {
     let bytes = body.as_bytes();
     let mut units = Vec::new();
-    let mut diagnosis = None;
+    let mut diagnostic = None;
     let mut i = 0;
     while i < bytes.len() {
         let value = next(bytes, &mut i);
         if !is_wide && value > 0xff {
-            diagnosis = diagnosis.or(Some(Diagnosis::EscapeOutOfRange));
+            diagnostic = diagnostic.or(Some(Diagnostic::EscapeOutOfRange));
         }
         units.push(if is_wide { value } else { value & 0xff });
     }
-    Diag::new(units, diagnosis)
+    Diag::new(units, diagnostic)
 }

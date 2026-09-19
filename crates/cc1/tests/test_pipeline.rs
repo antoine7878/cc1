@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use cc1::context::Context;
 use cc1::pipeline::Pipeline;
-use cc1::semantic::{Diagnosis, DiagnosisNode, ExpectedTokens, Sema};
+use cc1::semantic::{Diagnostic, DiagnosticNode, ExpectedTokens, Sema};
 use libft::Span;
 
 static TAPPED: AtomicUsize = AtomicUsize::new(0);
@@ -14,8 +14,8 @@ fn mark(mut ctx: Context) -> Context {
 }
 
 fn fail(mut ctx: Context) -> Context {
-    ctx.diagnosis.push(DiagnosisNode::new(
-        Diagnosis::SyntaxError { found: "';'", expected: ExpectedTokens::new("';'", &[]) },
+    ctx.diagnostics.push(DiagnosticNode::new(
+        Diagnostic::SyntaxError { found: "';'", expected: ExpectedTokens::new("';'", &[]) },
         Span::default(),
     ));
     ctx
@@ -43,7 +43,7 @@ fn a_pass_that_reports_an_error_does_not_stop_the_pipeline() {
     assert!(!pipeline.stopped());
     let (ctx, stopped) = pipeline.pass(mark).pass(mark).finish();
     assert_eq!(ctx.file_name, "mmm");
-    assert_eq!(ctx.diagnosis.len(), 1);
+    assert_eq!(ctx.diagnostics.len(), 1);
     assert!(!stopped);
 }
 
@@ -53,7 +53,7 @@ fn a_check_after_an_error_stops_the_pipeline() {
     assert!(pipeline.stopped());
     let (ctx, stopped) = pipeline.pass(mark).pass(mark).finish();
     assert_eq!(ctx.file_name, "m");
-    assert_eq!(ctx.diagnosis.len(), 1);
+    assert_eq!(ctx.diagnostics.len(), 1);
     assert!(stopped);
 }
 
@@ -108,7 +108,7 @@ fn to_sema(ctx: Context) -> Sema {
 fn to_unit(_: Sema) {}
 
 fn mark_sema(mut sema: Sema) -> Sema {
-    sema.diagnosis.clear();
+    sema.diagnostics.clear();
     sema
 }
 
@@ -157,6 +157,6 @@ fn a_run_reporting_an_error_fails_the_pipeline() {
     let pipeline = Pipeline::default()
         .then(to_sema)
         .then(to_unit)
-        .run(|| vec![DiagnosisNode::new(Diagnosis::Invariant("test"), Span::default())]);
+        .run(|| vec![DiagnosticNode::new(Diagnostic::Invariant("test"), Span::default())]);
     assert!(pipeline.failed());
 }

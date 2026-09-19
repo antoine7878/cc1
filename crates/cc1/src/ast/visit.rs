@@ -2,12 +2,12 @@ use std::ops::Deref;
 
 use crate::ast::{
     CompoundStatementNode, ConstValueNode, DeclarationNode, DeclarationSpecifier, Declarator, DeclaratorNode, Enum,
-    Expression, ExpressionNode, ExpressionStatementNode, ExternalDeclaration, ExternalDeclarationNode,
+    Enumerator, Expression, ExpressionNode, ExpressionStatementNode, ExternalDeclaration, ExternalDeclarationNode,
     FunctionDefinitionNode, FunctionParameters, FunctionParametersNode, InitDeclaratorNode, Initializer,
     InitializerNode, IterationStatement, IterationStatementNode, JumpStatement, JumpStatementNode, LabeledStatement,
     LabeledStatementNode, Name, ParameterDeclaration, Qualifier, SelectionStatement, SelectionStatementNode, Statement,
-    StatementNode, StringLiteralNode, Struct, StructDeclaration, StructMemberDeclarator, TranslationUnitNode, Type,
-    TypeSpecifier, Union, Variant,
+    StatementNode, StringLiteralNode, Struct, StructDeclaration, StructMemberDeclarator, TranslationUnitNode, TypeName,
+    TypeSpecifier, Union,
 };
 
 pub trait Visitor {
@@ -71,8 +71,8 @@ pub trait Visitor {
         walk_expression(self, node);
     }
 
-    fn visit_type(&mut self, node: &Type) {
-        walk_type(self, node);
+    fn visit_type_name(&mut self, node: &TypeName) {
+        walk_type_name(self, node);
     }
 
     fn visit_function_parameters(&mut self, node: &FunctionParametersNode) {
@@ -95,8 +95,8 @@ pub trait Visitor {
         walk_enum(self, node);
     }
 
-    fn visit_variant(&mut self, node: &Variant) {
-        walk_variant(self, node);
+    fn visit_enumerator(&mut self, node: &Enumerator) {
+        walk_enumerator(self, node);
     }
 
     fn visit_struct_declaration(&mut self, node: &StructDeclaration) {
@@ -301,15 +301,15 @@ pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, node: &ExpressionNode) {
             v.visit_expression(then);
             v.visit_expression(otherwise);
         }
-        Expression::Member(_, tag, ident) => {
-            v.visit_expression(tag);
+        Expression::Member(_, object, ident) => {
+            v.visit_expression(object);
             v.visit_name(ident);
         }
         Expression::Cast(ty, expr) => {
-            v.visit_type(ty);
+            v.visit_type_name(ty);
             v.visit_expression(expr);
         }
-        Expression::SizeofType(ty) => v.visit_type(ty),
+        Expression::SizeofType(ty) => v.visit_type_name(ty),
         Expression::List(exps) => {
             for e in exps {
                 v.visit_expression(e);
@@ -318,7 +318,7 @@ pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, node: &ExpressionNode) {
     }
 }
 
-pub fn walk_type<V: Visitor + ?Sized>(v: &mut V, node: &Type) {
+pub fn walk_type_name<V: Visitor + ?Sized>(v: &mut V, node: &TypeName) {
     walk_specifiers(v, &node.specifiers);
     v.visit_declarator(&node.declarator);
 }
@@ -348,8 +348,8 @@ pub fn walk_struct<V: Visitor + ?Sized>(v: &mut V, node: &Struct) {
     if let Some(name) = &node.name {
         v.visit_name(name);
     }
-    for field in &node.fields {
-        v.visit_struct_declaration(field);
+    for declaration in &node.declarations {
+        v.visit_struct_declaration(declaration);
     }
 }
 
@@ -357,8 +357,8 @@ pub fn walk_union<V: Visitor + ?Sized>(v: &mut V, node: &Union) {
     if let Some(name) = &node.name {
         v.visit_name(name);
     }
-    for field in &node.fields {
-        v.visit_struct_declaration(field);
+    for declaration in &node.declarations {
+        v.visit_struct_declaration(declaration);
     }
 }
 
@@ -366,12 +366,12 @@ pub fn walk_enum<V: Visitor + ?Sized>(v: &mut V, node: &Enum) {
     if let Some(name) = &node.name {
         v.visit_name(name);
     }
-    for variant_id in &node.variants {
-        v.visit_variant(variant_id.resolve());
+    for enumerator_id in &node.enumerators {
+        v.visit_enumerator(enumerator_id.resolve());
     }
 }
 
-pub fn walk_variant<V: Visitor + ?Sized>(v: &mut V, node: &Variant) {
+pub fn walk_enumerator<V: Visitor + ?Sized>(v: &mut V, node: &Enumerator) {
     v.visit_name(&node.name);
     if let Some(value) = &node.value {
         v.visit_expression(value);

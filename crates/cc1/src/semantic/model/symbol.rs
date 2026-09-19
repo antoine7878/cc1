@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::ast::{Name, Storage};
 use crate::define_arena;
-use crate::semantic::{ExpressionKind, InitializerId, QualifiedType, ScopeKind, Sema};
+use crate::semantic::{InitializerId, QualifiedType, ScopeKind, Sema, ValueCategory};
 
 define_arena!(Symbol, SymbolArena, SymbolId);
 
@@ -21,10 +21,10 @@ pub enum Duration {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Definition {
+pub enum DefinitionState {
+    Declared,
     Tentative,
-    Definition,
-    Declaration,
+    Defined,
 }
 
 #[derive(Clone, Debug)]
@@ -36,23 +36,29 @@ pub struct Symbol {
     pub value: Option<i32>,
     pub linkage: Linkage,
     pub duration: Duration,
-    pub definition: Definition,
-    pub is_init: bool,
+    pub definition: DefinitionState,
+    pub has_initializer: bool,
     pub used: bool,
     pub initializer: Option<InitializerId>,
 }
 
 impl Symbol {
-    pub fn new(name: Name, ty: QualifiedType, storage: Option<Storage>, kind: SymbolKind, is_init: bool) -> Self {
+    pub fn new(
+        name: Name,
+        ty: QualifiedType,
+        storage: Option<Storage>,
+        kind: SymbolKind,
+        has_initializer: bool,
+    ) -> Self {
         Self {
             name,
             ty,
             storage,
             kind,
             value: None,
-            is_init,
+            has_initializer,
             linkage: Linkage::None,
-            definition: Definition::Definition,
+            definition: DefinitionState::Defined,
             duration: Duration::None,
             used: false,
             initializer: None,
@@ -96,22 +102,22 @@ impl Symbol {
         storage: Option<Storage>,
         has_initializer: bool,
         kind: SymbolKind,
-    ) -> Definition {
+    ) -> DefinitionState {
         if kind == SymbolKind::Function {
-            return Definition::Declaration;
+            return DefinitionState::Declared;
         }
         if has_initializer {
-            return Definition::Definition;
+            return DefinitionState::Defined;
         }
         if scope == ScopeKind::File {
             return match storage {
-                None | Some(Storage::Static) => Definition::Tentative,
-                _ => Definition::Declaration,
+                None | Some(Storage::Static) => DefinitionState::Tentative,
+                _ => DefinitionState::Declared,
             };
         }
         match storage {
-            Some(Storage::Extern) => Definition::Declaration,
-            _ => Definition::Definition,
+            Some(Storage::Extern) => DefinitionState::Declared,
+            _ => DefinitionState::Defined,
         }
     }
 
@@ -123,15 +129,15 @@ impl Symbol {
         Self::with_value(name, ty, value, SymbolKind::Member)
     }
 
-    pub fn variant(name: Name, ty: QualifiedType, value: i32) -> Self {
-        Self::with_value(name, ty, Some(value), SymbolKind::Variant)
+    pub fn enumerator(name: Name, ty: QualifiedType, value: i32) -> Self {
+        Self::with_value(name, ty, Some(value), SymbolKind::Enumerator)
     }
 
     pub fn function(name: Name, ty: QualifiedType, storage: Storage) -> Self {
         Self::new(name, ty, Some(storage), SymbolKind::Function, true)
     }
 
-    pub fn parameter(name: Name, ty: QualifiedType, storage: Storage) -> Self {
+    pub fn param(name: Name, ty: QualifiedType, storage: Storage) -> Self {
         Self { duration: Duration::Automatic, ..Self::new(name, ty, Some(storage), SymbolKind::Parameter, false) }
     }
 
@@ -141,10 +147,10 @@ impl Symbol {
             && (self.ty == other.ty || self.ty.is_compatible(sema, &other.ty))
     }
 
-    pub fn expression_kind(&self) -> ExpressionKind {
+    pub fn value_category(&self) -> ValueCategory {
         match self.kind {
-            SymbolKind::Function | SymbolKind::Variant => ExpressionKind::RValue,
-            _ => ExpressionKind::LValue,
+            SymbolKind::Function | SymbolKind::Enumerator => ValueCategory::RValue,
+            _ => ValueCategory::LValue,
         }
     }
 }
@@ -159,7 +165,7 @@ pub enum SymbolKind {
     Union,
     Member,
     Typedef,
-    Variant,
+    Enumerator,
 }
 
 impl fmt::Display for Linkage {
@@ -182,12 +188,12 @@ impl fmt::Display for Duration {
     }
 }
 
-impl fmt::Display for Definition {
+impl fmt::Display for DefinitionState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Definition::Declaration => write!(f, "declaration"),
-            Definition::Tentative => write!(f, "tentative"),
-            Definition::Definition => write!(f, "definition"),
+            DefinitionState::Declared => write!(f, "declaration"),
+            DefinitionState::Tentative => write!(f, "tentative"),
+            DefinitionState::Defined => write!(f, "definition"),
         }
     }
 }
@@ -203,7 +209,7 @@ impl fmt::Display for SymbolKind {
             SymbolKind::Union => write!(f, "union"),
             SymbolKind::Member => write!(f, "member"),
             SymbolKind::Typedef => write!(f, "typedef"),
-            SymbolKind::Variant => write!(f, "variant"),
+            SymbolKind::Enumerator => write!(f, "enumerator"),
         }
     }
 }

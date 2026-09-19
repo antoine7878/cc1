@@ -12,7 +12,7 @@ folded!(fold_to_result_type, "int main(void) { long l; l = 1 + 1L; return 0; }",
 folded!(fold_unsigned, "int main(void) { unsigned u; u = 1u + 2; return 0; }", ["UnsignedInt(3)"]);
 folded!(fold_floating, "int main(void) { double d; d = 1.5 + 2.5; return 0; }", ["Double(4.0)"]);
 folded!(fold_cast, "int main(void) { return (char)300; }", ["Int(44)"]);
-folded!(fold_enum_variant, "enum E { A = 2 }; int main(void) { return A + 1; }", ["Int(2)", "Int(2)", "Int(3)"]);
+folded!(fold_enumerator, "enum E { A = 2 }; int main(void) { return A + 1; }", ["Int(2)", "Int(2)", "Int(3)"]);
 folded!(fold_ternary, "int main(void) { return 1 ? 2 : 3; }", ["Int(2)"]);
 
 folded!(fold_skips_unevaluated_and_operand, "int f(void); int main(void) { return 0 && f(); }", ["Int(0)"]);

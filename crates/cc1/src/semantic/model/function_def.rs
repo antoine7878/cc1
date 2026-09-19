@@ -5,7 +5,7 @@ use libft::Span;
 use crate::ast::{Name, Storage};
 use crate::define_arena;
 use crate::semantic::model::cast::default_argument_promotions;
-use crate::semantic::{ExpressionKind, QualifiedType, ResolvedExpression, Sema, SymbolId};
+use crate::semantic::{QualifiedType, ResolvedExpression, Sema, SymbolId, ValueCategory};
 
 define_arena!(FunctionDef, FunctionDefArena, FunctionDefId);
 
@@ -13,17 +13,17 @@ define_arena!(FunctionDef, FunctionDefArena, FunctionDefId);
 pub struct FunctionDef {
     pub sym: SymbolId,
     pub return_ty: QualifiedType,
-    pub parameters: Vec<SymbolId>,
+    pub params: Vec<SymbolId>,
     pub labels: Vec<Name>,
 }
 
 impl FunctionDefArena {
     pub fn declare(&mut self, sym: SymbolId, return_ty: QualifiedType) -> FunctionDefId {
-        self.alloc(FunctionDef { sym, return_ty, parameters: Vec::new(), labels: Vec::new() })
+        self.alloc(FunctionDef { sym, return_ty, params: Vec::new(), labels: Vec::new() })
     }
 
-    pub fn complete(&mut self, id: FunctionDefId, parameters: Vec<SymbolId>) {
-        self.get_mut(id).parameters = parameters;
+    pub fn complete(&mut self, id: FunctionDefId, params: Vec<SymbolId>) {
+        self.get_mut(id).params = params;
     }
 }
 
@@ -65,7 +65,7 @@ impl ParamTypes {
 }
 
 fn promoted(sema: &Sema, ty: QualifiedType) -> QualifiedType {
-    let mut re = ResolvedExpression::new(ty, ExpressionKind::RValue);
+    let mut re = ResolvedExpression::new(ty, ValueCategory::RValue);
     default_argument_promotions(sema, &mut re);
     re.casted_ty()
 }

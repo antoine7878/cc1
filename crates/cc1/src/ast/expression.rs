@@ -28,12 +28,12 @@ pub enum Expression {
     FunctionCall(ExpressionNode, Vec<ExpressionNode>),
     Member(MemberOp, ExpressionNode, Name),
     SizeofExpr(ExpressionNode),
-    SizeofType(Type),
-    Cast(Type, ExpressionNode),
+    SizeofType(TypeName),
+    Cast(TypeName, ExpressionNode),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Type {
+pub struct TypeName {
     pub specifiers: Vec<DeclarationSpecifier>,
     pub declarator: DeclaratorNode,
 }
@@ -51,8 +51,8 @@ impl ExpressionArena {
         ExpressionNode::new(self.alloc(Expression::StringLiteral(literal)), span)
     }
 
-    pub fn constant_expression(&mut self, node_id: ExpressionNode, span: Span) -> ExpressionNode {
-        ExpressionNode::new(self.alloc(Expression::ConstantExpression(node_id)), span)
+    pub fn constant_expression(&mut self, inner: ExpressionNode, span: Span) -> ExpressionNode {
+        ExpressionNode::new(self.alloc(Expression::ConstantExpression(inner)), span)
     }
 
     fn get_args(&self, args: Option<ExpressionNode>) -> Vec<ExpressionNode> {
@@ -74,20 +74,20 @@ impl ExpressionArena {
         ExpressionNode::new(self.alloc(Expression::FunctionCall(function, self.get_args(args))), span)
     }
 
-    pub fn sizeof_expr(&mut self, node_node: ExpressionNode, span: Span) -> ExpressionNode {
-        ExpressionNode::new(self.alloc(Expression::SizeofExpr(node_node)), span)
+    pub fn sizeof_expr(&mut self, operand: ExpressionNode, span: Span) -> ExpressionNode {
+        ExpressionNode::new(self.alloc(Expression::SizeofExpr(operand)), span)
     }
 
-    pub fn sizeof_type(&mut self, type_node: Type, span: Span) -> ExpressionNode {
+    pub fn sizeof_type(&mut self, type_node: TypeName, span: Span) -> ExpressionNode {
         ExpressionNode::new(self.alloc(Expression::SizeofType(type_node)), span)
     }
 
-    pub fn cast(&mut self, type_node: Type, node_id: ExpressionNode, span: Span) -> ExpressionNode {
-        ExpressionNode::new(self.alloc(Expression::Cast(type_node, node_id)), span)
+    pub fn cast(&mut self, type_node: TypeName, operand: ExpressionNode, span: Span) -> ExpressionNode {
+        ExpressionNode::new(self.alloc(Expression::Cast(type_node, operand)), span)
     }
 
-    pub fn member(&mut self, tag: ExpressionNode, op: MemberOp, identifier: Name, span: Span) -> ExpressionNode {
-        ExpressionNode::new(self.alloc(Expression::Member(op, tag, identifier)), span)
+    pub fn member(&mut self, object: ExpressionNode, op: MemberOp, identifier: Name, span: Span) -> ExpressionNode {
+        ExpressionNode::new(self.alloc(Expression::Member(op, object, identifier)), span)
     }
 
     pub fn unary(&mut self, op: UnaryOp, operand: ExpressionNode, span: Span) -> ExpressionNode {
@@ -98,7 +98,7 @@ impl ExpressionArena {
         ExpressionNode::new(self.alloc(Expression::ArraySubscripting(lhs, index)), span)
     }
 
-    pub fn add_list(&mut self, mut lhs: ExpressionNode, rhs: ExpressionNode) -> ExpressionNode {
+    pub fn push_comma(&mut self, mut lhs: ExpressionNode, rhs: ExpressionNode) -> ExpressionNode {
         let Expression::List(v) = self.get_mut(lhs.id) else {
             let span = Span::new(lhs.span.start, rhs.span.end);
             return ExpressionNode::new(self.alloc(Expression::List(vec![lhs, rhs])), span);

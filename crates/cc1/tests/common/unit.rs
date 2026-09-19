@@ -4,15 +4,15 @@ use std::process::{Command, Stdio};
 use cc1::ast::statement::StatementId;
 use cc1::ast::{ConstValue, Expression, ExpressionId, Name, StringConstant, Tag};
 use cc1::codegen::generate_to;
-use cc1::context::{self, Context, install};
+use cc1::context::{self, Context, install_context};
 use cc1::parser::parse_reader;
 use cc1::semantic::{
-    AddressBase, Analyzer, Diagnosis, DiagnosisNode, ExpressionKind, Initializer, ParamTypes, QualifiedType,
-    ResolvedStatement, ResolvedType, Sema, SymbolKind, install as install_sema,
+    AddressBase, Analyzer, Diagnostic, DiagnosticNode, Initializer, ParamTypes, QualifiedType, ResolvedStatement,
+    ResolvedType, Sema, SymbolKind, ValueCategory, install_sema,
 };
 use cc1::target::{I386, Target};
 
-use crate::common::ty::Ty;
+use crate::common::types::Ty;
 
 fn string_body(constant: &StringConstant) -> String {
     let mut out = String::new();
@@ -79,7 +79,7 @@ impl Unit {
     pub fn parse(src: &str) -> Self {
         let src = preprocess(src);
         let (ctx, status) = parse_reader(new_ctx(), Cursor::new(src));
-        let ctx = install(ctx);
+        let ctx = install_context(ctx);
         let sema = install_sema(Sema::new(ctx.target.clone()));
         Self { ctx, sema, status }
     }
@@ -96,22 +96,22 @@ impl Unit {
     }
 
     pub fn parsed(&self) -> bool {
-        self.status == 0 && !self.diagnosis().iter().any(|diag| matches!(diag.inner, Diagnosis::SyntaxError { .. }))
+        self.status == 0 && !self.diagnostics().iter().any(|diag| matches!(diag.inner, Diagnostic::SyntaxError { .. }))
     }
 
-    pub fn diagnosis(&self) -> Vec<DiagnosisNode> {
-        self.ctx.diagnosis.iter().chain(&self.sema.diagnosis).cloned().collect()
+    pub fn diagnostics(&self) -> Vec<DiagnosticNode> {
+        self.ctx.diagnostics.iter().chain(&self.sema.diagnostics).cloned().collect()
     }
 
     pub fn accepts(&self) -> bool {
-        self.parsed() && self.diagnosis().is_empty()
+        self.parsed() && self.diagnostics().is_empty()
     }
 
-    pub fn variants(&self) -> Vec<(String, String)> {
+    pub fn enumerators(&self) -> Vec<(String, String)> {
         self.sema
             .symbols
             .iter()
-            .filter(|symbol| symbol.kind == SymbolKind::Variant)
+            .filter(|symbol| symbol.kind == SymbolKind::Enumerator)
             .map(|symbol| (symbol.name.id.resolve().clone(), symbol.value.map(|v| v.to_string()).unwrap_or_default()))
             .collect()
     }
@@ -145,7 +145,7 @@ impl Unit {
                     Expression::ConstantExpression(_) | Expression::SizeofExpr(_) | Expression::SizeofType(_)
                 )
             })
-            .filter(|&id| self.sema.expr_consts.seen(id))
+            .filter(|&id| self.sema.expr_consts.contains(id))
             .map(|id| self.sema.expr_consts.get(id).copied())
             .collect()
     }
@@ -163,16 +163,16 @@ impl Unit {
             .collect()
     }
 
-    pub fn shapes(&self) -> Vec<crate::common::ty::Shape> {
-        use crate::common::ty::Shape;
+    pub fn shapes(&self) -> Vec<crate::common::types::Shape> {
+        use crate::common::types::Shape;
 
-        (0..self.sema.expr_types.len())
+        (0..self.sema.expressions.len())
             .map(ExpressionId::from)
-            .filter(|&id| self.sema.expr_types.seen(id))
-            .map(|id| match self.sema.expr_types.get(id) {
+            .filter(|&id| self.sema.expressions.contains(id))
+            .map(|id| match self.sema.expressions.get(id) {
                 Some(resolved) => Shape {
                     ty: Some(self.ty_tree(resolved.ty)),
-                    lvalue: matches!(resolved.kind, ExpressionKind::LValue),
+                    lvalue: matches!(resolved.kind, ValueCategory::LValue),
                     casts: resolved.casts.iter().map(|cast| (cast.kind, self.ty_tree(cast.to))).collect(),
                     result_cast: resolved.result_cast.map(|cast| (cast.kind, self.ty_tree(cast.to))),
                 },
@@ -258,7 +258,7 @@ impl Unit {
     pub fn bindings(&self) -> Vec<(String, Option<usize>)> {
         (0..self.sema.expr_bindings.len())
             .map(ExpressionId::from)
-            .filter(|&id| self.sema.expr_bindings.seen(id))
+            .filter(|&id| self.sema.expr_bindings.contains(id))
             .map(|id| {
                 let name = match self.ctx.arenas.expressions.iter().nth(id.into()).unwrap() {
                     Expression::Identifier(name) => name.id.resolve().clone(),
@@ -272,10 +272,10 @@ impl Unit {
     pub fn member_refs(&self) -> Vec<(String, String, usize)> {
         (0..self.sema.member_refs.len())
             .map(ExpressionId::from)
-            .filter(|&id| self.sema.member_refs.seen(id))
+            .filter(|&id| self.sema.member_refs.contains(id))
             .filter_map(|id| {
                 let reference = self.sema.member_refs.get(id).copied()?;
-                let sym = reference.member(self.sema).sym?;
+                let sym = reference.member(self.sema).symbol?;
                 let member = self.sema.symbols.get(sym).name.id.resolve().clone();
                 let tag = self.sema.tags.get(reference.tag).name;
                 let tag = tag.map_or_else(|| "<anonymous>".to_string(), |n| n.id.resolve().clone());
@@ -285,10 +285,10 @@ impl Unit {
     }
 
     pub fn statements(&self) -> Vec<String> {
-        (0..self.sema.stmts.len())
+        (0..self.sema.statements.len())
             .map(StatementId::from)
             .filter_map(|id| {
-                let fact = self.render_statement(self.sema.stmts.get(id)?);
+                let fact = self.render_statement(self.sema.statements.get(id)?);
                 Some(format!("#{} {fact}", usize::from(id)))
             })
             .collect()
@@ -352,7 +352,7 @@ impl Unit {
             .filter_map(|symbol| {
                 let id = symbol.initializer?;
                 let name = symbol.name.id.resolve().clone();
-                Some((name, self.render_initializer(self.sema.inits.get(id))))
+                Some((name, self.render_initializer(self.sema.initializers.get(id))))
             })
             .collect()
     }
@@ -404,7 +404,7 @@ impl Unit {
         def.members
             .iter()
             .filter_map(|m| {
-                let sym = m.sym?;
+                let sym = m.symbol?;
                 let name = self.sema.symbols.get(sym).name.id.resolve().clone();
                 Some((name, m.offset, m.bit_offset))
             })
@@ -417,7 +417,7 @@ impl Unit {
     }
 
     pub fn messages(&self) -> Vec<String> {
-        self.diagnosis()
+        self.diagnostics()
             .iter()
             .map(|diag| {
                 let mut buf = Vec::new();
@@ -429,14 +429,14 @@ impl Unit {
 
     pub fn ir(&self) -> String {
         let mut buf = Vec::new();
-        let diagnosis = generate_to(&mut buf);
-        assert!(diagnosis.is_empty(), "codegen diagnosis: {diagnosis:?}");
+        let diagnostics = generate_to(&mut buf);
+        assert!(diagnostics.is_empty(), "codegen diagnostics: {diagnostics:?}");
         String::from_utf8(buf).expect("ir is utf-8")
     }
 
     pub fn render(&self) -> String {
         let mut out = String::new();
-        for diag in self.diagnosis() {
+        for diag in self.diagnostics() {
             let mut buf = Vec::new();
             let _ = diag.write(&mut buf);
             out.push_str(&String::from_utf8_lossy(&buf));
@@ -475,7 +475,7 @@ pub fn strip_ansi(text: &str) -> String {
 pub fn accepted(src: &str) -> Unit {
     let unit = Unit::compile(src);
     assert!(unit.parsed(), "cc1 failed to parse:\n{src}");
-    assert!(unit.diagnosis().is_empty(), "unexpected diagnosis:\n{src}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "unexpected diagnostic:\n{src}\n{}", unit.render());
     unit
 }
 
@@ -502,7 +502,7 @@ pub fn run_accept(name: &str, src: &str) {
     let unit = Unit::compile(src);
 
     assert!(unit.parsed(), "`{name}` should parse:\n{src}");
-    assert!(unit.diagnosis().is_empty(), "`{name}` should be accepted:\n{src}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "`{name}` should be accepted:\n{src}\n{}", unit.render());
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{src}");
 }
 
@@ -516,16 +516,16 @@ pub fn run_value(name: &str, src: &str, expected: &[(&str, &str)]) {
     let unit = Unit::compile(src);
 
     assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
-    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{src}\n{}", unit.render());
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{src}");
 
-    let variants = unit.variants();
-    for (variant, value) in expected {
-        let found = variants.iter().find(|(name, _)| name == variant);
+    let enumerators = unit.enumerators();
+    for (enumerator, value) in expected {
+        let found = enumerators.iter().find(|(name, _)| name == enumerator);
         assert_eq!(
             found.map(|(_, value)| value.as_str()),
             Some(*value),
-            "`{name}` variant `{variant}` should be {value}:\n{src}\n{variants:?}"
+            "`{name}` enumerator `{enumerator}` should be {value}:\n{src}\n{enumerators:?}"
         );
     }
 }
@@ -535,11 +535,11 @@ pub fn run_size(name: &str, decl: &str, ty: &str, expected: u64) {
     let unit = Unit::compile(&src);
 
     assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
-    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{src}\n{}", unit.render());
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{decl}");
 
-    let variants = unit.variants();
-    let got = variants.iter().find(|(name, _)| name == "PROBE");
+    let enumerators = unit.enumerators();
+    let got = enumerators.iter().find(|(name, _)| name == "PROBE");
     assert_eq!(
         got.map(|(_, value)| value.as_str()),
         Some(expected.to_string().as_str()),
@@ -551,7 +551,7 @@ pub fn run_bits(name: &str, decl: &str, tag: &str, expected: &[(&str, u32)]) {
     let unit = Unit::compile(decl);
 
     assert!(unit.parsed(), "`{name}` failed to parse:\n{decl}");
-    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{decl}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{decl}\n{}", unit.render());
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{decl}");
 
     let expected: Vec<(String, u32)> = expected.iter().map(|(n, b)| (n.to_string(), *b)).collect();
@@ -562,7 +562,7 @@ pub fn run_offsets(name: &str, decl: &str, tag: &str, expected: &[(&str, u32, u3
     let unit = Unit::compile(decl);
 
     assert!(unit.parsed(), "`{name}` failed to parse:\n{decl}");
-    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{decl}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{decl}\n{}", unit.render());
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{decl}");
 
     let got = unit.tag_members(tag);
@@ -574,7 +574,7 @@ pub fn run_uses(name: &str, src: &str, expected: &[(&str, bool)]) {
     let unit = Unit::compile(src);
 
     assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
-    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{src}\n{}", unit.render());
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{src}");
 
     let got = unit.uses();
@@ -586,7 +586,7 @@ pub fn run_initializers(name: &str, src: &str, expected: &[(&str, &str)]) {
     let unit = Unit::compile(src);
 
     assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
-    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{src}\n{}", unit.render());
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{src}");
 
     let got = unit.initializers();
@@ -598,7 +598,7 @@ pub fn run_statements(name: &str, src: &str, expected: &[&str]) {
     let unit = Unit::compile(src);
 
     assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
-    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{src}\n{}", unit.render());
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{src}");
 
     let expected: Vec<String> = expected.iter().map(|s| s.to_string()).collect();
@@ -609,7 +609,7 @@ pub fn run_labels(name: &str, src: &str, expected: &[(&str, &[&str])]) {
     let unit = Unit::compile(src);
 
     assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
-    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{src}\n{}", unit.render());
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{src}");
 
     let expected: Vec<(String, Vec<String>)> =
@@ -621,7 +621,7 @@ pub fn run_member_refs(name: &str, src: &str, expected: &[(&str, &str, usize)]) 
     let unit = Unit::compile(src);
 
     assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
-    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{src}\n{}", unit.render());
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{src}");
 
     let got = unit.member_refs();
@@ -634,7 +634,7 @@ pub fn run_placements(name: &str, src: &str, expected: &[(&str, &str, &str, &str
     let unit = Unit::compile(src);
 
     assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
-    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{src}\n{}", unit.render());
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{src}");
 
     let got = unit.placements();
@@ -661,19 +661,23 @@ pub fn run_literal(name: &str, src: &str, expected: &str) {
     assert_eq!(unit.string_literals(), vec![expected.to_string()], "wrong string literal value for `{name}`:\n{src}");
 }
 
-fn diagnosis_name(diagnosis: &Diagnosis) -> Option<Name> {
-    match diagnosis {
-        Diagnosis::UndeclaredIdentifier(name) => Some(*name),
-        Diagnosis::DuplicateDeclaration(_, name) => Some(*name),
+fn diagnostic_name(diagnostic: &Diagnostic) -> Option<Name> {
+    match diagnostic {
+        Diagnostic::UndeclaredIdentifier(name) => Some(*name),
+        Diagnostic::DuplicateDeclaration(_, name) => Some(*name),
         _ => None,
     }
 }
 
 pub fn assert_unmentioned(name: &str, src: &str, unit: &Unit, forbidden: &[&str]) {
     for word in forbidden {
-        for diag in unit.diagnosis() {
-            let mentioned = diagnosis_name(&diag.inner).map(|n| n.id.resolve().as_str() == *word);
-            assert!(mentioned != Some(true), "`{name}` cascading diagnosis mentions {word}:\n{src}\n{}", unit.render());
+        for diag in unit.diagnostics() {
+            let mentioned = diagnostic_name(&diag.inner).map(|n| n.id.resolve().as_str() == *word);
+            assert!(
+                mentioned != Some(true),
+                "`{name}` cascading diagnostic mentions {word}:\n{src}\n{}",
+                unit.render()
+            );
         }
     }
 }

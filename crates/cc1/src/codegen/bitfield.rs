@@ -19,7 +19,7 @@ impl<W: Write> Generator<W> {
         let Expression::Member(_, _, _) = node.id.resolve() else { return None };
         let member = sema().member_refs[node.id].member(sema());
         let width = member.width?;
-        let qty = sema().expr_types[node.id].ty;
+        let qty = sema().expressions[node.id].ty;
         Some(BitField {
             unit: qty.llvm(),
             bit_offset: member.bit_offset as i32,
@@ -28,33 +28,33 @@ impl<W: Write> Generator<W> {
         })
     }
 
-    pub fn load_place(&mut self, loc: LlvmSymbol, qty: QualifiedType, bf: Option<&BitField>) -> LlvmSymbol {
+    pub fn emit_load(&mut self, loc: LlvmSymbol, qty: QualifiedType, bf: Option<&BitField>) -> LlvmSymbol {
         match bf {
-            None => self.b.load(qty.llvm(), loc),
+            None => self.builder.load(qty.llvm(), loc),
             Some(bf) => {
-                let v = self.b.load(bf.unit, loc);
+                let v = self.builder.load(bf.unit, loc);
                 self.extract(v, bf)
             }
         }
     }
 
-    pub fn store_place(&mut self, src: LlvmSymbol, loc: LlvmSymbol, bf: Option<&BitField>) -> LlvmSymbol {
+    pub fn emit_store(&mut self, src: LlvmSymbol, loc: LlvmSymbol, bf: Option<&BitField>) -> LlvmSymbol {
         match bf {
-            None => self.b.store(src, loc),
+            None => self.builder.store(src, loc),
             Some(bf) => {
-                let old = self.b.load(bf.unit, loc);
+                let old = self.builder.load(bf.unit, loc);
                 let mask = ((1u64 << bf.width) - 1) << bf.bit_offset;
 
                 let cst = LlvmSymbol::cst(bf.unit, ConstValue::Int(!mask as u32 as i32));
-                let cleared = self.b.binop("and", old, cst);
+                let cleared = self.builder.binop("and", old, cst);
 
                 let cst = LlvmSymbol::cst(bf.unit, ConstValue::Int(bf.bit_offset));
-                let v = self.b.binop("shl", src, cst);
+                let v = self.builder.binop("shl", src, cst);
                 let cst = LlvmSymbol::cst(bf.unit, ConstValue::Int(mask as u32 as i32));
-                let field = self.b.binop("and", v, cst);
+                let field = self.builder.binop("and", v, cst);
 
-                let v = self.b.binop("or", cleared, field);
-                self.b.store(v, loc);
+                let v = self.builder.binop("or", cleared, field);
+                self.builder.store(v, loc);
                 self.extract(v, bf)
             }
         }
@@ -63,9 +63,9 @@ impl<W: Write> Generator<W> {
     fn extract(&mut self, v: LlvmSymbol, bf: &BitField) -> LlvmSymbol {
         let bits = (bf.unit.size() * 8) as i32;
         let cst = LlvmSymbol::cst(bf.unit, ConstValue::Int(bits - bf.width - bf.bit_offset));
-        let sh = self.b.binop("shl", v, cst);
+        let sh = self.builder.binop("shl", v, cst);
         let op = if bf.signed { "ashr" } else { "lshr" };
         let cst = LlvmSymbol::cst(bf.unit, ConstValue::Int(bits - bf.width));
-        self.b.binop(op, sh, cst)
+        self.builder.binop(op, sh, cst)
     }
 }

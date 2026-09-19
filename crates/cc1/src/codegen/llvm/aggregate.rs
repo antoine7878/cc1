@@ -11,12 +11,12 @@ pub enum LlvmElement {
 impl LlvmElement {
     pub fn ty(&self) -> String {
         match self {
-            LlvmElement::Pad(n) | LlvmElement::Bits { bytes: n, .. } => Self::bytes_ty(*n),
+            LlvmElement::Pad(n) | LlvmElement::Bits { bytes: n, .. } => Self::bytes_type(*n),
             LlvmElement::Member { ty, .. } => ty.llvm().to_string(),
         }
     }
 
-    pub fn bytes_ty(n: u32) -> String {
+    pub fn bytes_type(n: u32) -> String {
         match n {
             1 | 2 | 4 | 8 => LlvmType::integer(n).to_string(),
             n => format!("[{n} x {}]", LlvmType::char()),
@@ -25,7 +25,9 @@ impl LlvmElement {
 
     pub fn zero(&self) -> String {
         match self {
-            LlvmElement::Pad(1 | 2 | 4 | 8) | LlvmElement::Bits { bytes: 1 | 2 | 4 | 8, .. } => format!("{} 0", self.ty()),
+            LlvmElement::Pad(1 | 2 | 4 | 8) | LlvmElement::Bits { bytes: 1 | 2 | 4 | 8, .. } => {
+                format!("{} 0", self.ty())
+            }
             _ => format!("{} zeroinitializer", self.ty()),
         }
     }
@@ -44,7 +46,7 @@ pub fn struct_elements(def: &TagDef, size: u32) -> Vec<LlvmElement> {
         match member.width {
             Some(0) => continue,
             None => {
-                let Some(id) = member.sym else { unreachable!() };
+                let Some(id) = member.symbol else { unreachable!() };
                 let ty = id.resolve().ty;
                 pad(&mut elements, &mut cur, member.offset);
                 elements.push(LlvmElement::Member { index, ty });

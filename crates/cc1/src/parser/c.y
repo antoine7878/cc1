@@ -1,9 +1,9 @@
 %no_main
 %feedback
 %{
-use crate::ast::{Qualifier, Type, ExpressionNode, Name, DeclarationSpecifier, Initializer, TypeSpecifier, ParameterDeclaration};
+use crate::ast::{Qualifier, TypeName, ExpressionNode, Name, DeclarationSpecifier, Initializer, TypeSpecifier, ParameterDeclaration};
 use crate::ast::{DeclarationNode, InitDeclaratorNode, DeclaratorNode, InitializerNode, Storage, FunctionParametersNode, Tag};
-use crate::ast::{StructDeclaration, StructMemberDeclarator, VariantId, EnumId, LabeledStatementNode, StatementNode, LabeledStatement, CompoundStatementNode};
+use crate::ast::{StructDeclaration, StructMemberDeclarator, EnumeratorId, EnumId, LabeledStatementNode, StatementNode, LabeledStatement, CompoundStatementNode};
 use crate::ast::{ExpressionStatementNode, SelectionStatementNode, IterationStatementNode, JumpStatementNode, JumpStatement};
 use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode, ConstValueNode, StringLiteralNode};
 use crate::ast::{BinaryOp, MemberOp, UnaryOp};
@@ -12,11 +12,11 @@ use crate::context::Context;
 use libft::Span;
 use crate::parser::YYLex;
 use crate::parser::yyerror;
-use crate::semantic::{Diagnosis, DiagnosisNode};
+use crate::semantic::{Diagnostic, DiagnosticNode};
 
 fn concat_string_literals(ctx: &mut Context, lhs: StringLiteralNode, rhs: StringLiteralNode, span: Span) -> StringLiteralNode {
     if lhs.id.resolve_with(&ctx.arenas).is_wide != rhs.id.resolve_with(&ctx.arenas).is_wide {
-        ctx.diagnosis.push(DiagnosisNode::new(Diagnosis::MixedWideStringConcat, span));
+        ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::MixedWideStringConcat, span));
     }
     ctx.arenas.strings.concat(lhs, rhs, span)
 }
@@ -89,7 +89,7 @@ macro_rules! spec {
 
 %type<ExpressionNode> expression constant_expression
 
-%type<Type> type_name
+%type<TypeName> type_name
 %type<DeclarationNode> declaration
 %type<Vec<DeclarationNode>> declaration_list
 %type<TypeSpecifier> type_specifier type_specifier_kw struct_or_union_specifier
@@ -114,8 +114,8 @@ macro_rules! spec {
 %type<Vec<StructMemberDeclarator>> struct_declarator_list
 %type<StructMemberDeclarator> struct_declarator
 %type<EnumId> enum_specifier
-%type<Vec<VariantId>> enumerator_list
-%type<VariantId> enumerator
+%type<Vec<EnumeratorId>> enumerator_list
+%type<EnumeratorId> enumerator
 
 %type<StatementNode> statement
 %type<Vec<StatementNode>> statement_list
@@ -231,7 +231,7 @@ expression /* ExpressionNode */
 	| expression XOR_ASSIGN expression                                                      { node_span!(self, expressions, assign, $1, Some(BinaryOp::BitXor), $3) }
 	| expression OR_ASSIGN expression                                                       { node_span!(self, expressions, assign, $1, Some(BinaryOp::BitOr), $3) }
     | expression '?' expression ':' expression                                              { node_span!(self, expressions, ternary, $1, $3, $5) }
-    | expression ',' expression                                                             { self.lexer.ctx.arenas.expressions.add_list($1, $3) }
+    | expression ',' expression                                                             { self.lexer.ctx.arenas.expressions.push_comma($1, $3) }
     ;
 
 declaration /* DeclarationNode */
@@ -318,7 +318,7 @@ declarator /* DeclaratorNode */
 	;
 
 direct_declarator /* DeclaratorNode */
-	: IDENTIFIER                                                                            { self.lexer.ctx.parse.add_symbol($1.id); node_span!(self, declarators, ident, $1) }
+	: IDENTIFIER                                                                            { self.lexer.ctx.parse.add_symbol($1.id); node_span!(self, declarators, identifier, $1) }
 	| '(' declarator ')'                                                                    { $2 }
 	| direct_declarator '[' constant_expression ']'                                         { node_span!(self, declarators, array, $1, Some($3)) }
 	| direct_declarator '[' ']'                                                             { node_span!(self, declarators, array, $1, None) }
@@ -360,9 +360,9 @@ identifier_list /* Vec<Name> */
 	| identifier_list ',' IDENTIFIER                                                        { push!($<mut>1, $3) }
 	;
 
-type_name /* Type */
-	: specifier_qualifier_list                                                              { Type { specifiers: $1, declarator: node_span!(self, declarators, abstract_declarator) } }
-	| specifier_qualifier_list abstract_declarator                                          { Type { specifiers: $1, declarator: $2 } }
+type_name /* TypeName */
+	: specifier_qualifier_list                                                              { TypeName { specifiers: $1, declarator: node_span!(self, declarators, abstract_declarator) } }
+	| specifier_qualifier_list abstract_declarator                                          { TypeName { specifiers: $1, declarator: $2 } }
 	;
 
 specifier_qualifier_list /* Vec<DeclarationSpecifier> */
@@ -440,14 +440,14 @@ enum_specifier /* EnumId */
 	| ENUM IDENTIFIER                                                                       { node_span!(self, enums, add, Some($2), vec![]) }
 	;
 
-enumerator_list /* Vec<VariantId> */
+enumerator_list /* Vec<EnumeratorId> */
 	: enumerator                                                                            { vec![$1] }
 	| enumerator_list ',' enumerator                                                        { push!($<mut>1, $3) }
 	;
 
-enumerator /* VariantId */
-	: IDENTIFIER                                                                            { node_span!(self, variants, add, $1, None) }
-	| IDENTIFIER '=' constant_expression                                                    { node_span!(self, variants, add, $1, Some($3)) }
+enumerator /* EnumeratorId */
+	: IDENTIFIER                                                                            { node_span!(self, enumerators, add, $1, None) }
+	| IDENTIFIER '=' constant_expression                                                    { node_span!(self, enumerators, add, $1, Some($3)) }
 	;
 
 statement /* StatementNode */
@@ -461,10 +461,10 @@ statement /* StatementNode */
 	;
 
 labeled_statement /* LabeledStatementNode */
-	: IDENTIFIER ':' statement                                                              { with_span!(self, LabeledStatementNode::identifier, $1, $3) }
-	| TYPE_NAME ':' statement                                                               { with_span!(self, LabeledStatementNode::identifier, $1, $3) }
-	| CASE constant_expression ':' statement                                                { with_span!(self, LabeledStatementNode::case, $2, $4) }
-	| DEFAULT ':' statement                                                                 { with_span!(self, LabeledStatementNode::default, $3) }
+	: IDENTIFIER ':' statement                                                              { with_span!(self, LabeledStatementNode::identifier_label, $1, $3) }
+	| TYPE_NAME ':' statement                                                               { with_span!(self, LabeledStatementNode::identifier_label, $1, $3) }
+	| CASE constant_expression ':' statement                                                { with_span!(self, LabeledStatementNode::case_label, $2, $4) }
+	| DEFAULT ':' statement                                                                 { with_span!(self, LabeledStatementNode::default_label, $3) }
 	;
 
 compound_statement /* CompoundStatementNode */
@@ -490,23 +490,23 @@ expression_statement /* ExpressionStatementNode */
 	;
 
 selection_statement /* SelectionStatementNode */
-	: IF '(' expression ')' statement %prec PREC_THEN                                       { with_span!(self, SelectionStatementNode::new_if, $3, $5, None) }
-	| IF '(' expression ')' statement ELSE statement                                        { with_span!(self, SelectionStatementNode::new_if, $3, $5, Some($7))  }
-	| SWITCH '(' expression ')' statement                                                   { with_span!(self, SelectionStatementNode::switch, $3, $5) } ;
+	: IF '(' expression ')' statement %prec PREC_THEN                                       { with_span!(self, SelectionStatementNode::if_stmt, $3, $5, None) }
+	| IF '(' expression ')' statement ELSE statement                                        { with_span!(self, SelectionStatementNode::if_stmt, $3, $5, Some($7))  }
+	| SWITCH '(' expression ')' statement                                                   { with_span!(self, SelectionStatementNode::switch_stmt, $3, $5) } ;
 
 iteration_statement /* IterationStatementNode */
-	: WHILE '(' expression ')' statement                                                    { with_span!(self, IterationStatementNode::new_while, $3, $5) }
-	| DO statement WHILE '(' expression ')' ';'                                             { with_span!(self, IterationStatementNode::new_do, $2, $5) }
-	| FOR '(' expression_statement expression_statement ')' statement                       { with_span!(self, IterationStatementNode::new_for, $3, $4, None, $6) }
-	| FOR '(' expression_statement expression_statement expression ')' statement            { with_span!(self, IterationStatementNode::new_for, $3, $4, Some($5), $7) }
+	: WHILE '(' expression ')' statement                                                    { with_span!(self, IterationStatementNode::while_stmt, $3, $5) }
+	| DO statement WHILE '(' expression ')' ';'                                             { with_span!(self, IterationStatementNode::do_stmt, $2, $5) }
+	| FOR '(' expression_statement expression_statement ')' statement                       { with_span!(self, IterationStatementNode::for_stmt, $3, $4, None, $6) }
+	| FOR '(' expression_statement expression_statement expression ')' statement            { with_span!(self, IterationStatementNode::for_stmt, $3, $4, Some($5), $7) }
 	;
 
 jump_statement /* JumpStatementNode */
-	: GOTO IDENTIFIER ';'                                                                   { with_span!(self, JumpStatementNode::goto, $2) }
+	: GOTO IDENTIFIER ';'                                                                   { with_span!(self, JumpStatementNode::goto_stmt, $2) }
 	| CONTINUE ';'                                                                          { with_span!(self, JumpStatementNode::new, JumpStatement::Continue) }
 	| BREAK ';'                                                                             { with_span!(self, JumpStatementNode::new, JumpStatement::Break) }
-	| RETURN ';'                                                                            { with_span!(self, JumpStatementNode::new_return, None) }
-    | RETURN expression ';'                                                                 { with_span!(self, JumpStatementNode::new_return, Some($2)) }
+	| RETURN ';'                                                                            { with_span!(self, JumpStatementNode::return_stmt, None) }
+    | RETURN expression ';'                                                                 { with_span!(self, JumpStatementNode::return_stmt, Some($2)) }
 	;
 
 %%

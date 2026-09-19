@@ -6,19 +6,19 @@ use crate::{ast_node, define_arena};
 define_arena!(Struct, StructArena, StructId);
 define_arena!(Union, UnionArena, UnionId);
 define_arena!(Enum, EnumArena, EnumId);
-define_arena!(Variant, VariantArena, VariantId);
+define_arena!(Enumerator, EnumeratorArena, EnumeratorId);
 
 ast_node! {
     pub struct Struct {
         pub name: Option<Name>,
-        pub fields: Vec<StructDeclaration>,
+        pub declarations: Vec<StructDeclaration>,
     }
 }
 
 ast_node! {
     pub struct Union {
         pub name: Option<Name>,
-        pub fields: Vec<StructDeclaration>,
+        pub declarations: Vec<StructDeclaration>,
     }
 }
 
@@ -40,11 +40,11 @@ ast_node! {
 pub struct Enum {
     pub span: Span,
     pub name: Option<Name>,
-    pub variants: Vec<VariantId>,
+    pub enumerators: Vec<EnumeratorId>,
 }
 
 #[derive(Clone, Debug)]
-pub struct Variant {
+pub struct Enumerator {
     pub span: Span,
     pub name: Name,
     pub value: Option<ExpressionNode>,
@@ -57,25 +57,25 @@ pub enum Tag {
     Enum,
 }
 impl StructArena {
-    pub fn add(&mut self, name: Option<Name>, fields: Vec<StructDeclaration>, span: Span) -> StructId {
-        self.alloc(Struct { name, fields, span })
+    pub fn add(&mut self, name: Option<Name>, declarations: Vec<StructDeclaration>, span: Span) -> StructId {
+        self.alloc(Struct { name, declarations, span })
     }
 }
 
 impl UnionArena {
-    pub fn add(&mut self, name: Option<Name>, fields: Vec<StructDeclaration>, span: Span) -> UnionId {
-        self.alloc(Union { name, fields, span })
+    pub fn add(&mut self, name: Option<Name>, declarations: Vec<StructDeclaration>, span: Span) -> UnionId {
+        self.alloc(Union { name, declarations, span })
     }
 }
 
 impl EnumArena {
-    pub fn add(&mut self, name: Option<Name>, variants: Vec<VariantId>, span: Span) -> EnumId {
-        self.alloc(Enum { name, variants, span })
+    pub fn add(&mut self, name: Option<Name>, enumerators: Vec<EnumeratorId>, span: Span) -> EnumId {
+        self.alloc(Enum { name, enumerators, span })
     }
 }
 
-impl VariantArena {
-    pub fn add(&mut self, name: Name, value: Option<ExpressionNode>, span: Span) -> VariantId {
-        self.alloc(Variant { name, value, span })
+impl EnumeratorArena {
+    pub fn add(&mut self, name: Name, value: Option<ExpressionNode>, span: Span) -> EnumeratorId {
+        self.alloc(Enumerator { name, value, span })
     }
 }

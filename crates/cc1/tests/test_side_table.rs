@@ -30,7 +30,7 @@ fn default_table_is_empty_and_reads_unknown() {
     assert!(table.is_empty());
     assert_eq!(table.len(), 0);
     let id = Id::from(0usize);
-    assert!(!table.seen(id));
+    assert!(!table.contains(id));
     assert!(!table.poisoned(id));
     assert_eq!(table.get(id), None);
 }
@@ -42,7 +42,7 @@ fn resize_grows_and_fills_with_unknown() {
     assert_eq!(table.len(), 3);
     for i in 0..3 {
         let id = Id::from(i);
-        assert!(!table.seen(id));
+        assert!(!table.contains(id));
         assert!(!table.poisoned(id));
     }
 }
@@ -64,7 +64,7 @@ fn set_some_makes_it_known() {
     table.resize(1);
     let id = Id::from(0usize);
     table.set(id, Some("a".to_string()));
-    assert!(table.seen(id));
+    assert!(table.contains(id));
     assert!(!table.poisoned(id));
     assert_eq!(table.get(id), Some(&"a".to_string()));
 }
@@ -75,7 +75,7 @@ fn set_none_makes_it_poisoned() {
     table.resize(1);
     let id = Id::from(0usize);
     table.set(id, None);
-    assert!(table.seen(id));
+    assert!(table.contains(id));
     assert!(table.poisoned(id));
     assert_eq!(table.get(id), None);
 }
@@ -119,7 +119,7 @@ fn take_known_yields_value_and_leaves_borrowed_state() {
     let id = Id::from(0usize);
     table.set(id, Some("a".to_string()));
     assert_eq!(table.take(id), Some("a".to_string()));
-    assert!(table.seen(id));
+    assert!(table.contains(id));
     assert!(!table.poisoned(id));
     assert_eq!(table.get(id), None);
 }
@@ -140,7 +140,7 @@ fn take_on_unknown_returns_none_and_leaves_state() {
     table.resize(1);
     let id = Id::from(0usize);
     assert_eq!(table.take(id), None);
-    assert!(!table.seen(id));
+    assert!(!table.contains(id));
 }
 
 #[test]
@@ -160,7 +160,7 @@ fn give_after_take_restores_known() {
     let id = Id::from(0usize);
     table.set(id, Some("a".to_string()));
     let value = table.take(id).unwrap();
-    table.give(id, value);
+    table.insert(id, value);
     assert!(!table.poisoned(id));
     assert_eq!(table.get(id), Some(&"a".to_string()));
 }
@@ -169,7 +169,7 @@ fn give_after_take_restores_known() {
 fn reads_past_the_end_do_not_panic() {
     let table = table();
     let id = Id::from(42usize);
-    assert!(!table.seen(id));
+    assert!(!table.contains(id));
     assert!(!table.poisoned(id));
     assert_eq!(table.get(id), None);
 }
@@ -226,7 +226,7 @@ fn loan_fails_when_id_unknown_and_changes_nothing() {
     let loan: Option<Ops<1>> = Loan::take(&mut holder, [id0]);
     assert!(loan.is_none());
     drop(loan);
-    assert!(!holder.table.seen(id0));
+    assert!(!holder.table.contains(id0));
 }
 
 #[test]
@@ -237,7 +237,7 @@ fn loaned_id_reads_as_none_but_seen_while_loan_is_alive() {
     let mut ops: Ops<1> = Loan::take(&mut holder, [id0]).unwrap();
     let (holder, _) = ops.parts();
     assert_eq!(holder.table.get(id0), None);
-    assert!(holder.table.seen(id0));
+    assert!(holder.table.contains(id0));
 }
 
 #[test]

@@ -1,7 +1,7 @@
 use crate::ast::visit::{Visitor, walk_expression, walk_translation_unit};
 use crate::ast::{Expression, ExpressionNode};
 use crate::context::ctx;
-use crate::semantic::{Sema, ice};
+use crate::semantic::{Sema, fold};
 
 struct ConstChecker<'a> {
     sema: &'a mut Sema,
@@ -10,12 +10,12 @@ struct ConstChecker<'a> {
 impl Visitor for ConstChecker<'_> {
     fn visit_expression(&mut self, node: &ExpressionNode) {
         if matches!(node.id.resolve(), Expression::ConstantExpression(_)) {
-            ice::eval_constant(self.sema, node);
+            fold::eval_constant(self.sema, node);
             return;
         }
         walk_expression(self, node);
-        if !self.sema.expr_consts.seen(node.id) {
-            let value = ice::try_fold(self.sema, node);
+        if !self.sema.expr_consts.contains(node.id) {
+            let value = fold::try_fold(self.sema, node);
             self.sema.expr_consts.set(node.id, value);
         }
     }

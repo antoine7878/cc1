@@ -14,7 +14,7 @@ pub struct TagDef {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Member {
-    pub sym: Option<SymbolId>,
+    pub symbol: Option<SymbolId>,
     pub width: Option<i32>,
     pub offset: u32,
     pub bit_offset: u32,
@@ -22,11 +22,11 @@ pub struct Member {
 
 impl Member {
     pub fn symbol(sym: SymbolId, width: Option<i32>) -> Self {
-        Self { sym: Some(sym), width, offset: 0, bit_offset: 0 }
+        Self { symbol: Some(sym), width, offset: 0, bit_offset: 0 }
     }
 
     pub fn bitfield(width: i32) -> Self {
-        Self { sym: None, width: Some(width), offset: 0, bit_offset: 0 }
+        Self { symbol: None, width: Some(width), offset: 0, bit_offset: 0 }
     }
 }
 
@@ -53,17 +53,13 @@ impl Tag {
 }
 
 impl TagDef {
-    pub fn kind(&self) -> SymbolKind {
-        self.kind.symbol_kind()
-    }
-
     pub fn is_enum(&self) -> bool {
         matches!(self.kind, Tag::Enum)
     }
 
     pub fn find_member(&self, sema: &Sema, name: &Name) -> Option<(usize, SymbolId)> {
         self.members.iter().enumerate().find_map(|(index, member)| {
-            let sym_id = member.sym?;
+            let sym_id = member.symbol?;
             (sema.symbols.get(sym_id).name.id == name.id).then_some((index, sym_id))
         })
     }

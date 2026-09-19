@@ -59,7 +59,7 @@ pub fn run_exit(name: &str, src: &str, expected: i32) {
     let unit = Unit::compile(src);
 
     assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
-    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{src}\n{}", unit.render());
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{src}");
 
     let gcc = run_gcc(src);
@@ -74,8 +74,13 @@ pub fn run_emits(name: &str, src: &str, needle: &str, expected: bool) {
     let unit = Unit::compile(src);
 
     assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
-    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", unit.render());
+    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{src}\n{}", unit.render());
 
     let ir = unit.ir();
-    assert_eq!(ir.contains(needle), expected, "`{name}` ir {} `{needle}`:\n{src}\n{ir}", if expected { "lacks" } else { "contains" });
+    assert_eq!(
+        ir.contains(needle),
+        expected,
+        "`{name}` ir {} `{needle}`:\n{src}\n{ir}",
+        if expected { "lacks" } else { "contains" }
+    );
 }

@@ -1,7 +1,7 @@
 use libft::print_table;
 
 use crate::context::ctx;
-use crate::semantic::{DiagnosisNode, sema};
+use crate::semantic::{DiagnosticNode, sema};
 
 pub fn dump_symbols() {
     let sema = sema();
@@ -30,8 +30,8 @@ pub fn dump_symbols() {
     print_table(&["KIND", "NAME", "STORAGE", "LINKAGE", "DURATION", "DEFINITION", "VALUE", "TYPE", "USED"], &rows);
 }
 
-pub fn dump_diagnostics(codegen: &Vec<DiagnosisNode>) {
-    for diag in ctx().diagnosis.iter().chain(&sema().diagnosis).chain(codegen) {
+pub fn dump_diagnostics(codegen: &Vec<DiagnosticNode>) {
+    for diag in ctx().diagnostics.iter().chain(&sema().diagnostics).chain(codegen) {
         let _ = diag.print();
     }
 }

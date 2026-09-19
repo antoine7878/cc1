@@ -8,20 +8,20 @@ use crate::semantic::{Duration, Initializer, SymbolId, sema};
 
 #[derive(Debug, Default)]
 pub struct Globals {
-    pub strings: HashMap<StringConstId, LlvmSymbol>,
-    pub lists: HashMap<SymbolId, LlvmSymbol>,
-    map: HashMap<SymbolId, LlvmSymbol>,
+    pub literals: HashMap<StringConstId, LlvmSymbol>,
+    pub aggregates: HashMap<SymbolId, LlvmSymbol>,
+    symbols: HashMap<SymbolId, LlvmSymbol>,
     pub order: Vec<SymbolId>,
     pub functions: Vec<SymbolId>,
 }
 
 impl Globals {
-    pub fn get_symbol(&self, id: SymbolId) -> Option<&LlvmSymbol> {
-        self.map.get(&id)
+    pub fn symbol(&self, id: SymbolId) -> Option<&LlvmSymbol> {
+        self.symbols.get(&id)
     }
 
-    pub fn get_literal(&self, id: StringConstId) -> Option<&LlvmSymbol> {
-        self.strings.get(&id)
+    pub fn literal(&self, id: StringConstId) -> Option<&LlvmSymbol> {
+        self.literals.get(&id)
     }
 
     pub fn collect(&mut self, node: &TranslationUnitNode) {
@@ -40,23 +40,23 @@ impl Globals {
     }
 
     fn register(&mut self, sym_id: SymbolId) {
-        if self.map.contains_key(&sym_id) {
+        if self.symbols.contains_key(&sym_id) {
             return;
         }
         let qty = sym_id.resolve().ty;
         let name = LlvmName::Global(sym_id);
         if qty.is_function(sema()) {
-            self.map.insert(sym_id, LlvmSymbol::ptr(name));
+            self.symbols.insert(sym_id, LlvmSymbol::ptr(name));
             self.functions.push(sym_id);
             return;
         }
-        self.map.insert(sym_id, LlvmSymbol::ptr(name));
+        self.symbols.insert(sym_id, LlvmSymbol::ptr(name));
         self.order.push(sym_id);
     }
 
     fn collect_literals(&mut self) {
         for i in 0..ctx().arenas.strings.len() {
-            self.strings.insert(i.into(), LlvmSymbol::ptr(LlvmName::StringLiteral(i.into())));
+            self.literals.insert(i.into(), LlvmSymbol::ptr(LlvmName::StringLiteral(i.into())));
         }
     }
 
@@ -71,7 +71,7 @@ impl Globals {
             if !matches!(init.resolve(), Initializer::List(_) | Initializer::String(_)) {
                 continue;
             }
-            self.lists.insert(sym_id, LlvmSymbol::ptr(LlvmName::ListInit(sym_id)));
+            self.aggregates.insert(sym_id, LlvmSymbol::ptr(LlvmName::ListInit(sym_id)));
         }
     }
 }

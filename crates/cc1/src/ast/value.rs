@@ -3,7 +3,7 @@ use std::fmt;
 
 use crate::ast::{BinaryOp, F80, UnaryOp, escape};
 use crate::ast_node;
-use crate::semantic::{Diag, Diagnosis, QualifiedType, ResolvedType, Sema};
+use crate::semantic::{Diag, Diagnostic, QualifiedType, ResolvedType, Sema};
 use crate::target::Target;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -159,10 +159,10 @@ impl ConstValue {
 
     fn integer_type(value: u64, candidates: &[ResolvedType], target: &Target) -> Diag<Self> {
         let fitting = candidates.iter().find(|ty| target.fits(value, ty));
-        let diagnosis = fitting.is_none().then_some(Diagnosis::IntegerConstantTooLarge);
+        let diagnostic = fitting.is_none().then_some(Diagnostic::IntegerConstantTooLarge);
         let ty = fitting.or_else(|| candidates.last()).expect("a non empty candidate list");
         let value = target.cast(ty, ConstValue::UnsignedLong(value)).expect("an integer type");
-        Diag::new(value, diagnosis)
+        Diag::new(value, diagnostic)
     }
 
     pub fn parse(s: &str, target: &Target) -> Diag<Self> {
@@ -294,11 +294,11 @@ impl ConstValue {
     }
 }
 
-pub struct Fold<'a> {
+pub struct ConstFolder<'a> {
     target: &'a Target,
 }
 
-impl<'a> Fold<'a> {
+impl<'a> ConstFolder<'a> {
     pub fn new(target: &'a Target) -> Self {
         Self { target }
     }
@@ -402,11 +402,11 @@ impl<'a> Fold<'a> {
         Diag::new(value, self.overflow(ty, op, r))
     }
 
-    fn overflow(&self, ty: &ResolvedType, op: BinaryOp, r: i128) -> Option<Diagnosis> {
+    fn overflow(&self, ty: &ResolvedType, op: BinaryOp, r: i128) -> Option<Diagnostic> {
         let min = i128::from(self.target.min_value(ty).unwrap_or(i64::MIN));
         let max = i128::from(self.target.max_value(ty).unwrap_or(i64::MAX as u64) as i64);
         let out_of_range = matches!(op, BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul) && (r < min || r > max);
-        out_of_range.then_some(Diagnosis::ArithmeticOverflow)
+        out_of_range.then_some(Diagnostic::ArithmeticOverflow)
     }
 
     pub fn unary(&self, ty: &ResolvedType, op: UnaryOp, value: ConstValue) -> Diag<ConstValue> {

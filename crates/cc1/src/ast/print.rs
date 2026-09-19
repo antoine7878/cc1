@@ -4,20 +4,20 @@ use std::io::{self, Write, stdout};
 use libft::{CYAN, GRAY, GREEN, RESET};
 
 use crate::ast::visit::{
-    Visitor, walk_compound_statement, walk_declaration, walk_declarator, walk_enum, walk_expression,
+    Visitor, walk_compound_statement, walk_declaration, walk_declarator, walk_enum, walk_enumerator, walk_expression,
     walk_expression_statement, walk_function_parameters, walk_init_declarator, walk_initializer,
     walk_iteration_statement, walk_jump_statement, walk_labeled_statement, walk_selection_statement, walk_struct,
-    walk_struct_declarator, walk_translation_unit, walk_union, walk_variant,
+    walk_struct_declarator, walk_translation_unit, walk_union,
 };
 use crate::ast::{
-    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Enum, Expression, ExpressionId,
-    ExpressionNode, ExpressionStatementNode, FunctionDefinitionNode, FunctionParameters, FunctionParametersNode,
-    InitDeclaratorNode, InitializerNode, IterationStatementNode, JumpStatementNode, LabeledStatementNode, Name,
-    ParameterDeclaration, Qualifier, SelectionStatementNode, Struct, StructDeclaration, StructMemberDeclarator,
-    TranslationUnitNode, Type, TypeSpecifier, Union, Variant,
+    CompoundStatementNode, DeclarationNode, DeclarationSpecifier, DeclaratorNode, Enum, Enumerator, Expression,
+    ExpressionId, ExpressionNode, ExpressionStatementNode, FunctionDefinitionNode, FunctionParameters,
+    FunctionParametersNode, InitDeclaratorNode, InitializerNode, IterationStatementNode, JumpStatementNode,
+    LabeledStatementNode, Name, ParameterDeclaration, Qualifier, SelectionStatementNode, Struct, StructDeclaration,
+    StructMemberDeclarator, TranslationUnitNode, TypeName, TypeSpecifier, Union,
 };
 use crate::context::ctx;
-use crate::semantic::{ExpressionKind, Sema};
+use crate::semantic::{Sema, ValueCategory};
 
 pub struct AstPrinter<'a> {
     sema: &'a Sema,
@@ -72,9 +72,9 @@ impl<'a> AstPrinter<'a> {
     }
 
     fn print_expression_type(&mut self, id: ExpressionId) {
-        let Some(resolved) = self.sema.expr_types.get(id) else { return };
+        let Some(resolved) = self.sema.expressions.get(id) else { return };
         self.put(format_args!("{GREEN}'{}'{CYAN}", resolved.ty));
-        if matches!(resolved.kind, ExpressionKind::LValue) {
+        if matches!(resolved.kind, ValueCategory::LValue) {
             self.put(format_args!(" lvalue"));
         }
         for cast in &resolved.casts {
@@ -225,8 +225,8 @@ impl Visitor for AstPrinter<'_> {
             let expr = node.id.resolve();
             printer.put(format_args!("{} ", expr));
             printer.print_expression_type(node.id);
-            if let Expression::Member(op, tag, ident) = expr {
-                printer.visit_expression(tag);
+            if let Expression::Member(op, object, ident) = expr {
+                printer.visit_expression(object);
                 printer.put(format_args!("{}", op.symbol()));
                 printer.visit_name(ident);
             } else {
@@ -235,7 +235,7 @@ impl Visitor for AstPrinter<'_> {
         });
     }
 
-    fn visit_type(&mut self, node: &Type) {
+    fn visit_type_name(&mut self, node: &TypeName) {
         self.print_node(node, |printer| {
             for spec in &node.specifiers {
                 printer.print_specifier(spec);
@@ -278,8 +278,8 @@ impl Visitor for AstPrinter<'_> {
         self.print_node(node, |printer| walk_enum(printer, node));
     }
 
-    fn visit_variant(&mut self, node: &Variant) {
-        self.print_node(node, |printer| walk_variant(printer, node));
+    fn visit_enumerator(&mut self, node: &Enumerator) {
+        self.print_node(node, |printer| walk_enumerator(printer, node));
     }
 
     fn visit_struct_declaration(&mut self, node: &StructDeclaration) {

@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
-use cc1::ast::{BinaryOp, ConstValue, F80, Fold, UnaryOp};
-use cc1::semantic::{Diag, Diagnosis, ResolvedType};
+use cc1::ast::{BinaryOp, ConstFolder, ConstValue, F80, UnaryOp};
+use cc1::semantic::{Diag, Diagnostic, ResolvedType};
 use cc1::target::{I386, X86_64};
 
 trait FoldValue {
@@ -34,7 +34,7 @@ macro_rules! fold {
     ($name:ident, $method:ident($($arg:expr),* $(,)?), $expected:expr) => {
         #[test]
         fn $name() {
-            let fold = Fold::new(&I386);
+            let fold = ConstFolder::new(&I386);
             assert_eq!(
                 repr(fold.$method($($arg),*)),
                 $expected,
@@ -47,7 +47,7 @@ macro_rules! fold {
         #[test]
         #[ignore = $reason]
         fn $name() {
-            let fold = Fold::new(&I386);
+            let fold = ConstFolder::new(&I386);
             assert_eq!(
                 repr(fold.$method($($arg),*)),
                 $expected,
@@ -62,11 +62,11 @@ macro_rules! fold_overflow {
     ($name:ident, $method:ident($($arg:expr),* $(,)?), $expected:expr) => {
         #[test]
         fn $name() {
-            let Diag { res, diagnosis } = Fold::new(&I386).$method($($arg),*);
+            let Diag { res, diagnostic } = ConstFolder::new(&I386).$method($($arg),*);
             assert_eq!(repr(res), $expected, "{}", stringify!($method($($arg),*)));
             assert!(
-                matches!(diagnosis, Some(Diagnosis::ArithmeticOverflow)),
-                "{} should report ArithmeticOverflow, got {diagnosis:?}",
+                matches!(diagnostic, Some(Diagnostic::ArithmeticOverflow)),
+                "{} should report ArithmeticOverflow, got {diagnostic:?}",
                 stringify!($method($($arg),*))
             );
         }
@@ -204,7 +204,7 @@ fold!(convert_from_double_truncates, convert(&ResolvedType::Int, ConstValue::Dou
 
 #[test]
 fn a_wider_target_keeps_the_whole_value() {
-    let fold = Fold::new(&X86_64);
+    let fold = ConstFolder::new(&X86_64);
     assert_eq!(repr(fold.convert(&ResolvedType::Long, ConstValue::UnsignedLong(4294967296))), "Long(4294967296)");
     assert_eq!(
         repr(fold.convert(&ResolvedType::UnsignedLong, ConstValue::Int(-1))),
@@ -214,7 +214,7 @@ fn a_wider_target_keeps_the_whole_value() {
 
 #[test]
 fn unsigned_int_and_long_meet_at_long_on_x86_64() {
-    let fold = Fold::new(&X86_64);
+    let fold = ConstFolder::new(&X86_64);
     assert_eq!(
         repr(fold.binary(&ResolvedType::Long, BinaryOp::Add, ConstValue::UnsignedInt(1), ConstValue::Long(-1))),
         "Long(0)"
@@ -279,7 +279,7 @@ fn to_i64_and_to_u64_reinterpret() {
 
 #[test]
 fn equality_compares_same_type_operands() {
-    let fold = Fold::new(&I386);
+    let fold = ConstFolder::new(&I386);
     assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(1)), Some(Ordering::Equal)));
     assert!(matches!(fold.compare(ConstValue::Double(1.0), ConstValue::Double(1.0)), Some(Ordering::Equal)));
     assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(2)), Some(Ordering::Less | Ordering::Greater)));
@@ -287,7 +287,7 @@ fn equality_compares_same_type_operands() {
 
 #[test]
 fn ordering_compares_same_type_operands() {
-    let fold = Fold::new(&I386);
+    let fold = ConstFolder::new(&I386);
     assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(2)), Some(Ordering::Less)));
     assert!(matches!(fold.compare(ConstValue::Double(1.0), ConstValue::Double(1.5)), Some(Ordering::Less)));
     assert!(matches!(fold.compare(ConstValue::UnsignedInt(1), ConstValue::UnsignedInt(0)), Some(Ordering::Greater)));
@@ -298,7 +298,7 @@ fn ordering_compares_same_type_operands() {
 
 #[test]
 fn every_operator_folds_in_sequence() {
-    let fold = Fold::new(&I386);
+    let fold = ConstFolder::new(&I386);
     let ty = ResolvedType::Int;
     let steps = [
         (BinaryOp::Add, 2, "Int(3)"),
@@ -330,7 +330,7 @@ fold!(
     "UnsignedInt(1)"
 );
 fold!(
-    unsigned_mul_wraps_without_a_diagnosis,
+    unsigned_mul_wraps_without_a_diagnostic,
     binary(&ResolvedType::UnsignedInt, BinaryOp::Mul, ConstValue::UnsignedInt(65536), ConstValue::UnsignedInt(65536)),
     "UnsignedInt(0)"
 );
@@ -359,10 +359,10 @@ fold_overflow!(
 
 #[test]
 fn the_same_addition_fits_a_64_bit_long() {
-    let fold = Fold::new(&X86_64);
+    let fold = ConstFolder::new(&X86_64);
     let folded = fold.binary(&ResolvedType::Long, BinaryOp::Add, ConstValue::Long(2147483647), ConstValue::Long(1));
     assert_eq!(repr(folded.res), "Long(2147483648)");
-    assert!(folded.diagnosis.is_none(), "{:?}", folded.diagnosis);
+    assert!(folded.diagnostic.is_none(), "{:?}", folded.diagnostic);
 }
 
 fold!(
@@ -418,14 +418,14 @@ fold!(convert_to_float_rounds, convert(&ResolvedType::Float, ConstValue::Double(
 
 #[test]
 fn convert_rejects_a_type_that_holds_no_value() {
-    let fold = Fold::new(&I386);
+    let fold = ConstFolder::new(&I386);
     assert_eq!(fold.convert(&ResolvedType::Void, ConstValue::Int(1)), None);
 }
 
 // 6.2.1.5 the operands of a comparison reach the fold already converted to a common type.
 #[test]
 fn comparing_unconverted_operands_yields_no_ordering() {
-    let fold = Fold::new(&I386);
+    let fold = ConstFolder::new(&I386);
     assert_eq!(fold.compare(ConstValue::Int(1), ConstValue::Double(1.0)), None);
 }
 
@@ -433,14 +433,14 @@ fn comparing_unconverted_operands_yields_no_ordering() {
 // a division or a bitwise operator never reports an overflow.
 #[test]
 fn only_additive_and_multiplicative_results_report_an_overflow() {
-    let fold = Fold::new(&I386);
+    let fold = ConstFolder::new(&I386);
     for (op, lhs, rhs) in [
         (BinaryOp::Div, ConstValue::Int(i32::MIN), ConstValue::Int(-1)),
         (BinaryOp::Left, ConstValue::Int(1), ConstValue::Int(31)),
         (BinaryOp::BitXor, ConstValue::Int(-1), ConstValue::Int(0)),
     ] {
         let folded = fold.binary(&ResolvedType::Int, op, lhs, rhs);
-        assert!(folded.diagnosis.is_none(), "{op:?} reported {:?}", folded.diagnosis);
+        assert!(folded.diagnostic.is_none(), "{op:?} reported {:?}", folded.diagnostic);
     }
 }
 
@@ -476,7 +476,7 @@ fold!(
 
 #[test]
 fn the_same_shift_keeps_its_value_in_a_64_bit_long() {
-    let fold = Fold::new(&X86_64);
+    let fold = ConstFolder::new(&X86_64);
     let shifted = fold.binary(&ResolvedType::Long, BinaryOp::Left, ConstValue::Long(1), ConstValue::Int(31));
     assert_eq!(repr(shifted.res), "Long(2147483648)");
 }
@@ -491,7 +491,7 @@ fold!(
 
 #[test]
 fn the_same_complement_fills_a_64_bit_unsigned_long() {
-    let fold = Fold::new(&X86_64);
+    let fold = ConstFolder::new(&X86_64);
     let value = fold.unary(&ResolvedType::UnsignedLong, UnaryOp::BitNot, ConstValue::UnsignedLong(0));
     assert_eq!(repr(value.res), "UnsignedLong(18446744073709551615)");
 }
@@ -518,7 +518,7 @@ fold!(convert_an_unsigned_long_to_double, convert(&ResolvedType::Double, ConstVa
 
 #[test]
 fn compare_orders_every_representation() {
-    let fold = Fold::new(&I386);
+    let fold = ConstFolder::new(&I386);
     assert_eq!(fold.compare(ConstValue::UnsignedLong(1), ConstValue::UnsignedLong(2)), Some(Ordering::Less));
     assert_eq!(fold.compare(ConstValue::Float(1.0), ConstValue::Float(2.0)), Some(Ordering::Less));
     assert_eq!(
@@ -572,7 +572,7 @@ fn a_floating_value_reinterprets_as_an_integer_by_truncation() {
 
 #[test]
 fn the_minimum_of_a_signed_type_is_recognised() {
-    let fold = Fold::new(&I386);
+    let fold = ConstFolder::new(&I386);
     assert!(fold.is_min(&ResolvedType::Int, ConstValue::Int(i32::MIN)));
     assert!(fold.is_min(&ResolvedType::Long, ConstValue::Long(-2147483648)));
     assert!(!fold.is_min(&ResolvedType::Int, ConstValue::Int(0)));

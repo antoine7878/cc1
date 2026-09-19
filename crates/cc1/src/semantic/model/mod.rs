@@ -8,12 +8,12 @@ pub mod resolved_type;
 pub mod symbol;
 pub mod tag_def;
 
-pub use address::{AddressBase, AdressOffset};
+pub use address::{AddressBase, AddressOffset};
 pub use cast::{AssignmentContext, CastKind, ImplicitCast};
 pub use function_def::{DeclaredParams, FunctionDef, FunctionDefArena, FunctionDefId, ParamInfo, ParamTypes};
 pub use initializer::{Initializer, InitializerArena, InitializerId};
-pub use resolved_expression::{ExpressionKind, ResolvedExpression};
+pub use resolved_expression::{ResolvedExpression, ValueCategory};
 pub use resolved_statement::ResolvedStatement;
-pub use resolved_type::{Builtins, Class, QualifiedType, ResolvedType, ResolvedTypeArena, ResolvedTypeId};
-pub use symbol::{Definition, Duration, Linkage, Symbol, SymbolArena, SymbolId, SymbolKind};
+pub use resolved_type::{Builtins, NumericClass, QualifiedType, ResolvedType, ResolvedTypeId, ResolvedTypeInterner};
+pub use symbol::{DefinitionState, Duration, Linkage, Symbol, SymbolArena, SymbolId, SymbolKind};
 pub use tag_def::{Member, MemberRef, TagDef, TagDefArena, TagDefId};

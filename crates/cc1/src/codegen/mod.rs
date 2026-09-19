@@ -12,14 +12,14 @@ pub use global::Globals;
 pub use llvm::{Builder, LlvmElement, LlvmInit, LlvmName, LlvmOperator, LlvmSymbol, LlvmType, struct_elements};
 pub use local::Locals;
 
-use crate::semantic::Diagnosis;
+use crate::semantic::Diagnostic;
 
 pub trait Invariant<T> {
-    fn invariant(self, what: &'static str) -> Result<T, Diagnosis>;
+    fn invariant(self, what: &'static str) -> Result<T, Diagnostic>;
 }
 
 impl<T> Invariant<T> for Option<T> {
-    fn invariant(self, what: &'static str) -> Result<T, Diagnosis> {
-        self.ok_or(Diagnosis::Invariant(what))
+    fn invariant(self, what: &'static str) -> Result<T, Diagnostic> {
+        self.ok_or(Diagnostic::Invariant(what))
     }
 }

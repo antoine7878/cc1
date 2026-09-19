@@ -1,5 +1,5 @@
 use cc1::semantic::CastKind::*;
-use cc1::semantic::Diagnosis;
+use cc1::semantic::Diagnostic;
 
 use crate::common::{Ty, Unit, ints, lv, none, rv};
 
@@ -24,14 +24,14 @@ shaped!(
 rejects_shaped!(
     an_array_operand_becomes_a_pointer_to_its_first_element,
     "char a[10]; void f(void) { -a; }",
-    Diagnosis::InvalidUnary(_),
+    Diagnostic::InvalidUnary(_),
     vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Char, 10)).then(ArrayToPointer, Ty::ptr(Ty::Char)), none(),]
 );
 
 rejects_shaped!(
     a_function_designator_becomes_a_pointer_to_function,
     "int g(); void f(void) { g + 1; }",
-    Diagnosis::InvalidOperand,
+    Diagnostic::InvalidOperand,
     vec![rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))), rv(Ty::Int), none(),]
 );
 
@@ -253,7 +253,7 @@ shaped!(
 rejects_shaped!(
     calling_a_prototype_with_too_many_arguments_is_rejected,
     "int g(int); void f(void) { g(1, 2); }",
-    Diagnosis::TooManyArguments(1, 2),
+    Diagnostic::TooManyArguments(1, 2),
     vec![
         rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
         rv(Ty::Int),
@@ -265,7 +265,7 @@ rejects_shaped!(
 rejects_shaped!(
     calling_a_prototype_with_too_few_arguments_is_rejected,
     "int g(int, int); void f(void) { g(1); }",
-    Diagnosis::TooFewArguments(2, 1),
+    Diagnostic::TooFewArguments(2, 1),
     vec![
         rv(Ty::func(Ty::Int, [Ty::Int, Ty::Int]))
             .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int, Ty::Int])),),
@@ -277,14 +277,14 @@ rejects_shaped!(
 rejects_shaped!(
     a_prototype_with_no_parameters_takes_no_argument,
     "int g(void); void f(void) { g(1); }",
-    Diagnosis::TooManyArguments(0, 1),
+    Diagnostic::TooManyArguments(0, 1),
     vec![rv(Ty::func0(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Int))), rv(Ty::Int), none(),]
 );
 
 rejects_shaped!(
     a_variadic_call_still_needs_an_argument_for_each_named_parameter,
     "int g(int, ...); void f(void) { g(); }",
-    Diagnosis::TooFewArguments(1, 0),
+    Diagnostic::TooFewArguments(1, 0),
     vec![
         rv(Ty::func_variadic(Ty::Int, [Ty::Int]))
             .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
@@ -295,7 +295,7 @@ rejects_shaped!(
 rejects_shaped!(
     an_argument_incompatible_with_its_parameter_is_rejected,
     "int g(char *); void f(void) { g(1); }",
-    Diagnosis::ArgumentIncompatibleTypes(1, _, _),
+    Diagnostic::ArgumentIncompatibleTypes(1, _, _),
     vec![
         rv(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))
             .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))),
@@ -307,7 +307,7 @@ rejects_shaped!(
 rejects_shaped!(
     a_void_argument_is_rejected,
     "void v(void); int g(int); void f(void) { g(v()); }",
-    Diagnosis::ArgumentIncompatibleTypes(1, _, _),
+    Diagnostic::ArgumentIncompatibleTypes(1, _, _),
     vec![
         rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
         rv(Ty::func0(Ty::Void)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Void))),
@@ -321,21 +321,21 @@ rejects_shaped!(
 rejects_shaped!(
     calling_an_object_is_rejected,
     "double d; void f(void) { d(); }",
-    Diagnosis::CallingNotFunction(_),
+    Diagnostic::CallingNotFunction(_),
     vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), none()]
 );
 
 rejects_shaped!(
     calling_an_array_is_rejected,
     "int arr[3]; void f(void) { arr(); }",
-    Diagnosis::CallingNotFunction(_),
+    Diagnostic::CallingNotFunction(_),
     vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)), none(),]
 );
 
 rejects_shaped!(
     calling_the_result_of_a_call_is_rejected,
     "int g(int); void f(void) { g(1)(2); }",
-    Diagnosis::CallingNotFunction(_),
+    Diagnostic::CallingNotFunction(_),
     vec![
         rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
         rv(Ty::Int),
@@ -348,7 +348,7 @@ rejects_shaped!(
 rejects_shaped!(
     calling_a_function_with_an_incomplete_return_type_is_rejected,
     "struct S; struct S g(void); void f(void) { g(); }",
-    Diagnosis::CallingIncompleteReturn(_),
+    Diagnostic::CallingIncompleteReturn(_),
     vec![
         rv(Ty::func0(Ty::strukt_incomplete("S")))
             .then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt_incomplete("S")))),
@@ -418,7 +418,7 @@ shaped!(
 rejects_shaped!(
     an_argument_without_a_type_does_not_cascade,
     "int g(int); void f(void) { g(x); }",
-    Diagnosis::UndeclaredIdentifier(_),
+    Diagnostic::UndeclaredIdentifier(_),
     vec![
         rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
         none(),
@@ -469,7 +469,7 @@ shaped!(
 rejects_shaped!(
     assigning_to_an_address_is_rejected,
     "int i, *p; void f(void) { &i = p; }",
-    Diagnosis::AssignToRValue,
+    Diagnostic::AssignToRValue,
     vec![lv(Ty::Int), rv(Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none(),]
 );
 
@@ -477,14 +477,14 @@ rejects_shaped!(
 rejects_shaped!(
     the_address_of_a_constant_is_rejected,
     "void f(void) { &1; }",
-    Diagnosis::RValueAddress(_),
+    Diagnostic::RValueAddress(_),
     vec![rv(Ty::Int), none()]
 );
 
 rejects_shaped!(
     the_address_of_an_enumeration_constant_is_rejected,
     "enum E { A }; void f(void) { &A; }",
-    Diagnosis::RValueAddress(_),
+    Diagnostic::RValueAddress(_),
     vec![rv(Ty::Int), none()]
 );
 
@@ -592,14 +592,14 @@ reject!(indirection_on_a_pointer_to_void_is_rejected, "void *v; void f(void) { *
 rejects_shaped!(
     minus_rejects_a_pointer,
     "int *p; void f(void) { -p; }",
-    Diagnosis::InvalidUnary(_),
+    Diagnostic::InvalidUnary(_),
     vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]
 );
 
 rejects_shaped!(
     minus_rejects_a_structure,
     "struct S { int x; } s; void f(void) { -s; }",
-    Diagnosis::InvalidUnary(_),
+    Diagnostic::InvalidUnary(_),
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
 );
 
@@ -621,14 +621,14 @@ shaped!(
 rejects_shaped!(
     unary_plus_rejects_a_pointer,
     "int *p; void f(void) { +p; }",
-    Diagnosis::InvalidUnary(_),
+    Diagnostic::InvalidUnary(_),
     vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]
 );
 
 rejects_shaped!(
     unary_plus_rejects_a_structure,
     "struct S { int x; } s; void f(void) { +s; }",
-    Diagnosis::InvalidUnary(_),
+    Diagnostic::InvalidUnary(_),
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
 );
 
@@ -656,14 +656,14 @@ shaped!(
 rejects_shaped!(
     a_complement_rejects_a_floating_operand,
     "void f(void) { double d; ~d; }",
-    Diagnosis::InvalidUnary(_),
+    Diagnostic::InvalidUnary(_),
     vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), none()]
 );
 
 rejects_shaped!(
     a_complement_rejects_a_pointer,
     "int *p; void f(void) { ~p; }",
-    Diagnosis::InvalidUnary(_),
+    Diagnostic::InvalidUnary(_),
     vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]
 );
 
@@ -697,7 +697,7 @@ shaped!(
 rejects_shaped!(
     a_logical_negation_rejects_a_structure,
     "struct S { int x; } s; void f(void) { !s; }",
-    Diagnosis::InvalidUnary(_),
+    Diagnostic::InvalidUnary(_),
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
 );
 
@@ -720,7 +720,7 @@ shaped!(
 rejects_shaped!(
     add_rejects_two_structures,
     "struct S { int x; } s; void f(void) { s + s; }",
-    Diagnosis::InvalidOperand,
+    Diagnostic::InvalidOperand,
     vec![
         lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
         lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
@@ -731,21 +731,21 @@ rejects_shaped!(
 rejects_shaped!(
     add_rejects_a_floating_index,
     "int *p; void f(void) { p + 1.5; }",
-    Diagnosis::InvalidOperand,
+    Diagnostic::InvalidOperand,
     vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Double), none(),]
 );
 
 rejects_shaped!(
     add_rejects_a_pointer_to_void,
     "void *p; void f(void) { p + 1; }",
-    Diagnosis::InvalidOperand,
+    Diagnostic::InvalidOperand,
     vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), rv(Ty::Int), none(),]
 );
 
 rejects_shaped!(
     add_rejects_a_pointer_to_an_incomplete_type,
     "struct S *p; void f(void) { p + 1; }",
-    Diagnosis::InvalidOperand,
+    Diagnostic::InvalidOperand,
     vec![
         lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
         rv(Ty::Int),
@@ -802,28 +802,28 @@ shaped!(a_cast_to_void_discards_the_value, "void f(void) { (void)1; }", vec![rv(
 rejects_shaped!(
     cast_of_a_non_scalar_operand_is_rejected,
     "struct S { int a; } s; void f(void) { (int)s; }",
-    Diagnosis::CastOfNonScalar,
+    Diagnostic::CastOfNonScalar,
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
 );
 
 rejects_shaped!(
     cast_to_a_non_scalar_type_is_rejected,
     "struct S { int a; }; void f(void) { (struct S)1; }",
-    Diagnosis::CastToNonScalar,
+    Diagnostic::CastToNonScalar,
     vec![rv(Ty::Int), none()]
 );
 
 rejects_shaped!(
     cast_from_a_pointer_to_a_floating_type_is_rejected,
     "int *p; void f(void) { (double)p; }",
-    Diagnosis::InvalidOperand,
+    Diagnostic::InvalidOperand,
     vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]
 );
 
 rejects_shaped!(
     cast_from_a_floating_type_to_a_pointer_is_rejected,
     "double d; void f(void) { (int *)d; }",
-    Diagnosis::InvalidOperand,
+    Diagnostic::InvalidOperand,
     vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), none()]
 );
 
@@ -831,9 +831,9 @@ rejects_shaped!(
 fn cast_to_a_non_scalar_type_is_reported_once() {
     let unit = Unit::compile("struct S { int a; }; enum E { A = (struct S)1 };");
     assert!(unit.parsed(), "cc1 failed to parse:\n{}", unit.render());
-    let got: Vec<_> = unit.diagnosis().iter().map(|diag| diag.inner.clone()).collect();
+    let got: Vec<_> = unit.diagnostics().iter().map(|diag| diag.inner.clone()).collect();
     assert!(
-        matches!(got.as_slice(), [Diagnosis::CastToNonScalar]),
+        matches!(got.as_slice(), [Diagnostic::CastToNonScalar]),
         "expected exactly one CastToNonScalar, got {got:?}:\n{}",
         unit.render()
     );
@@ -874,7 +874,7 @@ shaped!(
 rejects_shaped!(
     an_integer_minus_a_pointer_is_rejected,
     "int i; int *p; void f(void) { i - p; }",
-    Diagnosis::InvalidOperand,
+    Diagnostic::InvalidOperand,
     vec![
         lv(Ty::Int).then(LValueToRValue, Ty::Int),
         lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
@@ -885,7 +885,7 @@ rejects_shaped!(
 rejects_shaped!(
     subtracting_pointers_to_an_incomplete_type_is_rejected,
     "struct S *p, *q; void f(void) { p - q; }",
-    Diagnosis::InvalidOperand,
+    Diagnostic::InvalidOperand,
     vec![
         lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
         lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
@@ -896,7 +896,7 @@ rejects_shaped!(
 rejects_shaped!(
     subtracting_a_floating_index_is_rejected,
     "int *p; void f(void) { p - 1.5; }",
-    Diagnosis::InvalidOperand,
+    Diagnostic::InvalidOperand,
     vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Double), none(),]
 );
 
@@ -923,7 +923,7 @@ shaped!(
 rejects_shaped!(
     assigning_an_incompatible_pointer_is_rejected,
     "char *p; int *q; void f(void) { q = p; }",
-    |u| Diagnosis::AssignmentIncompatibleTypes(to, from)
+    |u| Diagnostic::AssignmentIncompatibleTypes(to, from)
         if *to == u.symbol_ty("q") && *from == u.symbol_ty("p"),
     vec![
         lv(Ty::ptr(Ty::Int)),
@@ -935,7 +935,7 @@ rejects_shaped!(
 rejects_shaped!(
     assigning_away_const_through_a_pointer_is_rejected,
     "const char *p; char *q; void f(void) { q = p; }",
-    Diagnosis::AssignmentDiscardedQualifiers(_, _),
+    Diagnostic::AssignmentDiscardedQualifiers(_, _),
     vec![
         lv(Ty::ptr(Ty::Char)),
         lv(Ty::ptr(Ty::konst(Ty::Char))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Char))),
@@ -964,14 +964,14 @@ shaped!(
 rejects_shaped!(
     assigning_to_an_rvalue_is_rejected,
     "void f(void) { 1 = 1; }",
-    Diagnosis::AssignToRValue,
+    Diagnostic::AssignToRValue,
     vec![rv(Ty::Int), rv(Ty::Int), none()]
 );
 
 rejects_shaped!(
     assigning_to_a_const_variable_is_rejected,
     "void f(void) { const int x; x = 1; }",
-    Diagnosis::ConstAssignment(_),
+    Diagnostic::ConstAssignment(_),
     vec![lv(Ty::konst(Ty::Int)), rv(Ty::Int), none()]
 );
 
@@ -994,7 +994,7 @@ shaped!(
 rejects_shaped!(
     initializing_a_pointer_with_a_double_is_rejected,
     "void f(void) { int *p = 3.5; }",
-    |u| Diagnosis::InitIncompatibleTypes(to, from)
+    |u| Diagnostic::InitIncompatibleTypes(to, from)
         if *to == u.symbol_ty("p") && *from == u.prim("double"),
     vec![rv(Ty::Double)]
 );
@@ -1002,7 +1002,7 @@ rejects_shaped!(
 rejects_shaped!(
     initializing_with_an_incompatible_pointer_is_rejected,
     "void f(void) { char *p; int *q = p; }",
-    |u| Diagnosis::InitIncompatibleTypes(to, from)
+    |u| Diagnostic::InitIncompatibleTypes(to, from)
         if *to == u.symbol_ty("q") && *from == u.symbol_ty("p"),
     vec![lv(Ty::ptr(Ty::Char)).then(LValueToRValue, Ty::ptr(Ty::Char))]
 );
@@ -1010,7 +1010,7 @@ rejects_shaped!(
 rejects_shaped!(
     initializing_away_const_through_a_pointer_is_rejected,
     "void f(void) { const char *p; char *q = p; }",
-    Diagnosis::InitDiscardedQualifiers(_, _),
+    Diagnostic::InitDiscardedQualifiers(_, _),
     vec![lv(Ty::ptr(Ty::konst(Ty::Char))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Char))),]
 );
 
@@ -1033,7 +1033,7 @@ shaped!(array_initializer_may_have_fewer_elements_than_declared, "void f(void) {
 rejects_shaped!(
     array_initializer_with_too_many_elements_is_rejected,
     "void f(void) { int a[2] = {1,2,3}; }",
-    Diagnosis::ArrayInitTooLong,
+    Diagnostic::ArrayInitTooLong,
     ints(4)
 );
 
@@ -1044,7 +1044,7 @@ shaped!(scalar_initializer_may_be_wrapped_in_braces, "void f(void) { int x = {1}
 rejects_shaped!(
     scalar_initializer_with_too_many_elements_is_rejected,
     "void f(void) { int x = {1,2}; }",
-    Diagnosis::ArrayInitTooLong,
+    Diagnostic::ArrayInitTooLong,
     ints(1)
 );
 
@@ -1055,7 +1055,7 @@ shaped!(nested_array_initializer_types_every_element, "void f(void) { int a[2][2
 rejects_shaped!(
     excess_elements_in_a_nested_list_do_not_affect_sibling_lists,
     "void f(void) { int a[2][2] = {{1,2,3},{4,5}}; }",
-    Diagnosis::ArrayInitTooLong,
+    Diagnostic::ArrayInitTooLong,
     ints(8)
 );
 
@@ -1081,14 +1081,14 @@ shaped!(
 rejects_shaped!(
     an_undeclared_identifier_has_no_type,
     "void f(void) { x; }",
-    Diagnosis::UndeclaredIdentifier(_),
+    Diagnostic::UndeclaredIdentifier(_),
     vec![none()]
 );
 
 rejects_shaped!(
     an_operand_without_a_type_is_reported_once,
     "void f(void) { x + 1; }",
-    Diagnosis::UndeclaredIdentifier(_),
+    Diagnostic::UndeclaredIdentifier(_),
     vec![none(), rv(Ty::Int), none()]
 );
 
@@ -1156,7 +1156,7 @@ shaped!(
 rejects_shaped!(
     subscripting_a_structure_is_rejected,
     "struct S { int x; } s; void f(void) { s[0]; }",
-    Diagnosis::InvalidOperand,
+    Diagnostic::InvalidOperand,
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), none(),]
 );
 
@@ -1200,7 +1200,7 @@ shaped!(
 rejects_shaped!(
     assigning_to_a_member_of_an_rvalue_structure_is_rejected,
     "struct S { int x; }; struct S g(void); void f(void) { g().x = 1; }",
-    Diagnosis::AssignToRValue,
+    Diagnostic::AssignToRValue,
     vec![
         rv(Ty::func0(Ty::strukt("S"))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt("S")))),
         rv(Ty::strukt("S")),
@@ -1227,21 +1227,21 @@ reject!(
 rejects_shaped!(
     a_dot_applied_to_a_pointer_is_rejected,
     "struct S { int x; } *p; void f(void) { p.x; }",
-    Diagnosis::AccessNotStuctOrUnion(_),
+    Diagnostic::AccessNotStuctOrUnion(_),
     vec![lv(Ty::ptr(Ty::strukt("S"))), none()]
 );
 
 rejects_shaped!(
     a_dot_applied_to_an_enumeration_is_rejected,
     "enum E { A }; enum E e; void f(void) { e.x; }",
-    Diagnosis::AccessNotStuctOrUnion(_),
+    Diagnostic::AccessNotStuctOrUnion(_),
     vec![lv(Ty::enom("E")), none()]
 );
 
 rejects_shaped!(
     a_member_that_the_structure_does_not_have_is_rejected,
     "struct S { int x; } s; void f(void) { s.y; }",
-    Diagnosis::AccessNotMember(_, _),
+    Diagnostic::AccessNotMember(_, _),
     vec![lv(Ty::strukt("S")), none()]
 );
 
@@ -1250,7 +1250,7 @@ rejects_shaped!(
 rejects_shaped!(
     an_arrow_applied_to_a_structure_is_rejected,
     "struct S { int x; } s; void f(void) { s->x; }",
-    Diagnosis::AccessNotPointer(_),
+    Diagnostic::AccessNotPointer(_),
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
 );
 
@@ -1318,7 +1318,7 @@ reject!(post_increment_of_an_array_is_rejected, "int a[3]; void f(void) { a++; }
 rejects_shaped!(
     post_increment_of_a_structure_is_rejected,
     "struct S { int x; } s; void f(void) { s++; }",
-    Diagnosis::BadPostIncDec(_, _),
+    Diagnostic::BadPostIncDec(_, _),
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
 );
 
@@ -1327,14 +1327,14 @@ rejects_shaped!(
 rejects_shaped!(
     post_increment_of_a_pointer_to_an_incomplete_type_is_rejected,
     "struct S; struct S *p; void f(void) { p++; }",
-    Diagnosis::IncompleteType(_),
+    Diagnostic::IncompleteType(_),
     vec![lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))), none(),]
 );
 
 rejects_shaped!(
     post_increment_of_a_pointer_to_void_is_rejected,
     "void *p; void f(void) { p++; }",
-    Diagnosis::IncompleteType(_),
+    Diagnostic::IncompleteType(_),
     vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), none()]
 );
 
@@ -1372,7 +1372,7 @@ shaped!(
 rejects_shaped!(
     assigning_to_a_pre_increment_is_rejected,
     "int i; void f(void) { ++i = 1; }",
-    Diagnosis::AssignToRValue,
+    Diagnostic::AssignToRValue,
     vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int), none(),]
 );
 
@@ -1387,14 +1387,14 @@ reject!(pre_increment_of_an_array_is_rejected, "int a[3]; void f(void) { ++a; }"
 rejects_shaped!(
     pre_increment_of_a_structure_is_rejected,
     "struct S { int x; } s; void f(void) { ++s; }",
-    Diagnosis::BadPostIncDec(_, _),
+    Diagnostic::BadPostIncDec(_, _),
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
 );
 
 rejects_shaped!(
     pre_decrement_of_a_pointer_to_an_incomplete_type_is_rejected,
     "struct S; struct S *p; void f(void) { --p; }",
-    Diagnosis::IncompleteType(_),
+    Diagnostic::IncompleteType(_),
     vec![lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))), none(),]
 );
 
@@ -1422,21 +1422,21 @@ shaped!(
 rejects_shaped!(
     multiplying_a_structure_is_rejected,
     "struct S { int x; } s; void f(void) { s * 1; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), none(),]
 );
 
 rejects_shaped!(
     multiplying_by_a_structure_is_rejected,
     "struct S { int x; } s; void f(void) { 1 * s; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![rv(Ty::Int), lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none(),]
 );
 
 rejects_shaped!(
     dividing_a_pointer_is_rejected,
     "int *p; void f(void) { p / 2; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), none(),]
 );
 
@@ -1444,14 +1444,14 @@ rejects_shaped!(
 rejects_shaped!(
     a_remainder_with_a_floating_right_operand_is_rejected,
     "void f(void) { 1 % 1.5; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![rv(Ty::Int), rv(Ty::Double), none()]
 );
 
 rejects_shaped!(
     a_remainder_with_a_floating_left_operand_is_rejected,
     "void f(void) { 1.5 % 1; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![rv(Ty::Double), rv(Ty::Int), none()]
 );
 
@@ -1506,14 +1506,14 @@ shaped!(
 rejects_shaped!(
     shifting_a_floating_left_operand_is_rejected,
     "void f(void) { 1.5 << 1; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![rv(Ty::Double), rv(Ty::Int), none()]
 );
 
 rejects_shaped!(
     shifting_by_a_floating_count_is_rejected,
     "void f(void) { 1 << 1.5; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![rv(Ty::Int), rv(Ty::Double), none()]
 );
 
@@ -1584,7 +1584,7 @@ shaped!(
 rejects_shaped!(
     a_rejected_shift_leaves_its_operands_unpromoted,
     "enum E { A }; enum E e; void f(void) { e << 1.5; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")), rv(Ty::Double), none(),]
 );
 
@@ -1641,7 +1641,7 @@ shaped!(
 rejects_shaped!(
     pointers_to_functions_may_not_be_ordered,
     "int (*p)(void); int (*q)(void); void f(void) { p < q; }",
-    Diagnosis::OrderedFunctionPointers(_, _),
+    Diagnostic::OrderedFunctionPointers(_, _),
     vec![
         lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))),
         lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))),
@@ -1652,7 +1652,7 @@ rejects_shaped!(
 rejects_shaped!(
     pointers_to_incompatible_types_may_not_be_ordered,
     "int *p; unsigned *q; void f(void) { p < q; }",
-    Diagnosis::InvalidComparison(_, _),
+    Diagnostic::InvalidComparison(_, _),
     vec![
         lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
         lv(Ty::ptr(Ty::UInt)).then(LValueToRValue, Ty::ptr(Ty::UInt)),
@@ -1704,7 +1704,7 @@ shaped!(
 rejects_shaped!(
     a_pointer_to_an_incomplete_array_may_not_be_ordered_with_one_to_a_complete_array,
     "int (*p)[]; int (*q)[3]; void f(void) { p < q; }",
-    Diagnosis::MixedCompletenessComparison(_, _),
+    Diagnostic::MixedCompletenessComparison(_, _),
     vec![
         rv(Ty::Int),
         rv(Ty::Int),
@@ -1719,7 +1719,7 @@ rejects_shaped!(
 rejects_shaped!(
     a_pointer_may_not_be_ordered_with_a_null_pointer_constant,
     "int *p; void f(void) { p > 0; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), none(),]
 );
 
@@ -1729,7 +1729,7 @@ rejects_shaped!(
 rejects_shaped!(
     a_pointer_to_void_may_not_be_ordered_with_a_pointer_to_an_object,
     "void *v; int *p; void f(void) { v < p; }",
-    Diagnosis::InvalidComparison(_, _),
+    Diagnostic::InvalidComparison(_, _),
     vec![
         lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
         lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
@@ -1814,7 +1814,7 @@ shaped!(
 rejects_shaped!(
     a_pointer_to_a_function_may_not_be_compared_to_a_void_pointer,
     "void *v; int (*p)(void); void f(void) { v == p; }",
-    Diagnosis::InvalidComparison(_, _),
+    Diagnostic::InvalidComparison(_, _),
     vec![
         lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
         lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))),
@@ -1878,28 +1878,28 @@ shaped!(
 rejects_shaped!(
     a_bitwise_and_with_a_floating_left_operand_is_rejected,
     "void f(void) { 1.5 & 1; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![rv(Ty::Double), rv(Ty::Int), none()]
 );
 
 rejects_shaped!(
     a_bitwise_xor_with_a_floating_right_operand_is_rejected,
     "void f(void) { 1 ^ 1.5; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![rv(Ty::Int), rv(Ty::Double), none()]
 );
 
 rejects_shaped!(
     a_bitwise_or_with_a_pointer_operand_is_rejected,
     "int *p; void f(void) { p | 1; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), none(),]
 );
 
 rejects_shaped!(
     combining_two_pointers_bitwise_is_rejected,
     "int *p; void f(void) { p & p; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![
         lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
         lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
@@ -1910,7 +1910,7 @@ rejects_shaped!(
 rejects_shaped!(
     a_bitwise_and_with_a_structure_operand_is_rejected,
     "struct S { int x; } s; void f(void) { s & 1; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), none(),]
 );
 
@@ -1919,7 +1919,7 @@ rejects_shaped!(
 rejects_shaped!(
     an_array_operand_of_a_bitwise_or_is_rejected_after_it_decays,
     "char a[10]; void f(void) { a | 1; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![
         rv(Ty::Int),
         rv(Ty::Int),
@@ -1933,7 +1933,7 @@ rejects_shaped!(
 rejects_shaped!(
     a_rejected_bitwise_and_leaves_its_operands_unpromoted,
     "enum E { A }; enum E e; void f(void) { e & 1.5; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")), rv(Ty::Double), none(),]
 );
 
@@ -2226,14 +2226,14 @@ shaped!(
 rejects_shaped!(
     a_logical_and_with_a_structure_left_operand_is_rejected,
     "struct S { int x; } s; void f(void) { s && 1; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), none(),]
 );
 
 rejects_shaped!(
     a_logical_or_with_a_structure_right_operand_is_rejected,
     "struct S { int x; } s; void f(void) { 1 || s; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![rv(Ty::Int), lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none(),]
 );
 
@@ -2392,7 +2392,7 @@ shaped!(
 rejects_shaped!(
     comparing_structures_for_equality_is_rejected,
     "struct S { int x; } s; void f(void) { s == s; }",
-    Diagnosis::InvalidBinaryOperand(_, _),
+    Diagnostic::InvalidBinaryOperand(_, _),
     vec![
         lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
         lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
@@ -2465,7 +2465,7 @@ reject!(
 rejects_shaped!(
     a_conditional_with_a_non_scalar_controlling_expression_is_rejected,
     "struct S { int x; } s; void f(void) { s ? 1 : 2; }",
-    Diagnosis::NotScalar(_),
+    Diagnostic::NotScalar(_),
     vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), rv(Ty::Int), none(),]
 );
 
@@ -2473,7 +2473,7 @@ rejects_shaped!(
 rejects_shaped!(
     a_conditional_mixing_an_arithmetic_and_a_pointer_operand_is_rejected,
     "int *p; void f(int c) { c ? 1 : p; }",
-    Diagnosis::IncompatibleOperands(_, _),
+    Diagnostic::IncompatibleOperands(_, _),
     vec![
         lv(Ty::Int).then(LValueToRValue, Ty::Int),
         rv(Ty::Int),
@@ -2486,7 +2486,7 @@ rejects_shaped!(
 rejects_shaped!(
     a_conditional_between_incompatible_object_pointers_is_rejected,
     "int *p; char *q; void f(int c) { c ? p : q; }",
-    Diagnosis::PointerMismatch(_, _),
+    Diagnostic::PointerMismatch(_, _),
     vec![
         lv(Ty::Int).then(LValueToRValue, Ty::Int),
         lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
@@ -2501,7 +2501,7 @@ rejects_shaped!(
 rejects_shaped!(
     subscripting_a_non_pointer_is_rejected,
     "void f(void) { int i; i[0]; }",
-    Diagnosis::SubscriptNotArray,
+    Diagnostic::SubscriptNotArray,
     vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), none()]
 );
 
@@ -2511,7 +2511,7 @@ rejects_shaped!(
 rejects_shaped!(
     sizeof_of_a_function_designator_is_rejected,
     "int g(void); void f(void) { sizeof g; }",
-    Diagnosis::SizeofFunction,
+    Diagnostic::SizeofFunction,
     vec![rv(Ty::func0(Ty::Int)), none()]
 );
 

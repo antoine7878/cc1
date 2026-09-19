@@ -1,8 +1,8 @@
 use std::fmt::{self, Display, Formatter};
 
 use crate::ast::statement::StatementId;
-use crate::ast::{ConstValue, StringConstId, StringId};
-use crate::semantic::{Diagnosis, Linkage, SymbolId};
+use crate::ast::{ConstValue, NameId, StringConstId};
+use crate::semantic::{Diagnostic, Linkage, SymbolId};
 #[derive(Debug, Clone, Copy)]
 pub enum LlvmName {
     SSA(usize),
@@ -11,7 +11,7 @@ pub enum LlvmName {
     ListInit(SymbolId),
     Bool(bool),
     Label(usize),
-    NamedLabel(StringId),
+    NamedLabel(NameId),
     BreakLabel(StatementId),
     ContinueLabel(StatementId),
     CaseLabel(StatementId),
@@ -31,10 +31,10 @@ impl LlvmName {
         Self::Label(i)
     }
 
-    pub fn ssa_value(&self) -> Result<usize, Diagnosis> {
+    pub fn ssa_index(&self) -> Result<usize, Diagnostic> {
         match self {
             LlvmName::SSA(i) => Ok(*i),
-            _ => Err(Diagnosis::Invariant("not SSA name")),
+            _ => Err(Diagnostic::Invariant("not SSA name")),
         }
     }
 }

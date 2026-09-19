@@ -117,20 +117,20 @@ impl StatementArena {
 }
 
 impl LabeledStatementNode {
-    pub fn identifier(name: Name, stmt: StatementNode, span: Span) -> LabeledStatementNode {
+    pub fn identifier_label(name: Name, stmt: StatementNode, span: Span) -> LabeledStatementNode {
         Self::new(LabeledStatement::Identifier(name, stmt), span)
     }
 
-    pub fn case(node: ExpressionNode, stmt: StatementNode, span: Span) -> LabeledStatementNode {
+    pub fn case_label(node: ExpressionNode, stmt: StatementNode, span: Span) -> LabeledStatementNode {
         Self::new(LabeledStatement::Case(node, stmt), span)
     }
 
-    pub fn default(stmt: StatementNode, span: Span) -> LabeledStatementNode {
+    pub fn default_label(stmt: StatementNode, span: Span) -> LabeledStatementNode {
         Self::new(LabeledStatement::Default(stmt), span)
     }
 }
 impl SelectionStatementNode {
-    pub fn new_if(
+    pub fn if_stmt(
         e_condition: ExpressionNode,
         s_if: StatementNode,
         s_else: Option<StatementNode>,
@@ -139,21 +139,21 @@ impl SelectionStatementNode {
         SelectionStatementNode::new(SelectionStatement::If(e_condition, s_if, s_else), span)
     }
 
-    pub fn switch(expr: ExpressionNode, stmt: StatementNode, span: Span) -> SelectionStatementNode {
+    pub fn switch_stmt(expr: ExpressionNode, stmt: StatementNode, span: Span) -> SelectionStatementNode {
         SelectionStatementNode::new(SelectionStatement::Switch(expr, stmt), span)
     }
 }
 
 impl IterationStatementNode {
-    pub fn new_while(expr: ExpressionNode, stmt: StatementNode, span: Span) -> IterationStatementNode {
+    pub fn while_stmt(expr: ExpressionNode, stmt: StatementNode, span: Span) -> IterationStatementNode {
         IterationStatementNode::new(IterationStatement::While(expr, stmt), span)
     }
 
-    pub fn new_do(stmt: StatementNode, expr: ExpressionNode, span: Span) -> IterationStatementNode {
+    pub fn do_stmt(stmt: StatementNode, expr: ExpressionNode, span: Span) -> IterationStatementNode {
         IterationStatementNode::new(IterationStatement::Do(stmt, expr), span)
     }
 
-    pub fn new_for(
+    pub fn for_stmt(
         e1: ExpressionStatementNode,
         e2: ExpressionStatementNode,
         expr: Option<ExpressionNode>,
@@ -165,10 +165,10 @@ impl IterationStatementNode {
 }
 
 impl JumpStatementNode {
-    pub fn goto(name: Name, span: Span) -> JumpStatementNode {
+    pub fn goto_stmt(name: Name, span: Span) -> JumpStatementNode {
         JumpStatementNode::new(JumpStatement::Goto(name), span)
     }
-    pub fn new_return(expr: Option<ExpressionNode>, span: Span) -> JumpStatementNode {
+    pub fn return_stmt(expr: Option<ExpressionNode>, span: Span) -> JumpStatementNode {
         JumpStatementNode::new(JumpStatement::Return(expr), span)
     }
 }

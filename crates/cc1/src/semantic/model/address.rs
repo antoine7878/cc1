@@ -1,5 +1,5 @@
 use crate::ast::{BinaryOp, Expression, ExpressionNode, MemberOp, StringConstId, UnaryOp};
-use crate::semantic::{Duration, ResolvedType, Sema, SymbolId, SymbolKind, ice, layout};
+use crate::semantic::{Duration, ResolvedType, Sema, SymbolId, SymbolKind, fold, layout};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AddressBase {
@@ -9,12 +9,12 @@ pub enum AddressBase {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct AdressOffset {
+pub struct AddressOffset {
     pub base: AddressBase,
     pub offset: i64,
 }
 
-impl AdressOffset {
+impl AddressOffset {
     fn at(base: AddressBase, offset: i64) -> Self {
         Self { base, offset }
     }
@@ -24,13 +24,13 @@ impl AdressOffset {
     }
 }
 
-pub fn fold(sema: &mut Sema, e: &ExpressionNode) -> Option<AdressOffset> {
+pub fn address_constant(sema: &mut Sema, e: &ExpressionNode) -> Option<AddressOffset> {
     if decays(sema, e) {
         return place(sema, e);
     }
     match e.id.resolve() {
-        Expression::ConstantExpression(inner) => fold(sema, inner),
-        Expression::StringLiteral(literal) => Some(AdressOffset::at(AddressBase::String(literal.id), 0)),
+        Expression::ConstantExpression(inner) => address_constant(sema, inner),
+        Expression::StringLiteral(literal) => Some(AddressOffset::at(AddressBase::String(literal.id), 0)),
         Expression::Unary(UnaryOp::Addr, inner) => place(sema, inner),
         Expression::Cast(_, inner) => cast(sema, e, inner),
         Expression::Binary(BinaryOp::Add, e1, e2) => match additive(sema, e1, e2, 1) {
@@ -42,12 +42,12 @@ pub fn fold(sema: &mut Sema, e: &ExpressionNode) -> Option<AdressOffset> {
     }
 }
 
-fn place(sema: &mut Sema, e: &ExpressionNode) -> Option<AdressOffset> {
+fn place(sema: &mut Sema, e: &ExpressionNode) -> Option<AddressOffset> {
     match e.id.resolve() {
         Expression::ConstantExpression(inner) => place(sema, inner),
         Expression::Identifier(_) => object(sema, e),
-        Expression::StringLiteral(literal) => Some(AdressOffset::at(AddressBase::String(literal.id), 0)),
-        Expression::Unary(UnaryOp::Deref, inner) => fold(sema, inner),
+        Expression::StringLiteral(literal) => Some(AddressOffset::at(AddressBase::String(literal.id), 0)),
+        Expression::Unary(UnaryOp::Deref, inner) => address_constant(sema, inner),
         Expression::ArraySubscripting(base, index) => match additive(sema, base, index, 1) {
             Some(at) => Some(at),
             None => additive(sema, index, base, 1),
@@ -57,55 +57,55 @@ fn place(sema: &mut Sema, e: &ExpressionNode) -> Option<AdressOffset> {
     }
 }
 
-fn object(sema: &Sema, e: &ExpressionNode) -> Option<AdressOffset> {
+fn object(sema: &Sema, e: &ExpressionNode) -> Option<AddressOffset> {
     let sym_id = sema.expr_bindings.get(e.id).copied()?;
     let sym = sym_id.resolve_with(sema);
     let addressable = sym.duration == Duration::Static || sym.kind == SymbolKind::Function;
-    addressable.then(|| AdressOffset::at(AddressBase::Symbol(sym_id), 0))
+    addressable.then(|| AddressOffset::at(AddressBase::Symbol(sym_id), 0))
 }
 
 fn decays(sema: &Sema, e: &ExpressionNode) -> bool {
-    let Some(re) = sema.expr_types.get(e.id) else { return false };
+    let Some(re) = sema.expressions.get(e.id) else { return false };
     matches!(re.ty.id.resolve_with(sema), ResolvedType::Array { .. } | ResolvedType::Function { .. })
 }
 
-fn member(sema: &mut Sema, node: &ExpressionNode, base: &ExpressionNode, op: MemberOp) -> Option<AdressOffset> {
+fn member(sema: &mut Sema, node: &ExpressionNode, base: &ExpressionNode, op: MemberOp) -> Option<AddressOffset> {
     let reference = sema.member_refs.get(node.id).copied()?;
     layout::of_tag(sema, reference.tag)?;
     let offset = reference.member(sema).offset;
     let at = match op {
         MemberOp::Dot => place(sema, base)?,
-        MemberOp::Arrow => fold(sema, base)?,
+        MemberOp::Arrow => address_constant(sema, base)?,
     };
     at.shift(i64::from(offset))
 }
 
-fn additive(sema: &mut Sema, ptr: &ExpressionNode, index: &ExpressionNode, sign: i64) -> Option<AdressOffset> {
+fn additive(sema: &mut Sema, ptr: &ExpressionNode, index: &ExpressionNode, sign: i64) -> Option<AddressOffset> {
     let size = pointee_size(sema, ptr)?;
     let count = integer(sema, index)?;
-    let at = fold(sema, ptr)?;
+    let at = address_constant(sema, ptr)?;
     at.shift(count.checked_mul(size)?.checked_mul(sign)?)
 }
 
-fn cast(sema: &mut Sema, node: &ExpressionNode, inner: &ExpressionNode) -> Option<AdressOffset> {
-    if let Some(at) = fold(sema, inner) {
+fn cast(sema: &mut Sema, node: &ExpressionNode, inner: &ExpressionNode) -> Option<AddressOffset> {
+    if let Some(at) = address_constant(sema, inner) {
         return Some(at);
     }
-    let ty = sema.expr_types.get(node.id)?.casted_ty();
+    let ty = sema.expressions.get(node.id)?.casted_ty();
     if !ty.is_pointer(sema) {
         return None;
     }
-    Some(AdressOffset::at(AddressBase::Absolute, integer(sema, inner)?))
+    Some(AddressOffset::at(AddressBase::Absolute, integer(sema, inner)?))
 }
 
 fn pointee_size(sema: &mut Sema, e: &ExpressionNode) -> Option<i64> {
-    let ty = sema.expr_types.get(e.id)?.casted_ty();
+    let ty = sema.expressions.get(e.id)?.casted_ty();
     let &ResolvedType::Pointer(inner) = ty.id.resolve_with(sema) else { return None };
     layout::of(sema, inner.id).map(|layout| i64::from(layout.size))
 }
 
 fn integer(sema: &mut Sema, e: &ExpressionNode) -> Option<i64> {
-    let value = ice::try_fold(sema, e)?;
+    let value = fold::try_fold(sema, e)?;
     value.get_integer_value()?;
     Some(value.to_i64())
 }

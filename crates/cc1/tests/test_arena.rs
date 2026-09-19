@@ -74,8 +74,8 @@ fn interner_starts_empty() {
 #[test]
 fn interner_gives_one_id_per_distinct_value() {
     let mut interner = interner();
-    let first = interner.alloc("a".to_string());
-    let second = interner.alloc("b".to_string());
+    let first = interner.intern("a".to_string());
+    let second = interner.intern("b".to_string());
     assert_ne!(first, second);
     assert_eq!(interner.len(), 2);
 }
@@ -83,9 +83,9 @@ fn interner_gives_one_id_per_distinct_value() {
 #[test]
 fn interner_reuses_the_id() {
     let mut interner = interner();
-    let first = interner.alloc("a".to_string());
-    let other = interner.alloc("b".to_string());
-    let again = interner.alloc("a".to_string());
+    let first = interner.intern("a".to_string());
+    let other = interner.intern("b".to_string());
+    let again = interner.intern("a".to_string());
     assert_eq!(first, again);
     assert_ne!(first, other);
     assert_eq!(interner.len(), 2);
@@ -94,11 +94,11 @@ fn interner_reuses_the_id() {
 #[test]
 fn interner_resolves_id() {
     let mut interner = interner();
-    let first = interner.alloc("a".to_string());
-    let second = interner.alloc("b".to_string());
+    let first = interner.intern("a".to_string());
+    let second = interner.intern("b".to_string());
     assert_eq!(interner.get(first), "a");
     assert_eq!(interner.get(second), "b");
-    let again = interner.alloc("a".to_string());
+    let again = interner.intern("a".to_string());
     assert_eq!(interner.get(again), "a");
 }
 

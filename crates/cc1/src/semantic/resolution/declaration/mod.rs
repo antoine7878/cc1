@@ -1,9 +1,9 @@
 mod function;
 mod symbol;
 mod tag;
-mod ty;
+mod types;
 
 pub use function::*;
 pub use symbol::*;
 pub use tag::*;
-pub use ty::*;
+pub use types::*;

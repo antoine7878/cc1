@@ -5,7 +5,7 @@ use std::iter::once;
 use crate::ast::{StringConstant, Tag};
 use crate::codegen::{LlvmInit, LlvmName, LlvmSymbol, LlvmType, struct_elements};
 use crate::semantic::{
-    Definition, Initializer, Linkage, ParamTypes, QualifiedType, ResolvedType, SymbolId, TagDef, TagDefId, sema,
+    DefinitionState, Initializer, Linkage, ParamTypes, QualifiedType, ResolvedType, SymbolId, TagDef, TagDefId, sema,
 };
 use crate::target::Layout;
 
@@ -66,19 +66,19 @@ impl<W: Write> Builder<W> {
         self.write_str("\n");
     }
 
-    pub fn define(&mut self, sym_id: SymbolId, parameters: &[LlvmSymbol], is_variadic: bool) {
+    pub fn define_function(&mut self, sym_id: SymbolId, params: &[LlvmSymbol], is_variadic: bool) {
         let ResolvedType::Function { ret, .. } = sym_id.resolve().ty.id.resolve() else {
             unreachable!("define on a non-function")
         };
         self.blank();
-        self.reset(parameters.len());
+        self.reset(params.len());
         self.write_fmt(format_args!("define {} {}", ret.llvm(), LlvmName::Global(sym_id)));
-        self.params(parameters, is_variadic);
+        self.params(params, is_variadic);
         self.write_line(format_args!(" {{"));
     }
 
-    fn params(&mut self, parameters: &[LlvmSymbol], is_variadic: bool) {
-        let mut it = parameters.iter().peekable();
+    fn params(&mut self, params: &[LlvmSymbol], is_variadic: bool) {
+        let mut it = params.iter().peekable();
         self.write_str("(");
         while let Some(param) = it.next() {
             self.write_fmt(format_args!("{param}"));
@@ -155,7 +155,7 @@ impl<W: Write> Builder<W> {
         self.has_block_ret = true;
     }
 
-    pub fn brc(&mut self, cond: LlvmSymbol, l1: LlvmName, l2: LlvmName) {
+    pub fn br_cond(&mut self, cond: LlvmSymbol, l1: LlvmName, l2: LlvmName) {
         self.write_line(format_args!("  br {cond}, label {l1}, label {l2}"));
         self.has_block_ret = true;
     }
@@ -165,7 +165,7 @@ impl<W: Write> Builder<W> {
         self.has_block_ret = true;
     }
 
-    pub fn emit_label(&mut self, l: LlvmName) {
+    pub fn label(&mut self, l: LlvmName) {
         self.has_block_ret = false;
         self.blank();
         self.current_block = l;
@@ -185,24 +185,24 @@ impl<W: Write> Builder<W> {
         LlvmSymbol::new(s1.ty, r)
     }
 
-    pub fn call(&mut self, fty: LlvmType, ret: LlvmType, f: LlvmSymbol, parameters: &[LlvmSymbol]) -> LlvmSymbol {
+    pub fn call(&mut self, fty: LlvmType, ret: LlvmType, f: LlvmSymbol, params: &[LlvmSymbol]) -> LlvmSymbol {
         match ret.is_void() {
-            true => self.call_void(fty, f.name, parameters),
-            false => self.call_ret(fty, ret, f.name, parameters),
+            true => self.call_void(fty, f.name, params),
+            false => self.call_ret(fty, ret, f.name, params),
         }
     }
 
-    fn call_void(&mut self, fty: LlvmType, f_name: LlvmName, parameters: &[LlvmSymbol]) -> LlvmSymbol {
+    fn call_void(&mut self, fty: LlvmType, f_name: LlvmName, params: &[LlvmSymbol]) -> LlvmSymbol {
         self.write_fmt(format_args!("  call {fty} {f_name}"));
-        self.params(parameters, false);
+        self.params(params, false);
         self.blank();
         LlvmSymbol::void()
     }
 
-    fn call_ret(&mut self, fty: LlvmType, ret: LlvmType, f_name: LlvmName, parameters: &[LlvmSymbol]) -> LlvmSymbol {
+    fn call_ret(&mut self, fty: LlvmType, ret: LlvmType, f_name: LlvmName, params: &[LlvmSymbol]) -> LlvmSymbol {
         let r = self.fresh();
         self.write_fmt(format_args!("  {r} = call {fty} {f_name}"));
-        self.params(parameters, false);
+        self.params(params, false);
         self.blank();
         LlvmSymbol::new(ret, r)
     }
@@ -213,7 +213,7 @@ impl<W: Write> Builder<W> {
         LlvmSymbol::ptr(r)
     }
 
-    pub fn list_literal(&mut self, name: LlvmName, qty: QualifiedType, init: &Initializer) {
+    pub fn aggregate_constant(&mut self, name: LlvmName, qty: QualifiedType, init: &Initializer) {
         let init = LlvmInit::new(qty, Some(init));
         self.write_line(format_args!("{} = private unnamed_addr constant {}", name, init));
         self.blank();
@@ -242,7 +242,7 @@ impl<W: Write> Builder<W> {
         self.write_str("]");
     }
 
-    pub fn type_def(&mut self, id: TagDefId) {
+    pub fn define_type(&mut self, id: TagDefId) {
         let def = id.resolve();
         let ty = LlvmType::Tag(id);
         match def.kind {
@@ -264,7 +264,7 @@ impl<W: Write> Builder<W> {
 
     fn union_def(&mut self, ty: LlvmType, def: &TagDef) {
         let size = ty.size();
-        let members = def.members.iter().filter_map(|member| member.sym).map(|sym| sym.resolve().ty);
+        let members = def.members.iter().filter_map(|member| member.symbol).map(|sym| sym.resolve().ty);
         let Some(widest) = members.max_by_key(|qty| sema().layout(&qty.id).align) else {
             return self.write_line(format_args!("{ty} = type {{ [{size} x {}] }}", LlvmType::char()));
         };
@@ -274,7 +274,7 @@ impl<W: Write> Builder<W> {
         }
     }
 
-    pub fn declare(&mut self, sym_id: SymbolId) {
+    pub fn declare_function(&mut self, sym_id: SymbolId) {
         let sym = sym_id.resolve();
         let ResolvedType::Function { ret, params } = sym.ty.id.resolve() else {
             unreachable!("declare on a non-function")
@@ -298,12 +298,12 @@ impl<W: Write> Builder<W> {
         self.write_line(format_args!(")"));
     }
 
-    pub fn global(&mut self, sym_id: SymbolId) {
+    pub fn define_global(&mut self, sym_id: SymbolId) {
         let sym = sym_id.resolve();
         let name = LlvmName::Global(sym_id);
         let align = sema().layout(&sym.ty.id).align;
         let kind = if sym.ty.is_const { "constant" } else { "global" };
-        if sym.definition == Definition::Declaration {
+        if sym.definition == DefinitionState::Declared {
             return self.write_line(format_args!("{name} = external {kind} {}, align {align}", sym.ty.llvm()));
         }
         let linkage = match sym.linkage {

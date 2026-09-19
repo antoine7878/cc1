@@ -208,7 +208,7 @@ fn probe(target: Target, ty: &str) -> String {
     let name = target.name;
     let unit = Unit::compile_for(target, &format!("enum probe {{ PROBE = sizeof({ty}) }};"));
     assert!(unit.accepts(), "sizeof({ty}) on {name}:\n{}", unit.render());
-    unit.variants().into_iter().find(|(name, _)| name == "PROBE").expect("the probe variant").1
+    unit.enumerators().into_iter().find(|(name, _)| name == "PROBE").expect("the probe enumerator").1
 }
 
 #[test]

@@ -6,7 +6,7 @@ use crate::ast::{Name, StringLiteralNode, ConstValueNode, ConstValue};
 use crate::context::Context;
 use libft::{Position, Span};
 use crate::parser::{YYToken, YYFeedback};
-use crate::semantic::{Diag, DiagnosisNode};
+use crate::semantic::{Diag, DiagnosticNode};
 
 %}
 
@@ -55,7 +55,7 @@ IS			(u|U|l|L|ul|UL|Ul|uL|lu|LU|lU|Lu)
 "volatile"		            { return YYToken::VOLATILE; }
 "while"			            { return YYToken::WHILE; }
 
-{L}({L}|{D})*		        { let name = alloc_ident(self); return self.ctx.parse.check_type(name); }
+{L}({L}|{D})*		        { let name = alloc_ident(self); return self.ctx.parse.classify_identifier(name); }
 
 L?'(\\.|[^\\'])+'	        { return YYToken::CONSTANT(alloc_constant(self)); }
 0[xX]{H}+{IS}?		        { return YYToken::CONSTANT(alloc_constant(self)); }
@@ -132,7 +132,7 @@ fn line_marker<R: Read>(lex: &mut YYLex<R>) {
     let Ok(line) = rest[..end].parse::<usize>() else { return };
 
     if let Some(file) = rest[end..].trim_start().strip_prefix('"').and_then(|s| s.split('"').next()) {
-        lex.pos.file = lex.ctx.arenas.names.alloc(file.to_string()).into();
+        lex.pos.file = lex.ctx.arenas.names.intern(file.to_string()).into();
     }
     lex.pos.line = line;
     lex.pos.col = 1;
@@ -146,9 +146,9 @@ fn alloc_ident<R: Read>(lex: &mut YYLex<R>) -> Name {
 
 fn alloc_constant<R: Read>(lex: &mut YYLex<R>) -> ConstValueNode {
     let span = lex.span;
-    let Diag { res: value, diagnosis } = ConstValue::parse(lex.yytext.as_str(), &lex.ctx.target);
-    if let Some(diagnosis) = diagnosis {
-        lex.ctx.diagnosis.push(DiagnosisNode::new(diagnosis, span));
+    let Diag { res: value, diagnostic } = ConstValue::parse(lex.yytext.as_str(), &lex.ctx.target);
+    if let Some(diagnostic) = diagnostic {
+        lex.ctx.diagnostics.push(DiagnosticNode::new(diagnostic, span));
     }
     ConstValueNode::new(value, span)
 }
@@ -156,9 +156,9 @@ fn alloc_constant<R: Read>(lex: &mut YYLex<R>) -> ConstValueNode {
 fn alloc_string<R: Read>(lex: &mut YYLex<R>) -> StringLiteralNode {
     let span = lex.span;
     let text = lex.yytext.clone();
-    let Diag { res: node, diagnosis } = lex.ctx.arenas.strings.literal(&text, span);
-    if let Some(diagnosis) = diagnosis {
-        lex.ctx.diagnosis.push(DiagnosisNode::new(diagnosis, span));
+    let Diag { res: node, diagnostic } = lex.ctx.arenas.strings.literal(&text, span);
+    if let Some(diagnostic) = diagnostic {
+        lex.ctx.diagnostics.push(DiagnosticNode::new(diagnostic, span));
     }
     node
 }

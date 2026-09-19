@@ -127,8 +127,8 @@ macro_rules! recover {
             let name = stringify!($name);
             let unit = $crate::common::Unit::compile($src);
 
-            let diagnosis = unit.diagnosis();
-            let mut got = diagnosis.iter();
+            let diagnostics = unit.diagnostics();
+            let mut got = diagnostics.iter();
             $(
                 let next = got.next().map(|diag| diag.inner.clone());
                 assert!(
@@ -142,7 +142,7 @@ macro_rules! recover {
             let extra: Vec<_> = got.map(|diag| diag.inner.clone()).collect();
             assert!(
                 extra.is_empty(),
-                "`{name}` unexpected extra diagnosis {extra:?}:\n{}\n{}",
+                "`{name}` unexpected extra diagnostic {extra:?}:\n{}\n{}",
                 $src,
                 unit.render()
             );
@@ -231,8 +231,8 @@ macro_rules! shaped {
             let unit = $crate::common::Unit::compile($src);
             assert!(unit.parsed(), "cc1 failed to parse:\n{}", $src);
             assert!(
-                unit.diagnosis().is_empty(),
-                "unexpected diagnosis:\n{}\n{}",
+                unit.diagnostics().is_empty(),
+                "unexpected diagnostic:\n{}\n{}",
                 $src,
                 unit.render()
             );
@@ -252,15 +252,15 @@ macro_rules! shaped {
 
 #[macro_export]
 macro_rules! rejects_shaped {
-    (@build $name:ident, $src:expr, $u:ident, $diagnosis:pat, $guard:expr, $shapes:expr) => {
+    (@build $name:ident, $src:expr, $u:ident, $diagnostic:pat, $guard:expr, $shapes:expr) => {
         test_case!($name, {
             let $u = $crate::common::Unit::compile($src);
             assert!($u.parsed(), "cc1 failed to parse:\n{}", $src);
-            let got: Vec<_> = $u.diagnosis().iter().map(|diag| diag.inner.clone()).collect();
+            let got: Vec<_> = $u.diagnostics().iter().map(|diag| diag.inner.clone()).collect();
             assert!(
-                matches!(got.as_slice(), [$diagnosis] if $guard),
+                matches!(got.as_slice(), [$diagnostic] if $guard),
                 "expected one {}, got {got:?}:\n{}\n{}",
-                stringify!($diagnosis),
+                stringify!($diagnostic),
                 $src,
                 $u.render()
             );
@@ -268,11 +268,11 @@ macro_rules! rejects_shaped {
             assert_eq!($u.shapes(), expected, "{}", $src);
         });
     };
-    ($name:ident, $src:expr, |$u:ident| $diagnosis:pat if $guard:expr, $shapes:expr $(,)?) => {
-        rejects_shaped!(@build $name, $src, $u, $diagnosis, $guard, $shapes);
+    ($name:ident, $src:expr, |$u:ident| $diagnostic:pat if $guard:expr, $shapes:expr $(,)?) => {
+        rejects_shaped!(@build $name, $src, $u, $diagnostic, $guard, $shapes);
     };
-    ($name:ident, $src:expr, $diagnosis:pat, $shapes:expr $(,)?) => {
-        rejects_shaped!(@build $name, $src, _u, $diagnosis, true, $shapes);
+    ($name:ident, $src:expr, $diagnostic:pat, $shapes:expr $(,)?) => {
+        rejects_shaped!(@build $name, $src, _u, $diagnostic, true, $shapes);
     };
 }
 
@@ -331,9 +331,9 @@ macro_rules! reports {
 macro_rules! constant {
     ($name:ident, $src:expr, $expected:expr) => {
         test_case!($name, {
-            let cc1::semantic::Diag { res: value, diagnosis } = cc1::ast::ConstValue::parse($src, &cc1::target::I386);
+            let cc1::semantic::Diag { res: value, diagnostic } = cc1::ast::ConstValue::parse($src, &cc1::target::I386);
             assert_eq!($crate::common::repr(Some(value)), $expected, "Value::parse({:?})", $src);
-            assert!(diagnosis.is_none(), "ConstValue::parse({:?}) reported {diagnosis:?}", $src);
+            assert!(diagnostic.is_none(), "ConstValue::parse({:?}) reported {diagnostic:?}", $src);
         });
     };
 }
@@ -342,11 +342,11 @@ macro_rules! constant {
 macro_rules! too_large {
     ($name:ident, $src:expr, $expected:expr) => {
         test_case!($name, {
-            let cc1::semantic::Diag { res: value, diagnosis } = cc1::ast::ConstValue::parse($src, &cc1::target::I386);
+            let cc1::semantic::Diag { res: value, diagnostic } = cc1::ast::ConstValue::parse($src, &cc1::target::I386);
             assert_eq!($crate::common::repr(Some(value)), $expected, "ConstValue::parse({:?})", $src);
             assert!(
-                matches!(diagnosis, Some(cc1::semantic::Diagnosis::IntegerConstantTooLarge)),
-                "ConstValue::parse({:?}) reported {diagnosis:?}",
+                matches!(diagnostic, Some(cc1::semantic::Diagnostic::IntegerConstantTooLarge)),
+                "ConstValue::parse({:?}) reported {diagnostic:?}",
                 $src
             );
         });

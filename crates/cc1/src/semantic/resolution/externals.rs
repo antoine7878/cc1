@@ -1,10 +1,9 @@
-use crate::ast::StringId;
+use crate::ast::NameId;
 use crate::semantic::sema::External;
-use crate::semantic::{Definition, Diag, DiagCollector, Diagnosis, Linkage, QualifiedType, ResolvedType, Sema};
+use crate::semantic::{DefinitionState, Diag, Diagnostic, DiagnosticSink, Linkage, QualifiedType, ResolvedType, Sema};
 
 pub fn finish_externals(sema: &mut Sema) {
-    let mut entries: Vec<(StringId, External)> =
-        sema.externals.iter().map(|(&name, ext)| (name, ext.clone())).collect();
+    let mut entries: Vec<(NameId, External)> = sema.externals.iter().map(|(&name, ext)| (name, ext.clone())).collect();
     entries.sort_by_key(|(_, ext)| {
         let p = ext.tentative.or(ext.defined).unwrap_or_default().start;
         (p.file, p.line, p.col)
@@ -24,10 +23,10 @@ pub fn finish_externals(sema: &mut Sema) {
                 sema.symbols.get_mut(sym_id).ty = qty;
             }
             if !qty.is_complete(sema) {
-                sema.add_diag(Diag::err((), Diagnosis::TentativeNeverCompleted(qty)), &span);
+                sema.add_diag(Diag::err((), Diagnostic::TentativeNeverCompleted(qty)), &span);
                 continue;
             }
-            sema.symbols.get_mut(sym_id).definition = Definition::Definition;
+            sema.symbols.get_mut(sym_id).definition = DefinitionState::Defined;
             defined = Some(span);
             if let Some(e) = sema.externals.get_mut(&i) {
                 e.defined = Some(span);
@@ -36,7 +35,7 @@ pub fn finish_externals(sema: &mut Sema) {
         let sym = sema.symbols.get(sym_id);
         if sym.used && defined.is_none() && sym.linkage == Linkage::Internal {
             let span = sym.name.span;
-            sema.add_diag(Diag::err((), Diagnosis::InternalNeverDefined(sym.name)), &span);
+            sema.add_diag(Diag::err((), Diagnostic::InternalNeverDefined(sym.name)), &span);
         }
     }
 }

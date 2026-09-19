@@ -1,4 +1,4 @@
-use cc1::semantic::Diagnosis;
+use cc1::semantic::Diagnostic;
 
 // 6.6.1 Labeled statements
 
@@ -107,6 +107,6 @@ reject!(stmt_case_with_a_non_constant, "void f(void){ int x; switch (1) { case x
 
 // 6.6.6.4 A return without a value in a non-void function is undefined behaviour, not a
 // constraint violation, so it is diagnosed as a warning.
-recover!(stmt_return_without_a_value, "int f(void){ return; }", [Diagnosis::ReturnWithoutValue], &[]);
+recover!(stmt_return_without_a_value, "int f(void){ return; }", [Diagnostic::ReturnWithoutValue], &[]);
 reject!(stmt_return_with_a_value_from_void, "void f(void){ return 1; }");
 accept!(stmt_return_without_a_value_from_void, "void f(void){ return; }");

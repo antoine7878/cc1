@@ -1,14 +1,14 @@
 use cc1::ast::declaration::DeclaratorId;
 use cc1::ast::{
-    ConstValue, DeclarationSpecifier, DeclaratorNode, InitDeclaratorNode, Initializer, InitializerNode, Name, Node,
-    Qualifier, Storage, StringId, TypeSpecifier,
+    ConstValue, DeclarationSpecifier, DeclaratorNode, InitDeclaratorNode, Initializer, InitializerNode, Name, NameId,
+    Node, Qualifier, Storage, TypeSpecifier,
 };
-use cc1::semantic::constrain::parameter::{check_complete_parameter, is_valid_old_style, param_storage_only_register};
-use cc1::semantic::constrain::specifier::{
-    basic_type, check_external_specifiers, check_function_storage, check_qualifier, extern_function_only,
-    get_qualifier, get_storage, is_tentative_definition,
+use cc1::semantic::constraints::param::{check_complete_param, check_param_storage, is_valid_old_style};
+use cc1::semantic::constraints::specifier::{
+    basic_type, check_block_extern_function, check_external_specifiers, check_function_storage, check_qualifiers,
+    is_tentative_definition, qualifiers_of, storage_of,
 };
-use cc1::semantic::constrain::ty::{
+use cc1::semantic::constraints::types::{
     check_bit_width, check_complete_object, check_definition_return, check_element_type, check_member_type,
 };
 use cc1::semantic::{Diag, QualifiedType, ResolvedType, ScopeKind, Sema};
@@ -16,14 +16,14 @@ use cc1::target::I386;
 use libft::Span;
 
 fn reported<T>(diag: &Diag<T>) -> String {
-    match &diag.diagnosis {
-        Some(diagnosis) => format!("{diagnosis:?}"),
+    match &diag.diagnostic {
+        Some(diagnostic) => format!("{diagnostic:?}"),
         None => "None".to_string(),
     }
 }
 
-fn name(index: usize) -> StringId {
-    StringId::from(index)
+fn name(index: usize) -> NameId {
+    NameId::from(index)
 }
 
 fn resolve(types: &[TypeSpecifier]) -> Diag<Option<ResolvedType>> {
@@ -32,7 +32,7 @@ fn resolve(types: &[TypeSpecifier]) -> Diag<Option<ResolvedType>> {
 
 #[test]
 fn no_storage_specifier_is_not_an_error() {
-    let diag = get_storage(&[DeclarationSpecifier::Type(TypeSpecifier::Int)]);
+    let diag = storage_of(&[DeclarationSpecifier::Type(TypeSpecifier::Int)]);
     assert_eq!(diag.res, None);
     assert_eq!(reported(&diag), "None");
 }
@@ -40,7 +40,7 @@ fn no_storage_specifier_is_not_an_error() {
 #[test]
 fn one_storage_specifier_is_returned() {
     let diag =
-        get_storage(&[DeclarationSpecifier::Storage(Storage::Static), DeclarationSpecifier::Type(TypeSpecifier::Int)]);
+        storage_of(&[DeclarationSpecifier::Storage(Storage::Static), DeclarationSpecifier::Type(TypeSpecifier::Int)]);
     assert_eq!(diag.res, Some(Storage::Static));
     assert_eq!(reported(&diag), "None");
 }
@@ -48,44 +48,44 @@ fn one_storage_specifier_is_returned() {
 #[test]
 fn two_storage_specifiers_are_rejected() {
     let diag =
-        get_storage(&[DeclarationSpecifier::Storage(Storage::Static), DeclarationSpecifier::Storage(Storage::Extern)]);
+        storage_of(&[DeclarationSpecifier::Storage(Storage::Static), DeclarationSpecifier::Storage(Storage::Extern)]);
     assert_eq!(diag.res, Some(Storage::Static));
     assert_eq!(reported(&diag), "MultipleStorageSpecifiers");
 }
 
 #[test]
 fn a_function_declared_in_a_block_must_be_extern() {
-    assert_eq!(reported(&extern_function_only(ScopeKind::Block, Storage::Extern)), "None");
-    assert_eq!(reported(&extern_function_only(ScopeKind::Block, Storage::Static)), "BlockScopeNotExtern");
-    assert_eq!(reported(&extern_function_only(ScopeKind::Block, Storage::Auto)), "BlockScopeNotExtern");
-    assert_eq!(reported(&extern_function_only(ScopeKind::Function, Storage::Auto)), "BlockScopeNotExtern");
-    assert_eq!(reported(&extern_function_only(ScopeKind::Function, Storage::Extern)), "None");
-    assert_eq!(reported(&extern_function_only(ScopeKind::File, Storage::Static)), "None");
-    assert_eq!(reported(&extern_function_only(ScopeKind::File, Storage::Auto)), "None");
-    assert_eq!(reported(&extern_function_only(ScopeKind::Prototype, Storage::Auto)), "None");
+    assert_eq!(reported(&check_block_extern_function(ScopeKind::Block, Storage::Extern)), "None");
+    assert_eq!(reported(&check_block_extern_function(ScopeKind::Block, Storage::Static)), "BlockScopeNotExtern");
+    assert_eq!(reported(&check_block_extern_function(ScopeKind::Block, Storage::Auto)), "BlockScopeNotExtern");
+    assert_eq!(reported(&check_block_extern_function(ScopeKind::Function, Storage::Auto)), "BlockScopeNotExtern");
+    assert_eq!(reported(&check_block_extern_function(ScopeKind::Function, Storage::Extern)), "None");
+    assert_eq!(reported(&check_block_extern_function(ScopeKind::File, Storage::Static)), "None");
+    assert_eq!(reported(&check_block_extern_function(ScopeKind::File, Storage::Auto)), "None");
+    assert_eq!(reported(&check_block_extern_function(ScopeKind::Prototype, Storage::Auto)), "None");
 }
 
 #[test]
 fn no_qualifier_leaves_the_type_unqualified() {
-    let diag = check_qualifier([]);
+    let diag = check_qualifiers([]);
     assert_eq!(diag.res, (false, false));
     assert_eq!(reported(&diag), "None");
 }
 
 #[test]
 fn each_qualifier_is_reported_once() {
-    assert_eq!(check_qualifier([Qualifier::Const]).res, (true, false));
-    assert_eq!(check_qualifier([Qualifier::Volatile]).res, (false, true));
-    assert_eq!(check_qualifier([Qualifier::Const, Qualifier::Volatile]).res, (true, true));
-    assert_eq!(reported(&check_qualifier([Qualifier::Const, Qualifier::Volatile])), "None");
+    assert_eq!(check_qualifiers([Qualifier::Const]).res, (true, false));
+    assert_eq!(check_qualifiers([Qualifier::Volatile]).res, (false, true));
+    assert_eq!(check_qualifiers([Qualifier::Const, Qualifier::Volatile]).res, (true, true));
+    assert_eq!(reported(&check_qualifiers([Qualifier::Const, Qualifier::Volatile])), "None");
 }
 
 #[test]
 fn a_repeated_qualifier_is_rejected() {
-    let diag = check_qualifier([Qualifier::Const, Qualifier::Const]);
+    let diag = check_qualifiers([Qualifier::Const, Qualifier::Const]);
     assert_eq!(diag.res, (true, false));
     assert_eq!(reported(&diag), "DuplicateTypeQualifiers");
-    assert_eq!(reported(&check_qualifier([Qualifier::Volatile, Qualifier::Volatile])), "DuplicateTypeQualifiers");
+    assert_eq!(reported(&check_qualifiers([Qualifier::Volatile, Qualifier::Volatile])), "DuplicateTypeQualifiers");
 }
 
 #[test]
@@ -95,11 +95,11 @@ fn qualifiers_are_picked_out_of_the_specifier_list() {
         DeclarationSpecifier::Qualifier(Qualifier::Const),
         DeclarationSpecifier::Type(TypeSpecifier::Int),
     ];
-    let diag = get_qualifier(&specifiers);
+    let diag = qualifiers_of(&specifiers);
     assert_eq!(diag.res, (true, false));
     assert_eq!(reported(&diag), "None");
     assert_eq!(
-        reported(&get_qualifier(&[
+        reported(&qualifiers_of(&[
             DeclarationSpecifier::Qualifier(Qualifier::Const),
             DeclarationSpecifier::Qualifier(Qualifier::Const)
         ])),
@@ -202,14 +202,14 @@ fn a_function_definition_is_static_or_extern() {
 
 #[test]
 fn an_old_style_parameter_declaration_is_register_or_nothing() {
-    let diag = param_storage_only_register(Storage::Register);
+    let diag = check_param_storage(Storage::Register);
     assert_eq!(diag.res, Some(()));
     assert_eq!(reported(&diag), "None");
 
-    let diag = param_storage_only_register(Storage::Static);
+    let diag = check_param_storage(Storage::Static);
     assert_eq!(diag.res, None);
     assert_eq!(reported(&diag), "ParameterNotRegister");
-    assert_eq!(reported(&param_storage_only_register(Storage::Auto)), "ParameterNotRegister");
+    assert_eq!(reported(&check_param_storage(Storage::Auto)), "ParameterNotRegister");
 }
 
 #[test]
@@ -312,7 +312,7 @@ fn an_unlisted_combination_is_rejected() {
 
 #[test]
 fn a_tag_or_typedef_name_is_not_a_basic_type() {
-    let name = Name::new(StringId::from(0usize), Span::default());
+    let name = Name::new(NameId::from(0usize), Span::default());
     assert_eq!(reported(&resolve(&[TypeSpecifier::TypedefName(name)])), "InvalidTypeSpecifier");
     assert_eq!(reported(&resolve(&[TypeSpecifier::Int, TypeSpecifier::TypedefName(name)])), "InvalidTypeSpecifier");
 }
@@ -385,12 +385,12 @@ fn an_array_element_without_an_object_type_is_rejected() {
 
 #[test]
 fn a_complete_parameter_is_accepted() {
-    assert_eq!(reported(&check_complete_parameter(true, int_type())), "None");
+    assert_eq!(reported(&check_complete_param(true, int_type())), "None");
 }
 
 #[test]
 fn an_incomplete_parameter_is_rejected() {
-    assert!(reported(&check_complete_parameter(false, int_type())).starts_with("IncompleteParameter("));
+    assert!(reported(&check_complete_param(false, int_type())).starts_with("IncompleteParameter("));
 }
 
 #[test]

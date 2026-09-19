@@ -1,10 +1,10 @@
 use cc1::ast::Tag;
 use cc1::semantic::model::cast::{promote, usual_arithmetic};
-use cc1::semantic::{CastKind, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId, Sema};
+use cc1::semantic::{CastKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId, Sema, ValueCategory};
 use cc1::target::I386;
 
 fn rvalue(ty: ResolvedTypeId) -> ResolvedExpression {
-    ResolvedExpression::new(QualifiedType::new(ty, false, false), ExpressionKind::RValue)
+    ResolvedExpression::new(QualifiedType::new(ty, false, false), ValueCategory::RValue)
 }
 
 fn kinds(re: &ResolvedExpression) -> Vec<CastKind> {

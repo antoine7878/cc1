@@ -1,12 +1,12 @@
 use cc1::ast::statement::StatementId;
-use cc1::ast::{ConstValue, StringId};
+use cc1::ast::{ConstValue, NameId};
 use cc1::semantic::{
-    Diagnosis, QualifiedType, ResolvedStatement, ResolvedTypeId, ScopeKind, StatementScope, StatementScopes, SymbolId,
+    Diagnostic, QualifiedType, ResolvedStatement, ResolvedTypeId, ScopeKind, StatementScope, StatementScopes, SymbolId,
     SymbolScopes, TagDefId,
 };
 
-fn name(index: usize) -> StringId {
-    StringId::from(index)
+fn name(index: usize) -> NameId {
+    NameId::from(index)
 }
 
 fn symbol(index: usize) -> SymbolId {
@@ -61,7 +61,7 @@ fn an_undeclared_name_is_not_found() {
 #[test]
 fn lookup_finds_a_name_of_an_enclosing_scope() {
     let mut scopes = file_scope();
-    scopes.insert(name(0), symbol(0));
+    scopes.insert_ordinary(name(0), symbol(0));
     scopes.push(ScopeKind::Block);
     assert_eq!(scopes.lookup_ordinary(name(0)), Some(symbol(0)));
 }
@@ -69,9 +69,9 @@ fn lookup_finds_a_name_of_an_enclosing_scope() {
 #[test]
 fn an_inner_declaration_shadows_an_outer_one() {
     let mut scopes = file_scope();
-    scopes.insert(name(0), symbol(0));
+    scopes.insert_ordinary(name(0), symbol(0));
     scopes.push(ScopeKind::Block);
-    scopes.insert(name(0), symbol(1));
+    scopes.insert_ordinary(name(0), symbol(1));
     assert_eq!(scopes.lookup_ordinary(name(0)), Some(symbol(1)));
     scopes.pop();
     assert_eq!(scopes.lookup_ordinary(name(0)), Some(symbol(0)));
@@ -81,7 +81,7 @@ fn an_inner_declaration_shadows_an_outer_one() {
 fn a_scope_does_not_outlive_its_pop() {
     let mut scopes = file_scope();
     scopes.push(ScopeKind::Block);
-    scopes.insert(name(0), symbol(0));
+    scopes.insert_ordinary(name(0), symbol(0));
     scopes.pop();
     assert_eq!(scopes.lookup_ordinary(name(0)), None);
 }
@@ -89,27 +89,27 @@ fn a_scope_does_not_outlive_its_pop() {
 #[test]
 fn current_only_sees_the_innermost_scope() {
     let mut scopes = file_scope();
-    scopes.insert(name(0), symbol(0));
-    assert_eq!(scopes.current(name(0)), Some(symbol(0)));
+    scopes.insert_ordinary(name(0), symbol(0));
+    assert_eq!(scopes.lookup_current(name(0)), Some(symbol(0)));
     scopes.push(ScopeKind::Block);
-    assert_eq!(scopes.current(name(0)), None);
+    assert_eq!(scopes.lookup_current(name(0)), None);
     assert_eq!(scopes.lookup_ordinary(name(0)), Some(symbol(0)));
 }
 
 #[test]
 fn ordinary_identifiers_share_one_namespace() {
     let mut scopes = file_scope();
-    scopes.insert(name(0), symbol(0));
-    assert_eq!(scopes.current(name(0)), Some(symbol(0)));
-    assert_eq!(scopes.current(name(0)), Some(symbol(0)));
-    assert_eq!(scopes.current(name(0)), Some(symbol(0)));
-    assert_eq!(scopes.current(name(0)), Some(symbol(0)));
+    scopes.insert_ordinary(name(0), symbol(0));
+    assert_eq!(scopes.lookup_current(name(0)), Some(symbol(0)));
+    assert_eq!(scopes.lookup_current(name(0)), Some(symbol(0)));
+    assert_eq!(scopes.lookup_current(name(0)), Some(symbol(0)));
+    assert_eq!(scopes.lookup_current(name(0)), Some(symbol(0)));
 }
 
 #[test]
 fn tags_live_in_their_own_namespace() {
     let mut scopes = file_scope();
-    scopes.insert(name(0), symbol(0));
+    scopes.insert_ordinary(name(0), symbol(0));
     scopes.insert_tag(name(0), tag(3));
     assert_eq!(scopes.lookup_ordinary(name(0)), Some(symbol(0)));
     assert_eq!(scopes.lookup_tag(name(0), false), Some(tag(3)));
@@ -154,8 +154,8 @@ fn switch_scope() -> StatementScopes {
 fn statement_scopes_start_empty() {
     let scopes = StatementScopes::default();
     assert!(scopes.is_empty());
-    assert_eq!(scopes.breakable(), None);
-    assert_eq!(scopes.nearest_loop(), None);
+    assert_eq!(scopes.break_target(), None);
+    assert_eq!(scopes.continue_target(), None);
     assert_eq!(scopes.switch_control(), None);
 }
 
@@ -163,16 +163,16 @@ fn statement_scopes_start_empty() {
 fn a_loop_is_both_breakable_and_continuable() {
     let mut scopes = StatementScopes::default();
     scopes.push_loop(stmt(1));
-    assert_eq!(scopes.breakable(), Some(stmt(1)));
-    assert_eq!(scopes.nearest_loop(), Some(stmt(1)));
+    assert_eq!(scopes.break_target(), Some(stmt(1)));
+    assert_eq!(scopes.continue_target(), Some(stmt(1)));
     assert_eq!(scopes.switch_control(), None);
 }
 
 #[test]
 fn a_switch_is_breakable_but_not_continuable() {
     let scopes = switch_scope();
-    assert_eq!(scopes.breakable(), Some(stmt(0)));
-    assert_eq!(scopes.nearest_loop(), None);
+    assert_eq!(scopes.break_target(), Some(stmt(0)));
+    assert_eq!(scopes.continue_target(), None);
     assert_eq!(scopes.switch_control(), Some(control()));
 }
 
@@ -181,11 +181,11 @@ fn break_binds_to_the_innermost_scope_and_continue_to_the_innermost_loop() {
     let mut scopes = StatementScopes::default();
     scopes.push_loop(stmt(1));
     scopes.push_switch(stmt(2), control());
-    assert_eq!(scopes.breakable(), Some(stmt(2)));
-    assert_eq!(scopes.nearest_loop(), Some(stmt(1)));
+    assert_eq!(scopes.break_target(), Some(stmt(2)));
+    assert_eq!(scopes.continue_target(), Some(stmt(1)));
     scopes.push_loop(stmt(3));
-    assert_eq!(scopes.breakable(), Some(stmt(3)));
-    assert_eq!(scopes.nearest_loop(), Some(stmt(3)));
+    assert_eq!(scopes.break_target(), Some(stmt(3)));
+    assert_eq!(scopes.continue_target(), Some(stmt(3)));
 }
 
 #[test]
@@ -201,8 +201,8 @@ fn a_case_binds_to_the_enclosing_switch_across_a_loop() {
 fn a_case_outside_a_switch_is_rejected() {
     let mut scopes = StatementScopes::default();
     scopes.push_loop(stmt(1));
-    assert!(matches!(scopes.record_case(ConstValue::Int(0), stmt(2)), Err(Diagnosis::OutsideSwitch("case"))));
-    assert!(matches!(scopes.record_default(stmt(3)), Err(Diagnosis::OutsideSwitch("default"))));
+    assert!(matches!(scopes.record_case(ConstValue::Int(0), stmt(2)), Err(Diagnostic::OutsideSwitch("case"))));
+    assert!(matches!(scopes.record_default(stmt(3)), Err(Diagnostic::OutsideSwitch("default"))));
 }
 
 #[test]
@@ -212,7 +212,7 @@ fn a_case_value_is_unique_within_a_switch() {
     assert_eq!(scopes.record_case(ConstValue::Int(2), stmt(2)).ok(), Some(stmt(0)));
     assert!(matches!(
         scopes.record_case(ConstValue::Int(1), stmt(3)),
-        Err(Diagnosis::DuplicateCase(ConstValue::Int(1)))
+        Err(Diagnostic::DuplicateCase(ConstValue::Int(1)))
     ));
 }
 
@@ -228,7 +228,7 @@ fn a_nested_switch_owns_its_own_cases() {
 fn a_switch_has_at_most_one_default() {
     let mut scopes = switch_scope();
     assert_eq!(scopes.record_default(stmt(1)).ok(), Some(stmt(0)));
-    assert!(matches!(scopes.record_default(stmt(2)), Err(Diagnosis::DuplicateDefault)));
+    assert!(matches!(scopes.record_default(stmt(2)), Err(Diagnostic::DuplicateDefault)));
 }
 
 #[test]

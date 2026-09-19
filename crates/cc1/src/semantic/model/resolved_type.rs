@@ -6,7 +6,7 @@ use crate::define_interner;
 use crate::semantic::{ParamTypes, Sema, TagDefId};
 use crate::target::Target;
 
-define_interner!(ResolvedType, ResolvedTypeArena, ResolvedTypeId);
+define_interner!(ResolvedType, ResolvedTypeInterner, ResolvedTypeId);
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq)]
 pub enum ResolvedType {
@@ -142,13 +142,13 @@ impl ResolvedType {
         )
     }
 
-    pub fn class(&self) -> Option<Class> {
+    pub fn class(&self) -> Option<NumericClass> {
         if self.is_floating() {
-            Some(Class::Float)
+            Some(NumericClass::Float)
         } else if self.is_signed() {
-            Some(Class::Signed)
+            Some(NumericClass::Signed)
         } else if self.is_unsigned() {
-            Some(Class::Unsigned)
+            Some(NumericClass::Unsigned)
         } else {
             None
         }
@@ -176,50 +176,50 @@ pub struct Builtins {
 }
 
 impl Builtins {
-    pub fn new(types: &mut ResolvedTypeArena, target: &Target) -> Self {
-        let v = types.alloc(ResolvedType::Void);
+    pub fn new(types: &mut ResolvedTypeInterner, target: &Target) -> Self {
+        let v = types.intern(ResolvedType::Void);
         Self {
-            void: types.alloc(ResolvedType::Void),
-            char: types.alloc(ResolvedType::Char),
-            signed_char: types.alloc(ResolvedType::SignedChar),
-            unsigned_char: types.alloc(ResolvedType::UnsignedChar),
-            short: types.alloc(ResolvedType::Short),
-            unsigned_short: types.alloc(ResolvedType::UnsignedShort),
-            int: types.alloc(ResolvedType::Int),
-            unsigned_int: types.alloc(ResolvedType::UnsignedInt),
-            long: types.alloc(ResolvedType::Long),
-            unsigned_long: types.alloc(ResolvedType::UnsignedLong),
-            float: types.alloc(ResolvedType::Float),
-            double: types.alloc(ResolvedType::Double),
-            long_double: types.alloc(ResolvedType::LongDouble),
-            ptrdiff_t: types.alloc(target.ptrdiff_t.clone()),
-            size_t: types.alloc(target.size_t.clone()),
+            void: types.intern(ResolvedType::Void),
+            char: types.intern(ResolvedType::Char),
+            signed_char: types.intern(ResolvedType::SignedChar),
+            unsigned_char: types.intern(ResolvedType::UnsignedChar),
+            short: types.intern(ResolvedType::Short),
+            unsigned_short: types.intern(ResolvedType::UnsignedShort),
+            int: types.intern(ResolvedType::Int),
+            unsigned_int: types.intern(ResolvedType::UnsignedInt),
+            long: types.intern(ResolvedType::Long),
+            unsigned_long: types.intern(ResolvedType::UnsignedLong),
+            float: types.intern(ResolvedType::Float),
+            double: types.intern(ResolvedType::Double),
+            long_double: types.intern(ResolvedType::LongDouble),
+            ptrdiff_t: types.intern(target.ptrdiff_t.clone()),
+            size_t: types.intern(target.size_t.clone()),
             void_ptr: QualifiedType::plain(v),
         }
     }
 }
 
-impl ResolvedTypeArena {
+impl ResolvedTypeInterner {
     pub fn pointer(&mut self, inner: QualifiedType) -> ResolvedTypeId {
-        self.alloc(ResolvedType::Pointer(inner))
+        self.intern(ResolvedType::Pointer(inner))
     }
 
     pub fn array(&mut self, elem: QualifiedType, len: Option<usize>) -> ResolvedTypeId {
-        self.alloc(ResolvedType::Array { elem, len })
+        self.intern(ResolvedType::Array { elem, len })
     }
 
     pub fn function(&mut self, ret: QualifiedType, params: ParamTypes) -> ResolvedTypeId {
         let params = match params {
             ParamTypes::Unspecified => ParamTypes::Unspecified,
             ParamTypes::Prototype { params, is_variadic } => ParamTypes::Prototype {
-                params: params.into_iter().map(|param| self.parameter(param)).collect(),
+                params: params.into_iter().map(|param| self.param(param)).collect(),
                 is_variadic,
             },
         };
-        self.alloc(ResolvedType::Function { ret, params })
+        self.intern(ResolvedType::Function { ret, params })
     }
 
-    pub fn adjust_parameter(&mut self, param: QualifiedType) -> QualifiedType {
+    pub fn adjust_param(&mut self, param: QualifiedType) -> QualifiedType {
         let id = match self.get(param.id).clone() {
             ResolvedType::Array { elem, .. } => self.pointer(elem),
             ResolvedType::Function { .. } => self.pointer(QualifiedType::plain(param.id)),
@@ -228,13 +228,13 @@ impl ResolvedTypeArena {
         QualifiedType::new(id, param.is_const, param.is_volatile)
     }
 
-    fn parameter(&mut self, param: QualifiedType) -> QualifiedType {
-        let param = self.adjust_parameter(param);
+    fn param(&mut self, param: QualifiedType) -> QualifiedType {
+        let param = self.adjust_param(param);
         QualifiedType::plain(param.id)
     }
 
     pub fn tag(&mut self, id: TagDefId) -> ResolvedTypeId {
-        self.alloc(ResolvedType::Tag(id))
+        self.intern(ResolvedType::Tag(id))
     }
 }
 
@@ -377,7 +377,7 @@ impl QualifiedType {
             ResolvedType::Array { elem, .. } => elem.is_const || elem.has_const_member(sema),
             ResolvedType::Tag(id) => sema.tags.get(*id).members.iter().any(|member| {
                 member
-                    .sym
+                    .symbol
                     .map(|sym| sema.symbols.get(sym).ty)
                     .is_some_and(|ty| ty.is_const || ty.has_const_member(sema))
             }),
@@ -401,13 +401,13 @@ impl QualifiedType {
         self.id.resolve_with(sema).is_unsigned()
     }
 
-    pub fn class(&self, sema: &Sema) -> Option<Class> {
+    pub fn class(&self, sema: &Sema) -> Option<NumericClass> {
         self.id.resolve_with(sema).class()
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum Class {
+pub enum NumericClass {
     Signed,
     Unsigned,
     Float,
@@ -446,7 +446,7 @@ impl fmt::Display for QualifiedType {
             &ResolvedType::Tag(id) => {
                 let def = id.resolve();
                 let name = def.name.map_or("<anonymous>", |n| n.id.resolve().as_str());
-                write!(f, "{} {}", def.kind(), name)
+                write!(f, "{} {}", def.kind.symbol_kind(), name)
             }
             ResolvedType::Array { elem, len } => {
                 let mut base = elem;

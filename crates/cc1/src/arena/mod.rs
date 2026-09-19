@@ -8,8 +8,8 @@ pub use interner::Interner;
 pub use side_table::{HasTable, Loan, OptionPoisoned, SideTable, Slot};
 pub use store::Arena;
 
-pub trait Global {
-    fn global() -> &'static Self;
+pub trait Installed {
+    fn installed() -> &'static Self;
 }
 
 pub trait Has<T> {
@@ -21,7 +21,7 @@ pub trait HasMut<T>: Has<T> {
 }
 
 pub trait Owned: Sized {
-    type Holder: Has<Self> + Global;
+    type Holder: Has<Self> + Installed;
 }
 
 #[macro_export]

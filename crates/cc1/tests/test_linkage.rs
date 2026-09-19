@@ -1,4 +1,4 @@
-use cc1::semantic::Diagnosis;
+use cc1::semantic::Diagnostic;
 
 use crate::common::accepted;
 
@@ -82,12 +82,12 @@ reject!(tentative_array_sizeof_before_completion, "int a[]; enum e { P = sizeof(
 recover!(
     internal_function_never_defined,
     "static int sf(void); int use(void) { return sf(); }",
-    [Diagnosis::InternalNeverDefined(_)],
+    [Diagnostic::InternalNeverDefined(_)],
     &[]
 );
 recover!(
-    end_of_unit_diagnosis_order,
+    end_of_unit_diagnostic_order,
     "static int sf(void); struct S; static struct S x; int use(void) { return sf(); }",
-    [Diagnosis::InternalNeverDefined(_), Diagnosis::TentativeNeverCompleted(_)],
+    [Diagnostic::InternalNeverDefined(_), Diagnostic::TentativeNeverCompleted(_)],
     &[]
 );

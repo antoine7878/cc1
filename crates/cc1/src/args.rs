@@ -6,7 +6,7 @@ use std::vec;
 use libft::{ArgError, ArgParser, Span, argv};
 
 use crate::context::Context;
-use crate::semantic::{Diagnosis, DiagnosisNode};
+use crate::semantic::{Diagnostic, DiagnosticNode};
 use crate::target::{I386, Target, X86_64};
 
 #[derive(Debug)]
@@ -83,7 +83,7 @@ pub fn parse_args(mut ctx: Context) -> Context {
             ctx.set_file_name(args.infiles.swap_remove(0));
         }
         Err(error) => {
-            ctx.diagnosis.push(DiagnosisNode::new(Diagnosis::BadArguments(error.to_string()), Span::default()))
+            ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::BadArguments(error.to_string()), Span::default()))
         }
     }
     ctx

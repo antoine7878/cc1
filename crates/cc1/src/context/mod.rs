@@ -5,18 +5,18 @@ use std::fs::read_to_string;
 use libft::{SourceMap, Span};
 
 use crate::ast::{
-    AstArenas, ConstValue, ConstValueNode, ExpressionNode, Name, StringId, StructDeclaration, Tag, TranslationUnitNode,
+    AstArenas, ConstValue, ConstValueNode, ExpressionNode, Name, NameId, StructDeclaration, Tag, TranslationUnitNode,
     TypeSpecifier,
 };
 use crate::parser::ParseState;
-use crate::semantic::DiagnosisNode;
+use crate::semantic::DiagnosticNode;
 use crate::target::Target;
 
 thread_local! {
     static CTX: Cell<Option<&'static Context>> = const { Cell::new(None) };
 }
 
-pub fn install(ctx: Context) -> &'static Context {
+pub fn install_context(ctx: Context) -> &'static Context {
     let ctx = Box::leak(Box::new(ctx));
     CTX.set(Some(ctx));
     ctx
@@ -30,12 +30,12 @@ pub fn ctx() -> &'static Context {
 pub struct Context {
     pub file_name: String,
     pub target: Target,
-    pub diagnosis: Vec<DiagnosisNode>,
+    pub diagnostics: Vec<DiagnosticNode>,
     pub parse: ParseState,
     pub arenas: AstArenas,
     pub ast: TranslationUnitNode,
     source_cache: RefCell<HashMap<String, Option<Vec<String>>>>,
-    one: ExpressionNode,
+    const_one: ExpressionNode,
 }
 impl Default for Context {
     fn default() -> Self {
@@ -47,12 +47,12 @@ impl Context {
     pub fn with_target(target: Target) -> Self {
         let mut arenas = AstArenas::default();
         let value_node = ConstValueNode { span: Span::default(), value: ConstValue::Int(1) };
-        let one = arenas.expressions.constant(value_node, Span::default());
+        let const_one = arenas.expressions.constant(value_node, Span::default());
         Self {
-            one,
+            const_one,
             file_name: String::default(),
             target,
-            diagnosis: Vec::default(),
+            diagnostics: Vec::default(),
             parse: ParseState::default(),
             arenas,
             ast: TranslationUnitNode::default(),
@@ -60,8 +60,8 @@ impl Context {
         }
     }
 
-    pub fn one(&self) -> ExpressionNode {
-        self.one.clone()
+    pub fn const_one(&self) -> ExpressionNode {
+        self.const_one.clone()
     }
 
     pub fn set_target(&mut self, target: Target) {
@@ -69,7 +69,7 @@ impl Context {
     }
 
     pub fn set_file_name(&mut self, file_name: String) {
-        self.arenas.names.alloc(file_name.clone());
+        self.arenas.names.intern(file_name.clone());
         self.file_name = file_name;
     }
 
@@ -77,12 +77,12 @@ impl Context {
         &mut self,
         tag: Tag,
         name: Option<Name>,
-        fields: Vec<StructDeclaration>,
+        declarations: Vec<StructDeclaration>,
         span: Span,
     ) -> TypeSpecifier {
         match tag {
-            Tag::Struct => TypeSpecifier::Struct(self.arenas.structs.add(name, fields, span)),
-            Tag::Union => TypeSpecifier::Union(self.arenas.unions.add(name, fields, span)),
+            Tag::Struct => TypeSpecifier::Struct(self.arenas.structs.add(name, declarations, span)),
+            Tag::Union => TypeSpecifier::Union(self.arenas.unions.add(name, declarations, span)),
             Tag::Enum => panic!("only for structs and unions"),
         }
     }
@@ -90,7 +90,7 @@ impl Context {
 
 impl SourceMap for Context {
     fn path_of(&self, file: usize) -> Option<&str> {
-        self.arenas.names.try_get(StringId::from(file)).map(String::as_str)
+        self.arenas.names.try_get(NameId::from(file)).map(String::as_str)
     }
 
     fn source_line(&self, path: &str, line_no: usize) -> Option<String> {

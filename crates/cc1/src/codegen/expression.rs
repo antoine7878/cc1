@@ -5,31 +5,31 @@ use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, UnaryOp};
 use crate::codegen::{BitField, Generator, Invariant, LlvmOperator, LlvmSymbol, LlvmType};
 use crate::context::ctx;
 use crate::semantic::{
-    CastKind, Diagnosis, ExpressionKind, ImplicitCast, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId,
+    CastKind, Diagnostic, ImplicitCast, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId, ValueCategory,
     sema,
 };
 
 impl<W: Write> Generator<W> {
-    pub fn emit_expression(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+    pub fn emit_expression(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
         let s = match sema().expr_consts.get(node.id) {
-            Some(value) => self.constant(sema().expr_types[node.id].ty, *value),
-            None => self.fold_raw(node)?,
+            Some(value) => self.emit_constant(sema().expressions[node.id].ty, *value),
+            None => self.emit_operation(node)?,
         };
         self.apply_casts(s, node)
     }
 
-    pub fn constant(&mut self, qty: QualifiedType, value: ConstValue) -> LlvmSymbol {
+    pub fn emit_constant(&mut self, qty: QualifiedType, value: ConstValue) -> LlvmSymbol {
         if !qty.is_pointer(sema()) {
             return LlvmSymbol::cst(qty.llvm(), value);
         }
         if value.is_zero() {
             return LlvmSymbol::null();
         }
-        self.b.convert("inttoptr", LlvmSymbol::cst(LlvmType::ptr_size(), value), qty.llvm())
+        self.builder.convert("inttoptr", LlvmSymbol::cst(LlvmType::ptr_size(), value), qty.llvm())
     }
 
-    fn apply_casts(&mut self, mut s: LlvmSymbol, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let re = &sema().expr_types[node.id];
+    fn apply_casts(&mut self, mut s: LlvmSymbol, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
+        let re = &sema().expressions[node.id];
         let mut from = re.ty;
         let bf = Self::bitfield_of(node);
         for cast in &re.casts {
@@ -45,13 +45,13 @@ impl<W: Write> Generator<W> {
         from: QualifiedType,
         cast: &ImplicitCast,
         bf: Option<BitField>,
-    ) -> Result<LlvmSymbol, Diagnosis> {
+    ) -> Result<LlvmSymbol, Diagnostic> {
         let mut v = v;
         let to = cast.to;
         let conv = match cast.kind {
             CastKind::ArrayToPointer | CastKind::FunctionToPointer | CastKind::PointerConversion => return Ok(v),
             CastKind::LValueToRValue if to.is_record(sema()) => return Ok(v),
-            CastKind::LValueToRValue => return Ok(self.load_place(v, to, bf.as_ref())),
+            CastKind::LValueToRValue => return Ok(self.emit_load(v, to, bf.as_ref())),
             CastKind::ToVoid => return Ok(LlvmSymbol::void()),
             CastKind::NullPointer => return Ok(LlvmSymbol::null()),
             CastKind::IntegerPromotion | CastKind::IntegerConversion => Self::i_to_i(from, to),
@@ -62,7 +62,7 @@ impl<W: Write> Generator<W> {
             CastKind::IntegerToPointer => self.i_to_p(&mut v, from),
         };
         Ok(match conv {
-            Some(conv) => self.b.convert(conv, v, to.llvm()),
+            Some(conv) => self.builder.convert(conv, v, to.llvm()),
             None => v,
         })
     }
@@ -98,62 +98,62 @@ impl<W: Write> Generator<W> {
 
     fn i_to_p(&mut self, v: &mut LlvmSymbol, from: QualifiedType) -> Option<&'static str> {
         if let Some(ext) = Self::i_to_i_size(from, ctx().target.pointer.size) {
-            *v = self.b.convert(ext, *v, LlvmType::ptr_size());
+            *v = self.builder.convert(ext, *v, LlvmType::ptr_size());
         }
         Some("inttoptr")
     }
 
-    pub fn fold_raw(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+    pub fn emit_operation(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
         match node.id.resolve() {
-            Expression::Identifier(_) => self.ident(node),
+            Expression::Identifier(_) => self.identifier(node),
             Expression::StringLiteral(s) => {
-                self.globals.get_literal(s.id).copied().invariant("unregistered string literal")
+                self.globals.literal(s.id).copied().invariant("unregistered string literal")
             }
             Expression::Constant(value_node) => Ok(LlvmSymbol::from(value_node.value)),
             Expression::Binary(op, lhs, rhs) => self.binary(op, lhs, rhs),
             Expression::Unary(op, e) => self.unary(op, e),
             Expression::Assign(op, lhs, rhs) => self.assign(op, lhs, rhs),
-            Expression::List(lst) => self.list(lst),
+            Expression::List(items) => self.list(items),
             Expression::Ternary(e, lhs, rhs) => self.ternary(e, lhs, rhs),
             Expression::FunctionCall(f, args) => self.call(node, f, args),
             Expression::ArraySubscripting(array, idx) => self.array_subscript(array, idx),
-            Expression::Member(_, tag, _) => self.member(node, tag),
+            Expression::Member(_, object, _) => self.member(node, object),
             Expression::Cast(_, e) => self.explicit_cast(node, e),
             Expression::ConstantExpression(_) | Expression::SizeofExpr(_) | Expression::SizeofType(_) => {
-                Err(Diagnosis::Invariant("non folded constant expression"))
+                Err(Diagnostic::Invariant("non folded constant expression"))
             }
         }
     }
 
-    fn list(&mut self, lst: &[ExpressionNode]) -> Result<LlvmSymbol, Diagnosis> {
+    fn list(&mut self, items: &[ExpressionNode]) -> Result<LlvmSymbol, Diagnostic> {
         let mut last = LlvmSymbol::from(0);
-        for e in lst {
+        for e in items {
             last = self.emit_expression(e)?;
         }
         Ok(last)
     }
 
-    fn ident(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+    fn identifier(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
         let &sym_id = sema().expr_bindings.get(node.id).invariant("unknown identifier")?;
-        if let Some(v) = self.globals.get_symbol(sym_id) {
+        if let Some(v) = self.globals.symbol(sym_id) {
             return Ok(*v);
         }
         self.locals.get(sym_id).copied().invariant("unknown identifier")
     }
 
-    fn unary(&mut self, op: &UnaryOp, e: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+    fn unary(&mut self, op: &UnaryOp, e: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
         match op {
             UnaryOp::PostInc | UnaryOp::PostDec | UnaryOp::PreInc | UnaryOp::PreDec => self.unary_inc_dec(op, e),
             UnaryOp::Plus => self.emit_expression(e),
             UnaryOp::Minus => self.unary_minus(e),
-            UnaryOp::LogicalNot => self.unary_logic_not(e),
-            UnaryOp::BitNot => self.unary_bitnot(op, e),
+            UnaryOp::LogicalNot => self.unary_logical_not(e),
+            UnaryOp::BitNot => self.unary_bit_not(op, e),
             UnaryOp::Addr => self.emit_expression(e),
             UnaryOp::Deref => self.unary_deref(e),
         }
     }
 
-    fn binary(&mut self, op: &BinaryOp, lhs: &ExpressionNode, rhs: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+    fn binary(&mut self, op: &BinaryOp, lhs: &ExpressionNode, rhs: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
         match op {
             BinaryOp::Add
             | BinaryOp::Sub
@@ -175,10 +175,10 @@ impl<W: Write> Generator<W> {
         }
     }
 
-    fn unary_inc_dec(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let re_operand = &sema().expr_types[operand.id];
+    fn unary_inc_dec(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
+        let re_operand = &sema().expressions[operand.id];
         let qty = re_operand.casted_ty();
-        let loc = self.fold_raw(operand)?;
+        let loc = self.emit_operation(operand)?;
         let v_before = self.apply_casts(loc, operand)?;
         let bop = match op {
             UnaryOp::PreInc | UnaryOp::PostInc => BinaryOp::Add,
@@ -187,43 +187,43 @@ impl<W: Write> Generator<W> {
         let one = LlvmSymbol::one(qty);
         let v_after = self.arithmetic(&bop, v_before, qty, one, QualifiedType::plain(sema().builtins.int))?;
         let bf = Self::bitfield_of(operand);
-        let v_after = self.store_place(v_after, loc, bf.as_ref());
+        let v_after = self.emit_store(v_after, loc, bf.as_ref());
         match op {
             UnaryOp::PreDec | UnaryOp::PreInc => Ok(v_after),
             _ => Ok(v_before),
         }
     }
 
-    fn unary_minus(&mut self, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+    fn unary_minus(&mut self, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
         let v = self.emit_expression(operand)?;
-        let re_operand = &sema().expr_types[operand.id];
+        let re_operand = &sema().expressions[operand.id];
         let qty = re_operand.casted_ty();
         if qty.is_floating(sema()) {
-            return Ok(self.b.unop("fneg", v));
+            return Ok(self.builder.unop("fneg", v));
         }
         let op = LlvmOperator::binary(&BinaryOp::Sub, qty)?;
-        Ok(self.b.binop(op, LlvmSymbol::cst(v.ty, ConstValue::Int(0)), v))
+        Ok(self.builder.binop(op, LlvmSymbol::cst(v.ty, ConstValue::Int(0)), v))
     }
 
-    fn unary_logic_not(&mut self, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let v = self.logic_not(operand)?;
+    fn unary_logical_not(&mut self, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
+        let v = self.emit_logical_not(operand)?;
         Ok(self.zext_to_int(v))
     }
 
-    pub fn logic_not(&mut self, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+    pub fn emit_logical_not(&mut self, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
         let v = self.emit_condition(operand)?;
-        Ok(self.b.binop("xor", v, LlvmSymbol::from(true)))
+        Ok(self.builder.binop("xor", v, LlvmSymbol::from(true)))
     }
 
-    fn unary_bitnot(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let re_operand = &sema().expr_types[operand.id];
+    fn unary_bit_not(&mut self, op: &UnaryOp, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
+        let re_operand = &sema().expressions[operand.id];
         let qty = re_operand.casted_ty();
         let v = self.emit_expression(operand)?;
         let xor = LlvmOperator::unary(op, qty)?;
-        Ok(self.b.binop(xor, v, LlvmSymbol::from(-1)))
+        Ok(self.builder.binop(xor, v, LlvmSymbol::from(-1)))
     }
 
-    fn unary_deref(&mut self, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+    fn unary_deref(&mut self, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
         let v = self.emit_expression(operand)?;
         Ok(LlvmSymbol::ptr(v.name))
     }
@@ -233,9 +233,9 @@ impl<W: Write> Generator<W> {
         op: &BinaryOp,
         lhs: &ExpressionNode,
         rhs: &ExpressionNode,
-    ) -> Result<LlvmSymbol, Diagnosis> {
-        let t1 = sema().expr_types[lhs.id].casted_ty();
-        let t2 = sema().expr_types[rhs.id].casted_ty();
+    ) -> Result<LlvmSymbol, Diagnostic> {
+        let t1 = sema().expressions[lhs.id].casted_ty();
+        let t2 = sema().expressions[rhs.id].casted_ty();
         let v1 = self.emit_expression(lhs)?;
         let v2 = self.emit_expression(rhs)?;
         self.arithmetic(op, v1, t1, v2, t2)
@@ -248,13 +248,13 @@ impl<W: Write> Generator<W> {
         t1: QualifiedType,
         v2: LlvmSymbol,
         t2: QualifiedType,
-    ) -> Result<LlvmSymbol, Diagnosis> {
+    ) -> Result<LlvmSymbol, Diagnostic> {
         let sema = sema();
         match (op, t1.is_pointer(sema), t2.is_pointer(sema)) {
             (BinaryOp::Sub, true, true) => self.pointer_difference(v1, v2, t1),
             (BinaryOp::Add | BinaryOp::Sub, true, false) => self.pointer_offset(v1, t1, v2, *op == BinaryOp::Sub),
             (BinaryOp::Add, false, true) => self.pointer_offset(v2, t2, v1, false),
-            _ => Ok(self.b.binop(LlvmOperator::binary(op, t1)?, v1, v2)),
+            _ => Ok(self.builder.binop(LlvmOperator::binary(op, t1)?, v1, v2)),
         }
     }
 
@@ -264,12 +264,12 @@ impl<W: Write> Generator<W> {
         ty: QualifiedType,
         mut idx: LlvmSymbol,
         negate: bool,
-    ) -> Result<LlvmSymbol, Diagnosis> {
+    ) -> Result<LlvmSymbol, Diagnostic> {
         let elem = ty.id.resolve().pointee().invariant("pointer arithmetic on non-pointer")?;
         if negate {
-            idx = self.b.binop("sub", LlvmSymbol::cst(idx.ty, ConstValue::Int(0)), idx);
+            idx = self.builder.binop("sub", LlvmSymbol::cst(idx.ty, ConstValue::Int(0)), idx);
         }
-        Ok(self.b.gep(elem.llvm(), base, idx))
+        Ok(self.builder.gep(elem.llvm(), base, idx))
     }
 
     fn pointer_difference(
@@ -277,16 +277,16 @@ impl<W: Write> Generator<W> {
         v1: LlvmSymbol,
         v2: LlvmSymbol,
         ty: QualifiedType,
-    ) -> Result<LlvmSymbol, Diagnosis> {
+    ) -> Result<LlvmSymbol, Diagnostic> {
         let elem = ty.id.resolve().pointee().invariant("pointer difference on non-pointer")?;
-        let a = self.b.convert("ptrtoint", v1, LlvmType::ptr_size());
-        let b = self.b.convert("ptrtoint", v2, LlvmType::ptr_size());
-        let d = self.b.binop("sub", a, b);
+        let a = self.builder.convert("ptrtoint", v1, LlvmType::ptr_size());
+        let b = self.builder.convert("ptrtoint", v2, LlvmType::ptr_size());
+        let d = self.builder.binop("sub", a, b);
         let size = sema().layout(&elem.id).size;
         if size == 1 {
             return Ok(d);
         }
-        Ok(self.b.binop("sdiv exact", d, LlvmSymbol::idx(u64::from(size))))
+        Ok(self.builder.binop("sdiv exact", d, LlvmSymbol::idx(u64::from(size))))
     }
 
     fn binary_comparison(
@@ -294,22 +294,22 @@ impl<W: Write> Generator<W> {
         op: &BinaryOp,
         lhs: &ExpressionNode,
         rhs: &ExpressionNode,
-    ) -> Result<LlvmSymbol, Diagnosis> {
-        let v = self.comparison(op, lhs, rhs)?;
+    ) -> Result<LlvmSymbol, Diagnostic> {
+        let v = self.emit_comparison(op, lhs, rhs)?;
         Ok(self.zext_to_int(v))
     }
 
-    pub fn comparison(
+    pub fn emit_comparison(
         &mut self,
         op: &BinaryOp,
         lhs: &ExpressionNode,
         rhs: &ExpressionNode,
-    ) -> Result<LlvmSymbol, Diagnosis> {
-        let rel = &sema().expr_types[lhs.id];
+    ) -> Result<LlvmSymbol, Diagnostic> {
+        let rel = &sema().expressions[lhs.id];
         let op = LlvmOperator::binary(op, rel.casted_ty())?;
         let v1 = self.emit_expression(lhs)?;
         let v2 = self.emit_expression(rhs)?;
-        Ok(self.b.cmp(op, v1, v2))
+        Ok(self.builder.cmp(op, v1, v2))
     }
 
     fn binary_logical(
@@ -317,34 +317,34 @@ impl<W: Write> Generator<W> {
         op: &BinaryOp,
         lhs: &ExpressionNode,
         rhs: &ExpressionNode,
-    ) -> Result<LlvmSymbol, Diagnosis> {
-        let v = self.logical(op, lhs, rhs)?;
+    ) -> Result<LlvmSymbol, Diagnostic> {
+        let v = self.emit_logical(op, lhs, rhs)?;
         Ok(self.zext_to_int(v))
     }
 
-    pub fn logical(
+    pub fn emit_logical(
         &mut self,
         op: &BinaryOp,
         lhs: &ExpressionNode,
         rhs: &ExpressionNode,
-    ) -> Result<LlvmSymbol, Diagnosis> {
-        let l1 = self.b.fresh_label();
-        let l2 = self.b.fresh_label();
-        let initial_block = self.b.current_block;
+    ) -> Result<LlvmSymbol, Diagnostic> {
+        let l1 = self.builder.fresh_label();
+        let l2 = self.builder.fresh_label();
+        let initial_block = self.builder.current_block;
         let v = self.emit_condition(lhs)?;
         match op {
-            BinaryOp::LogicalAnd => self.b.brc(v, l1, l2),
-            BinaryOp::LogicalOr => self.b.brc(v, l2, l1),
-            _ => return Err(Diagnosis::Invariant("non logical operator in binary_logical")),
+            BinaryOp::LogicalAnd => self.builder.br_cond(v, l1, l2),
+            BinaryOp::LogicalOr => self.builder.br_cond(v, l2, l1),
+            _ => return Err(Diagnostic::Invariant("non logical operator in binary_logical")),
         }
 
-        self.b.emit_label(l1);
+        self.builder.label(l1);
         let v = self.emit_condition(rhs)?;
-        let rhs_block = self.b.current_block;
-        self.b.br(l2);
+        let rhs_block = self.builder.current_block;
+        self.builder.br(l2);
 
-        self.b.emit_label(l2);
-        Ok(self.b.phi((*op == BinaryOp::LogicalOr).into(), initial_block, v, rhs_block))
+        self.builder.label(l2);
+        Ok(self.builder.phi((*op == BinaryOp::LogicalOr).into(), initial_block, v, rhs_block))
     }
 
     fn assign(
@@ -352,13 +352,13 @@ impl<W: Write> Generator<W> {
         op: &Option<BinaryOp>,
         lhs: &ExpressionNode,
         rhs: &ExpressionNode,
-    ) -> Result<LlvmSymbol, Diagnosis> {
-        let rl = &sema().expr_types[lhs.id];
+    ) -> Result<LlvmSymbol, Diagnostic> {
+        let rl = &sema().expressions[lhs.id];
         let qty = rl.casted_ty();
 
-        let loc = self.fold_raw(lhs)?;
+        let loc = self.emit_operation(lhs)?;
         match qty.is_record(sema()) {
-            true => self.copy_aggregate(loc, rhs, qty),
+            true => self.emit_copy_aggregate(loc, rhs, qty),
             false => self.copy_scalar(op, loc, lhs, rhs, rl),
         }
     }
@@ -370,28 +370,28 @@ impl<W: Write> Generator<W> {
         lhs: &ExpressionNode,
         rhs: &ExpressionNode,
         rl: &ResolvedExpression,
-    ) -> Result<LlvmSymbol, Diagnosis> {
+    ) -> Result<LlvmSymbol, Diagnostic> {
         let mut vr = self.emit_expression(rhs)?;
 
         if let Some(op) = op {
             let vl = self.apply_casts(loc, lhs)?;
-            vr = self.arithmetic(op, vl, rl.casted_ty(), vr, sema().expr_types[rhs.id].casted_ty())?;
+            vr = self.arithmetic(op, vl, rl.casted_ty(), vr, sema().expressions[rhs.id].casted_ty())?;
             if let Some(cast) = &rl.result_cast {
                 vr = self.convert(vr, rl.casted_ty(), cast, None)?;
             }
         }
         let bf = Self::bitfield_of(lhs);
-        Ok(self.store_place(vr, loc, bf.as_ref()))
+        Ok(self.emit_store(vr, loc, bf.as_ref()))
     }
 
-    pub fn copy_aggregate(
+    pub fn emit_copy_aggregate(
         &mut self,
         loc: LlvmSymbol,
         rhs: &ExpressionNode,
         qty: QualifiedType,
-    ) -> Result<LlvmSymbol, Diagnosis> {
+    ) -> Result<LlvmSymbol, Diagnostic> {
         let src = self.emit_expression(rhs)?;
-        self.b.memcpy(loc.name, src.name, sema().layout(&qty.id));
+        self.builder.memcpy(loc.name, src.name, sema().layout(&qty.id));
         Ok(loc)
     }
 
@@ -400,25 +400,25 @@ impl<W: Write> Generator<W> {
         cond: &ExpressionNode,
         a: &ExpressionNode,
         b: &ExpressionNode,
-    ) -> Result<LlvmSymbol, Diagnosis> {
-        let l1 = self.b.fresh_label();
-        let l2 = self.b.fresh_label();
-        let l3 = self.b.fresh_label();
+    ) -> Result<LlvmSymbol, Diagnostic> {
+        let l1 = self.builder.fresh_label();
+        let l2 = self.builder.fresh_label();
+        let l3 = self.builder.fresh_label();
 
         let cond = self.emit_condition(cond)?;
-        self.b.brc(cond, l1, l2);
-        self.b.emit_label(l1);
+        self.builder.br_cond(cond, l1, l2);
+        self.builder.label(l1);
         let va = self.emit_expression(a)?;
-        let a_block = self.b.current_block;
-        self.b.br(l3);
-        self.b.emit_label(l2);
+        let a_block = self.builder.current_block;
+        self.builder.br(l3);
+        self.builder.label(l2);
         let vb = self.emit_expression(b)?;
-        let b_block = self.b.current_block;
-        self.b.br(l3);
-        self.b.emit_label(l3);
+        let b_block = self.builder.current_block;
+        self.builder.br(l3);
+        self.builder.label(l3);
         match va.ty.is_void() {
             true => Ok(va),
-            false => Ok(self.b.phi(va, a_block, vb, b_block)),
+            false => Ok(self.builder.phi(va, a_block, vb, b_block)),
         }
     }
 
@@ -427,86 +427,86 @@ impl<W: Write> Generator<W> {
         node: &ExpressionNode,
         f: &ExpressionNode,
         args: &[ExpressionNode],
-    ) -> Result<LlvmSymbol, Diagnosis> {
+    ) -> Result<LlvmSymbol, Diagnostic> {
         let qty =
-            sema().expr_types[f.id].casted_ty().id.resolve().pointee().invariant("call of non-pointer function")?;
+            sema().expressions[f.id].casted_ty().id.resolve().pointee().invariant("call of non-pointer function")?;
         let fty = LlvmType::Function(qty.id);
         let ResolvedType::Function { ret, .. } = qty.id.resolve() else {
-            return Err(Diagnosis::Invariant("call of non-function"));
+            return Err(Diagnostic::Invariant("call of non-function"));
         };
         let f = self.emit_expression(f)?;
-        let parameters = args.iter().map(|e| self.emit_argument(e)).collect::<Result<Vec<_>, Diagnosis>>()?;
-        let v = self.b.call(fty, ret.llvm(), f, parameters.as_slice());
+        let params = args.iter().map(|e| self.emit_argument(e)).collect::<Result<Vec<_>, Diagnostic>>()?;
+        let v = self.builder.call(fty, ret.llvm(), f, params.as_slice());
         if !ret.is_record(sema()) {
             return Ok(v);
         }
         let slot = self.locals.spill(node.id);
-        self.b.store(v, slot);
+        self.builder.store(v, slot);
         Ok(slot)
     }
 
-    fn emit_argument(&mut self, e: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let qty = sema().expr_types[e.id].casted_ty();
+    fn emit_argument(&mut self, e: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
+        let qty = sema().expressions[e.id].casted_ty();
         let v = self.emit_expression(e)?;
-        Ok(self.load_aggregate(v, qty))
+        Ok(self.emit_load_aggregate(v, qty))
     }
 
-    pub fn load_aggregate(&mut self, v: LlvmSymbol, qty: QualifiedType) -> LlvmSymbol {
+    pub fn emit_load_aggregate(&mut self, v: LlvmSymbol, qty: QualifiedType) -> LlvmSymbol {
         match qty.is_record(sema()) {
-            true => self.b.load(qty.llvm(), v),
+            true => self.builder.load(qty.llvm(), v),
             false => v,
         }
     }
 
-    fn array_subscript(&mut self, array: &ExpressionNode, idx: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let t1 = sema().expr_types[array.id].casted_ty();
-        let t2 = sema().expr_types[idx.id].casted_ty();
+    fn array_subscript(&mut self, array: &ExpressionNode, idx: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
+        let t1 = sema().expressions[array.id].casted_ty();
+        let t2 = sema().expressions[idx.id].casted_ty();
         let v1 = self.emit_expression(array)?;
         let v2 = self.emit_expression(idx)?;
         self.arithmetic(&BinaryOp::Add, v1, t1, v2, t2)
     }
 
-    pub fn neq_zero(&mut self, v: LlvmSymbol, qty: QualifiedType) -> Result<LlvmSymbol, Diagnosis> {
+    pub fn emit_nonzero(&mut self, v: LlvmSymbol, qty: QualifiedType) -> Result<LlvmSymbol, Diagnostic> {
         let op = LlvmOperator::binary(&BinaryOp::Neq, qty)?;
-        Ok(self.b.cmp(op, v, LlvmSymbol::zero(qty)))
+        Ok(self.builder.cmp(op, v, LlvmSymbol::zero(qty)))
     }
 
     fn zext_to_int(&mut self, v: LlvmSymbol) -> LlvmSymbol {
-        self.b.convert("zext", v, LlvmType::int())
+        self.builder.convert("zext", v, LlvmType::int())
     }
 
-    fn member(&mut self, node: &ExpressionNode, tag_node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let re = &sema().expr_types[tag_node.id];
-        let tag = self.emit_expression(tag_node)?;
+    fn member(&mut self, node: &ExpressionNode, object_node: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
+        let re = &sema().expressions[object_node.id];
+        let object = self.emit_expression(object_node)?;
         let ty = re.ty.id;
         let place = match ty.resolve() {
-            ResolvedType::Pointer(qty) => self.get_member(node, tag, qty.id)?,
-            ResolvedType::Tag(_) => self.get_member(node, tag, ty)?,
+            ResolvedType::Pointer(qty) => self.member_place(node, object, qty.id)?,
+            ResolvedType::Tag(_) => self.member_place(node, object, ty)?,
             _ => unreachable!(),
         };
-        let qty = sema().expr_types[node.id].ty;
-        match re.kind == ExpressionKind::RValue && qty.is_scalar(sema()) {
-            true => Ok(self.load_place(place, qty, Self::bitfield_of(node).as_ref())),
+        let qty = sema().expressions[node.id].ty;
+        match re.kind == ValueCategory::RValue && qty.is_scalar(sema()) {
+            true => Ok(self.emit_load(place, qty, Self::bitfield_of(node).as_ref())),
             false => Ok(place),
         }
     }
 
-    fn get_member(
+    fn member_place(
         &mut self,
         node: &ExpressionNode,
-        tag: LlvmSymbol,
+        base: LlvmSymbol,
         ty: ResolvedTypeId,
-    ) -> Result<LlvmSymbol, Diagnosis> {
+    ) -> Result<LlvmSymbol, Diagnostic> {
         let ResolvedType::Tag(tag_id) = ty.resolve() else { unreachable!() };
         let tagdef = tag_id.resolve();
         let member_idx = sema().member_refs[node.id].index;
         let idx = LlvmSymbol::cst(LlvmType::ptr_size(), ConstValue::Long(tagdef.members[member_idx].offset as i64));
-        Ok(self.b.gep(LlvmType::I8, tag, idx))
+        Ok(self.builder.gep(LlvmType::I8, base, idx))
     }
 
-    fn explicit_cast(&mut self, node: &ExpressionNode, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
+    fn explicit_cast(&mut self, node: &ExpressionNode, operand: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
         let v = self.emit_expression(operand)?;
-        if sema().expr_types[node.id].ty.is_void(sema()) {
+        if sema().expressions[node.id].ty.is_void(sema()) {
             return Ok(LlvmSymbol::void());
         }
         Ok(v)

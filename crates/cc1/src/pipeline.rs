@@ -1,25 +1,25 @@
 use std::process::exit;
 
 use crate::context::Context;
-use crate::semantic::{DiagnosisNode, Sema};
+use crate::semantic::{DiagnosticNode, Sema};
 
 pub trait Errors {
     fn error_count(&self) -> usize;
 }
 
-fn count(diagnosis: &[DiagnosisNode]) -> usize {
-    diagnosis.iter().filter(|d| d.is_error()).count()
+fn count(diagnostics: &[DiagnosticNode]) -> usize {
+    diagnostics.iter().filter(|d| d.is_error()).count()
 }
 
 impl Errors for Context {
     fn error_count(&self) -> usize {
-        count(&self.diagnosis)
+        count(&self.diagnostics)
     }
 }
 
 impl Errors for Sema {
     fn error_count(&self) -> usize {
-        count(&self.diagnosis)
+        count(&self.diagnostics)
     }
 }
 
@@ -29,7 +29,7 @@ impl Errors for () {
     }
 }
 
-impl Errors for Vec<DiagnosisNode> {
+impl Errors for Vec<DiagnosticNode> {
     fn error_count(&self) -> usize {
         count(self)
     }
@@ -80,11 +80,11 @@ impl<T: Errors> Pipeline<T> {
         self
     }
 
-    pub fn report(self, obse: fn(&T)) -> Self {
+    pub fn report(self, observer: fn(&T)) -> Self {
         if self.stopped {
             return self;
         }
-        obse(&self.state);
+        observer(&self.state);
         self
     }
 

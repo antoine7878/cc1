@@ -1,6 +1,6 @@
 use crate::ast::ConstValue;
 use crate::ast::statement::StatementId;
-use crate::semantic::{Diagnosis, QualifiedType, ResolvedStatement};
+use crate::semantic::{Diagnostic, QualifiedType, ResolvedStatement};
 
 #[derive(Debug)]
 pub enum StatementScope {
@@ -42,11 +42,11 @@ impl StatementScopes {
         self.0.is_empty()
     }
 
-    pub fn breakable(&self) -> Option<StatementId> {
+    pub fn break_target(&self) -> Option<StatementId> {
         self.0.last().map(StatementScope::stmt)
     }
 
-    pub fn nearest_loop(&self) -> Option<StatementId> {
+    pub fn continue_target(&self) -> Option<StatementId> {
         self.0.iter().rev().find_map(|scope| match scope {
             StatementScope::Loop(stmt) => Some(*stmt),
             StatementScope::Switch { .. } => None,
@@ -60,23 +60,23 @@ impl StatementScopes {
         })
     }
 
-    pub fn record_case(&mut self, value: ConstValue, id: StatementId) -> Result<StatementId, Diagnosis> {
+    pub fn record_case(&mut self, value: ConstValue, id: StatementId) -> Result<StatementId, Diagnostic> {
         let Some(StatementScope::Switch { stmt, cases, .. }) = self.nearest_switch() else {
-            return Err(Diagnosis::OutsideSwitch("case"));
+            return Err(Diagnostic::OutsideSwitch("case"));
         };
         if cases.iter().any(|(v, _)| value == *v) {
-            return Err(Diagnosis::DuplicateCase(value));
+            return Err(Diagnostic::DuplicateCase(value));
         }
         cases.push((value, id));
         Ok(*stmt)
     }
 
-    pub fn record_default(&mut self, id: StatementId) -> Result<StatementId, Diagnosis> {
+    pub fn record_default(&mut self, id: StatementId) -> Result<StatementId, Diagnostic> {
         let Some(StatementScope::Switch { stmt, default, .. }) = self.nearest_switch() else {
-            return Err(Diagnosis::OutsideSwitch("default"));
+            return Err(Diagnostic::OutsideSwitch("default"));
         };
         if default.is_some() {
-            return Err(Diagnosis::DuplicateDefault);
+            return Err(Diagnostic::DuplicateDefault);
         }
         *default = Some(id);
         Ok(*stmt)

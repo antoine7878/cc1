@@ -10,34 +10,39 @@ use crate::ast::{
 };
 use crate::codegen::{Builder, Globals, LlvmSymbol, Locals};
 use crate::context::ctx;
-use crate::semantic::{Definition, Diagnosis, DiagnosisNode, Duration, Initializer, SymbolId, sema};
+use crate::semantic::{DefinitionState, Diagnostic, DiagnosticNode, Duration, Initializer, SymbolId, sema};
 
-pub fn generate() -> Vec<DiagnosisNode> {
+pub fn generate() -> Vec<DiagnosticNode> {
     generate_to(stdout())
 }
 
-pub fn generate_to<W: Write>(w: W) -> Vec<DiagnosisNode> {
+pub fn generate_to<W: Write>(w: W) -> Vec<DiagnosticNode> {
     let mut generator = Generator::new(w);
     generator.visit_translation_unit(&ctx().ast);
-    generator.diagnosis
+    generator.diagnostics
 }
 
 #[derive(Debug)]
 pub struct Generator<W: Write> {
-    pub b: Builder<W>,
+    pub builder: Builder<W>,
     pub locals: Locals,
     pub globals: Globals,
-    pub diagnosis: Vec<DiagnosisNode>,
+    pub diagnostics: Vec<DiagnosticNode>,
 }
 
 impl<W: Write> Generator<W> {
     fn new(w: W) -> Self {
-        Self { b: Builder::new(w), locals: Locals::default(), globals: Globals::default(), diagnosis: Vec::new() }
+        Self {
+            builder: Builder::new(w),
+            locals: Locals::default(),
+            globals: Globals::default(),
+            diagnostics: Vec::new(),
+        }
     }
 
-    fn collect_diag(&mut self, res: Result<(), Diagnosis>, span: &Span) {
-        if let Err(diagnosis) = res {
-            self.diagnosis.push(DiagnosisNode::new(diagnosis, *span));
+    fn collect_diag(&mut self, res: Result<(), Diagnostic>, span: &Span) {
+        if let Err(diagnostic) = res {
+            self.diagnostics.push(DiagnosticNode::new(diagnostic, *span));
         }
     }
 
@@ -47,80 +52,80 @@ impl<W: Write> Generator<W> {
         let qty = sym.ty;
         match init.resolve() {
             Initializer::Zero => {
-                let _ = self.b.store(LlvmSymbol::zero(qty), self.locals[id]);
+                let _ = self.builder.store(LlvmSymbol::zero(qty), self.locals[id]);
             }
             Initializer::Value(v) => {
-                let v = self.constant(qty, *v);
-                self.b.store(v, self.locals[id]);
+                let v = self.emit_constant(qty, *v);
+                self.builder.store(v, self.locals[id]);
             }
             Initializer::Expr(e) if qty.is_record(sema()) => {
-                let res = self.copy_aggregate(self.locals[id], e, qty).map(|_| ());
+                let res = self.emit_copy_aggregate(self.locals[id], e, qty).map(|_| ());
                 self.collect_diag(res, &e.span);
             }
             Initializer::Expr(e) => {
                 let res = self.emit_expression(e).map(|v| {
-                    let _ = self.b.store(v, self.locals[id]);
+                    let _ = self.builder.store(v, self.locals[id]);
                 });
                 self.collect_diag(res, &e.span);
             }
             Initializer::List(_) | Initializer::String(_) => {
-                let src = self.globals.lists[&id];
+                let src = self.globals.aggregates[&id];
                 let layout = sema().layout(&qty.id);
-                self.b.memcpy(self.locals[id].name, src.name, layout);
+                self.builder.memcpy(self.locals[id].name, src.name, layout);
             }
             Initializer::Address(_) => todo!("address init"),
         }
     }
 
-    pub fn emit_condition(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnosis> {
-        let re = &sema().expr_types[node.id];
+    pub fn emit_condition(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
+        let re = &sema().expressions[node.id];
         if re.casts.is_empty() && sema().expr_consts.get(node.id).is_none() {
             match node.id.resolve() {
-                Expression::Binary(op, lhs, rhs) if op.is_comparison() => return self.comparison(op, lhs, rhs),
+                Expression::Binary(op, lhs, rhs) if op.is_comparison() => return self.emit_comparison(op, lhs, rhs),
                 Expression::Binary(op @ (BinaryOp::LogicalAnd | BinaryOp::LogicalOr), lhs, rhs) => {
-                    return self.logical(op, lhs, rhs);
+                    return self.emit_logical(op, lhs, rhs);
                 }
-                Expression::Unary(UnaryOp::LogicalNot, e) => return self.logic_not(e),
+                Expression::Unary(UnaryOp::LogicalNot, e) => return self.emit_logical_not(e),
                 _ => (),
             }
         }
         let v = self.emit_expression(node)?;
-        self.neq_zero(v, re.casted_ty())
+        self.emit_nonzero(v, re.casted_ty())
     }
 
     fn emit_globals(&mut self) {
-        let mut literals: Vec<_> = self.globals.strings.iter().collect();
+        let mut literals: Vec<_> = self.globals.literals.iter().collect();
         literals.sort_by_key(|(id, _)| usize::from(**id));
         for (id, sym) in literals {
-            self.b.string_literal(sym.name, id.resolve());
+            self.builder.string_literal(sym.name, id.resolve());
         }
 
         for index in 0..sema().tags.len() {
-            self.b.type_def(index.into());
+            self.builder.define_type(index.into());
         }
         for sym in &self.globals.order {
-            self.b.global(*sym);
+            self.builder.define_global(*sym);
         }
         for sym in &self.globals.functions {
-            if sym.resolve().definition != Definition::Definition {
-                self.b.declare(*sym);
+            if sym.resolve().definition != DefinitionState::Defined {
+                self.builder.declare_function(*sym);
             }
         }
 
-        let mut aggregates: Vec<_> = self.globals.lists.iter().collect();
+        let mut aggregates: Vec<_> = self.globals.aggregates.iter().collect();
         aggregates.sort_by_key(|(id, _)| usize::from(**id));
         for (id, sym) in aggregates {
             let sem_sym = id.resolve();
-            self.b.list_literal(sym.name, sem_sym.ty, sem_sym.initializer.unwrap().resolve());
+            self.builder.aggregate_constant(sym.name, sem_sym.ty, sem_sym.initializer.unwrap().resolve());
         }
     }
 
-    pub fn emit_statement(&mut self, id: StatementId) -> Result<(), Diagnosis> {
+    pub fn emit_statement(&mut self, id: StatementId) -> Result<(), Diagnostic> {
         match id.resolve() {
-            Statement::Jump(inner) => self.jump_statement(id, inner),
-            Statement::Selection(inner) => self.selection_statement(id, inner),
-            Statement::Iteration(inner) => self.iteration_statement(id, inner),
-            Statement::Labeled(inner) => self.labeled_statement(id, inner),
+            Statement::Jump(inner) => self.emit_jump_statement(id, inner),
+            Statement::Selection(inner) => self.emit_selection_statement(id, inner),
+            Statement::Iteration(inner) => self.emit_iteration_statement(id, inner),
+            Statement::Labeled(inner) => self.emit_labeled_statement(id, inner),
             _ => Ok(()),
         }
     }
@@ -128,7 +133,7 @@ impl<W: Write> Generator<W> {
 
 impl<W: Write> Visitor for Generator<W> {
     fn visit_translation_unit(&mut self, node: &TranslationUnitNode) {
-        self.b.target(ctx().target.datalayout, ctx().target.triple);
+        self.builder.target(ctx().target.datalayout, ctx().target.triple);
         self.globals.collect(node);
         self.emit_globals();
 
@@ -138,10 +143,10 @@ impl<W: Write> Visitor for Generator<W> {
     fn visit_function_definition(&mut self, node: &FunctionDefinitionNode) {
         let sym = sema().declarations[&node.declarator.id];
         self.locals.collect_locals(node);
-        self.b.define(sym, self.locals.parameters(), self.locals.is_variadic());
-        self.locals.emit_decl(&mut self.b);
+        self.builder.define_function(sym, self.locals.params(), self.locals.is_variadic());
+        self.locals.emit_decl(&mut self.builder);
         self.visit_compound_statement(&node.body);
-        self.b.end_function(sym);
+        self.builder.end_function(sym);
     }
 
     fn visit_expression(&mut self, node: &ExpressionNode) {

@@ -3,10 +3,10 @@ use std::fmt;
 use libft::Span;
 
 use crate::ast::{self};
-use crate::semantic::ExpressionKind::RValue;
+use crate::semantic::ValueCategory::RValue;
 use crate::semantic::{
-    Diag, DiagCollector, Diagnosis, ExpressionKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId,
-    Sema,
+    Diag, Diagnostic, DiagnosticSink, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId, Sema,
+    ValueCategory,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -39,10 +39,10 @@ pub enum CastKind {
     PointerConversion, // 6.3.16.1
 }
 
-pub fn lvalue_conversion(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
+pub fn convert_operand(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
     function_to_pointer(sema, re);
     array_to_pointer(sema, re);
-    l_to_r_value(sema, re, span);
+    lvalue_to_rvalue(sema, re, span);
 }
 
 pub fn function_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
@@ -57,8 +57,8 @@ pub fn array_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
     re.casts.push(ImplicitCast::new(CastKind::ArrayToPointer, to))
 }
 
-pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
-    if !matches!(re.kind, ExpressionKind::LValue) {
+pub fn lvalue_to_rvalue(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
+    if !matches!(re.kind, ValueCategory::LValue) {
         return;
     }
     let ty = re.ty.id.resolve_with(sema);
@@ -66,7 +66,7 @@ pub fn l_to_r_value(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
         return;
     }
     if !ty.is_complete(sema) {
-        sema.add_diag(Diag::err((), Diagnosis::IncompleteType(re.ty)), span);
+        sema.add_diag(Diag::err((), Diagnostic::IncompleteType(re.ty)), span);
     }
     let to = QualifiedType::plain(re.ty.id);
     re.casts.push(ImplicitCast::new(CastKind::LValueToRValue, to));
@@ -89,25 +89,23 @@ pub fn promote(sema: &Sema, re: &mut ResolvedExpression) {
     re.casts.push(ImplicitCast::new(kind, to));
 }
 
-fn convert_type(ty: ResolvedTypeId) -> QualifiedType {
-    QualifiedType::plain(ty)
-}
-
 pub fn convert(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId, is_null_ptr: bool) {
     let from = from_re.casted_ty();
     let implicit_cast = match (from.id.resolve_with(sema), to_id.resolve_with(sema)) {
         _ if from.id == to_id => return,
         (f, t) if f.is_arithmetic(sema) && t.is_arithmetic(sema) => return num_conv(sema, from_re, to_id),
-        (_, ResolvedType::Void) => ImplicitCast::new(CastKind::ToVoid, convert_type(to_id)),
-        (_, ResolvedType::Pointer(_)) if is_null_ptr => ImplicitCast::new(CastKind::NullPointer, convert_type(to_id)),
+        (_, ResolvedType::Void) => ImplicitCast::new(CastKind::ToVoid, QualifiedType::plain(to_id)),
+        (_, ResolvedType::Pointer(_)) if is_null_ptr => {
+            ImplicitCast::new(CastKind::NullPointer, QualifiedType::plain(to_id))
+        }
         (ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => {
-            ImplicitCast::new(CastKind::PointerConversion, convert_type(to_id))
+            ImplicitCast::new(CastKind::PointerConversion, QualifiedType::plain(to_id))
         }
         (ResolvedType::Pointer(_), t) if t.is_integral(sema) => {
-            ImplicitCast::new(CastKind::PointerToInteger, convert_type(to_id))
+            ImplicitCast::new(CastKind::PointerToInteger, QualifiedType::plain(to_id))
         }
         (f, ResolvedType::Pointer(_)) if f.is_integral(sema) => {
-            ImplicitCast::new(CastKind::IntegerToPointer, convert_type(to_id))
+            ImplicitCast::new(CastKind::IntegerToPointer, QualifiedType::plain(to_id))
         }
         _ => unreachable!(),
     };
@@ -120,7 +118,7 @@ pub fn to_void(sema: &Sema, re: &mut ResolvedExpression) {
 }
 
 fn num_conv(sema: &Sema, from_re: &mut ResolvedExpression, to_id: ResolvedTypeId) {
-    if let Some(cast) = arithmetic_conversion(sema, from_re.casted_ty(), convert_type(to_id)) {
+    if let Some(cast) = arithmetic_conversion(sema, from_re.casted_ty(), QualifiedType::plain(to_id)) {
         from_re.casts.push(cast);
     }
 }
@@ -136,14 +134,14 @@ pub fn arithmetic_conversion(sema: &Sema, from: QualifiedType, to: QualifiedType
         (false, true) => CastKind::FloatingToInteger,
         (false, false) => CastKind::FloatingConversion,
     };
-    Some(ImplicitCast::new(kind, convert_type(to.id)))
+    Some(ImplicitCast::new(kind, QualifiedType::plain(to.id)))
 }
 
 pub fn usual_arithmetic(
     sema: &mut Sema,
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,
-) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
+) -> Result<(QualifiedType, ValueCategory), Diagnostic> {
     use ResolvedType as R;
 
     let l = lhs.casted_ty().id.resolve_with(sema);
@@ -195,21 +193,21 @@ pub enum AssignmentContext {
 }
 
 impl AssignmentContext {
-    pub fn discarded(&self, to: QualifiedType, from: QualifiedType) -> Diagnosis {
+    pub fn discarded(&self, to: QualifiedType, from: QualifiedType) -> Diagnostic {
         match self {
-            AssignmentContext::Return => Diagnosis::ReturnDiscardedQualifiers(to, from),
-            AssignmentContext::Assignment => Diagnosis::AssignmentDiscardedQualifiers(to, from),
-            AssignmentContext::Argument(n) => Diagnosis::ArgumentDiscardedQualifiers(*n, to, from),
-            AssignmentContext::Initialization => Diagnosis::InitDiscardedQualifiers(to, from),
+            AssignmentContext::Return => Diagnostic::ReturnDiscardedQualifiers(to, from),
+            AssignmentContext::Assignment => Diagnostic::AssignmentDiscardedQualifiers(to, from),
+            AssignmentContext::Argument(n) => Diagnostic::ArgumentDiscardedQualifiers(*n, to, from),
+            AssignmentContext::Initialization => Diagnostic::InitDiscardedQualifiers(to, from),
         }
     }
 
-    pub fn incompatible(&self, to: QualifiedType, from: QualifiedType) -> Diagnosis {
+    pub fn incompatible(&self, to: QualifiedType, from: QualifiedType) -> Diagnostic {
         match self {
-            AssignmentContext::Return => Diagnosis::ReturnIncompatibleTypes(to, from),
-            AssignmentContext::Assignment => Diagnosis::AssignmentIncompatibleTypes(to, from),
-            AssignmentContext::Argument(n) => Diagnosis::ArgumentIncompatibleTypes(*n, to, from),
-            AssignmentContext::Initialization => Diagnosis::InitIncompatibleTypes(to, from),
+            AssignmentContext::Return => Diagnostic::ReturnIncompatibleTypes(to, from),
+            AssignmentContext::Assignment => Diagnostic::AssignmentIncompatibleTypes(to, from),
+            AssignmentContext::Argument(n) => Diagnostic::ArgumentIncompatibleTypes(*n, to, from),
+            AssignmentContext::Initialization => Diagnostic::InitIncompatibleTypes(to, from),
         }
     }
 }
@@ -220,7 +218,7 @@ pub fn assignment_conversion(
     rhs: &mut ResolvedExpression,
     is_null_ptr: bool,
     assign_ctx: AssignmentContext,
-) -> Result<QualifiedType, Diagnosis> {
+) -> Result<QualifiedType, Diagnostic> {
     let l = lhs.ty.id.resolve_with(sema);
     let rhs_ty = rhs.casted_ty();
     let r = rhs_ty.id.resolve_with(sema);
@@ -251,13 +249,13 @@ pub fn pointer_integer_arithmetic(
     sema: &mut Sema,
     pointer: &mut ResolvedExpression,
     integral: &mut ResolvedExpression,
-) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
+) -> Result<(QualifiedType, ValueCategory), Diagnostic> {
     let ResolvedType::Pointer(inner) = pointer.casted_ty().id.resolve_with(sema) else {
-        return Err(Diagnosis::Poisoned);
+        return Err(Diagnostic::Poisoned);
     };
     match inner.id.resolve_with(sema) {
-        t if !t.is_complete(sema) => Err(Diagnosis::InvalidOperand),
-        ResolvedType::Function { .. } => Err(Diagnosis::InvalidOperand),
+        t if !t.is_complete(sema) => Err(Diagnostic::InvalidOperand),
+        ResolvedType::Function { .. } => Err(Diagnostic::InvalidOperand),
         _ => {
             promote(sema, integral);
             Ok((pointer.casted_ty(), RValue))
@@ -269,20 +267,20 @@ pub fn pointer_minus_pointer(
     sema: &Sema,
     lhs: &mut ResolvedExpression,
     rhs: &mut ResolvedExpression,
-) -> Result<(QualifiedType, ExpressionKind), Diagnosis> {
+) -> Result<(QualifiedType, ValueCategory), Diagnostic> {
     let ResolvedType::Pointer(lp) = lhs.casted_ty().id.resolve_with(sema) else {
-        return Err(Diagnosis::Poisoned);
+        return Err(Diagnostic::Poisoned);
     };
     let ResolvedType::Pointer(rp) = rhs.casted_ty().id.resolve_with(sema) else {
-        return Err(Diagnosis::Poisoned);
+        return Err(Diagnostic::Poisoned);
     };
     let l = lp.id.resolve_with(sema);
     let r = rp.id.resolve_with(sema);
     if !l.is_object(sema) || !r.is_object(sema) {
-        return Err(Diagnosis::InvalidOperand);
+        return Err(Diagnostic::InvalidOperand);
     }
     if !lp.is_compatible_ignoring_qualifiers(sema, rp) {
-        return Err(Diagnosis::InvalidOperand);
+        return Err(Diagnostic::InvalidOperand);
     }
     Ok((QualifiedType::plain(sema.builtins.ptrdiff_t), RValue))
 }

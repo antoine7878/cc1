@@ -1,4 +1,4 @@
 pub mod expression;
-pub mod parameter;
+pub mod param;
 pub mod specifier;
-pub mod ty;
+pub mod types;
