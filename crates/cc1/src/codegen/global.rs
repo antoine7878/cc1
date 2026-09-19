@@ -4,11 +4,12 @@ use crate::ast::visit::walk_init_declarator;
 use crate::ast::{InitDeclaratorNode, StringConstId, TranslationUnitNode, Visitor};
 use crate::codegen::{LlvmName, LlvmSymbol};
 use crate::context::ctx;
-use crate::semantic::{Duration, SymbolId, sema};
+use crate::semantic::{Duration, Initializer, SymbolId, sema};
 
 #[derive(Debug, Default)]
 pub struct Globals {
     pub strings: HashMap<StringConstId, LlvmSymbol>,
+    pub lists: HashMap<SymbolId, LlvmSymbol>,
     map: HashMap<SymbolId, LlvmSymbol>,
     pub order: Vec<SymbolId>,
     pub functions: Vec<SymbolId>,
@@ -25,6 +26,7 @@ impl Globals {
 
     pub fn collect(&mut self, node: &TranslationUnitNode) {
         self.collect_literals();
+        self.collect_list_init();
         self.collect_externals();
         self.visit_translation_unit(node);
         self.order.sort_by_key(|id| usize::from(*id));
@@ -55,6 +57,21 @@ impl Globals {
     fn collect_literals(&mut self) {
         for i in 0..ctx().arenas.strings.len() {
             self.strings.insert(i.into(), LlvmSymbol::ptr(LlvmName::StringLiteral(i.into())));
+        }
+    }
+
+    fn collect_list_init(&mut self) {
+        for i in 0..sema().symbols.len() {
+            let sym_id: SymbolId = i.into();
+            let sym = sym_id.resolve();
+            if sym.duration != Duration::Automatic {
+                continue;
+            }
+            let Some(init) = sym.initializer else { continue };
+            if !matches!(init.resolve(), Initializer::List(_) | Initializer::String(_)) {
+                continue;
+            }
+            self.lists.insert(sym_id, LlvmSymbol::ptr(LlvmName::ListInit(sym_id)));
         }
     }
 }

@@ -568,3 +568,75 @@ exits!(
 );
 exits!(sibling_blocks_init, "int main(void) { int r; { int a = 40; r = a; } { int b = 2; r += b; } return r; }", 42);
 exits!(init_from_outer_shadowed, "int main(void) { int x = 1; { int x = 42; return x; } }", 42);
+exits!(
+    local_string_and_partial_list,
+    "int main(void) { char s[] = \"ab*\"; int a[4] = {1, 2}; return s[2] + a[1] - a[2] - a[3] - 2; }",
+    42
+);
+exits!(
+    local_struct_list_null_pointer,
+    "struct s { int a; char c; int *p; }; int main(void) { int i = 20; struct s v = {40, 2, 0}; int y = v.a + v.c + i; return y - i - (v.p != 0); }",
+    42
+);
+exits!(
+    local_string_zero_padded,
+    "int main(void) { char s[6] = \"ab\"; return s[0] + s[1] + s[2] + s[5] - 'a' - 'b' + 42; }",
+    42
+);
+exits!(
+    local_string_exact_size_no_nul,
+    "int main(void) { char s[2] = \"ab\"; return s[0] + s[1] - 'a' - 'b' + 42; }",
+    42
+);
+exits!(local_array_size_from_list, "int main(void) { int a[] = {1, 2, 3}; return sizeof a / sizeof a[0] * 14; }", 42);
+exits!(
+    local_array_of_structs,
+    "struct p { int x; int y; }; int main(void) { struct p a[2] = {{1, 2}, {3, 40}}; return a[0].x - a[0].y + a[1].x + a[1].y; }",
+    42
+);
+exits!(
+    local_brace_elision,
+    "int main(void) { int a[2][2] = {1, 2, 3, 4}; return a[0][0] * 10 + a[0][1] * 10 + a[1][0] + a[1][1] + 5; }",
+    42
+);
+exits!(local_union_first_member, "union u { int i; char c; }; int main(void) { union u v = {42}; return v.i; }", 42);
+exits!(
+    local_init_in_loop_recopies,
+    "int main(void) { int i; int s = 0; for (i = 0; i < 3; i++) { int a[2] = {10, 1}; a[0] += i; s += a[0] + a[1]; } return s + 6; }",
+    42
+);
+exits!(
+    local_struct_with_string_member,
+    "struct s { char name[4]; int n; }; int main(void) { struct s v = {\"ab\", 40}; return v.name[0] - 'a' + v.name[1] - 'b' + v.name[2] + v.name[3] + v.n + 2; }",
+    42
+);
+exits!(
+    local_struct_address_constant,
+    "int g; struct s { int *p; int k; }; int main(void) { struct s v = {&g, 2}; *v.p = 40; return g + v.k; }",
+    42
+);
+exits!(
+    local_nested_struct,
+    "struct in { int a; int b; }; struct out { struct in i; int c; }; int main(void) { struct out v = {{1, 2}, 39}; return v.i.a + v.i.b + v.c; }",
+    42
+);
+exits!(
+    local_partial_struct_zero_rest,
+    "struct s { int a; int b; int c; }; int main(void) { struct s v = {42}; return v.a + v.b + v.c; }",
+    42
+);
+exits!(
+    local_init_from_shadowing_block,
+    "int main(void) { int a[2] = {1, 2}; { int a[2] = {40, 2}; return a[0] + a[1]; } }",
+    42
+);
+exits!(
+    local_char_array_with_escapes,
+    "int main(void) { char s[] = \"\\t\\n\\0x\"; return s[0] + s[1] + s[2] + sizeof s + 18; }",
+    42
+);
+exits!(
+    local_long_double_member,
+    "struct s { char c; long double d; int n; }; int main(void) { struct s v = {2, 1.5L, 40}; return v.c + v.n + (int) v.d - 1; }",
+    42
+);

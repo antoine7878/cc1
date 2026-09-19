@@ -4,7 +4,10 @@ use std::iter::once;
 
 use crate::ast::{StringConstant, Tag};
 use crate::codegen::{LlvmInit, LlvmName, LlvmSymbol, LlvmType, struct_elements};
-use crate::semantic::{Definition, Linkage, ParamTypes, ResolvedType, SymbolId, TagDef, TagDefId, sema};
+use crate::semantic::{
+    Definition, Initializer, Linkage, ParamTypes, QualifiedType, ResolvedType, SymbolId, TagDef, TagDefId, sema,
+};
+use crate::target::Layout;
 
 #[derive(Debug)]
 pub struct Builder<W: Write> {
@@ -210,6 +213,12 @@ impl<W: Write> Builder<W> {
         LlvmSymbol::ptr(r)
     }
 
+    pub fn list_literal(&mut self, name: LlvmName, qty: QualifiedType, init: &Initializer) {
+        let init = LlvmInit::new(qty, Some(init));
+        self.write_line(format_args!("{} = private unnamed_addr constant {}", name, init));
+        self.blank();
+    }
+
     pub fn string_literal(&mut self, name: LlvmName, str: &StringConstant) {
         let len = str.units.len() + 1;
         let ty = if str.is_wide { LlvmType::int() } else { LlvmType::char() };
@@ -312,5 +321,13 @@ impl<W: Write> Builder<W> {
         }
         self.write_line(format_args!("  ]"));
         self.has_block_ret = true;
+    }
+
+    pub fn memcpy(&mut self, dst: LlvmName, src: LlvmName, layout: Layout) {
+        let Layout { size, align } = layout;
+        let ptr_len = LlvmType::integer(sema().target.pointer.size);
+        self.write_line(format_args!(
+            "  call void @llvm.memcpy.p0.p0.{ptr_len}(ptr align {align} {dst}, ptr align {align} {src}, {ptr_len} {size}, i1 false)"
+        ));
     }
 }

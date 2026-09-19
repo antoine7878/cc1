@@ -53,17 +53,17 @@ impl<W: Write> Generator<W> {
                 let v = self.constant(qty, *v);
                 self.b.store(v, self.locals[id]);
             }
-            Initializer::String(s) => {
-                let &a = self.globals.get_literal(*s).unwrap();
-                self.b.store(a, self.locals[id]);
-            }
             Initializer::Expr(e) => {
                 let res = self.emit_expression(e).map(|v| {
                     let _ = self.b.store(v, self.locals[id]);
                 });
                 self.collect_diag(res, &e.span);
             }
-            Initializer::List(_) => todo!("list init"),
+            Initializer::List(_) | Initializer::String(_) => {
+                let src = self.globals.lists[&id];
+                let layout = sema().layout(&qty.id);
+                self.b.memcpy(self.locals[id].name, src.name, layout);
+            }
             Initializer::Address(_) => todo!("address init"),
         }
     }
@@ -85,11 +85,12 @@ impl<W: Write> Generator<W> {
     }
 
     fn emit_globals(&mut self) {
-        let mut strings: Vec<_> = self.globals.strings.iter().collect();
-        strings.sort_by_key(|(id, _)| usize::from(**id));
-        for (id, sym) in strings {
+        let mut literals: Vec<_> = self.globals.strings.iter().collect();
+        literals.sort_by_key(|(id, _)| usize::from(**id));
+        for (id, sym) in literals {
             self.b.string_literal(sym.name, id.resolve());
         }
+
         for index in 0..sema().tags.len() {
             self.b.type_def(index.into());
         }
@@ -100,6 +101,13 @@ impl<W: Write> Generator<W> {
             if sym.resolve().definition != Definition::Definition {
                 self.b.declare(*sym);
             }
+        }
+
+        let mut aggregates: Vec<_> = self.globals.lists.iter().collect();
+        aggregates.sort_by_key(|(id, _)| usize::from(**id));
+        for (id, sym) in aggregates {
+            let sem_sym = id.resolve();
+            self.b.list_literal(sym.name, sem_sym.ty, sem_sym.initializer.unwrap().resolve());
         }
     }
 
