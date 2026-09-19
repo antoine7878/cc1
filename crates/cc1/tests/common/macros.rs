@@ -66,6 +66,20 @@ macro_rules! exits {
 }
 
 #[macro_export]
+macro_rules! emits {
+    ($name:ident, $src:expr, $needle:literal) => {
+        test_case!($name, {
+            $crate::common::run_emits(stringify!($name), $src, $needle, true);
+        });
+    };
+    (not $name:ident, $src:expr, $needle:literal) => {
+        test_case!($name, {
+            $crate::common::run_emits(stringify!($name), $src, $needle, false);
+        });
+    };
+}
+
+#[macro_export]
 macro_rules! stmts {
     ($name:ident, $src:expr, $expected:expr) => {
         test_case!($name, {

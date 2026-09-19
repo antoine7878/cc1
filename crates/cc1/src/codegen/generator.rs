@@ -53,6 +53,10 @@ impl<W: Write> Generator<W> {
                 let v = self.constant(qty, *v);
                 self.b.store(v, self.locals[id]);
             }
+            Initializer::Expr(e) if qty.is_tag(sema()) => {
+                let res = self.copy_aggregate(self.locals[id], e, qty).map(|_| ());
+                self.collect_diag(res, &e.span);
+            }
             Initializer::Expr(e) => {
                 let res = self.emit_expression(e).map(|v| {
                     let _ = self.b.store(v, self.locals[id]);

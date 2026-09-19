@@ -5,7 +5,8 @@ use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, UnaryOp};
 use crate::codegen::{BitField, Generator, Invariant, LlvmOperator, LlvmSymbol, LlvmType};
 use crate::context::ctx;
 use crate::semantic::{
-    CastKind, Diagnosis, ExpressionKind, ImplicitCast, QualifiedType, ResolvedType, ResolvedTypeId, sema,
+    CastKind, Diagnosis, ExpressionKind, ImplicitCast, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId,
+    sema,
 };
 
 impl<W: Write> Generator<W> {
@@ -353,18 +354,54 @@ impl<W: Write> Generator<W> {
     ) -> Result<LlvmSymbol, Diagnosis> {
         let rl = &sema().expr_types[lhs.id];
         let qty = rl.casted_ty();
+
         let loc = self.fold_raw(lhs)?;
+        match qty.id.resolve() {
+            ResolvedType::Tag(_) => self.copy_aggregate(loc, rhs, qty),
+            _ => self.copy_scalar(op, loc, lhs, rhs, rl),
+        }
+    }
+
+    fn copy_scalar(
+        &mut self,
+        op: &Option<BinaryOp>,
+        loc: LlvmSymbol,
+        lhs: &ExpressionNode,
+        rhs: &ExpressionNode,
+        rl: &ResolvedExpression,
+    ) -> Result<LlvmSymbol, Diagnosis> {
         let mut vr = self.emit_expression(rhs)?;
+
         if let Some(op) = op {
             let vl = self.apply_casts(loc, lhs)?;
-            vr = self.arithmetic(op, vl, qty, vr, sema().expr_types[rhs.id].casted_ty())?;
+            vr = self.arithmetic(op, vl, rl.casted_ty(), vr, sema().expr_types[rhs.id].casted_ty())?;
             if let Some(cast) = &rl.result_cast {
-                vr = self.convert(vr, qty, cast, None)?;
+                vr = self.convert(vr, rl.casted_ty(), cast, None)?;
             }
         }
         let bf = Self::bitfield_of(lhs);
         Ok(self.store_place(vr, loc, bf.as_ref()))
     }
+
+    pub fn copy_aggregate(
+        &mut self,
+        loc: LlvmSymbol,
+        rhs: &ExpressionNode,
+        qty: QualifiedType,
+    ) -> Result<LlvmSymbol, Diagnosis> {
+        match sema().expr_types[rhs.id].kind {
+            ExpressionKind::LValue => {
+                let src = self.fold_raw(rhs)?;
+                self.b.memcpy(loc.name, src.name, sema().layout(&qty.id));
+                Ok(self.b.load(qty.llvm(), loc))
+            }
+            ExpressionKind::RValue => {
+                let v = self.emit_expression(rhs)?;
+                Ok(self.b.store(v, loc))
+            }
+        }
+    }
+
     fn ternary(
         &mut self,
         cond: &ExpressionNode,

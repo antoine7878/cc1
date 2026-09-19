@@ -5,7 +5,7 @@ mod facts;
 mod ty;
 mod unit;
 
-pub use exec::run_exit;
+pub use exec::{run_emits, run_exit};
 pub use facts::run_facts;
 pub use ty::{Shape, Ty, ints, lv, none, rv};
 pub use unit::{

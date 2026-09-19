@@ -69,3 +69,13 @@ pub fn run_exit(name: &str, src: &str, expected: i32) {
     let run = run_ir(&ir);
     assert_eq!(run.status, expected, "wrong exit status for `{name}`:\n{src}\n{ir}\n{}", run.stderr);
 }
+
+pub fn run_emits(name: &str, src: &str, needle: &str, expected: bool) {
+    let unit = Unit::compile(src);
+
+    assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
+    assert!(unit.diagnosis().is_empty(), "`{name}` unexpected diagnosis:\n{src}\n{}", unit.render());
+
+    let ir = unit.ir();
+    assert_eq!(ir.contains(needle), expected, "`{name}` ir {} `{needle}`:\n{src}\n{ir}", if expected { "lacks" } else { "contains" });
+}

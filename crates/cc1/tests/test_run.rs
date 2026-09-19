@@ -26,6 +26,7 @@ exits!(comma, "int main(void) { return (7, 42); }", 42);
 exits!(local_variable, "int main(void) { int x; x = 42; return x; }", 42);
 exits!(local_arithmetic, "int main(void) { int a; int b; a = 6; b = 7; return a * b; }", 42);
 exits!(compound_assign, "int main(void) { int x; x = 40; x += 2; return x; }", 42);
+exits!(compound_assign_promoted_lhs, "int main(void) { unsigned char c; c = 198; c += 100; return c; }", 42);
 exits!(
     compound_assign_all,
     "int main(void) { int x; x = 1; x <<= 6; x -= 20; x *= 2; x /= 2; x |= 2; x &= 0xff; x ^= 0; x %= 100; x >>= 0; return x; }",
@@ -674,6 +675,46 @@ exits!(
 );
 
 /* 14. aggregate copies */
+emits!(
+    struct_assign_from_lvalue_uses_memcpy,
+    "struct s { int a; }; int main(void) { struct s v; struct s w; v.a = 42; w = v; return w.a; }",
+    "@llvm.memcpy"
+);
+emits!(
+    struct_init_from_lvalue_uses_memcpy,
+    "struct s { int a; }; int main(void) { struct s v; v.a = 42; { struct s w = v; return w.a; } }",
+    "@llvm.memcpy"
+);
+emits!(
+    union_assign_from_lvalue_uses_memcpy,
+    "union u { int i; char c[8]; }; int main(void) { union u a; union u b; a.i = 42; b = a; return b.i; }",
+    "@llvm.memcpy"
+);
+emits!(
+    struct_assign_through_deref_uses_memcpy,
+    "struct s { int a; }; int main(void) { struct s v; struct s w; struct s *p; v.a = 42; p = &v; w = *p; return w.a; }",
+    "@llvm.memcpy"
+);
+emits!(
+    not struct_assign_from_rvalue_stores_value,
+    "struct s { int a; }; struct s mk(void) { struct s v; v.a = 42; return v; } int main(void) { struct s w; w = mk(); return w.a; }",
+    "@llvm.memcpy"
+);
+emits!(
+    struct_assign_from_rvalue_stores_value_store,
+    "struct s { int a; }; struct s mk(void) { struct s v; v.a = 42; return v; } int main(void) { struct s w; w = mk(); return w.a; }",
+    "store %struct.s"
+);
+exits!(
+    struct_assign_chain,
+    "struct s { int a; int b; }; int main(void) { struct s u; struct s v; struct s w; u.a = 40; u.b = 2; w = v = u; return w.a + w.b + v.a - u.a; }",
+    42
+);
+exits!(
+    struct_assign_self,
+    "struct s { int a; char c; }; int main(void) { struct s v; v.a = 40; v.c = 2; v = v; return v.a + v.c; }",
+    42
+);
 exits!(
     struct_assign_copies_all_members,
     "struct s { char c; int a; }; int main(void) { struct s v; struct s w; v.c = 2; v.a = 40; w = v; v.a = 0; return w.c + w.a; }",
