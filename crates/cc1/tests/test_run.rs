@@ -782,3 +782,151 @@ exits!(
     "struct s { int a; char c; long l; }; union u { int i; char c[8]; }; struct s cp(struct s v) { struct s w; w = v; return w; } int main(void) { struct s v; union u a; union u b; v.a = 40; v.c = 2; v.l = 7; a.c[5] = 9; b = a; return cp(v).a + cp(v).c + b.c[5] - 9; }",
     42
 );
+
+/* 15. i386 struct ABI */
+const BIG_HELPER: &str = "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int gsum(struct big v) { return v.a + v.b + v.c + v.d + v.e; }";
+
+emits!(
+    sret_define,
+    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int main(void) { return mk(42).a; }",
+    "define void @mk(ptr sret(%struct.big) align 4"
+);
+emits!(
+    not sret_define_returns_void,
+    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int main(void) { return mk(42).a; }",
+    "ret %struct.big"
+);
+emits!(
+    sret_declare,
+    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int main(void) { return gmk(42).a; }",
+    "declare void @gmk(ptr sret(%struct.big) align 4, i32)"
+);
+emits!(
+    sret_call,
+    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int main(void) { return gmk(42).a; }",
+    "call void @gmk(ptr sret(%struct.big) align 4 %"
+);
+emits!(
+    sret_align_follows_layout,
+    "struct three { char c[3]; }; struct three mk(void) { struct three r; r.c[0] = 42; return r; } int main(void) { struct three v; v = mk(); return v.c[0]; }",
+    "define void @mk(ptr sret(%struct.three) align 1"
+);
+emits!(
+    sret_union,
+    "union u { int i; char c[8]; }; union u mk(void) { union u r; r.i = 42; return r; } int main(void) { return mk().i; }",
+    "define void @mk(ptr sret(%union.u) align 4"
+);
+emits!(
+    byval_define,
+    "struct big { int a; int b; int c; int d; int e; }; int sum(struct big v) { return v.a + v.e; } int main(void) { struct big v; v.a = 40; v.e = 2; return sum(v); }",
+    "define i32 @sum(ptr byval(%struct.big) align 4"
+);
+emits!(
+    byval_declare,
+    "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; v.a = 42; return gsum(v); }",
+    "declare i32 @gsum(ptr byval(%struct.big) align 4)"
+);
+emits!(
+    byval_call,
+    "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; v.a = 42; return gsum(v); }",
+    "call i32 @gsum(ptr byval(%struct.big) align 4 %"
+);
+emits!(
+    not byval_call_does_not_load,
+    "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; v.a = 42; return gsum(v); }",
+    "load %struct.big"
+);
+emits!(
+    byval_union,
+    "union u { int i; char c[8]; }; int f(union u v) { return v.i; } int main(void) { union u v; v.i = 42; return f(v); }",
+    "define i32 @f(ptr byval(%union.u) align 4"
+);
+emits!(
+    byval_keeps_scalar_parameter_order,
+    "struct big { int a; int b; int c; int d; int e; }; int f(int x, struct big v, char y) { return x + v.a + y; } int main(void) { struct big v; v.a = 40; return f(1, v, 1); }",
+    "define i32 @f(i32 %0, ptr byval(%struct.big) align 4 %1, i8 %2)"
+);
+emits!(
+    sret_then_byval_share_temporary,
+    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n); int sum(struct big v); int main(void) { return sum(mk(42)); }",
+    "call i32 @sum(ptr byval(%struct.big) align 4 %"
+);
+
+exits_linked!(
+    abi_sret_from_gcc,
+    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int main(void) { struct big v; v = gmk(21); return v.a + v.e; }",
+    BIG_HELPER,
+    42
+);
+exits_linked!(
+    abi_sret_from_gcc_member_of_call,
+    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int main(void) { return gmk(21).a + gmk(21).e; }",
+    BIG_HELPER,
+    42
+);
+exits_linked!(
+    abi_byval_to_gcc,
+    "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; v.a = 10; v.b = 10; v.c = 10; v.d = 10; v.e = 2; return gsum(v); }",
+    BIG_HELPER,
+    42
+);
+exits_linked!(
+    abi_byval_to_gcc_is_a_copy,
+    "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; int r; v.a = 42; v.b = v.c = v.d = v.e = 0; r = gsum(v); return r + v.b; }",
+    "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v) { int r; r = v.a; v.b = 100; return r; }",
+    42
+);
+exits_linked!(
+    abi_nested_call_across_gcc,
+    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int gsum(struct big v); int main(void) { return gsum(gmk(21)); }",
+    BIG_HELPER,
+    42
+);
+exits_linked!(
+    abi_define_called_from_gcc,
+    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int sum(struct big v) { return v.a + v.b + v.c + v.d + v.e; } int gdrive(void); int main(void) { return gdrive(); }",
+    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n); int sum(struct big v); int gdrive(void) { return sum(mk(21)); }",
+    42
+);
+exits_linked!(
+    abi_sret_from_global,
+    "struct big { int a; int b; int c; int d; int e; }; struct big g; struct big mk(void) { return g; } int gdrive2(void); int main(void) { g.a = 40; g.e = 2; return gdrive2(); }",
+    "struct big { int a; int b; int c; int d; int e; }; struct big mk(void); int gdrive2(void) { struct big v; v = mk(); return v.a + v.e; }",
+    42
+);
+exits_linked!(
+    abi_byval_mixed_with_scalars,
+    "struct big { int a; int b; int c; int d; int e; }; int gmix(int x, struct big v, char y); int main(void) { struct big v; v.a = 40; v.b = v.c = v.d = v.e = 0; return gmix(1, v, 1); }",
+    "struct big { int a; int b; int c; int d; int e; }; int gmix(int x, struct big v, char y) { return x + v.a + y; }",
+    42
+);
+exits_linked!(
+    abi_sret_mixed_with_scalars,
+    "struct big { int a; int b; int c; int d; int e; }; struct big gset(int x, int y); int main(void) { struct big v; v = gset(40, 2); return v.a + v.e; }",
+    "struct big { int a; int b; int c; int d; int e; }; struct big gset(int x, int y) { struct big r; r.a = x; r.b = r.c = r.d = 0; r.e = y; return r; }",
+    42
+);
+exits_linked!(
+    abi_union_byval_and_sret,
+    "union u { int i; char c[8]; }; union u gmku(void); int gsu(union u v); int main(void) { union u v; v = gmku(); return gsu(v) + v.c[1]; }",
+    "union u { int i; char c[8]; }; union u gmku(void) { union u r; r.i = 0; r.c[1] = 2; r.c[5] = 40; return r; } int gsu(union u v) { return v.c[5]; }",
+    42
+);
+exits_linked!(
+    abi_small_struct_byval_and_sret,
+    "struct one { int a; }; struct three { char c[3]; }; struct one gm1(void); struct three gm3(void); int gs1(struct one v); int gs3(struct three v); int main(void) { struct one a; struct three b; a = gm1(); b = gm3(); return gs1(a) + gs3(b); }",
+    "struct one { int a; }; struct three { char c[3]; }; struct one gm1(void) { struct one r; r.a = 20; return r; } struct three gm3(void) { struct three r; r.c[0] = 1; r.c[1] = 20; r.c[2] = 1; return r; } int gs1(struct one v) { return v.a; } int gs3(struct three v) { return v.c[0] + v.c[1] + v.c[2]; }",
+    42
+);
+exits_linked!(
+    abi_double_struct_byval_and_sret,
+    "struct q { double d; int i; }; struct q gmq(void); int gsq(struct q v); int main(void) { struct q v; v = gmq(); return gsq(v) + v.i; }",
+    "struct q { double d; int i; }; struct q gmq(void) { struct q r; r.d = 2.5; r.i = 2; return r; } int gsq(struct q v) { return (int) (v.d * 16); }",
+    42
+);
+exits_linked!(
+    abi_long_double_struct_byval_and_sret,
+    "struct x { char c; long double d; }; struct x gmx(void); int gsx(struct x v); int main(void) { struct x v; v = gmx(); return gsx(v) + v.c; }",
+    "struct x { char c; long double d; }; struct x gmx(void) { struct x r; r.c = 2; r.d = 2.5L; return r; } int gsx(struct x v) { return (int) (v.d * 16); }",
+    42
+);
