@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::ast::{ConstValue, Tag};
-use crate::codegen::{ReturnAttr, classify_param};
+use crate::codegen::{Frozen, ReturnAttr, classify_param};
 use crate::semantic::{QualifiedType, ResolvedType, ResolvedTypeId, TagDefId, layout, sema};
 
 impl ResolvedTypeId {

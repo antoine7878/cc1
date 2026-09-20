@@ -1,8 +1,10 @@
+mod global;
 mod id;
 mod interner;
 mod side_table;
 mod store;
 
+pub use global::Global;
 pub use id::{ArenaId, ArenaKey};
 pub use interner::Interner;
 pub use side_table::{HasTable, Loan, OptionPoisoned, SideTable, Slot};

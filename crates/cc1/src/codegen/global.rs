@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::ast::visit::walk_init_declarator;
 use crate::ast::{InitDeclaratorNode, StringConstId, TranslationUnitNode, Visitor};
-use crate::codegen::{LlvmName, LlvmSymbol};
+use crate::codegen::{Frozen, LlvmName, LlvmSymbol};
 use crate::context::ctx;
 use crate::semantic::{Duration, Initializer, SymbolId, sema};
 

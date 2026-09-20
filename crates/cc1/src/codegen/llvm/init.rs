@@ -2,7 +2,7 @@ use std::fmt::{self, Display, Formatter};
 use std::ops::RangeInclusive;
 
 use crate::ast::{ConstFolder, ConstValue, StringConstId, Tag};
-use crate::codegen::{LlvmElement, LlvmName, LlvmSymbol, LlvmType, struct_elements};
+use crate::codegen::{Frozen, LlvmElement, LlvmName, LlvmSymbol, LlvmType, struct_elements};
 use crate::semantic::{AddressBase, AddressOffset, Initializer, QualifiedType, ResolvedType, TagDef, sema};
 
 pub struct LlvmInit<'a> {

@@ -2,6 +2,7 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::ast::statement::StatementId;
 use crate::ast::{ConstValue, NameId, StringConstId};
+use crate::codegen::Frozen;
 use crate::semantic::{Diagnostic, Linkage, SymbolId};
 #[derive(Debug, Clone, Copy)]
 pub enum LlvmName {

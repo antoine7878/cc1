@@ -138,5 +138,6 @@ fn ptrdiff_t_is_int() {
     let subtract = "int *p, *q; enum probe { PROBE = sizeof(p - q) };";
     let unit = Unit::compile(subtract);
     assert!(unit.accepts(), "{}", unit.render());
-    assert_eq!(unit.sema.builtins.ptrdiff_t, unit.sema.builtins.int);
+    let sema = unit.sema.expect("Unit::compile required");
+    assert_eq!(sema.builtins.ptrdiff_t, sema.builtins.int);
 }

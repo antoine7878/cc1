@@ -1,5 +1,5 @@
 use crate::ast::Tag;
-use crate::codegen::LlvmType;
+use crate::codegen::{Frozen, LlvmType};
 use crate::semantic::{ParamTypes, QualifiedType, ResolvedType, sema};
 
 #[derive(Debug, Clone, Copy)]

@@ -14,6 +14,8 @@ pub use function_def::{DeclaredParams, FunctionDef, FunctionDefArena, FunctionDe
 pub use initializer::{Initializer, InitializerArena, InitializerId};
 pub use resolved_expression::{ResolvedExpression, ValueCategory};
 pub use resolved_statement::ResolvedStatement;
-pub use resolved_type::{Builtins, NumericClass, QualifiedType, ResolvedType, ResolvedTypeId, ResolvedTypeInterner};
+pub use resolved_type::{
+    Builtins, NumericClass, QualifiedType, ResolvedType, ResolvedTypeId, ResolvedTypeInterner, TypeDisplay,
+};
 pub use symbol::{DefinitionState, Duration, Linkage, Symbol, SymbolArena, SymbolId, SymbolKind};
 pub use tag_def::{Member, MemberRef, TagDef, TagDefArena, TagDefId};

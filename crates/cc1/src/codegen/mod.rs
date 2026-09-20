@@ -16,7 +16,21 @@ pub use llvm::{
 };
 pub use local::Locals;
 
-use crate::semantic::Diagnostic;
+use crate::arena::{ArenaId, Has};
+use crate::semantic::{Diagnostic, Sema, sema};
+
+pub trait Frozen<T> {
+    fn resolve(self) -> &'static T;
+}
+
+impl<T: 'static> Frozen<T> for ArenaId<T>
+where
+    Sema: Has<T>,
+{
+    fn resolve(self) -> &'static T {
+        sema().get(self)
+    }
+}
 
 pub trait Invariant<T> {
     fn invariant(self, what: &'static str) -> Result<T, Diagnostic>;

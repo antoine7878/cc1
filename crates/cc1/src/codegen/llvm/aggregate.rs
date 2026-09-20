@@ -1,4 +1,4 @@
-use crate::codegen::LlvmType;
+use crate::codegen::{Frozen, LlvmType};
 use crate::semantic::{QualifiedType, TagDef, sema};
 
 #[derive(Debug, Clone, Copy)]

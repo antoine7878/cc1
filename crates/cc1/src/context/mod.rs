@@ -1,9 +1,10 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs::read_to_string;
 
 use libft::{SourceMap, Span};
 
+use crate::arena::Global;
 use crate::ast::{
     AstArenas, ConstValue, ConstValueNode, ExpressionNode, Name, NameId, StructDeclaration, Tag, TranslationUnitNode,
     TypeSpecifier,
@@ -12,17 +13,15 @@ use crate::parser::ParseState;
 use crate::semantic::DiagnosticNode;
 
 thread_local! {
-    static CTX: Cell<Option<&'static Context>> = const { Cell::new(None) };
+    static CTX: Global<Context> = const { Global::new("Context") };
 }
 
 pub fn install_context(ctx: Context) -> &'static Context {
-    let ctx = Box::leak(Box::new(ctx));
-    CTX.set(Some(ctx));
-    ctx
+    CTX.with(|g| g.install(ctx))
 }
 
 pub fn ctx() -> &'static Context {
-    CTX.get().expect("Context is not installed")
+    CTX.with(Global::get)
 }
 
 #[derive(Debug)]

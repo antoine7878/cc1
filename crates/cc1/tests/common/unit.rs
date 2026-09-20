@@ -3,12 +3,12 @@ use std::process::{Command, Stdio};
 
 use cc1::ast::statement::StatementId;
 use cc1::ast::{ConstValue, Expression, ExpressionId, Name, StringConstant, Tag};
-use cc1::codegen::generate_to;
+use cc1::codegen::{Frozen, generate_to};
 use cc1::context::{self, Context, install_context};
 use cc1::parser::parse_reader;
 use cc1::semantic::{
     AddressBase, Analyzer, Diagnostic, DiagnosticNode, Initializer, ParamTypes, QualifiedType, ResolvedStatement,
-    ResolvedType, Sema, SymbolKind, ValueCategory, install_sema,
+    ResolvedType, Sema, SymbolKind, ValueCategory,
 };
 
 use crate::common::types::Ty;
@@ -60,7 +60,7 @@ fn preprocess(src: &str) -> String {
 
 pub struct Unit {
     pub ctx: &'static Context,
-    pub sema: &'static Sema,
+    pub sema: Option<&'static Sema>,
     pub status: i32,
 }
 
@@ -75,15 +75,14 @@ impl Unit {
         let src = preprocess(src);
         let (ctx, status) = parse_reader(new_ctx(), Cursor::new(src));
         let ctx = install_context(ctx);
-        let sema = install_sema(Sema::default());
-        Self { ctx, sema, status }
+        Self { ctx, sema: None, status }
     }
 
     pub fn compile(src: &str) -> Self {
         let src = preprocess(src);
         let (ctx, status) = parse_reader(new_ctx(), Cursor::new(src));
         let sema = Analyzer::analyze(ctx);
-        Self { ctx: context::ctx(), sema, status }
+        Self { ctx: context::ctx(), sema: Some(sema), status }
     }
 
     pub fn parsed(&self) -> bool {
@@ -91,7 +90,7 @@ impl Unit {
     }
 
     pub fn diagnostics(&self) -> Vec<DiagnosticNode> {
-        self.ctx.diagnostics.iter().chain(&self.sema.diagnostics).cloned().collect()
+        self.ctx.diagnostics.iter().chain(self.sema.iter().flat_map(|sema| &sema.diagnostics)).cloned().collect()
     }
 
     pub fn accepts(&self) -> bool {
@@ -99,7 +98,7 @@ impl Unit {
     }
 
     pub fn enumerators(&self) -> Vec<(String, String)> {
-        self.sema
+        self.sema.expect("Unit::compile required")
             .symbols
             .iter()
             .filter(|symbol| symbol.kind == SymbolKind::Enumerator)
@@ -128,7 +127,7 @@ impl Unit {
     }
 
     pub fn const_values(&self) -> Vec<Option<ConstValue>> {
-        (0..self.sema.expr_consts.len())
+        (0..self.sema.expect("Unit::compile required").expr_consts.len())
             .map(ExpressionId::from)
             .filter(|&id| {
                 matches!(
@@ -136,8 +135,8 @@ impl Unit {
                     Expression::ConstantExpression(_) | Expression::SizeofExpr(_) | Expression::SizeofType(_)
                 )
             })
-            .filter(|&id| self.sema.expr_consts.contains(id))
-            .map(|id| self.sema.expr_consts.get(id).copied())
+            .filter(|&id| self.sema.expect("Unit::compile required").expr_consts.contains(id))
+            .map(|id| self.sema.expect("Unit::compile required").expr_consts.get(id).copied())
             .collect()
     }
 
@@ -146,10 +145,10 @@ impl Unit {
     }
 
     pub fn fold_values(&self) -> Vec<String> {
-        (0..self.sema.expr_consts.len())
+        (0..self.sema.expect("Unit::compile required").expr_consts.len())
             .map(ExpressionId::from)
             .filter(|&id| !matches!(id.resolve(), Expression::Constant(_)))
-            .filter_map(|id| self.sema.expr_consts.get(id).copied())
+            .filter_map(|id| self.sema.expect("Unit::compile required").expr_consts.get(id).copied())
             .map(|value| repr(Some(value)))
             .collect()
     }
@@ -157,10 +156,10 @@ impl Unit {
     pub fn shapes(&self) -> Vec<crate::common::types::Shape> {
         use crate::common::types::Shape;
 
-        (0..self.sema.expressions.len())
+        (0..self.sema.expect("Unit::compile required").expressions.len())
             .map(ExpressionId::from)
-            .filter(|&id| self.sema.expressions.contains(id))
-            .map(|id| match self.sema.expressions.get(id) {
+            .filter(|&id| self.sema.expect("Unit::compile required").expressions.contains(id))
+            .map(|id| match self.sema.expect("Unit::compile required").expressions.get(id) {
                 Some(resolved) => Shape {
                     ty: Some(self.ty_tree(resolved.ty)),
                     lvalue: matches!(resolved.kind, ValueCategory::LValue),
@@ -217,7 +216,7 @@ impl Unit {
     }
 
     pub fn symbol_ty(&self, name: &str) -> QualifiedType {
-        self.sema
+        self.sema.expect("Unit::compile required")
             .symbols
             .iter()
             .find(|symbol| symbol.name.id.resolve().as_str() == name)
@@ -226,7 +225,7 @@ impl Unit {
     }
 
     pub fn prim(&self, name: &str) -> QualifiedType {
-        let b = &self.sema.builtins;
+        let b = &self.sema.expect("Unit::compile required").builtins;
         let id = match name {
             "void" => b.void,
             "char" => b.char,
@@ -247,28 +246,28 @@ impl Unit {
     }
 
     pub fn bindings(&self) -> Vec<(String, Option<usize>)> {
-        (0..self.sema.expr_bindings.len())
+        (0..self.sema.expect("Unit::compile required").expr_bindings.len())
             .map(ExpressionId::from)
-            .filter(|&id| self.sema.expr_bindings.contains(id))
+            .filter(|&id| self.sema.expect("Unit::compile required").expr_bindings.contains(id))
             .map(|id| {
                 let name = match self.ctx.arenas.expressions.iter().nth(id.into()).unwrap() {
                     Expression::Identifier(name) => name.id.resolve().clone(),
                     other => format!("{other:?}"),
                 };
-                (name, self.sema.expr_bindings.get(id).copied().map(usize::from))
+                (name, self.sema.expect("Unit::compile required").expr_bindings.get(id).copied().map(usize::from))
             })
             .collect()
     }
 
     pub fn member_refs(&self) -> Vec<(String, String, usize)> {
-        (0..self.sema.member_refs.len())
+        (0..self.sema.expect("Unit::compile required").member_refs.len())
             .map(ExpressionId::from)
-            .filter(|&id| self.sema.member_refs.contains(id))
+            .filter(|&id| self.sema.expect("Unit::compile required").member_refs.contains(id))
             .filter_map(|id| {
-                let reference = self.sema.member_refs.get(id).copied()?;
-                let sym = reference.member(self.sema).symbol?;
-                let member = self.sema.symbols.get(sym).name.id.resolve().clone();
-                let tag = self.sema.tags.get(reference.tag).name;
+                let reference = self.sema.expect("Unit::compile required").member_refs.get(id).copied()?;
+                let sym = reference.member(self.sema.expect("Unit::compile required")).symbol?;
+                let member = self.sema.expect("Unit::compile required").symbols.get(sym).name.id.resolve().clone();
+                let tag = self.sema.expect("Unit::compile required").tags.get(reference.tag).name;
                 let tag = tag.map_or_else(|| "<anonymous>".to_string(), |n| n.id.resolve().clone());
                 Some((member, tag, reference.index))
             })
@@ -276,10 +275,10 @@ impl Unit {
     }
 
     pub fn statements(&self) -> Vec<String> {
-        (0..self.sema.statements.len())
+        (0..self.sema.expect("Unit::compile required").statements.len())
             .map(StatementId::from)
             .filter_map(|id| {
-                let fact = self.render_statement(self.sema.statements.get(id)?);
+                let fact = self.render_statement(self.sema.expect("Unit::compile required").statements.get(id)?);
                 Some(format!("#{} {fact}", usize::from(id)))
             })
             .collect()
@@ -288,7 +287,7 @@ impl Unit {
     fn render_statement(&self, stmt: &ResolvedStatement) -> String {
         match stmt {
             ResolvedStatement::Switch { control, cases, default } => {
-                let control = control.to_string();
+                let control = control.display(self.sema.expect("Unit::compile required")).to_string();
                 let cases: Vec<String> =
                     cases.iter().map(|(value, id)| format!("{}->#{}", repr(Some(*value)), usize::from(*id))).collect();
                 let default = default.map_or_else(|| "none".to_string(), |id| format!("#{}", usize::from(id)));
@@ -300,11 +299,11 @@ impl Unit {
     }
 
     pub fn labels(&self) -> Vec<(String, Vec<String>)> {
-        self.sema
+        self.sema.expect("Unit::compile required")
             .functions
             .iter()
             .map(|def| {
-                let name = self.sema.symbols.get(def.sym).name.id.resolve().clone();
+                let name = self.sema.expect("Unit::compile required").symbols.get(def.sym).name.id.resolve().clone();
                 let labels = def.labels.iter().map(|l| l.id.resolve().clone()).collect();
                 (name, labels)
             })
@@ -323,7 +322,7 @@ impl Unit {
             }
             Initializer::Address(at) => {
                 let base = match at.base {
-                    AddressBase::Symbol(sym) => self.sema.symbols.get(sym).name.id.resolve().clone(),
+                    AddressBase::Symbol(sym) => self.sema.expect("Unit::compile required").symbols.get(sym).name.id.resolve().clone(),
                     AddressBase::String(id) => string_quoted(id.resolve()),
                     AddressBase::Absolute => "abs".to_string(),
                 };
@@ -337,22 +336,22 @@ impl Unit {
     }
 
     pub fn initializers(&self) -> Vec<(String, String)> {
-        self.sema
+        self.sema.expect("Unit::compile required")
             .symbols
             .iter()
             .filter_map(|symbol| {
                 let id = symbol.initializer?;
                 let name = symbol.name.id.resolve().clone();
-                Some((name, self.render_initializer(self.sema.initializers.get(id))))
+                Some((name, self.render_initializer(self.sema.expect("Unit::compile required").initializers.get(id))))
             })
             .collect()
     }
 
     pub fn symbols(&self) -> Vec<(String, String, String)> {
-        self.sema
-            .symbols
+        let sema = self.sema.expect("Unit::compile required");
+        sema.symbols
             .iter()
-            .map(|symbol| (symbol.name.id.resolve().clone(), symbol.kind.to_string(), symbol.ty.to_string()))
+            .map(|symbol| (symbol.name.id.resolve().clone(), symbol.kind.to_string(), symbol.ty.display(sema).to_string()))
             .collect()
     }
 
@@ -361,7 +360,7 @@ impl Unit {
     }
 
     pub fn uses(&self) -> Vec<(String, bool)> {
-        self.sema
+        self.sema.expect("Unit::compile required")
             .symbols
             .iter()
             .filter(|symbol| matches!(symbol.kind, SymbolKind::Variable | SymbolKind::Function))
@@ -370,7 +369,7 @@ impl Unit {
     }
 
     pub fn placements(&self) -> Vec<(String, String, String, String)> {
-        self.sema
+        self.sema.expect("Unit::compile required")
             .symbols
             .iter()
             .filter(|symbol| matches!(symbol.kind, SymbolKind::Variable | SymbolKind::Function))
@@ -388,6 +387,7 @@ impl Unit {
     pub fn tag_members(&self, tag: &str) -> Vec<(String, u32, u32)> {
         let def = self
             .sema
+            .expect("Unit::compile required")
             .tags
             .iter()
             .find(|def| def.name.is_some_and(|name| name.id.resolve().as_str() == tag))
@@ -396,7 +396,7 @@ impl Unit {
             .iter()
             .filter_map(|m| {
                 let sym = m.symbol?;
-                let name = self.sema.symbols.get(sym).name.id.resolve().clone();
+                let name = self.sema.expect("Unit::compile required").symbols.get(sym).name.id.resolve().clone();
                 Some((name, m.offset, m.bit_offset))
             })
             .collect()

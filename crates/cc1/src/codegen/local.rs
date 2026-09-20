@@ -6,7 +6,7 @@ use std::vec::IntoIter;
 
 use crate::ast::visit::{walk_expression, walk_init_declarator};
 use crate::ast::{Expression, ExpressionId, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, Visitor};
-use crate::codegen::{Builder, LlvmName, LlvmParam, LlvmSymbol, LlvmType, ParamAttr, ReturnAttr, classify_param};
+use crate::codegen::{Builder, Frozen, LlvmName, LlvmParam, LlvmSymbol, LlvmType, ParamAttr, ReturnAttr, classify_param};
 use crate::semantic::{DeclaredParams, Duration, FunctionHeader, SymbolId, sema};
 
 #[derive(Debug, Default)]

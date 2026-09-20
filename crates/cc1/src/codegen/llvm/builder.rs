@@ -4,7 +4,8 @@ use std::iter::once;
 
 use crate::ast::{StringConstant, Tag};
 use crate::codegen::{
-    LlvmInit, LlvmName, LlvmParam, LlvmSymbol, LlvmType, ParamAttr, ReturnAttr, classify_param, struct_elements,
+    Frozen, LlvmInit, LlvmName, LlvmParam, LlvmSymbol, LlvmType, ParamAttr, ReturnAttr, classify_param,
+    struct_elements,
 };
 use crate::semantic::{
     DefinitionState, Initializer, Layout, Linkage, QualifiedType, ResolvedType, SymbolId, TagDef, TagDefId, sema,

@@ -1,9 +1,8 @@
-use std::cell::Cell;
 use std::collections::HashMap;
 
 use libft::Span;
 
-use crate::arena::{Has, HasMut, HasTable, Installed, Owned, SideTable};
+use crate::arena::{Global, Has, HasMut, HasTable, SideTable};
 use crate::ast::statement::StatementId;
 use crate::ast::{AstArenas, ConstValue, DeclaratorId, ExpressionId, NameId};
 use crate::semantic::declaration::FunctionHeader;
@@ -22,17 +21,15 @@ pub struct External {
 }
 
 thread_local! {
-    static SEMA: Cell<Option<&'static Sema>> = const { Cell::new(None) };
+    static SEMA: Global<Sema> = const { Global::new("Sema") };
 }
 
 pub fn install_sema(sema: Sema) -> &'static Sema {
-    let sema = Box::leak(Box::new(sema));
-    SEMA.set(Some(sema));
-    sema
+    SEMA.with(|g| g.install(sema))
 }
 
 pub fn sema() -> &'static Sema {
-    SEMA.get().expect("Sema is not installed")
+    SEMA.with(Global::get)
 }
 
 #[derive(Debug)]
@@ -87,12 +84,6 @@ impl Default for Sema {
     }
 }
 
-impl Installed for Sema {
-    fn installed() -> &'static Self {
-        sema()
-    }
-}
-
 impl Has<Symbol> for Sema {
     fn get(&self, id: SymbolId) -> &Symbol {
         self.symbols.get(id)
@@ -105,18 +96,10 @@ impl HasMut<Symbol> for Sema {
     }
 }
 
-impl Owned for Symbol {
-    type Holder = Sema;
-}
-
 impl Has<ResolvedType> for Sema {
     fn get(&self, id: ResolvedTypeId) -> &ResolvedType {
         self.types.get(id)
     }
-}
-
-impl Owned for ResolvedType {
-    type Holder = Sema;
 }
 
 impl Has<TagDef> for Sema {
@@ -131,10 +114,6 @@ impl HasMut<TagDef> for Sema {
     }
 }
 
-impl Owned for TagDef {
-    type Holder = Sema;
-}
-
 impl Has<FunctionDef> for Sema {
     fn get(&self, id: FunctionDefId) -> &FunctionDef {
         self.functions.get(id)
@@ -147,10 +126,6 @@ impl HasMut<FunctionDef> for Sema {
     }
 }
 
-impl Owned for FunctionDef {
-    type Holder = Sema;
-}
-
 impl Has<Initializer> for Sema {
     fn get(&self, id: InitializerId) -> &Initializer {
         self.initializers.get(id)
@@ -161,10 +136,6 @@ impl HasMut<Initializer> for Sema {
     fn get_mut(&mut self, id: InitializerId) -> &mut Initializer {
         self.initializers.get_mut(id)
     }
-}
-
-impl Owned for Initializer {
-    type Holder = Sema;
 }
 
 impl HasTable<StatementId, ResolvedStatement> for Sema {

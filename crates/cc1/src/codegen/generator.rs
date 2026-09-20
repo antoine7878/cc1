@@ -8,7 +8,7 @@ use crate::ast::{
     BinaryOp, Expression, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, Statement, StatementNode,
     TranslationUnitNode, UnaryOp, Visitor,
 };
-use crate::codegen::{Builder, Globals, LlvmSymbol, Locals};
+use crate::codegen::{Builder, Frozen, Globals, LlvmSymbol, Locals};
 use crate::context::ctx;
 use crate::semantic::{DefinitionState, Diagnostic, DiagnosticNode, Duration, Initializer, SymbolId, sema};
 

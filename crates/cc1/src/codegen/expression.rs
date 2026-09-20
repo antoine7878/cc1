@@ -3,7 +3,7 @@ use std::io::Write;
 
 use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, UnaryOp};
 use crate::codegen::{
-    BitField, Generator, Invariant, LlvmOperator, LlvmParam, LlvmSymbol, LlvmType, ParamAttr, ReturnAttr,
+    BitField, Frozen, Generator, Invariant, LlvmOperator, LlvmParam, LlvmSymbol, LlvmType, ParamAttr, ReturnAttr,
     classify_param,
 };
 use crate::semantic::{
