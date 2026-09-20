@@ -50,7 +50,7 @@ impl<'a> LlvmInit<'a> {
             ResolvedType::Array { len, .. } => len.unwrap_or(units.len() + 1),
             _ => unreachable!("string initializer on a non-array"),
         };
-        let ty = LlvmType::char();
+        let ty = if id.resolve().is_wide { LlvmType::int() } else { LlvmType::char() };
         write!(f, "[{len} x {ty}] [")?;
         let cells = units.iter().copied().chain(std::iter::repeat(0)).take(len);
         for (i, c) in cells.enumerate() {

@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::iter;
 use std::ops::Index;
-use std::vec::IntoIter;
 
 use crate::ast::visit::{walk_expression, walk_init_declarator};
 use crate::ast::{Expression, ExpressionId, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode, Visitor};

@@ -16,7 +16,7 @@ pub struct StringConstant {
 
 impl StringConstant {
     pub fn ty(&self, builtins: &Builtins) -> ResolvedTypeId {
-        if self.is_wide { builtins.int } else { builtins.char }
+        if self.is_wide { builtins.long } else { builtins.char }
     }
 }
 

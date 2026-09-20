@@ -41,6 +41,8 @@ exits!(pre_decrement, "int main(void) { int x; x = 43; return --x; }", 42);
 exits!(post_decrement, "int main(void) { int x; x = 43; x--; return x; }", 42);
 exits!(assign_chain, "int main(void) { int a; int b; a = b = 42; return a + b - 42; }", 42);
 exits!(char_local, "int main(void) { char c; c = 'A'; return c - 23; }", 42);
+exits!(wide_string_global_initializer, "typedef long wchar_t; wchar_t a[] = L\"x\"; int main(void) { return a[0] + a[1] + 41; }", 161);
+exits!(wide_string_automatic_initializer, "typedef long wchar_t; int main(void) { wchar_t a[] = L\"x\"; return a[0] + a[1] + 41; }", 161);
 exits!(unsigned_local, "int main(void) { unsigned u; u = 42u; return u; }", 42);
 exits!(long_local, "int main(void) { long l; l = 42L; return l; }", 42);
 exits!(unsigned_division, "int main(void) { unsigned u; u = 0xffffffffu; return u / 0x06185ea6u; }", 42);

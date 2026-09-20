@@ -142,13 +142,15 @@ fn string(resolver: &mut Resolver, ty: QualifiedType, e: &ExpressionNode) -> Opt
     let &ResolvedType::Array { elem, len } = ty.id.resolve_with(resolver.sema) else {
         return None;
     };
-    if !elem.id.resolve_with(resolver.sema).is_char() {
-        return None;
-    }
     let Expression::StringLiteral(literal) = e.id.resolve() else {
         return None;
     };
-    if literal.is_wide() {
+    let compatible = if literal.is_wide() {
+        elem.id == resolver.sema.builtins.long
+    } else {
+        elem.id.resolve_with(resolver.sema).is_char()
+    };
+    if !compatible {
         return None;
     }
     let id = literal.id;
