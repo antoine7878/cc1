@@ -41,9 +41,6 @@ pub use unit::{ExternalDeclaration, ExternalDeclarationNode, FunctionDefinitionN
 pub use value::{ConstFolder, ConstValue, ConstValueNode};
 pub use visit::Visitor;
 
-pub trait Node {
-    fn span(&self) -> libft::Span;
-}
 #[macro_export]
 macro_rules! ast_node {
     (
@@ -70,13 +67,6 @@ macro_rules! ast_node {
         impl std::fmt::Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{}{}{} {}", ::libft::BLUE, stringify!($name), ::libft::RESET, self.span)
-            }
-        }
-
-
-        impl $crate::ast::Node for $name {
-            fn span(&self) -> ::libft::Span {
-                self.span
             }
         }
     };

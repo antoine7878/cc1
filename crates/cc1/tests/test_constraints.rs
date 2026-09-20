@@ -1,7 +1,7 @@
 use cc1::ast::declaration::DeclaratorId;
 use cc1::ast::{
     ConstValue, DeclarationSpecifier, DeclaratorNode, InitDeclaratorNode, Initializer, InitializerNode, Name, NameId,
-    Node, Qualifier, Storage, TypeSpecifier,
+    Qualifier, Storage, TypeSpecifier,
 };
 use cc1::semantic::constraints::param::{check_complete_param, check_param_storage, is_valid_old_style};
 use cc1::semantic::constraints::specifier::{
@@ -337,7 +337,7 @@ fn a_tentative_definition_is_static_or_unqualified() {
     assert!(!is_tentative_definition(&init_declarator(Some(initializer())), None));
     assert!(!is_tentative_definition(&init_declarator(None), Some(Storage::Extern)));
     assert!(!is_tentative_definition(&init_declarator(Some(initializer())), Some(Storage::Extern)));
-    assert_eq!(init_declarator(None).span(), Span::default());
+    assert_eq!(init_declarator(None).span, Span::default());
 }
 
 #[test]

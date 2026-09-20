@@ -2,7 +2,6 @@ use std::fmt;
 
 use libft::{BLUE, RESET, Span};
 
-use crate::ast::Node;
 use crate::define_interner;
 
 define_interner!(String, NameInterner, NameId);
@@ -22,11 +21,6 @@ impl fmt::Display for Name {
 impl Name {
     pub fn new(id: NameId, span: Span) -> Self {
         Self { id, span }
-    }
-}
-impl Node for Name {
-    fn span(&self) -> Span {
-        self.span
     }
 }
 
