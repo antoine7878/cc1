@@ -9,7 +9,7 @@ pub mod sema;
 
 pub use analyzer::Analyzer;
 pub use declaration::FunctionHeader;
-pub use diagnostic::{Diag, Diagnostic, DiagnosticNode, DiagnosticSink, ExpectedTokens};
+pub use diagnostic::{Diag, Diagnostic, DiagnosticNode, DiagnosticSink, ExpectedTokens, has_errors};
 pub use eval::fold;
 pub use layout::Layout;
 pub use model::*;

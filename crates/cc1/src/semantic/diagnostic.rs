@@ -421,6 +421,10 @@ impl DiagnosticNode {
     }
 }
 
+pub fn has_errors(diagnostics: &[DiagnosticNode]) -> bool {
+    diagnostics.iter().any(DiagnosticNode::is_error)
+}
+
 pub trait DiagnosticSink {
     fn diagnostics(&mut self) -> &mut Vec<DiagnosticNode>;
 

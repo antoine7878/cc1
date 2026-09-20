@@ -4,6 +4,5 @@ pub mod ast;
 pub mod codegen;
 pub mod context;
 pub mod parser;
-pub mod pipeline;
 pub mod report;
 pub mod semantic;
