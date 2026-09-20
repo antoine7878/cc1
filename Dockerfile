@@ -31,7 +31,8 @@ RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master
     git clone https://github.com/jeffreytse/zsh-vi-mode /root/.oh-my-zsh/custom/plugins/zsh-vi-mode && \
     echo "plugins+=(zsh-vi-mode)" >> /root/.zshrc && \
     echo 'source $ZSH/oh-my-zsh.sh' >> /root/.zshrc && \
-    echo 'alias t="make test"' >> /root/.zshrc
+    echo 'alias t="make test"' >> /root/.zshrc && \
+    echo 'alias re="make re"' >> /root/.zshrc
 
 WORKDIR /work
 
