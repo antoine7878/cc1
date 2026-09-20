@@ -57,7 +57,7 @@ class Step:
 
 
 def preprocess_argv(step: Step, args: Namespace) -> list[str]:
-    argv = ["clang", "-E", "-std=c89"]
+    argv = ["clang", "-E", "-std=c89", "-m32"]
     argv.extend(f"-D{name}" for name in args.defines)
     argv.extend(f"-U{name}" for name in args.undefines)
     argv.extend(f"-I{dir}" for dir in args.includes)

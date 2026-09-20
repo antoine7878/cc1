@@ -58,19 +58,20 @@ impl Args {
     }
 
     pub fn help() {
-        println!("usage: cc1 file");
+        println!("usage: cc1 infile [-o outfile]");
         exit(0);
     }
 }
 
-pub fn parse_args(mut ctx: Context) -> Context {
+pub fn parse_args(mut ctx: Context) -> (Context, Option<String>) {
     match Args::parse() {
         Ok(mut args) => {
             ctx.set_file_name(args.infiles.swap_remove(0));
+            (ctx, args.outfile)
         }
         Err(error) => {
-            ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::BadArguments(error.to_string()), Span::default()))
+            ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::BadArguments(error.to_string()), Span::default()));
+            (ctx, None)
         }
     }
-    ctx
 }

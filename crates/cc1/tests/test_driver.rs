@@ -61,3 +61,25 @@ test_case!(valid_unit_emits_and_exits_zero, {
     assert!(run.stderr.is_empty(), "stderr: {}", run.stderr);
     assert!(run.stdout.contains("define i32 @main"));
 });
+
+test_case!(valid_unit_writes_requested_output, {
+    let dir = std::env::temp_dir();
+    let base = format!("cc1_driver_output_{}", std::process::id());
+    let input = dir.join(format!("{base}.c"));
+    let output = dir.join(format!("{base}.ll"));
+    fs::write(&input, "int main(void) { return 0; }\n").expect("write source");
+
+    let run = cc1(&[
+        input.to_str().expect("utf-8 input path"),
+        "-o",
+        output.to_str().expect("utf-8 output path"),
+    ]);
+
+    assert_eq!(run.status, 0, "stderr: {}", run.stderr);
+    assert!(run.stdout.is_empty());
+    let ir = fs::read_to_string(&output).expect("read LLVM output");
+    assert!(ir.contains("define i32 @main"));
+
+    let _ = fs::remove_file(input);
+    let _ = fs::remove_file(output);
+});
