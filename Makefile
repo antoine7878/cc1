@@ -29,6 +29,7 @@ test: all llvm ## emit LLVM IR for rscs/hello.c to stdout
 
 ctest: all ## run the cc1 test suite
 	cargo nextest run -p cc1
+	python3 -m unittest test/test_fcc.py
 
 ttest: all ## run every test in the workspace
 	cargo nextest run

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from __future__ import annotations
+
 from argparse import Namespace, ArgumentParser
 import argparse
 from contextlib import nullcontext
@@ -56,6 +58,12 @@ class Step:
     output: str
 
 
+@dataclass
+class LinkItem:
+    value: str
+    is_input: bool
+
+
 def preprocess_argv(step: Step, args: Namespace) -> list[str]:
     argv = ["clang", "-E", "-std=c89", "-m32"]
     argv.extend(f"-D{name}" for name in args.defines)
@@ -87,12 +95,15 @@ def assemble_argv(step: Step, _: Namespace) -> list[str]:
     return ["as", "--32", "-o", step.output, step.input]
 
 
-def link_argv(args: argparse.Namespace, objects: list) -> list:
+def link_argv(args: argparse.Namespace, outputs: dict[str, list[str]]) -> list:
     argv = ["clang", "-m32"]
     if args.strip:
         argv.append("-s")
-    argv.extend(objects)
-    argv.extend(args.libs)
+    for item in args.link_items:
+        if item.is_input:
+            argv.append(outputs[item.value].pop(0))
+        else:
+            argv.append(item.value)
     argv.extend(["-o", output_of("", Stage.LINK, args.outfile)])
     return argv
 
@@ -129,6 +140,30 @@ def output_of(input: str, last: Stage, requested: "str | None") -> str:
     if last == Stage.LINK:
         return "a.out"
     return str(Path(base_name(input)).with_suffix("." + OUT_EXTENTION[last]))
+
+
+def link_items(argv: list[str]) -> list[LinkItem]:
+    items = []
+    options_with_value = ("-D", "-I", "-O", "-U", "-o")
+    it = iter(argv)
+    operands_only = False
+
+    for arg in it:
+        if operands_only:
+            items.append(LinkItem(arg, True))
+        elif arg == "--":
+            operands_only = True
+        elif arg in ("-L", "-l"):
+            items.append(LinkItem(arg + next(it), False))
+        elif arg.startswith("-L") or arg.startswith("-l"):
+            items.append(LinkItem(arg, False))
+        elif arg in options_with_value:
+            next(it)
+        elif arg.startswith(options_with_value) or arg.startswith("-"):
+            continue
+        else:
+            items.append(LinkItem(arg, True))
+    return items
 
 
 def make_parser() -> argparse.ArgumentParser:
@@ -312,24 +347,25 @@ def compile(
 
 
 def build(args: Namespace, tmp: str) -> None:
-    objects = []
+    outputs = {}
     failed = 0
     for id, path in enumerate(args.files):
         try:
             if (obj := compile(args, path, tmp, id)) is not None:
-                objects.append(obj)
+                outputs.setdefault(path, []).append(obj)
         except Exception as e:
             print(f"fcc: {e}", file=sys.stderr)
             failed += 1
     if failed:
         raise Exception(f"{failed} file(s) failed")
     if args.last == Stage.LINK:
-        run(TOOL[Stage.LINK], link_argv(args, objects))
+        run(TOOL[Stage.LINK], link_argv(args, outputs))
 
 
 def main(argv: list) -> int:
     parser = make_parser()
     args = parser.parse_intermixed_args(argv)
+    args.link_items = link_items(argv)
     check_args(parser, args)
     try:
         with TemporaryDirectory(prefix="fcc") as tmp:
