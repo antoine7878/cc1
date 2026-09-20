@@ -84,7 +84,7 @@ def compile_argv(step: Step, _: Namespace) -> list[str]:
 
 
 def lower_argv(step: Step, args: Namespace) -> list[str]:
-    argv = ["llc"]
+    argv = ["llc", "-relocation-model=pic"]
     if args.optlevel is not None:
         argv.append(f"-O{args.optlevel}")
     argv.extend(["-o", step.output, step.input])
