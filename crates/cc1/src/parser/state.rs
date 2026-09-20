@@ -12,9 +12,7 @@ pub struct ParseState {
     struct_depth: usize,
     stashed: Option<HashMap<NameId, SymbolKind>>,
     type_name_id: usize,
-    identifier_id: usize,
     type_name_ok: bool,
-    identifier_ok: bool,
 }
 
 impl Default for ParseState {
@@ -26,9 +24,7 @@ impl Default for ParseState {
             struct_depth: 0,
             stashed: None,
             type_name_id: YYToken::id_of("TYPE_NAME").expect("TYPE_NAME token"),
-            identifier_id: YYToken::id_of("IDENTIFIER").expect("IDENTIFIER token"),
             type_name_ok: false,
-            identifier_ok: true,
         }
     }
 }
@@ -54,6 +50,10 @@ impl ParseState {
     pub fn note_specifiers(&mut self, specifiers: Vec<DeclarationSpecifier>) -> Vec<DeclarationSpecifier> {
         self.in_typedef = specifiers.contains(&DeclarationSpecifier::Storage(Storage::Typedef));
         specifiers
+    }
+
+    pub fn end_declaration(&mut self) {
+        self.in_typedef = false;
     }
 
     pub fn recover_to_file_scope(&mut self) {
@@ -82,17 +82,15 @@ impl ParseState {
 
     pub fn feedback(&mut self, accepts: &dyn Fn(usize) -> bool) {
         self.type_name_ok = accepts(self.type_name_id);
-        self.identifier_ok = accepts(self.identifier_id);
     }
 
     pub fn classify_identifier(&mut self, name: Name) -> YYToken {
-        match (self.type_name_ok, self.identifier_ok) {
-            (false, _) => YYToken::IDENTIFIER(name),
-            (true, false) => YYToken::TYPE_NAME(name),
-            (true, true) => match self.typedefs.iter().rev().find_map(|ty| ty.get(&name.id)) {
-                Some(SymbolKind::Typedef) => YYToken::TYPE_NAME(name),
-                _ => YYToken::IDENTIFIER(name),
-            },
+        if !self.type_name_ok {
+            return YYToken::IDENTIFIER(name);
+        }
+        match self.typedefs.iter().rev().find_map(|ty| ty.get(&name.id)) {
+            Some(SymbolKind::Typedef) => YYToken::TYPE_NAME(name),
+            _ => YYToken::IDENTIFIER(name),
         }
     }
 }

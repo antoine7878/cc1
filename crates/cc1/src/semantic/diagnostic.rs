@@ -162,6 +162,9 @@ pub enum Diagnostic {
     ParameterNotRegister,
     DuplicateParameterName,
 
+    // 6.5.6
+    UnknownTypeName(Name),
+
     // 6.5.7
     BlockScopeLinkageInitializer,
     ArrayInitTooLong,
@@ -391,6 +394,9 @@ impl DiagnosticNode {
             Diagnostic::VoidParameter => "Parameter shall not have void type".to_string(),
             Diagnostic::ParameterNotRegister => "Parameter shall only by declared with register storage".to_string(),
             Diagnostic::DuplicateParameterName => "Duplicate paramter identifier".to_string(),
+
+            // 6.5.6
+            Diagnostic::UnknownTypeName(name) => format!("unknown type name '{}'", name.id.resolve()),
 
             // 6.5.7
             Diagnostic::ArrayInitTooLong => "excess elements in array initializer".to_string(),

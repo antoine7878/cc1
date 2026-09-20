@@ -208,8 +208,6 @@ impl<R: Read> YYLex<R> {
         if c == b'\n' {
             self.pos.line += 1;
             self.pos.col = 1;
-        } else if c == b'\t' {
-            self.pos.col += 4 - (self.pos.col % 4);
         } else {
             self.pos.col += 1;
         }

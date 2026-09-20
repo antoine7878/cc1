@@ -403,3 +403,116 @@ reports!(
         "<test>:1:14: error: syntax error, unexpected ';', expecting end of file"
     ]
 );
+
+// ----- error position ------------------------------------------------------
+
+reports!(
+    report_unknown_type_name_as_a_struct_member,
+    "struct S { foo x; };",
+    ["<test>:1:12: error: syntax error, unexpected IDENTIFIER"]
+);
+
+reports!(
+    report_unknown_type_name_in_an_old_style_parameter_declaration,
+    "int f(a) foo a; { return 0; }",
+    [
+        "<test>:1:10: error: syntax error, unexpected IDENTIFIER, expecting ',' or ';'",
+        "<test>:1:17: error: syntax error, unexpected '{', expecting end of file",
+        "<test>:1:29: error: syntax error, unexpected '}', expecting end of file"
+    ]
+);
+
+reports!(
+    report_trailing_identifier_on_the_declaration_line,
+    "int f(void) __attribute__((noreturn));\nint main(void) { return 0; }",
+    ["<test>:1:13: error: syntax error, unexpected IDENTIFIER, expecting ',' or ';'"]
+);
+
+reports!(
+    report_untyped_declarator_after_a_typedef_is_not_a_type,
+    "typedef int T; foo() { return 0; } int main(void) { foo x = 1; return x; }",
+    [
+        "<test>:1:57: error: syntax error, unexpected IDENTIFIER, expecting ',' or ';'",
+        "<test>:1:71: error: Use of undeclared identifier 'x'"
+    ]
+);
+
+reports!(
+    report_tab_counts_as_one_column,
+    "int f(void)\n{\n\t\tint y = ;\n}",
+    ["<test>:3:11: error: syntax error, unexpected ';'"]
+);
+
+use std::fs::File;
+
+use cc1::context::install_context;
+use cc1::parser::parse_reader;
+use cc1::semantic::Analyzer;
+
+fn compile_file(dir: &TmpDir, contents: &str) -> Unit {
+    let path = scratch_file(dir, contents);
+    let mut ctx = Context::default();
+    ctx.set_file_name(path.to_str().unwrap().to_string());
+    let (ctx, status) = parse_reader(ctx, File::open(&path).unwrap());
+    let sema = Analyzer::analyze(ctx);
+    Unit { ctx: cc1::context::ctx(), sema: Some(sema), status }
+}
+
+fn excerpt_and_caret(rendered: &str) -> (String, usize) {
+    let lines: Vec<&str> = rendered.lines().collect();
+    let excerpt = lines[1].to_string();
+    let caret = lines[2].find('^').expect("caret line");
+    (excerpt, caret)
+}
+
+#[test]
+fn caret_is_under_the_offending_character_after_tabs() {
+    let dir = TmpDir::new("cc1-tab-caret");
+    let unit = compile_file(&dir, "int f(void)\n{\n\t\tint y = ;\n}\n");
+    let rendered = strip_ansi(&unit.render());
+    let (excerpt, caret) = excerpt_and_caret(&rendered);
+    assert_eq!(excerpt.find(';'), Some(caret), "{rendered}");
+}
+
+#[test]
+fn excerpt_of_a_line_marked_file_is_the_parsed_line() {
+    let dir = TmpDir::new("cc1-line-marker");
+    let unit = compile_file(&dir, "# 7 \"orig.c\"\nint main(void) { EXPANDED_MACRO x = 1; return x; }\n");
+    let rendered = strip_ansi(&unit.render());
+    assert!(rendered.starts_with("orig.c:7:33: error: syntax error, unexpected IDENTIFIER, expecting ',' or ';'\n"), "{rendered}");
+    let (excerpt, caret) = excerpt_and_caret(&rendered);
+    assert!(excerpt.ends_with("int main(void) { EXPANDED_MACRO x = 1; return x; }"), "{rendered}");
+    assert_eq!(excerpt.find("x = 1"), Some(caret), "{rendered}");
+}
+
+#[test]
+fn excerpt_follows_a_return_to_the_main_file() {
+    let dir = TmpDir::new("cc1-line-marker-return");
+    let path = dir.join("src.c");
+    let name = path.to_str().unwrap();
+    let src = format!("# 1 \"{name}\"\nint a;\n# 1 \"header.h\"\nint b;\nint c;\n# 4 \"{name}\"\nint d = ;\n");
+    let unit = compile_file(&dir, &src);
+    let rendered = strip_ansi(&unit.render());
+    assert!(rendered.starts_with(&format!("{name}:4:9: error: syntax error, unexpected ';'\n")), "{rendered}");
+    let (excerpt, caret) = excerpt_and_caret(&rendered);
+    assert!(excerpt.ends_with("int d = ;"), "{rendered}");
+    assert_eq!(excerpt.find(';'), Some(caret), "{rendered}");
+}
+
+#[test]
+fn source_line_maps_a_marked_line_to_the_parsed_file() {
+    let dir = TmpDir::new("cc1-marked-source-line");
+    let path = scratch_file(&dir, "# 10 \"other.c\"\nten\neleven\n# 3 \"other.c\"\nthree\n");
+    let name = path.to_str().unwrap();
+    let mut ctx = Context::default();
+    ctx.set_file_name(name.to_string());
+    let other = ctx.arenas.names.intern("other.c".to_string()).into();
+    ctx.mark_line(other, 10, 2);
+    ctx.mark_line(other, 3, 13);
+
+    assert_eq!(ctx.source_line("other.c", 10).as_deref(), Some("ten"));
+    assert_eq!(ctx.source_line("other.c", 11).as_deref(), Some("eleven"));
+    assert_eq!(ctx.source_line("other.c", 3).as_deref(), Some("three"));
+    assert_eq!(ctx.source_line("other.c", 4), None);
+    assert_eq!(ctx.source_line(name, 1).as_deref(), Some("# 10 \"other.c\""));
+}

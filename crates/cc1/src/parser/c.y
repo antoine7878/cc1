@@ -235,8 +235,8 @@ expression /* ExpressionNode */
     ;
 
 declaration /* DeclarationNode */
-	: declaration_specifiers ';'                                                            { with_span!(self, DeclarationNode::new, $1, vec![]) }
-	| declaration_specifiers init_declarator_list ';'                                       { with_span!(self, DeclarationNode::new, $1, $2) }
+	: declaration_specifiers ';'                                                            { self.lexer.ctx.parse.end_declaration(); with_span!(self, DeclarationNode::new, $1, vec![]) }
+	| declaration_specifiers init_declarator_list ';'                                       { self.lexer.ctx.parse.end_declaration(); with_span!(self, DeclarationNode::new, $1, $2) }
 	;
 
 declaration_specifiers /* Vec<DeclarationSpecifier> */

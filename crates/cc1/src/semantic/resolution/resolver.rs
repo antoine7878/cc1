@@ -137,10 +137,12 @@ impl Resolver<'_> {
         is_volatile: bool,
         span: &Span,
     ) -> Option<QualifiedType> {
-        let sym_id = self.sym_scopes.lookup_ordinary(name.id)?;
+        let Some(sym_id) = self.sym_scopes.lookup_ordinary(name.id) else {
+            return self.add_diag(Diag::err(None, Diagnostic::UnknownTypeName(name)), span);
+        };
         let sym = sym_id.resolve_with(self.sema);
         if sym.kind != SymbolKind::Typedef {
-            return self.add_diag(Diag::err(None, Diagnostic::UndeclaredIdentifier(name)), span);
+            return self.add_diag(Diag::err(None, Diagnostic::UnknownTypeName(name)), span);
         }
         let base = sym.ty;
         if (is_const && base.is_const) || (is_volatile && base.is_volatile) {

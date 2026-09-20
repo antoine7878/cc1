@@ -135,6 +135,7 @@ fn line_marker<R: Read>(lex: &mut YYLex<R>) {
     if let Some(file) = rest[end..].trim_start().strip_prefix('"').and_then(|s| s.split('"').next()) {
         lex.pos.file = lex.ctx.arenas.names.intern(file.to_string()).into();
     }
+    lex.ctx.mark_line(lex.pos.file, line, lex.pos.line);
     lex.pos.line = line;
     lex.pos.col = 1;
 }
