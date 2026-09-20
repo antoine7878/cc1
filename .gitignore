@@ -40,3 +40,5 @@ _d/
 *.fls
 *.log
 .claude/worktrees
+
+en.subject.*
