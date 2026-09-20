@@ -1,6 +1,6 @@
 int printf(const char *, ...);
 
 int main(void) {
-	printf("coucou");
+	printf("coucou\n");
 	return 0;
 }
