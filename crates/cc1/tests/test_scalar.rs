@@ -141,3 +141,12 @@ fn ptrdiff_t_is_int() {
     let sema = unit.sema.expect("Unit::compile required");
     assert_eq!(sema.builtins.ptrdiff_t, sema.builtins.int);
 }
+
+#[test]
+fn size_t_is_unsigned_int() {
+    let sizeof = "enum probe { PROBE = sizeof(sizeof 0) };";
+    let unit = Unit::compile(sizeof);
+    assert!(unit.accepts(), "{}", unit.render());
+    let sema = unit.sema.expect("Unit::compile required");
+    assert_eq!(sema.builtins.size_t, sema.builtins.unsigned_int);
+}

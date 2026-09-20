@@ -227,12 +227,12 @@ pub struct Builtins {
     pub long_double: ResolvedTypeId,
     pub ptrdiff_t: ResolvedTypeId,
     pub size_t: ResolvedTypeId,
-    pub void_ptr: QualifiedType,
 }
 
 impl Builtins {
     pub fn new(types: &mut ResolvedTypeInterner) -> Self {
-        let v = types.intern(ResolvedType::Void);
+        let int = types.intern(ResolvedType::Int);
+        let unsigned_int = types.intern(ResolvedType::UnsignedInt);
         Self {
             void: types.intern(ResolvedType::Void),
             char: types.intern(ResolvedType::Char),
@@ -240,16 +240,15 @@ impl Builtins {
             unsigned_char: types.intern(ResolvedType::UnsignedChar),
             short: types.intern(ResolvedType::Short),
             unsigned_short: types.intern(ResolvedType::UnsignedShort),
-            int: types.intern(ResolvedType::Int),
-            unsigned_int: types.intern(ResolvedType::UnsignedInt),
+            int,
+            unsigned_int,
             long: types.intern(ResolvedType::Long),
             unsigned_long: types.intern(ResolvedType::UnsignedLong),
             float: types.intern(ResolvedType::Float),
             double: types.intern(ResolvedType::Double),
             long_double: types.intern(ResolvedType::LongDouble),
-            ptrdiff_t: types.intern(ResolvedType::Int),
-            size_t: types.intern(ResolvedType::UnsignedInt),
-            void_ptr: QualifiedType::plain(v),
+            ptrdiff_t: int,
+            size_t: unsigned_int,
         }
     }
 }
