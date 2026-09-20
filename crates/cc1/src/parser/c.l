@@ -6,7 +6,7 @@ use crate::ast::{Name, StringLiteralNode, ConstValueNode, ConstValue};
 use crate::context::Context;
 use libft::{Position, Span};
 use crate::parser::{YYToken, YYFeedback};
-use crate::semantic::{Diag, DiagnosticNode};
+use crate::semantic::{Diag, Diagnostic, DiagnosticNode};
 
 %}
 
@@ -115,7 +115,8 @@ L?\"(\\.|[^\\"])*\"	        { return YYToken::STRING_LITERAL(alloc_string(self))
 ("{"|"<%"|"??<")            { return YYToken::Char('{'); }
 ("}"|"%>")|"??>"            { return YYToken::Char('}'); }
 [ \t\v\n\f]		            { }
-.			                { /* ignore bad characters */ }
+[\xc0-\xff][\x80-\xbf]*     { stray(self); }
+.			                { stray(self); }
 
 %%
 
@@ -161,4 +162,10 @@ fn alloc_string<R: Read>(lex: &mut YYLex<R>) -> StringLiteralNode {
         lex.ctx.diagnostics.push(DiagnosticNode::new(diagnostic, span));
     }
     node
+}
+
+fn stray<R: Read>(lex: &mut YYLex<R>) {
+    let span = lex.span;
+    let text = lex.yytext.clone();
+    lex.ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::StrayCharacter(text), span));
 }

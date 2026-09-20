@@ -1,3 +1,5 @@
+use crate::common::Unit;
+
 // ---- 6.5.6 typedef and lexerhack -----------------------
 
 accept!(typedef_then_use, "typedef int T; T x;");
@@ -388,3 +390,9 @@ syntax!(abstract_ptr_then_array, "int f(void) { return sizeof(int *[4]); }");
 syntax!(abstract_array_unsized_suffix, "void g(int (*)[]);");
 syntax!(abstract_empty_parens, "void g(int ());");
 syntax!(abstract_paren_param_list, "void g(int (int));");
+
+test_case!(stray_character_is_dropped_and_lexing_continues, {
+    let unit = Unit::compile("int x @ 1;");
+    assert!(!unit.parsed());
+    assert_eq!(unit.messages()[0], "<test>:1:7: error: stray '@' in program");
+});

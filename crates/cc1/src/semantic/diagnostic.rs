@@ -23,6 +23,9 @@ pub enum Diagnostic {
     InvalidOperand,
     SyntaxError { found: &'static str, expected: ExpectedTokens },
 
+    // 6.1
+    StrayCharacter(String),
+
     // 6.1.2.1
     DuplicateDeclaration(SymbolKind, Name),
 
@@ -243,6 +246,9 @@ impl DiagnosticNode {
             Diagnostic::InvalidOperand => "invalid operand".to_string(),
             Diagnostic::SyntaxError { found, expected } if expected.is_empty() => format!("syntax error, unexpected {}", token_label(found)),
             Diagnostic::SyntaxError { found, expected } => format!("syntax error, unexpected {}, expecting {expected}", token_label(found)),
+
+            // 6.1
+            Diagnostic::StrayCharacter(text) => format!("stray '{}' in program", text.escape_default()),
 
             // 6.1.2.1
             Diagnostic::DuplicateDeclaration(kind, name) => format!("duplicate declaration of {} `{}'", kind, name.id.resolve()),

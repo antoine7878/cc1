@@ -390,3 +390,16 @@ reports!(
     "struct S { int a; } s; void f(void) { (int)s; }",
     ["<test>:1:39: error: Conversion of non scalar type"]
 );
+
+reports!(report_stray_at_sign, "int x = 1; @", ["<test>:1:12: error: stray '@' in program"]);
+reports!(report_stray_backtick, "int x = 1; `", ["<test>:1:12: error: stray '`' in program"]);
+reports!(report_stray_dollar, "int x = 1; $", ["<test>:1:12: error: stray '$' in program"]);
+reports!(report_stray_non_ascii, "int x = 1; é", ["<test>:1:12: error: stray '\\u{e9}' in program"]);
+reports!(
+    report_stray_backslash,
+    "int x = 1; \\ ;",
+    [
+        "<test>:1:12: error: stray '\\\\' in program",
+        "<test>:1:14: error: syntax error, unexpected ';', expecting end of file"
+    ]
+);
