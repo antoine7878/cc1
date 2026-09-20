@@ -1,5 +1,4 @@
 CC1 = target/debug/cc1
-FCC = target/debug/fcc
 
 FT_LEX  = target/release/ft_lex
 FT_YACC = target/release/ft_yacc
@@ -10,8 +9,8 @@ C_Y = crates/cc1/src/parser/c.y
 LEX_RS =  crates/cc1/src/parser/lex.rs
 YACC_RS = crates/cc1/src/parser/yacc.rs
 
-all: $(LEX_RS) $(YACC_RS) ## build cc1, cpp and fcc
-	cargo build -p cpp -p cc1 -p fcc
+all: $(LEX_RS) $(YACC_RS) ## build cc1 and cpp
+	cargo build -p cpp -p cc1
 
 $(FT_LEX) $(FT_YACC):
 	cargo build --release -p ft_lex -p ft_yacc
@@ -26,13 +25,7 @@ $(YACC_RS): $(C_Y)
 
 test: all llvm ## emit LLVM IR for rscs/hello.c to stdout
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
-	cargo run --bin fcc -- -e ./rscs/hello.c -o /dev/stdout
-	@# ./a.out || echo $$?
-
-ftest: all cc  ## compile and run rscs/hello.c with fcc
-	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
-	cargo run --bin fcc -- ./rscs/hello.c -o ./rscs/a.out
-	./rscs/a.out || echo $$?
+	./fcc.py -e ./rscs/hello.c -o /dev/stdout
 
 ctest: all ## run the cc1 test suite
 	cargo nextest run -p cc1
@@ -40,7 +33,7 @@ ctest: all ## run the cc1 test suite
 ttest: all ## run every test in the workspace
 	cargo nextest run
 
-pytest: all ## compile and run rscs/hello.c with fcc.py
+ftest: all cc ## compile and run rscs/hello.c with fcc.py
 	./fcc.py ./rscs/hello.c -o ./rscs/a.out
 	./rscs/a.out || echo $$?
 
@@ -89,4 +82,4 @@ re: clean all ## clean and rebuild
 help: ## show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: all clean re test ctest ttest pytest c cc coverage $(FT_LEX) $(FT_YACC) $(NAME) llvm
+.PHONY: all clean re test ctest ttest ftest c cc coverage $(FT_LEX) $(FT_YACC) $(NAME) llvm

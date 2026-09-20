@@ -1,9 +1,0 @@
-[package]
-name = "fcc"
-version.workspace = true
-edition.workspace = true
-
-[dependencies]
-libft.workspace = true
-cc1.workspace = true
-cpp.workspace = true

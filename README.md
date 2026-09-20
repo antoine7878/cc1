@@ -5,16 +5,16 @@ Parsing is done with custom Rust versions of Lex and Yacc: `ft_lex` and `ft_yacc
 
 - Soon™ ISO/IEC 9899:1990 compliant
 - Targets i386
-- `fcc` compiler driver
+- `fcc.py` compiler driver
 - `cpp` C PreProcessor (just `clang -E` for now)
 - `cc1` the compiler to LLVM IR
 - Lowering with `llc` and assembly with `ar`, linking with `clang`
 
 ## Usage
 
-`cargo run --bin fcc -- -h`
+`./fcc.py -h`
 
-`fcc` is the cc-style front. `-E`, `-S`, `-c` stop where you'd expect;
+`fcc.py` is the cc-style front. `-E`, `-S`, `-c` stop where you'd expect;
 `-e` stops after `cc1` and leaves a `.ll`. Input files are routed by
 extension (`.c`, `.i`, `.ll`, `.s`, `.o`).
 

@@ -17,15 +17,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fcc"
-version = "0.1.0"
-dependencies = [
- "cc1",
- "cpp",
- "libft",
-]
-
-[[package]]
 name = "ft_lex"
 version = "0.1.0"
 dependencies = [
