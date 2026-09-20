@@ -6,7 +6,6 @@ Parsing is done with custom Rust versions of Lex and Yacc: `ft_lex` and `ft_yacc
 - Soon™ ISO/IEC 9899:1990 compliant
 - Targets i386
 - `fcc.py` compiler driver
-- `cpp` C PreProcessor (just `clang -E` for now)
 - `cc1` the compiler to LLVM IR
 - Lowering with `llc` and assembly with `ar`, linking with `clang`
 

@@ -1,7 +1,0 @@
-[package]
-name = "cpp"
-version.workspace = true
-edition.workspace = true
-
-[dependencies]
-libft.workspace = true

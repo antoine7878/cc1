@@ -34,10 +34,6 @@ impl LlvmSymbol {
         Self::ptr(LlvmName::Null)
     }
 
-    pub fn int(v: ConstValue) -> Self {
-        Self::new(LlvmType::int(), v.llvm())
-    }
-
     pub fn zero(qty: QualifiedType) -> Self {
         let sema = sema();
         if qty.is_pointer(sema) {

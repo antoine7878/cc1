@@ -9,8 +9,8 @@ C_Y = crates/cc1/src/parser/c.y
 LEX_RS =  crates/cc1/src/parser/lex.rs
 YACC_RS = crates/cc1/src/parser/yacc.rs
 
-all: $(LEX_RS) $(YACC_RS) ## build cc1 and cpp
-	cargo build -p cpp -p cc1
+all: $(LEX_RS) $(YACC_RS) ## build cc1
+	cargo build -p cc1
 
 $(FT_LEX) $(FT_YACC):
 	cargo build --release -p ft_lex -p ft_yacc
@@ -62,13 +62,10 @@ COV_SKIP = \
 	crates/cc1/src/ast/name.rs \
 	crates/cc1/src/ast/print.rs \
 	crates/cc1/src/parser/lex.rs \
-	crates/cc1/src/utils/table.rs \
 	crates/cc1/src/parser/yacc.rs \
 	crates/cc1/src/ast/display.rs \
-	crates/cc1/src/parser/span.rs \
 	crates/cc1/src/parser/driver.rs \
-	crates/cc1/src/ast/type_specifier.rs \
-	crates/cc1/src/semantic/diagnosis.rs
+	crates/cc1/src/ast/type_specifier.rs
 
 coverage: all ## run tests coverage report
 	cargo llvm-cov nextest --ignore-filename-regex '$(subst $(space),|,$(strip $(COV_SKIP)))'
@@ -82,4 +79,4 @@ re: clean all ## clean and rebuild
 help: ## show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: all clean re test ctest ttest ftest c cc coverage $(FT_LEX) $(FT_YACC) $(NAME) llvm
+.PHONY: all clean re test ctest ttest ftest c cc coverage $(FT_LEX) $(FT_YACC) llvm

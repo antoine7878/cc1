@@ -9,4 +9,3 @@ edition = "2024"
 [workspace.dependencies]
 libft = { path = "crates/libft" }
 cc1 = { path = "crates/cc1" }
-cpp = { path = "crates/cpp" }
