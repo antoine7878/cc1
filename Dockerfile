@@ -12,6 +12,7 @@ RUN dpkg --add-architecture i386 && \
     llvm \
     wget \
     make \
+    python3 \
     flex \
     curl \
     file \

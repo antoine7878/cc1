@@ -40,6 +40,10 @@ ctest: all ## run the cc1 test suite
 ttest: all ## run every test in the workspace
 	cargo nextest run
 
+pytest: all ## compile and run rscs/hello.c with fcc.py
+	./fcc.py ./rscs/hello.c -o ./rscs/a.out
+	./rscs/a.out || echo $$?
+
 # ----- reference --------------------
 
 CFF = -m32 -std=iso9899:1990 -pedantic-errors
@@ -63,7 +67,6 @@ COV_SKIP = \
 	crates/cc1/src/report.rs \
 	crates/cc1/src/ast/mod.rs \
 	crates/cc1/src/ast/name.rs \
-	crates/cc1/src/pipeline.rs \
 	crates/cc1/src/ast/print.rs \
 	crates/cc1/src/parser/lex.rs \
 	crates/cc1/src/utils/table.rs \
@@ -86,4 +89,4 @@ re: clean all ## clean and rebuild
 help: ## show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: all clean re test ctest ttest c cc coverage $(FT_LEX) $(FT_YACC) $(NAME) llvm
+.PHONY: all clean re test ctest ttest pytest c cc coverage $(FT_LEX) $(FT_YACC) $(NAME) llvm
