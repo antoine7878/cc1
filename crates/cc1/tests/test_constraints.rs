@@ -12,7 +12,6 @@ use cc1::semantic::constraints::types::{
     check_bit_width, check_complete_object, check_definition_return, check_element_type, check_member_type,
 };
 use cc1::semantic::{Diag, QualifiedType, ResolvedType, ScopeKind, Sema};
-use cc1::target::I386;
 use libft::Span;
 
 fn reported<T>(diag: &Diag<T>) -> String {
@@ -108,7 +107,7 @@ fn qualifiers_are_picked_out_of_the_specifier_list() {
 }
 
 fn width(ty: &ResolvedType, value: Option<ConstValue>) -> Diag<Option<i32>> {
-    check_bit_width(&I386, ty, value, None)
+    check_bit_width(ty, value, None)
 }
 
 #[test]
@@ -349,7 +348,7 @@ fn a_tentative_definition_is_not_typedef_auto_or_register() {
 }
 
 fn int_type() -> QualifiedType {
-    let sema = Sema::new(I386);
+    let sema = Sema::default();
     QualifiedType::new(sema.builtins.int, false, false)
 }
 

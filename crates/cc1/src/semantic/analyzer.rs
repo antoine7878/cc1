@@ -6,7 +6,7 @@ pub struct Analyzer;
 impl Analyzer {
     pub fn begin(ctx: Context) -> Sema {
         let ctx = install_context(ctx);
-        let mut sema = Sema::new(ctx.target.clone());
+        let mut sema = Sema::default();
         sema.size_tables(&ctx.arenas);
         sema
     }

@@ -1,10 +1,10 @@
 use std::fmt::{self};
 use std::iter::zip;
 
-use crate::ast::Tag;
+use crate::ast::{ConstValue, Tag};
 use crate::define_interner;
+use crate::semantic::layout::{self, Layout};
 use crate::semantic::{ParamTypes, Sema, TagDefId};
-use crate::target::Target;
 
 define_interner!(ResolvedType, ResolvedTypeInterner, ResolvedTypeId);
 
@@ -142,6 +142,61 @@ impl ResolvedType {
         )
     }
 
+    pub fn layout(&self) -> Option<Layout> {
+        let layout = match self {
+            ResolvedType::Char | ResolvedType::SignedChar | ResolvedType::UnsignedChar => layout::CHAR,
+            ResolvedType::Short | ResolvedType::UnsignedShort => layout::SHORT,
+            ResolvedType::Int | ResolvedType::UnsignedInt => layout::INT,
+            ResolvedType::Long | ResolvedType::UnsignedLong => layout::LONG,
+            ResolvedType::Float => layout::FLOAT,
+            ResolvedType::Double => layout::DOUBLE,
+            ResolvedType::LongDouble => layout::LONG_DOUBLE,
+            ResolvedType::Function { .. } | ResolvedType::Pointer(_) => layout::POINTER,
+            ResolvedType::Array { .. } | ResolvedType::Void | ResolvedType::Tag(_) => return None,
+        };
+        Some(layout)
+    }
+
+    pub fn bits(&self) -> Option<u32> {
+        self.layout().map(|l| l.size * layout::CHAR_BIT)
+    }
+
+    pub fn max_value(&self) -> Option<u64> {
+        if !self.is_integer() {
+            return None;
+        }
+        let bits = self.bits()?;
+        Some(if self.is_signed() { (1u64 << (bits - 1)) - 1 } else { (1u64 << bits) - 1 })
+    }
+
+    pub fn min_value(&self) -> Option<i64> {
+        if !self.is_integer() {
+            return None;
+        }
+        if !self.is_signed() {
+            return Some(0);
+        }
+        let bits = self.bits()?;
+        Some(-(1i64 << (bits - 1)))
+    }
+
+    pub fn cast(&self, val: ConstValue) -> Option<ConstValue> {
+        if !self.is_integer() {
+            return None;
+        }
+        let v = val.truncate(self.bits()?, self.is_signed());
+        Some(match self {
+            ResolvedType::Long => ConstValue::Long(v.to_i64()),
+            ResolvedType::UnsignedLong => ConstValue::UnsignedLong(v.to_u64()),
+            ResolvedType::UnsignedInt => ConstValue::UnsignedInt(v.to_u64() as u32),
+            _ => ConstValue::Int(v.to_i64() as i32),
+        })
+    }
+
+    pub fn fits(&self, value: u64) -> bool {
+        self.max_value().is_some_and(|max| value <= max)
+    }
+
     pub fn class(&self) -> Option<NumericClass> {
         if self.is_floating() {
             Some(NumericClass::Float)
@@ -176,7 +231,7 @@ pub struct Builtins {
 }
 
 impl Builtins {
-    pub fn new(types: &mut ResolvedTypeInterner, target: &Target) -> Self {
+    pub fn new(types: &mut ResolvedTypeInterner) -> Self {
         let v = types.intern(ResolvedType::Void);
         Self {
             void: types.intern(ResolvedType::Void),
@@ -192,8 +247,8 @@ impl Builtins {
             float: types.intern(ResolvedType::Float),
             double: types.intern(ResolvedType::Double),
             long_double: types.intern(ResolvedType::LongDouble),
-            ptrdiff_t: types.intern(target.ptrdiff_t.clone()),
-            size_t: types.intern(target.size_t.clone()),
+            ptrdiff_t: types.intern(ResolvedType::Int),
+            size_t: types.intern(ResolvedType::UnsignedInt),
             void_ptr: QualifiedType::plain(v),
         }
     }

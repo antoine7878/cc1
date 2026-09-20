@@ -55,10 +55,10 @@ fn operand(sema: &mut Sema, e: &ExpressionNode, sink: &mut VecSink) -> Result<Co
     let value = evaluate(sema, e, sink)?;
     let casted = sema.expressions.get(e.id).map(|re| re.casted_ty()).ok_or(Diagnostic::Poisoned)?;
     let ty = scalar_ty(sema, casted);
-    ConstFolder::new(&sema.target).convert(&ty, value).ok_or(Diagnostic::NonIntegerConstantExpression)
+    ConstFolder.convert(&ty, value).ok_or(Diagnostic::NonIntegerConstantExpression)
 }
 
-fn divisor(sema: &Sema, ty: &ResolvedType, lhs: ConstValue, rhs: ConstValue, op: BinaryOp) -> Result<(), Diagnostic> {
+fn divisor(ty: &ResolvedType, lhs: ConstValue, rhs: ConstValue, op: BinaryOp) -> Result<(), Diagnostic> {
     if rhs.is_zero() {
         return match op {
             BinaryOp::Div => Err(Diagnostic::DivisionByZero),
@@ -66,7 +66,7 @@ fn divisor(sema: &Sema, ty: &ResolvedType, lhs: ConstValue, rhs: ConstValue, op:
             _ => unreachable!(),
         };
     }
-    if rhs.to_i64() == -1 && ConstFolder::new(&sema.target).is_min(ty, lhs) {
+    if rhs.to_i64() == -1 && ConstFolder.is_min(ty, lhs) {
         return Err(Diagnostic::ConstantOverflow);
     }
     Ok(())
@@ -138,7 +138,7 @@ fn unary_op(
         UnaryOp::Minus | UnaryOp::BitNot => {
             let value = operand(sema, e, sink)?;
             let ty = scalar_ty(sema, node_ty(sema, expr)?);
-            let folded = ConstFolder::new(&sema.target).unary(&ty, op, value);
+            let folded = ConstFolder.unary(&ty, op, value);
             Ok(sink.add_diag(folded, &expr.span))
         }
         UnaryOp::LogicalNot => Ok(operand(sema, e, sink)?.logical_not()),
@@ -194,7 +194,7 @@ fn comparison(
 ) -> Result<ConstValue, Diagnostic> {
     let lhs = operand(sema, e1, sink)?;
     let rhs = operand(sema, e2, sink)?;
-    let ordering = ConstFolder::new(&sema.target).compare(lhs, rhs);
+    let ordering = ConstFolder.compare(lhs, rhs);
     let holds = match op {
         BinaryOp::Greater => matches!(ordering, Some(Ordering::Greater)),
         BinaryOp::Lower => matches!(ordering, Some(Ordering::Less)),
@@ -218,8 +218,8 @@ fn divide(
     let lhs = operand(sema, e1, sink)?;
     let rhs = operand(sema, e2, sink)?;
     let ty = scalar_ty(sema, node_ty(sema, expr)?);
-    divisor(sema, &ty, lhs, rhs, op)?;
-    Ok(ConstFolder::new(&sema.target).binary(&ty, op, lhs, rhs).res)
+    divisor(&ty, lhs, rhs, op)?;
+    Ok(ConstFolder.binary(&ty, op, lhs, rhs).res)
 }
 
 fn arithmetic(
@@ -233,7 +233,7 @@ fn arithmetic(
     let lhs = operand(sema, e1, sink)?;
     let rhs = operand(sema, e2, sink)?;
     let ty = scalar_ty(sema, node_ty(sema, expr)?);
-    let folded = ConstFolder::new(&sema.target).binary(&ty, op, lhs, rhs);
+    let folded = ConstFolder.binary(&ty, op, lhs, rhs);
     Ok(sink.add_diag(folded, &expr.span))
 }
 

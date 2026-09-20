@@ -2,7 +2,6 @@ use std::thread;
 
 use cc1::context::{Context, ctx, install_context};
 use cc1::semantic::{Sema, install_sema, sema};
-use cc1::target::I386;
 
 fn named(name: &str) -> Context {
     let mut ctx = Context::default();
@@ -39,7 +38,7 @@ fn installs_are_isolated_per_thread() {
 
 #[test]
 fn install_makes_the_sema_readable_through_sema() {
-    let mut s = Sema::new(I386);
+    let mut s = Sema::default();
     s.diagnostics.clear();
     let installed = install_sema(s);
     assert!(std::ptr::eq(installed, sema()));

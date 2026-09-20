@@ -1,7 +1,6 @@
 use crate::ast::{ConstValue, Name};
 use crate::semantic::diagnostic::{Diag, Diagnostic};
 use crate::semantic::{DeclaredParams, QualifiedType, ResolvedType};
-use crate::target::Target;
 
 /// 6.5.2.3 A type specifier of the form `enum identifier` without an enumerator list shall only
 /// appear after the type it specifies is complete.
@@ -49,7 +48,6 @@ pub fn check_element_type(is_object: bool, ty: QualifiedType) -> Diag<()> {
 }
 
 pub fn check_bit_width(
-    target: &Target,
     ty: &ResolvedType,
     value: Option<ConstValue>,
     name: Option<Name>,
@@ -64,7 +62,7 @@ pub fn check_bit_width(
     if value.is_negative() {
         return Diag::err(None, Diagnostic::NegativeBitFieldWidth(name, value.to_i64()));
     }
-    let Some(bits) = target.bits(ty) else {
+    let Some(bits) = ty.bits() else {
         return Diag::err(None, Diagnostic::NonIntBitFieldType);
     };
     if width > u64::from(bits) {

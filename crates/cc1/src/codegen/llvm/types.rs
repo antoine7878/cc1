@@ -2,8 +2,7 @@ use std::fmt;
 
 use crate::ast::{ConstValue, Tag};
 use crate::codegen::{ReturnAttr, classify_param};
-use crate::context::ctx;
-use crate::semantic::{QualifiedType, ResolvedType, ResolvedTypeId, TagDefId, sema};
+use crate::semantic::{QualifiedType, ResolvedType, ResolvedTypeId, TagDefId, layout, sema};
 
 impl ResolvedTypeId {
     pub fn llvm(&self) -> LlvmType {
@@ -23,7 +22,6 @@ pub enum LlvmType {
     I8,
     I16,
     I32,
-    I64,
     F32,
     F64,
     F80,
@@ -35,10 +33,6 @@ pub enum LlvmType {
 }
 
 impl LlvmType {
-    pub fn ptr_size() -> Self {
-        Self::integer(ctx().target.pointer.size)
-    }
-
     pub fn ptr() -> Self {
         LlvmType::Ptr
     }
@@ -52,11 +46,11 @@ impl LlvmType {
     }
 
     pub fn char() -> Self {
-        Self::integer(ctx().target.char.size)
+        Self::integer(layout::CHAR.size)
     }
 
     pub fn int() -> Self {
-        Self::integer(ctx().target.int.size)
+        Self::integer(layout::INT.size)
     }
 
     pub fn integer(i: u32) -> Self {
@@ -64,7 +58,6 @@ impl LlvmType {
             1 => Self::I8,
             2 => Self::I16,
             4 => Self::I32,
-            8 => Self::I64,
             _ => unimplemented!(),
         }
     }
@@ -73,7 +66,7 @@ impl LlvmType {
         match i {
             4 => Self::F32,
             8 => Self::F64,
-            12 | 16 => Self::F80,
+            12 => Self::F80,
             _ => unimplemented!(),
         }
     }
@@ -84,18 +77,16 @@ impl LlvmType {
             LlvmType::I8 => 1,
             LlvmType::I16 => 2,
             LlvmType::I32 => 4,
-            LlvmType::I64 => 8,
             LlvmType::F32 => 4,
             LlvmType::F64 => 8,
-            LlvmType::F80 => sema().target.long_double.size,
-            LlvmType::Ptr => sema().target.pointer.size,
+            LlvmType::F80 => 12,
+            LlvmType::Ptr | LlvmType::Function(_) => 4,
             LlvmType::Void => 0,
             LlvmType::Array(len, elem) => *len as u32 * elem.llvm().size(),
             LlvmType::Tag(id) => {
                 let ty = sema().types.lookup(&ResolvedType::Tag(*id)).expect("unregistered tag type");
                 sema().layout(&ty).size
             }
-            LlvmType::Function(_) => sema().target.pointer.size,
         }
     }
 
@@ -107,11 +98,11 @@ impl LlvmType {
 impl From<ConstValue> for LlvmType {
     fn from(value: ConstValue) -> Self {
         match value {
-            ConstValue::Int(_) | ConstValue::UnsignedInt(_) => LlvmType::integer(ctx().target.int.size),
-            ConstValue::Long(_) | ConstValue::UnsignedLong(_) => LlvmType::integer(ctx().target.long.size),
-            ConstValue::Float(_) => LlvmType::float(ctx().target.float.size),
-            ConstValue::Double(_) => LlvmType::float(ctx().target.double.size),
-            ConstValue::LongDouble(_) => LlvmType::float(ctx().target.long_double.size),
+            ConstValue::Int(_) | ConstValue::UnsignedInt(_) => LlvmType::integer(layout::INT.size),
+            ConstValue::Long(_) | ConstValue::UnsignedLong(_) => LlvmType::integer(layout::LONG.size),
+            ConstValue::Float(_) => LlvmType::float(layout::FLOAT.size),
+            ConstValue::Double(_) => LlvmType::float(layout::DOUBLE.size),
+            ConstValue::LongDouble(_) => LlvmType::float(layout::LONG_DOUBLE.size),
         }
     }
 }
@@ -147,7 +138,6 @@ impl fmt::Display for LlvmType {
             LlvmType::I8 => write!(f, "i8"),
             LlvmType::I16 => write!(f, "i16"),
             LlvmType::I32 => write!(f, "i32"),
-            LlvmType::I64 => write!(f, "i64"),
             LlvmType::F32 => write!(f, "float"),
             LlvmType::F64 => write!(f, "double"),
             LlvmType::F80 => write!(f, "x86_fp80"),

@@ -37,7 +37,7 @@ fn sizeof_result(sema: &Sema, ty: QualifiedType, is_bit_field: bool) -> ExprResu
 
 fn set_sizeof_constant(sema: &mut Sema, node: &ExpressionNode, ty: QualifiedType) {
     if let Some(layout) = layout::of(sema, ty.id)
-        && let Some(value) = sema.target.cast(&sema.target.size_t, ConstValue::UnsignedLong(layout.size.into()))
+        && let Some(value) = sema.builtins.size_t.resolve_with(sema).cast(ConstValue::UnsignedLong(layout.size.into()))
     {
         sema.expr_consts.set(node.id, Some(value));
     }

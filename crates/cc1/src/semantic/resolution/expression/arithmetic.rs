@@ -3,7 +3,7 @@ use libft::Span;
 use crate::ast::{BinaryOp, ConstValue, ExpressionNode};
 use crate::semantic::ValueCategory::RValue;
 use crate::semantic::resolution::expression::*;
-use crate::semantic::{Diag, Diagnostic, DiagnosticSink, ResolvedExpression, ResolvedType, Sema, cast, fold};
+use crate::semantic::{Diag, Diagnostic, DiagnosticSink, ResolvedExpression, ResolvedType, Sema, cast, fold, layout};
 
 pub fn multiplicative(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &ExpressionNode) -> ExprResult {
     with_converted(sema, [e1, e2], |sema, [lhs, rhs]| multiplicative_types(sema, op, lhs, rhs))
@@ -63,11 +63,11 @@ pub fn shift_types(
     cast::promote(sema, lhs);
     cast::promote(sema, rhs);
     let l = lhs.casted_ty().id.resolve_with(sema);
-    let l_layout = sema.target.layout(l).unwrap();
+    let l_layout = l.layout().unwrap();
     let Some(count) = count else { return Ok((lhs.casted_ty(), RValue)) };
     if count.is_negative() {
         sema.add_diag(Diag::err((), Diagnostic::ShiftCountNegative), span);
-    } else if count.is_greater_or_eq(l_layout.size * sema.target.byte_size) {
+    } else if count.is_greater_or_eq(l_layout.size * layout::CHAR_BIT) {
         sema.add_diag(Diag::err((), Diagnostic::ShiftCountOutOfRange), span);
     }
     Ok((lhs.casted_ty(), RValue))

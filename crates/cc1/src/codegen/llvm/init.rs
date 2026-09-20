@@ -24,14 +24,14 @@ impl<'a> LlvmInit<'a> {
         if rty.is_pointer() {
             return match value.is_zero() {
                 true => write!(f, "{}", LlvmSymbol::null()),
-                false => write!(f, "ptr inttoptr ({} to ptr)", LlvmSymbol::cst(LlvmType::ptr_size(), value)),
+                false => write!(f, "ptr inttoptr ({} to ptr)", LlvmSymbol::cst(LlvmType::int(), value)),
             };
         }
         let rty = match rty {
             ResolvedType::Tag(id) if id.resolve().is_enum() => &ResolvedType::Int,
             rty => rty,
         };
-        let value = ConstFolder::new(&sema().target).convert(rty, value).unwrap_or(value);
+        let value = ConstFolder.convert(rty, value).unwrap_or(value);
         write!(f, "{}", LlvmSymbol::cst(self.ty.llvm(), value))
     }
 
@@ -117,7 +117,7 @@ impl<'a> LlvmInit<'a> {
                 None | Some(Initializer::Zero) => 0,
                 Some(Initializer::Value(v)) => {
                     let rty = sym.resolve().ty.id.resolve();
-                    ConstFolder::new(&sema().target).convert(rty, *v).unwrap_or(*v).to_u64()
+                    ConstFolder.convert(rty, *v).unwrap_or(*v).to_u64()
                 }
                 _ => unreachable!("non-constant bit-field initializer"),
             };
@@ -172,7 +172,7 @@ struct LlvmAddress(AddressOffset);
 
 impl Display for LlvmAddress {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let offset = LlvmSymbol::cst(LlvmType::ptr_size(), ConstValue::Long(self.0.offset));
+        let offset = LlvmSymbol::cst(LlvmType::int(), ConstValue::Long(self.0.offset));
         let base = match self.0.base {
             AddressBase::Symbol(sym) => LlvmName::Global(sym),
             AddressBase::String(id) => LlvmName::StringLiteral(id),

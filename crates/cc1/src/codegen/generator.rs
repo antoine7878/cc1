@@ -133,7 +133,7 @@ impl<W: Write> Generator<W> {
 
 impl<W: Write> Visitor for Generator<W> {
     fn visit_translation_unit(&mut self, node: &TranslationUnitNode) {
-        self.builder.target(ctx().target.datalayout, ctx().target.triple);
+        self.builder.target();
         self.globals.collect(node);
         self.emit_globals();
 

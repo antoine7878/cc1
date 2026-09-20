@@ -4,7 +4,7 @@ A C90 compiler front end, written in Rust, that emits LLVM IR.
 Parsing is done with custom Rust versions of Lex and Yacc: `ft_lex` and `ft_yacc`
 
 - Soon™ ISO/IEC 9899:1990 compliant
-- Support targets i386 and x86_64
+- Targets i386
 - `fcc` compiler driver
 - `cpp` C PreProcessor (just `clang -E` for now)
 - `cc1` the compiler to LLVM IR

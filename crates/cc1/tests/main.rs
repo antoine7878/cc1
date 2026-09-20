@@ -23,7 +23,7 @@ mod test_semantic;
 mod test_side_table;
 mod test_statement;
 mod test_string;
-mod test_target;
+mod test_scalar;
 mod test_typing;
 mod test_uses;
 mod test_value;

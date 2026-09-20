@@ -4,7 +4,6 @@ use std::fmt;
 use crate::ast::{BinaryOp, F80, UnaryOp, escape};
 use crate::ast_node;
 use crate::semantic::{Diag, Diagnostic, QualifiedType, ResolvedType, Sema};
-use crate::target::Target;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ConstValue {
@@ -117,12 +116,12 @@ impl ConstValue {
         }
     }
 
-    fn parse_char(s: &str, target: &Target) -> Self {
+    fn parse_char(s: &str) -> Self {
         let prefix = if s.starts_with("L") { "L" } else { "" };
         let s = &s[(prefix.len() + 1)..(s.len() - 1)];
         let narrow = prefix.is_empty();
         let (value, count) = Self::char_sequence(s.as_bytes(), narrow);
-        if narrow && count == 1 && target.char_signed && value & 0x80 != 0 {
+        if narrow && count == 1 && ResolvedType::Char.is_signed() && value & 0x80 != 0 {
             ConstValue::Int((value | 0xffffff00) as i32)
         } else {
             ConstValue::Int(value as i32)
@@ -141,13 +140,13 @@ impl ConstValue {
         (value, count)
     }
 
-    fn parse_integer(s: &str, target: &Target) -> Diag<Self> {
+    fn parse_integer(s: &str) -> Diag<Self> {
         let s = s.to_lowercase();
         let (prefix, radix) = Self::get_radix(s.as_str());
         let suffix = Self::get_integer_suffix(s.as_str());
         let digits = &s[prefix.len()..(s.len() - suffix.len())];
         let value = Self::digits_value(digits, radix);
-        Self::integer_type(value, Self::integer_candidates(suffix, radix), target)
+        Self::integer_type(value, Self::integer_candidates(suffix, radix))
     }
 
     fn digits_value(digits: &str, radix: u32) -> u64 {
@@ -157,22 +156,22 @@ impl ConstValue {
         }
     }
 
-    fn integer_type(value: u64, candidates: &[ResolvedType], target: &Target) -> Diag<Self> {
-        let fitting = candidates.iter().find(|ty| target.fits(value, ty));
+    fn integer_type(value: u64, candidates: &[ResolvedType]) -> Diag<Self> {
+        let fitting = candidates.iter().find(|ty| ty.fits(value));
         let diagnostic = fitting.is_none().then_some(Diagnostic::IntegerConstantTooLarge);
         let ty = fitting.or_else(|| candidates.last()).expect("a non empty candidate list");
-        let value = target.cast(ty, ConstValue::UnsignedLong(value)).expect("an integer type");
+        let value = ty.cast(ConstValue::UnsignedLong(value)).expect("an integer type");
         Diag::new(value, diagnostic)
     }
 
-    pub fn parse(s: &str, target: &Target) -> Diag<Self> {
+    pub fn parse(s: &str) -> Diag<Self> {
         let lower = s.to_lowercase();
         if s.contains('\'') {
-            Diag::ok(Self::parse_char(s, target))
+            Diag::ok(Self::parse_char(s))
         } else if !lower.starts_with("0x") && (lower.contains('.') || lower.contains('e')) {
             Diag::ok(Self::parse_float(s))
         } else {
-            Self::parse_integer(s, target)
+            Self::parse_integer(s)
         }
     }
 }
@@ -269,9 +268,6 @@ impl ConstValue {
     }
 
     pub fn truncate(self, bits: u32, signed: bool) -> ConstValue {
-        if bits == 0 || bits >= 64 {
-            return if signed { ConstValue::Long(self.to_i64()) } else { ConstValue::UnsignedLong(self.to_u64()) };
-        }
         let mask = (1u64 << bits) - 1;
         let raw = if signed { self.to_i64() as u64 } else { self.to_u64() } & mask;
         if signed && raw & (1 << (bits - 1)) != 0 {
@@ -294,21 +290,15 @@ impl ConstValue {
     }
 }
 
-pub struct ConstFolder<'a> {
-    target: &'a Target,
-}
+pub struct ConstFolder;
 
-impl<'a> ConstFolder<'a> {
-    pub fn new(target: &'a Target) -> Self {
-        Self { target }
-    }
-
+impl ConstFolder {
     pub fn convert(&self, ty: &ResolvedType, value: ConstValue) -> Option<ConstValue> {
         match ty {
             ResolvedType::Float => Some(ConstValue::Float(value.to_f64() as f32)),
             ResolvedType::Double => Some(ConstValue::Double(value.to_f64())),
             ResolvedType::LongDouble => Some(ConstValue::LongDouble(value.to_f80())),
-            _ => self.target.cast(ty, value),
+            _ => ty.cast(value),
         }
     }
 
@@ -335,7 +325,7 @@ impl<'a> ConstFolder<'a> {
         if ty.is_floating() {
             return Diag::ok(self.floating(ty, op, lhs, rhs));
         }
-        if !self.target.is_signed(ty) {
+        if !ty.is_signed() {
             return Diag::ok(self.unsigned(ty, op, lhs, rhs));
         }
         self.signed(ty, op, lhs, rhs)
@@ -344,7 +334,7 @@ impl<'a> ConstFolder<'a> {
     fn floating(&self, ty: &ResolvedType, op: BinaryOp, lhs: ConstValue, rhs: ConstValue) -> ConstValue {
         use BinaryOp::{Add, Div, Mul, Sub};
 
-        if matches!(ty, ResolvedType::LongDouble) && self.target.long_double.size == 16 {
+        if matches!(ty, ResolvedType::LongDouble) {
             let (a, b) = (lhs.to_f80(), rhs.to_f80());
             return ConstValue::LongDouble(match op {
                 Add => a + b,
@@ -368,7 +358,7 @@ impl<'a> ConstFolder<'a> {
     fn unsigned(&self, ty: &ResolvedType, op: BinaryOp, lhs: ConstValue, rhs: ConstValue) -> ConstValue {
         use BinaryOp::{Add, BitAnd, BitOr, BitXor, Div, Mod, Mul, Sub};
 
-        let (a, b) = (u128::from(lhs.to_u64()), u128::from(rhs.to_u64()));
+        let (a, b) = (lhs.to_u64(), rhs.to_u64());
         let r = match op {
             Add => a.wrapping_add(b),
             Sub => a.wrapping_sub(b),
@@ -380,13 +370,13 @@ impl<'a> ConstFolder<'a> {
             BitXor => a ^ b,
             _ => unreachable!(),
         };
-        self.convert(ty, ConstValue::UnsignedLong(r as u64)).expect("an integer type")
+        self.convert(ty, ConstValue::UnsignedLong(r)).expect("an integer type")
     }
 
     fn signed(&self, ty: &ResolvedType, op: BinaryOp, lhs: ConstValue, rhs: ConstValue) -> Diag<ConstValue> {
         use BinaryOp::{Add, BitAnd, BitOr, BitXor, Div, Mod, Mul, Sub};
 
-        let (a, b) = (i128::from(lhs.to_i64()), i128::from(rhs.to_i64()));
+        let (a, b) = (lhs.to_i64(), rhs.to_i64());
         let r = match op {
             Add => a + b,
             Sub => a - b,
@@ -398,13 +388,13 @@ impl<'a> ConstFolder<'a> {
             BitXor => a ^ b,
             _ => unreachable!(),
         };
-        let value = self.convert(ty, ConstValue::Long(r as i64)).expect("an integer type");
+        let value = self.convert(ty, ConstValue::Long(r)).expect("an integer type");
         Diag::new(value, self.overflow(ty, op, r))
     }
 
-    fn overflow(&self, ty: &ResolvedType, op: BinaryOp, r: i128) -> Option<Diagnostic> {
-        let min = i128::from(self.target.min_value(ty).unwrap_or(i64::MIN));
-        let max = i128::from(self.target.max_value(ty).unwrap_or(i64::MAX as u64) as i64);
+    fn overflow(&self, ty: &ResolvedType, op: BinaryOp, r: i64) -> Option<Diagnostic> {
+        let min = ty.min_value().unwrap_or(i64::MIN);
+        let max = ty.max_value().unwrap_or(i64::MAX as u64) as i64;
         let out_of_range = matches!(op, BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul) && (r < min || r > max);
         out_of_range.then_some(Diagnostic::ArithmeticOverflow)
     }
@@ -453,6 +443,6 @@ impl<'a> ConstFolder<'a> {
     }
 
     pub fn is_min(&self, ty: &ResolvedType, value: ConstValue) -> bool {
-        self.target.is_signed(ty) && self.target.min_value(ty).is_some_and(|min| value.to_i64() == min)
+        ty.is_signed() && ty.min_value().is_some_and(|min| value.to_i64() == min)
     }
 }

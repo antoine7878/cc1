@@ -11,6 +11,11 @@ folded!(fold_comparison, "int main(void) { return 1 < 2; }", ["Int(1)"]);
 folded!(fold_to_result_type, "int main(void) { long l; l = 1 + 1L; return 0; }", ["Long(2)"]);
 folded!(fold_unsigned, "int main(void) { unsigned u; u = 1u + 2; return 0; }", ["UnsignedInt(3)"]);
 folded!(fold_floating, "int main(void) { double d; d = 1.5 + 2.5; return 0; }", ["Double(4.0)"]);
+folded!(
+    fold_long_double_at_x87_precision,
+    "int main(void) { return (9007199254740992.0L + 1.0L != 9007199254740992.0L) + 41; }",
+    ["LongDouble(9007199254740992.0)", "Int(1)", "Int(42)"]
+);
 folded!(fold_cast, "int main(void) { return (char)300; }", ["Int(44)"]);
 folded!(fold_enumerator, "enum E { A = 2 }; int main(void) { return A + 1; }", ["Int(2)", "Int(2)", "Int(3)"]);
 folded!(fold_ternary, "int main(void) { return 1 ? 2 : 3; }", ["Int(2)"]);

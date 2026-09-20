@@ -10,7 +10,6 @@ use cc1::semantic::{
     AddressBase, Analyzer, Diagnostic, DiagnosticNode, Initializer, ParamTypes, QualifiedType, ResolvedStatement,
     ResolvedType, Sema, SymbolKind, ValueCategory, install_sema,
 };
-use cc1::target::{I386, Target};
 
 use crate::common::types::Ty;
 
@@ -65,14 +64,10 @@ pub struct Unit {
     pub status: i32,
 }
 
-fn ctx_for(target: Target) -> Context {
-    let mut ctx = Context::with_target(target);
+fn new_ctx() -> Context {
+    let mut ctx = Context::default();
     ctx.set_file_name("<test>".to_string());
     ctx
-}
-
-fn new_ctx() -> Context {
-    ctx_for(I386)
 }
 
 impl Unit {
@@ -80,17 +75,13 @@ impl Unit {
         let src = preprocess(src);
         let (ctx, status) = parse_reader(new_ctx(), Cursor::new(src));
         let ctx = install_context(ctx);
-        let sema = install_sema(Sema::new(ctx.target.clone()));
+        let sema = install_sema(Sema::default());
         Self { ctx, sema, status }
     }
 
     pub fn compile(src: &str) -> Self {
-        Self::compile_for(I386, src)
-    }
-
-    pub fn compile_for(target: Target, src: &str) -> Self {
         let src = preprocess(src);
-        let (ctx, status) = parse_reader(ctx_for(target), Cursor::new(src));
+        let (ctx, status) = parse_reader(new_ctx(), Cursor::new(src));
         let sema = Analyzer::analyze(ctx);
         Self { ctx: context::ctx(), sema, status }
     }
@@ -445,7 +436,7 @@ impl Unit {
     }
 }
 
-/// Renders a folded/cast constant the same way for `test_target`, `test_value` and
+/// Renders a folded/cast constant the same way for `test_scalar`, `test_value` and
 /// `Unit::folded` — `None` for a value the target could not represent.
 pub fn repr(value: Option<ConstValue>) -> String {
     match value {

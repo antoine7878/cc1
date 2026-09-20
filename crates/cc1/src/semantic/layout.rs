@@ -1,6 +1,27 @@
 use crate::ast::Tag;
 use crate::semantic::{Member, ResolvedType, ResolvedTypeId, Sema, SymbolId, TagDefId};
-use crate::target::Layout;
+
+#[derive(Clone, Copy, Debug)]
+pub struct Layout {
+    pub size: u32,
+    pub align: u32,
+}
+
+impl Layout {
+    pub const fn new(size: u32, align: u32) -> Self {
+        Self { size, align }
+    }
+}
+
+pub const CHAR_BIT: u32 = 8;
+pub const CHAR: Layout = Layout::new(1, 1);
+pub const SHORT: Layout = Layout::new(2, 2);
+pub const INT: Layout = Layout::new(4, 4);
+pub const LONG: Layout = Layout::new(4, 4);
+pub const FLOAT: Layout = Layout::new(4, 4);
+pub const DOUBLE: Layout = Layout::new(8, 4);
+pub const LONG_DOUBLE: Layout = Layout::new(12, 4);
+pub const POINTER: Layout = Layout::new(4, 4);
 
 fn round_up(value: u64, multiple: u64) -> u64 {
     match value % multiple {
@@ -20,7 +41,7 @@ pub fn of(sema: &mut Sema, id: ResolvedTypeId) -> Option<Layout> {
             let elem = of(sema, elem.id)?;
             Layout::new(elem.size * len.unwrap_or(0) as u32, elem.align)
         }
-        ty => sema.target.layout(ty)?,
+        ty => ty.layout()?,
     };
     sema.layouts.insert(id, layout);
     Some(layout)
@@ -46,7 +67,7 @@ pub fn of_tag(sema: &mut Sema, id: TagDefId) -> Option<Layout> {
     let layout = match tag.kind {
         Tag::Struct => struct_layout(sema, &mut tag.members)?,
         Tag::Union => union_layout(sema, &mut tag.members)?,
-        Tag::Enum => return Some(sema.target.int),
+        Tag::Enum => return Some(INT),
     };
     sema.tags.get_mut(id).members = tag.members;
     Some(layout)

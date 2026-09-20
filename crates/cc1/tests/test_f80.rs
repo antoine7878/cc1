@@ -1,5 +1,4 @@
 use cc1::ast::{ConstValue, F80};
-use cc1::target::I386;
 
 #[test]
 fn f80_parses_decimal_constants() {
@@ -146,11 +145,11 @@ fn f80_orders_and_compares() {
 
 #[test]
 fn a_long_double_literal_reaches_value_as_f80() {
-    let ConstValue::LongDouble(v) = ConstValue::parse("3.3l", &I386).res else {
+    let ConstValue::LongDouble(v) = ConstValue::parse("3.3l").res else {
         panic!("expected a long double");
     };
     assert_eq!(format!("{v:X}"), "0xK4000D333333333333333");
-    assert_eq!(ConstValue::parse("1.0", &I386).res, ConstValue::Double(1.0));
+    assert_eq!(ConstValue::parse("1.0").res, ConstValue::Double(1.0));
 }
 
 // ---- special values ------------------------------------------------------

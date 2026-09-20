@@ -42,7 +42,7 @@ fn check_case(resolver: &mut Resolver, id: StatementId, expr: &ExpressionNode) -
     }
     let sema = &resolver.sema;
     let ty = sema.types.get(control.id);
-    let Some(value) = ConstFolder::new(&sema.target).convert(ty, value) else {
+    let Some(value) = ConstFolder.convert(ty, value) else {
         return Err(Diagnostic::Poisoned);
     };
     resolver.record_case(value, id)?;

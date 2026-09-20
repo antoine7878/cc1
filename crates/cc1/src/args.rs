@@ -7,12 +7,10 @@ use libft::{ArgError, ArgParser, Span, argv};
 
 use crate::context::Context;
 use crate::semantic::{Diagnostic, DiagnosticNode};
-use crate::target::{I386, Target, X86_64};
 
 #[derive(Debug)]
 pub struct Args {
     pub infiles: Vec<String>,
-    pub target: Target,
     pub outfile: Option<String>,
     argv: vec::IntoIter<String>,
 }
@@ -30,7 +28,6 @@ impl ArgParser for Args {
 
     fn flag(&mut self, c: char, it: &mut Chars) -> Result<(), ArgError> {
         match c {
-            'm' => self.target = machine(&self.value::<String>(it, 'm')?)?,
             'o' => self.outfile = self.value(it, 'o')?,
             'h' => Self::help(),
             c => return Err(ArgError::UnknownOption(c)),
@@ -41,7 +38,7 @@ impl ArgParser for Args {
 
 impl Default for Args {
     fn default() -> Self {
-        Self { infiles: Vec::default(), target: X86_64, outfile: None, argv: argv() }
+        Self { infiles: Vec::default(), outfile: None, argv: argv() }
     }
 }
 
@@ -61,25 +58,14 @@ impl Args {
     }
 
     pub fn help() {
-        println!("usage: cc1 [-m32|-m64] file");
-        println!("-m32      generate code for i386");
-        println!("-m64      generate code for x86_64 (default)");
+        println!("usage: cc1 file");
         exit(0);
-    }
-}
-
-fn machine(value: &str) -> Result<Target, ArgError> {
-    match value {
-        "32" => Ok(I386),
-        "64" => Ok(X86_64),
-        _ => Err(ArgError::WrongValue('m', value.to_string())),
     }
 }
 
 pub fn parse_args(mut ctx: Context) -> Context {
     match Args::parse() {
         Ok(mut args) => {
-            ctx.set_target(args.target);
             ctx.set_file_name(args.infiles.swap_remove(0));
         }
         Err(error) => {

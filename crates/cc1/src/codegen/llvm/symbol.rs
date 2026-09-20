@@ -16,7 +16,7 @@ impl LlvmSymbol {
     }
 
     pub fn idx(idx: u64) -> Self {
-        Self { name: ConstValue::UnsignedLong(idx).llvm(), ty: LlvmType::ptr_size() }
+        Self { name: ConstValue::UnsignedLong(idx).llvm(), ty: LlvmType::int() }
     }
 
     pub fn ptr(name: LlvmName) -> Self {

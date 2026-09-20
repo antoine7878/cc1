@@ -6,7 +6,7 @@ use crate::ast::{self};
 use crate::semantic::ValueCategory::RValue;
 use crate::semantic::{
     Diag, Diagnostic, DiagnosticSink, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId, Sema,
-    ValueCategory,
+    ValueCategory, layout,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -79,7 +79,7 @@ pub fn promote(sema: &Sema, re: &mut ResolvedExpression) {
         | ResolvedType::UnsignedChar
         | ResolvedType::Short
         | ResolvedType::UnsignedShort => (),
-        ResolvedType::UnsignedInt if re.bit_width.is_some_and(|w| w < (sema.target.int.size * 8) as i32) => (),
+        ResolvedType::UnsignedInt if re.bit_width.is_some_and(|w| w < (layout::INT.size * layout::CHAR_BIT) as i32) => (),
         &ResolvedType::Tag(id) if id.resolve_with(sema).kind == ast::Tag::Enum => (),
         _ => return,
     }
@@ -161,9 +161,6 @@ pub fn usual_arithmetic(
         (R::Double, _) | (_, R::Double) => sema.builtins.double,
         (R::Float, _) | (_, R::Float) => sema.builtins.float,
         (_, R::UnsignedLong) | (R::UnsignedLong, _) => sema.builtins.unsigned_long,
-        (R::UnsignedInt, R::Long) | (R::Long, R::UnsignedInt) if sema.target.long.size > sema.target.int.size => {
-            sema.builtins.long
-        }
         (R::UnsignedInt, R::Long) | (R::Long, R::UnsignedInt) => sema.builtins.unsigned_long,
         (_, R::Long) | (R::Long, _) => sema.builtins.long,
         (_, R::UnsignedInt) | (R::UnsignedInt, _) => sema.builtins.unsigned_int,

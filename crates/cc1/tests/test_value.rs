@@ -2,7 +2,6 @@ use std::cmp::Ordering;
 
 use cc1::ast::{BinaryOp, ConstFolder, ConstValue, F80, UnaryOp};
 use cc1::semantic::{Diag, Diagnostic, ResolvedType};
-use cc1::target::{I386, X86_64};
 
 trait FoldValue {
     fn fold_value(self) -> ConstValue;
@@ -34,7 +33,7 @@ macro_rules! fold {
     ($name:ident, $method:ident($($arg:expr),* $(,)?), $expected:expr) => {
         #[test]
         fn $name() {
-            let fold = ConstFolder::new(&I386);
+            let fold = ConstFolder;
             assert_eq!(
                 repr(fold.$method($($arg),*)),
                 $expected,
@@ -47,7 +46,7 @@ macro_rules! fold {
         #[test]
         #[ignore = $reason]
         fn $name() {
-            let fold = ConstFolder::new(&I386);
+            let fold = ConstFolder;
             assert_eq!(
                 repr(fold.$method($($arg),*)),
                 $expected,
@@ -62,7 +61,7 @@ macro_rules! fold_overflow {
     ($name:ident, $method:ident($($arg:expr),* $(,)?), $expected:expr) => {
         #[test]
         fn $name() {
-            let Diag { res, diagnostic } = ConstFolder::new(&I386).$method($($arg),*);
+            let Diag { res, diagnostic } = ConstFolder.$method($($arg),*);
             assert_eq!(repr(res), $expected, "{}", stringify!($method($($arg),*)));
             assert!(
                 matches!(diagnostic, Some(Diagnostic::ArithmeticOverflow)),
@@ -203,35 +202,6 @@ fold!(convert_to_double, convert(&ResolvedType::Double, ConstValue::Int(3)), "Do
 fold!(convert_from_double_truncates, convert(&ResolvedType::Int, ConstValue::Double(3.9)), "Int(3)");
 
 #[test]
-fn a_wider_target_keeps_the_whole_value() {
-    let fold = ConstFolder::new(&X86_64);
-    assert_eq!(repr(fold.convert(&ResolvedType::Long, ConstValue::UnsignedLong(4294967296))), "Long(4294967296)");
-    assert_eq!(
-        repr(fold.convert(&ResolvedType::UnsignedLong, ConstValue::Int(-1))),
-        "UnsignedLong(18446744073709551615)"
-    );
-}
-
-#[test]
-fn unsigned_int_and_long_meet_at_long_on_x86_64() {
-    let fold = ConstFolder::new(&X86_64);
-    assert_eq!(
-        repr(fold.binary(&ResolvedType::Long, BinaryOp::Add, ConstValue::UnsignedInt(1), ConstValue::Long(-1))),
-        "Long(0)"
-    );
-}
-
-#[test]
-fn truncate_carries_the_value_at_full_width() {
-    assert_eq!(repr(ConstValue::Int(200).truncate(8, true)), "Long(-56)");
-    assert_eq!(repr(ConstValue::Int(200).truncate(8, false)), "Long(200)");
-    assert_eq!(repr(ConstValue::Int(-1).truncate(16, false)), "Long(65535)");
-    assert_eq!(repr(ConstValue::Int(5).truncate(64, true)), "Long(5)");
-    assert_eq!(repr(ConstValue::Int(-1).truncate(64, false)), "UnsignedLong(18446744073709551615)");
-    assert_eq!(repr(ConstValue::Int(-1).truncate(0, false)), "UnsignedLong(18446744073709551615)");
-}
-
-#[test]
 fn logical_not_tests_against_zero() {
     assert_eq!(repr(ConstValue::Int(0).logical_not()), "Int(1)");
     assert_eq!(repr(ConstValue::Int(42).logical_not()), "Int(0)");
@@ -279,7 +249,7 @@ fn to_i64_and_to_u64_reinterpret() {
 
 #[test]
 fn equality_compares_same_type_operands() {
-    let fold = ConstFolder::new(&I386);
+    let fold = ConstFolder;
     assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(1)), Some(Ordering::Equal)));
     assert!(matches!(fold.compare(ConstValue::Double(1.0), ConstValue::Double(1.0)), Some(Ordering::Equal)));
     assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(2)), Some(Ordering::Less | Ordering::Greater)));
@@ -287,7 +257,7 @@ fn equality_compares_same_type_operands() {
 
 #[test]
 fn ordering_compares_same_type_operands() {
-    let fold = ConstFolder::new(&I386);
+    let fold = ConstFolder;
     assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(2)), Some(Ordering::Less)));
     assert!(matches!(fold.compare(ConstValue::Double(1.0), ConstValue::Double(1.5)), Some(Ordering::Less)));
     assert!(matches!(fold.compare(ConstValue::UnsignedInt(1), ConstValue::UnsignedInt(0)), Some(Ordering::Greater)));
@@ -298,7 +268,7 @@ fn ordering_compares_same_type_operands() {
 
 #[test]
 fn every_operator_folds_in_sequence() {
-    let fold = ConstFolder::new(&I386);
+    let fold = ConstFolder;
     let ty = ResolvedType::Int;
     let steps = [
         (BinaryOp::Add, 2, "Int(3)"),
@@ -352,18 +322,10 @@ fold!(
 
 // 6.2.1.5 the width of the result is the target's: long is 32 bits on i386.
 fold_overflow!(
-    long_add_wraps_at_the_width_of_the_target,
+    long_add_wraps_at_32_bits,
     binary(&ResolvedType::Long, BinaryOp::Add, ConstValue::Long(2147483647), ConstValue::Long(1)),
     "Long(-2147483648)"
 );
-
-#[test]
-fn the_same_addition_fits_a_64_bit_long() {
-    let fold = ConstFolder::new(&X86_64);
-    let folded = fold.binary(&ResolvedType::Long, BinaryOp::Add, ConstValue::Long(2147483647), ConstValue::Long(1));
-    assert_eq!(repr(folded.res), "Long(2147483648)");
-    assert!(folded.diagnostic.is_none(), "{:?}", folded.diagnostic);
-}
 
 fold!(
     double_sub,
@@ -418,14 +380,14 @@ fold!(convert_to_float_rounds, convert(&ResolvedType::Float, ConstValue::Double(
 
 #[test]
 fn convert_rejects_a_type_that_holds_no_value() {
-    let fold = ConstFolder::new(&I386);
+    let fold = ConstFolder;
     assert_eq!(fold.convert(&ResolvedType::Void, ConstValue::Int(1)), None);
 }
 
 // 6.2.1.5 the operands of a comparison reach the fold already converted to a common type.
 #[test]
 fn comparing_unconverted_operands_yields_no_ordering() {
-    let fold = ConstFolder::new(&I386);
+    let fold = ConstFolder;
     assert_eq!(fold.compare(ConstValue::Int(1), ConstValue::Double(1.0)), None);
 }
 
@@ -433,7 +395,7 @@ fn comparing_unconverted_operands_yields_no_ordering() {
 // a division or a bitwise operator never reports an overflow.
 #[test]
 fn only_additive_and_multiplicative_results_report_an_overflow() {
-    let fold = ConstFolder::new(&I386);
+    let fold = ConstFolder;
     for (op, lhs, rhs) in [
         (BinaryOp::Div, ConstValue::Int(i32::MIN), ConstValue::Int(-1)),
         (BinaryOp::Left, ConstValue::Int(1), ConstValue::Int(31)),
@@ -474,13 +436,6 @@ fold!(
     "Long(-2147483648)"
 );
 
-#[test]
-fn the_same_shift_keeps_its_value_in_a_64_bit_long() {
-    let fold = ConstFolder::new(&X86_64);
-    let shifted = fold.binary(&ResolvedType::Long, BinaryOp::Left, ConstValue::Long(1), ConstValue::Int(31));
-    assert_eq!(repr(shifted.res), "Long(2147483648)");
-}
-
 // 6.3.3.3 The result of the ~ operator is the bitwise complement of its promoted operand, taken
 // at the width the target gives that type.
 fold!(
@@ -488,13 +443,6 @@ fold!(
     unary(&ResolvedType::UnsignedLong, UnaryOp::BitNot, ConstValue::UnsignedLong(0)),
     "UnsignedLong(4294967295)"
 );
-
-#[test]
-fn the_same_complement_fills_a_64_bit_unsigned_long() {
-    let fold = ConstFolder::new(&X86_64);
-    let value = fold.unary(&ResolvedType::UnsignedLong, UnaryOp::BitNot, ConstValue::UnsignedLong(0));
-    assert_eq!(repr(value.res), "UnsignedLong(18446744073709551615)");
-}
 
 fold!(
     double_div,
@@ -518,7 +466,7 @@ fold!(convert_an_unsigned_long_to_double, convert(&ResolvedType::Double, ConstVa
 
 #[test]
 fn compare_orders_every_representation() {
-    let fold = ConstFolder::new(&I386);
+    let fold = ConstFolder;
     assert_eq!(fold.compare(ConstValue::UnsignedLong(1), ConstValue::UnsignedLong(2)), Some(Ordering::Less));
     assert_eq!(fold.compare(ConstValue::Float(1.0), ConstValue::Float(2.0)), Some(Ordering::Less));
     assert_eq!(
@@ -572,7 +520,7 @@ fn a_floating_value_reinterprets_as_an_integer_by_truncation() {
 
 #[test]
 fn the_minimum_of_a_signed_type_is_recognised() {
-    let fold = ConstFolder::new(&I386);
+    let fold = ConstFolder;
     assert!(fold.is_min(&ResolvedType::Int, ConstValue::Int(i32::MIN)));
     assert!(fold.is_min(&ResolvedType::Long, ConstValue::Long(-2147483648)));
     assert!(!fold.is_min(&ResolvedType::Int, ConstValue::Int(0)));
@@ -581,14 +529,12 @@ fn the_minimum_of_a_signed_type_is_recognised() {
 }
 
 #[test]
-fn long_double_literals_round_to_the_target_format() {
-    assert_ne!(ConstValue::parse("0.1l", &X86_64).res, ConstValue::LongDouble(F80::from(0.1)));
-    assert_eq!(ConstValue::parse("0.1l", &X86_64).res, ConstValue::LongDouble(F80::from("0.1")));
+fn long_double_literals_round_to_the_x87_format() {
+    assert_ne!(ConstValue::parse("0.1l").res, ConstValue::LongDouble(F80::from(0.1)));
+    assert_eq!(ConstValue::parse("0.1l").res, ConstValue::LongDouble(F80::from("0.1")));
 }
 
 #[test]
-fn an_exact_long_double_literal_is_the_same_on_every_target() {
-    for target in [&I386, &X86_64] {
-        assert_eq!(ConstValue::parse("1.5l", target).res, ConstValue::LongDouble(F80::from(1.5)));
-    }
+fn an_exact_long_double_literal_is_the_double_widened() {
+    assert_eq!(ConstValue::parse("1.5l").res, ConstValue::LongDouble(F80::from(1.5)));
 }

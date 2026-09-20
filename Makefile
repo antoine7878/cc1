@@ -26,12 +26,12 @@ $(YACC_RS): $(C_Y)
 
 test: all llvm ## emit LLVM IR for rscs/hello.c to stdout
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
-	cargo run --bin fcc -- -m32 -e ./rscs/hello.c -o /dev/stdout
+	cargo run --bin fcc -- -e ./rscs/hello.c -o /dev/stdout
 	@# ./a.out || echo $$?
 
 ftest: all cc  ## compile and run rscs/hello.c with fcc
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
-	cargo run --bin fcc -- -m32 ./rscs/hello.c -o ./rscs/a.out
+	cargo run --bin fcc -- ./rscs/hello.c -o ./rscs/a.out
 	./rscs/a.out || echo $$?
 
 ctest: all ## run the cc1 test suite
@@ -52,9 +52,8 @@ cc: ## compile and run rscs/hello.c with gcc
 	./a.out || echo $$?
 	rm ./a.out
 
-llvm: ## emit reference LLVM IR (32/64-bit) for rscs/hello.c with clang -O0
-	clang $(CFF) -O0 -S -m64 -emit-llvm rscs/hello.c -o ./rscs/hello_64.ll
-	clang $(CFF) -O0 -S -m32 -emit-llvm rscs/hello.c -o ./rscs/hello_32.ll
+llvm: ## emit reference LLVM IR for rscs/hello.c with clang -O0
+	clang $(CFF) -O0 -S -emit-llvm rscs/hello.c -o ./rscs/hello.ll
 
 empty :=
 space := $(empty) $(empty)

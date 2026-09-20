@@ -1,7 +1,6 @@
 use cc1::ast::Tag;
 use cc1::semantic::model::cast::{promote, usual_arithmetic};
 use cc1::semantic::{CastKind, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId, Sema, ValueCategory};
-use cc1::target::I386;
 
 fn rvalue(ty: ResolvedTypeId) -> ResolvedExpression {
     ResolvedExpression::new(QualifiedType::new(ty, false, false), ValueCategory::RValue)
@@ -38,7 +37,7 @@ fn convert(
 
 #[test]
 fn long_double_dominates() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let (to, l, r) = convert(&mut sema, b.int, b.long_double);
     assert_eq!(to, b.long_double);
@@ -49,7 +48,7 @@ fn long_double_dominates() {
 // gcc: sizeof(i + 2.0) == 8
 #[test]
 fn integer_and_double_meet_at_double() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let (to, l, r) = convert(&mut sema, b.int, b.double);
     assert_eq!(to, b.double);
@@ -60,7 +59,7 @@ fn integer_and_double_meet_at_double() {
 // gcc: sizeof(i + f) == 4
 #[test]
 fn integer_and_float_meet_at_float() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let (to, l, r) = convert(&mut sema, b.float, b.int);
     assert_eq!(to, b.float);
@@ -71,7 +70,7 @@ fn integer_and_float_meet_at_float() {
 // gcc: sizeof((float)1 + (double)1) == 8
 #[test]
 fn float_and_double_meet_at_double() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let (to, l, r) = convert(&mut sema, b.float, b.double);
     assert_eq!(to, b.double);
@@ -84,7 +83,7 @@ fn float_and_double_meet_at_double() {
 // gcc: sizeof((char)1 + (char)1) == 4
 #[test]
 fn narrow_operands_of_the_same_type_are_still_promoted() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let (to, l, r) = convert(&mut sema, b.char, b.char);
     assert_eq!(to, b.int);
@@ -95,7 +94,7 @@ fn narrow_operands_of_the_same_type_are_still_promoted() {
 // gcc: sizeof((char)1 + (short)1) == 4
 #[test]
 fn promotion_alone_reaches_the_common_type() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let (to, l, r) = convert(&mut sema, b.char, b.short);
     assert_eq!(to, b.int);
@@ -106,7 +105,7 @@ fn promotion_alone_reaches_the_common_type() {
 // A floating operand suppresses the promotions: char converts straight to double.
 #[test]
 fn a_floating_operand_suppresses_the_promotions() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let (to, l, r) = convert(&mut sema, b.char, b.double);
     assert_eq!(to, b.double);
@@ -119,7 +118,7 @@ fn a_floating_operand_suppresses_the_promotions() {
 // gcc: sizeof((enum E)0 + 0) == 4, and `enum E { A = -1 }` promotes to a signed int.
 #[test]
 fn an_enumerated_operand_is_promoted_to_int() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let e = enum_type(&mut sema);
     let (to, l, r) = convert(&mut sema, e, b.int);
@@ -130,7 +129,7 @@ fn an_enumerated_operand_is_promoted_to_int() {
 
 #[test]
 fn an_enumerated_operand_converts_as_an_integer_not_a_float() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let e = enum_type(&mut sema);
     let (to, l, r) = convert(&mut sema, e, b.long);
@@ -141,7 +140,7 @@ fn an_enumerated_operand_converts_as_an_integer_not_a_float() {
 
 #[test]
 fn int_promote_promotes_an_enumerated_type() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let e = enum_type(&mut sema);
     let mut re = rvalue(e);
@@ -154,7 +153,7 @@ fn int_promote_promotes_an_enumerated_type() {
 
 #[test]
 fn unsigned_long_dominates_the_integer_ladder() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let (to, l, r) = convert(&mut sema, b.int, b.unsigned_long);
     assert_eq!(to, b.unsigned_long);
@@ -167,9 +166,9 @@ fn unsigned_long_dominates_the_integer_ladder() {
 // gcc: ((long)-1 + (unsigned int)0) > 0
 #[test]
 fn unsigned_int_and_long_meet_at_unsigned_long_on_i386() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
-    assert_eq!(sema.target.long.size, sema.target.int.size);
+    assert_eq!(ResolvedType::Long.bits(), ResolvedType::Int.bits());
     let (to, l, r) = convert(&mut sema, b.unsigned_int, b.long);
     assert_eq!(to, b.unsigned_long);
     assert_eq!(l, vec![CastKind::IntegerConversion]);
@@ -178,7 +177,7 @@ fn unsigned_int_and_long_meet_at_unsigned_long_on_i386() {
 
 #[test]
 fn int_and_long_meet_at_long() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let (to, l, r) = convert(&mut sema, b.int, b.long);
     assert_eq!(to, b.long);
@@ -188,7 +187,7 @@ fn int_and_long_meet_at_long() {
 
 #[test]
 fn int_and_unsigned_int_meet_at_unsigned_int() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let (to, l, r) = convert(&mut sema, b.int, b.unsigned_int);
     assert_eq!(to, b.unsigned_int);
@@ -200,7 +199,7 @@ fn int_and_unsigned_int_meet_at_unsigned_int() {
 
 #[test]
 fn operands_of_the_same_type_are_not_converted() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let (to, l, r) = convert(&mut sema, b.long, b.long);
     assert_eq!(to, b.long);
@@ -212,7 +211,7 @@ fn operands_of_the_same_type_are_not_converted() {
 
 #[test]
 fn a_non_arithmetic_operand_is_left_alone() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let s = struct_type(&mut sema);
     let (mut lhs, mut rhs) = (rvalue(s), rvalue(b.int));
@@ -223,7 +222,7 @@ fn a_non_arithmetic_operand_is_left_alone() {
 
 #[test]
 fn a_pointer_operand_is_left_alone() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let b = sema.builtins;
     let p = sema.types.pointer(QualifiedType::new(b.int, false, false));
     let (mut lhs, mut rhs) = (rvalue(p), rvalue(b.int));
@@ -236,7 +235,7 @@ fn a_pointer_operand_is_left_alone() {
 
 #[test]
 fn an_enumerated_type_is_integral_and_arithmetic_but_not_an_integer() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let e = enum_type(&mut sema);
     let ty = sema.types.get(e);
     assert!(ty.is_integral(&sema));
@@ -247,7 +246,7 @@ fn an_enumerated_type_is_integral_and_arithmetic_but_not_an_integer() {
 
 #[test]
 fn a_struct_type_is_neither_integral_nor_arithmetic() {
-    let mut sema = Sema::new(I386);
+    let mut sema = Sema::default();
     let s = struct_type(&mut sema);
     let ty = sema.types.get(s);
     assert!(!ty.is_integral(&sema));
@@ -256,7 +255,7 @@ fn a_struct_type_is_neither_integral_nor_arithmetic() {
 
 #[test]
 fn the_basic_types_keep_their_classification() {
-    let sema = Sema::new(I386);
+    let sema = Sema::default();
     assert!(ResolvedType::Char.is_integral(&sema));
     assert!(ResolvedType::UnsignedLong.is_integral(&sema));
     assert!(!ResolvedType::Double.is_integral(&sema));

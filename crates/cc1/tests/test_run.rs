@@ -176,6 +176,11 @@ exits!(global_long, "long g = -100000L; int main(void) { return -(g / 2500) + 2;
 exits!(global_double_from_int, "double g = 2; int main(void) { return g * 21; }", 42);
 exits!(global_float, "float g = 1.5; int main(void) { return g * 28; }", 42);
 exits!(global_long_double, "long double g = 0.5; int main(void) { return g * 84; }", 42);
+exits!(
+    long_double_folds_at_x87_precision,
+    "int main(void) { return (9007199254740992.0L + 1.0L != 9007199254740992.0L) + 41; }",
+    42
+);
 exits!(global_negative, "int g = -42; int main(void) { return -g; }", 42);
 exits!(global_const, "const int g = 42; int main(void) { return g; }", 42);
 exits!(global_enum, "enum e { A = 40, B }; enum e g = B; int main(void) { return g + 1; }", 42);

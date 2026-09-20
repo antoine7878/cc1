@@ -101,8 +101,8 @@ fn tap_observes_the_context_without_stopping_it() {
     assert!(!stopped);
 }
 
-fn to_sema(ctx: Context) -> Sema {
-    Sema::new(ctx.target.clone())
+fn to_sema(_: Context) -> Sema {
+    Sema::default()
 }
 
 fn to_unit(_: Sema) {}

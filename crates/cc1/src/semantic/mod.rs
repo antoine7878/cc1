@@ -11,6 +11,7 @@ pub use analyzer::Analyzer;
 pub use declaration::FunctionHeader;
 pub use diagnostic::{Diag, Diagnostic, DiagnosticNode, DiagnosticSink, ExpectedTokens};
 pub use eval::fold;
+pub use layout::Layout;
 pub use model::*;
 pub use resolution::scope::{ScopeKind, StatementScope, StatementScopes, SymbolScopes};
 pub use resolution::{Resolver, declaration, finish_externals, mark_uses};

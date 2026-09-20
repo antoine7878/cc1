@@ -6,7 +6,6 @@ use crate::codegen::{
     BitField, Generator, Invariant, LlvmOperator, LlvmParam, LlvmSymbol, LlvmType, ParamAttr, ReturnAttr,
     classify_param,
 };
-use crate::context::ctx;
 use crate::semantic::{
     CastKind, Diagnostic, ImplicitCast, QualifiedType, ResolvedExpression, ResolvedType, ResolvedTypeId, ValueCategory,
     sema,
@@ -28,7 +27,7 @@ impl<W: Write> Generator<W> {
         if value.is_zero() {
             return LlvmSymbol::null();
         }
-        self.builder.convert("inttoptr", LlvmSymbol::cst(LlvmType::ptr_size(), value), qty.llvm())
+        self.builder.convert("inttoptr", LlvmSymbol::cst(LlvmType::int(), value), qty.llvm())
     }
 
     fn apply_casts(&mut self, mut s: LlvmSymbol, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
@@ -100,8 +99,8 @@ impl<W: Write> Generator<W> {
     }
 
     fn i_to_p(&mut self, v: &mut LlvmSymbol, from: QualifiedType) -> Option<&'static str> {
-        if let Some(ext) = Self::i_to_i_size(from, ctx().target.pointer.size) {
-            *v = self.builder.convert(ext, *v, LlvmType::ptr_size());
+        if let Some(ext) = Self::i_to_i_size(from, LlvmType::int().size()) {
+            *v = self.builder.convert(ext, *v, LlvmType::int());
         }
         Some("inttoptr")
     }
@@ -282,8 +281,8 @@ impl<W: Write> Generator<W> {
         ty: QualifiedType,
     ) -> Result<LlvmSymbol, Diagnostic> {
         let elem = ty.id.resolve().pointee().invariant("pointer difference on non-pointer")?;
-        let a = self.builder.convert("ptrtoint", v1, LlvmType::ptr_size());
-        let b = self.builder.convert("ptrtoint", v2, LlvmType::ptr_size());
+        let a = self.builder.convert("ptrtoint", v1, LlvmType::int());
+        let b = self.builder.convert("ptrtoint", v2, LlvmType::int());
         let d = self.builder.binop("sub", a, b);
         let size = sema().layout(&elem.id).size;
         if size == 1 {
@@ -504,7 +503,7 @@ impl<W: Write> Generator<W> {
         let ResolvedType::Tag(tag_id) = ty.resolve() else { unreachable!() };
         let tagdef = tag_id.resolve();
         let member_idx = sema().member_refs[node.id].index;
-        let idx = LlvmSymbol::cst(LlvmType::ptr_size(), ConstValue::Long(tagdef.members[member_idx].offset as i64));
+        let idx = LlvmSymbol::cst(LlvmType::int(), ConstValue::Long(tagdef.members[member_idx].offset as i64));
         Ok(self.builder.gep(LlvmType::I8, base, idx))
     }
 

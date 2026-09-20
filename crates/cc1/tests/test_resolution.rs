@@ -61,7 +61,7 @@ folds!(fold_array_size, "int a[2 + 3];", ["Int(5)"]);
 folds!(fold_logical_short_circuits, "enum E { A = 1 || 1 / 0, B = 0 && 1 / 0 };", ["Int(1)", "Int(0)"]);
 folds!(fold_cast_of_a_floating_constant, "enum E { A = (int)1.5 };", ["Int(1)"]);
 // gcc: `1L << 31` is -2147483648 on i386, where a long is 32 bits, so it fits an enum enumerator.
-folds!(fold_long_shift_narrows_to_the_target_width, "enum E { A = 1L << 31 };", ["Long(-2147483648)"]);
+folds!(fold_long_shift_narrows_to_32_bits, "enum E { A = 1L << 31 };", ["Long(-2147483648)"]);
 
 #[test]
 fn fold_sizeof_of_a_pointer_type() {

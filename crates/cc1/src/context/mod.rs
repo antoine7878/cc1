@@ -10,7 +10,6 @@ use crate::ast::{
 };
 use crate::parser::ParseState;
 use crate::semantic::DiagnosticNode;
-use crate::target::Target;
 
 thread_local! {
     static CTX: Cell<Option<&'static Context>> = const { Cell::new(None) };
@@ -29,7 +28,6 @@ pub fn ctx() -> &'static Context {
 #[derive(Debug)]
 pub struct Context {
     pub file_name: String,
-    pub target: Target,
     pub diagnostics: Vec<DiagnosticNode>,
     pub parse: ParseState,
     pub arenas: AstArenas,
@@ -39,19 +37,12 @@ pub struct Context {
 }
 impl Default for Context {
     fn default() -> Self {
-        Self::with_target(Target::default())
-    }
-}
-
-impl Context {
-    pub fn with_target(target: Target) -> Self {
         let mut arenas = AstArenas::default();
         let value_node = ConstValueNode { span: Span::default(), value: ConstValue::Int(1) };
         let const_one = arenas.expressions.constant(value_node, Span::default());
         Self {
             const_one,
             file_name: String::default(),
-            target,
             diagnostics: Vec::default(),
             parse: ParseState::default(),
             arenas,
@@ -59,13 +50,11 @@ impl Context {
             source_cache: RefCell::default(),
         }
     }
+}
 
+impl Context {
     pub fn const_one(&self) -> ExpressionNode {
         self.const_one.clone()
-    }
-
-    pub fn set_target(&mut self, target: Target) {
-        self.target = target;
     }
 
     pub fn set_file_name(&mut self, file_name: String) {

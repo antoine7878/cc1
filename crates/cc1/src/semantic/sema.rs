@@ -9,11 +9,10 @@ use crate::ast::{AstArenas, ConstValue, DeclaratorId, ExpressionId, NameId};
 use crate::semantic::declaration::FunctionHeader;
 use crate::semantic::{
     Builtins, DefinitionState, Diag, Diagnostic, DiagnosticNode, DiagnosticSink, FunctionDef, FunctionDefArena,
-    FunctionDefId, Initializer, InitializerArena, InitializerId, Linkage, MemberRef, ResolvedExpression,
+    FunctionDefId, Initializer, InitializerArena, InitializerId, Layout, Linkage, MemberRef, ResolvedExpression,
     ResolvedStatement, ResolvedType, ResolvedTypeId, ResolvedTypeInterner, Symbol, SymbolArena, SymbolId, TagDef,
     TagDefArena, TagDefId,
 };
-use crate::target::{Layout, Target};
 
 #[derive(Debug, Clone)]
 pub struct External {
@@ -57,19 +56,12 @@ pub struct Sema {
 
     pub headers: HashMap<DeclaratorId, FunctionHeader>,
     pub layouts: HashMap<ResolvedTypeId, Layout>,
-    pub target: Target,
 }
 
 impl Default for Sema {
     fn default() -> Self {
-        Self::new(Target::default())
-    }
-}
-
-impl Sema {
-    pub fn new(target: Target) -> Self {
         let mut types = ResolvedTypeInterner::default();
-        let builtins = Builtins::new(&mut types, &target);
+        let builtins = Builtins::new(&mut types);
 
         Self {
             diagnostics: Vec::new(),
@@ -91,7 +83,6 @@ impl Sema {
             externals: HashMap::default(),
 
             layouts: HashMap::default(),
-            target,
         }
     }
 }
@@ -255,7 +246,7 @@ impl Sema {
 
     pub fn layout(&self, id: &ResolvedTypeId) -> Layout {
         let ty = self.types.get(*id);
-        self.target.layout(ty).unwrap_or_else(|| self.layouts[id])
+        ty.layout().unwrap_or_else(|| self.layouts[id])
     }
 }
 

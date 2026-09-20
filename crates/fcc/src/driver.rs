@@ -58,9 +58,9 @@ fn drive(args: &Args, step: &Step) -> Result<(), String> {
     let output = str_of(&step.output)?;
     match step.stage {
         Stage::Preprocess => spawn(Tool::Cpp, &cpp_argv(args, input, output), None),
-        Stage::Compile => spawn(Tool::Cc1, &cc1_argv(args, input), Some(output)),
+        Stage::Compile => spawn(Tool::Cc1, &cc1_argv(input), Some(output)),
         Stage::Lower => spawn(Tool::Llc, &llc_argv(args, input, output), None),
-        Stage::Assemble => spawn(Tool::As, &as_argv(args, input, output), None),
+        Stage::Assemble => spawn(Tool::As, &as_argv(input, output), None),
         Stage::Link => Ok(()),
     }
 }
@@ -76,8 +76,8 @@ fn cpp_argv(args: &Args, input: &str, output: &str) -> Vec<String> {
     argv
 }
 
-fn cc1_argv(args: &Args, input: &str) -> Vec<String> {
-    strings(&[&format!("-m{}", args.target), input])
+fn cc1_argv(input: &str) -> Vec<String> {
+    strings(&[input])
 }
 
 fn llc_argv(args: &Args, input: &str, output: &str) -> Vec<String> {
@@ -89,14 +89,14 @@ fn llc_argv(args: &Args, input: &str, output: &str) -> Vec<String> {
     argv
 }
 
-fn as_argv(args: &Args, input: &str, output: &str) -> Vec<String> {
-    strings(&[&format!("--{}", args.target), "-o", output, input])
+fn as_argv(input: &str, output: &str) -> Vec<String> {
+    strings(&["--32", "-o", output, input])
 }
 
 fn link_argv(args: &Args, items: &[String]) -> Vec<String> {
     let mut argv = Vec::new();
 
-    argv.push(format!("-m{}", args.target));
+    argv.push("-m32".to_string());
     if args.strip {
         argv.push("-s".to_string());
     }

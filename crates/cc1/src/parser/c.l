@@ -146,7 +146,7 @@ fn alloc_ident<R: Read>(lex: &mut YYLex<R>) -> Name {
 
 fn alloc_constant<R: Read>(lex: &mut YYLex<R>) -> ConstValueNode {
     let span = lex.span;
-    let Diag { res: value, diagnostic } = ConstValue::parse(lex.yytext.as_str(), &lex.ctx.target);
+    let Diag { res: value, diagnostic } = ConstValue::parse(lex.yytext.as_str());
     if let Some(diagnostic) = diagnostic {
         lex.ctx.diagnostics.push(DiagnosticNode::new(diagnostic, span));
     }

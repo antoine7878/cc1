@@ -35,7 +35,7 @@ pub fn struct_or_union_tag(
             let bit_width = declarator.bit_width.as_ref().and_then(|e| {
                 let value = resolver.eval_constant(e);
                 let sema = &*resolver.sema;
-                let checked = constraints::types::check_bit_width(&sema.target, ty.id.resolve_with(sema), value, name);
+                let checked = constraints::types::check_bit_width(ty.id.resolve_with(sema), value, name);
                 checked.collect(resolver, &e.span)
             });
             let is_member_object = ty.is_object(resolver.sema);

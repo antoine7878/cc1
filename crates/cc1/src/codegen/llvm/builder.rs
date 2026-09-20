@@ -7,9 +7,11 @@ use crate::codegen::{
     LlvmInit, LlvmName, LlvmParam, LlvmSymbol, LlvmType, ParamAttr, ReturnAttr, classify_param, struct_elements,
 };
 use crate::semantic::{
-    DefinitionState, Initializer, Linkage, QualifiedType, ResolvedType, SymbolId, TagDef, TagDefId, sema,
+    DefinitionState, Initializer, Layout, Linkage, QualifiedType, ResolvedType, SymbolId, TagDef, TagDefId, sema,
 };
-use crate::target::Layout;
+
+const TRIPLE: &str = "i386-pc-linux-gnu";
+const DATALAYOUT: &str = "e-m:e-p:32:32-p270:32:32-p271:32:32-p272:64:64-i128:128-f64:32:64-f80:32-n8:16:32-S128";
 
 #[derive(Debug)]
 pub struct Builder<W: Write> {
@@ -59,9 +61,9 @@ impl<W: Write> Builder<W> {
         self.blank();
     }
 
-    pub fn target(&mut self, datalayout: &str, triple: &str) {
-        self.write_line(format_args!(r#"target datalayout = "{datalayout}""#));
-        self.write_line(format_args!(r#"target triple = "{triple}""#));
+    pub fn target(&mut self) {
+        self.write_line(format_args!(r#"target datalayout = "{DATALAYOUT}""#));
+        self.write_line(format_args!(r#"target triple = "{TRIPLE}""#));
     }
 
     pub fn blank(&mut self) {
@@ -322,7 +324,7 @@ impl<W: Write> Builder<W> {
 
     pub fn memcpy(&mut self, dst: LlvmName, src: LlvmName, layout: Layout) {
         let Layout { size, align } = layout;
-        let ptr_len = LlvmType::integer(sema().target.pointer.size);
+        let ptr_len = LlvmType::int();
         self.write_line(format_args!(
             "  call void @llvm.memcpy.p0.p0.{ptr_len}(ptr align {align} {dst}, ptr align {align} {src}, {ptr_len} {size}, i1 false)"
         ));
