@@ -1,6 +1,10 @@
 use std::fs;
 use std::process::Command;
 
+use cc1::context::Context;
+use cc1::parser::parse_source;
+use cc1::semantic::Diagnostic;
+
 use crate::common::strip_ansi;
 
 struct Run {
@@ -31,6 +35,15 @@ test_case!(no_argument_fails_without_emitting, {
     assert_eq!(run.status, 1);
     assert!(!run.stderr.is_empty());
     assert!(run.stdout.is_empty());
+});
+
+test_case!(input_open_failure_is_diagnostic, {
+    let mut ctx = Context::default();
+    let path = std::env::temp_dir().join(format!("cc1_missing_input_{}", std::process::id()));
+    ctx.set_file_name(path.to_string_lossy().into_owned());
+    let ctx = parse_source(ctx);
+
+    assert!(matches!(ctx.diagnostics.as_slice(), [diag] if matches!(diag.inner, Diagnostic::InputError(_))));
 });
 
 test_case!(syntax_error_stops_before_semantic_and_codegen, {

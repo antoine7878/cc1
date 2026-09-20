@@ -2,13 +2,21 @@ use std::fmt::Display;
 use std::fs::File;
 use std::io::{BufReader, Read};
 
+use libft::Span;
+
 use crate::context::Context;
 use crate::parser::{YYLex, Yacc};
 use crate::semantic::{Diagnostic, DiagnosticNode, ExpectedTokens};
 
 pub fn parse_source(ctx: Context) -> Context {
-    let file = File::open(&ctx.file_name).unwrap();
-    parse_reader(ctx, BufReader::new(file)).0
+    match File::open(&ctx.file_name) {
+        Ok(file) => parse_reader(ctx, BufReader::new(file)).0,
+        Err(error) => {
+            let mut ctx = ctx;
+            ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::InputError(error.to_string()), Span::default()));
+            ctx
+        }
+    }
 }
 
 pub fn parse_reader<R: Read>(ctx: Context, reader: R) -> (Context, i32) {
