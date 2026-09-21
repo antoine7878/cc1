@@ -245,6 +245,22 @@ reports!(
     ["<test>:1:16: error: invalid operands to binary expression ('double' and 'int')"]
 );
 
+#[test]
+fn complex_types_use_c_declarator_syntax_in_diagnostics() {
+    let cases = [
+        ("int (*p)[2]; void f(void) { p(); }", "'int (*)[2]'"),
+        ("int (*p)(void); void f(void) { +p; }", "'int (*)(void)'"),
+        ("int (**p)(void); void f(void) { p(); }", "'int (**)(void)'"),
+        ("const char **p; void f(void) { p(); }", "'const char **'"),
+    ];
+
+    for (src, expected) in cases {
+        let messages = Unit::compile(src).messages();
+        assert_eq!(messages.len(), 1, "{src}: {messages:?}");
+        assert!(messages[0].contains(expected), "{src}: {messages:?}");
+    }
+}
+
 reports!(report_remainder_by_zero, "enum E { A = 1 % 0 };", ["<test>:1:14: error: remainder by zero is undefined"]);
 
 reports!(report_division_by_zero, "enum E { A = 1 / 0 };", ["<test>:1:14: error: division by zero is undefined"]);

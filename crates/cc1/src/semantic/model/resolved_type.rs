@@ -480,80 +480,108 @@ impl QualifiedType {
 
 impl fmt::Display for TypeDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ty = self.ty;
-        if ty.is_const {
+        let mut ty = *self.ty;
+        let mut declarator = String::new();
+        let mut pointer_declarator = false;
+        let mut has_pointer = false;
+        let mut base_const = false;
+        let mut base_volatile = false;
+
+        let base = loop {
+            match ty.id.resolve_with(self.sema) {
+                ResolvedType::Pointer(inner) => {
+                    let mut pointer = String::from("*");
+                    if ty.is_const {
+                        pointer.push_str(" const");
+                    }
+                    if ty.is_volatile {
+                        pointer.push_str(" volatile");
+                    }
+                    if (ty.is_const || ty.is_volatile) && !declarator.is_empty() {
+                        pointer.push(' ');
+                    }
+                    pointer.push_str(&declarator);
+                    declarator = pointer;
+                    pointer_declarator = true;
+                    has_pointer = true;
+                    ty = *inner;
+                }
+                ResolvedType::Array { elem, len } => {
+                    base_const |= ty.is_const;
+                    base_volatile |= ty.is_volatile;
+                    if pointer_declarator {
+                        declarator = format!("({declarator})");
+                    }
+                    declarator.push('[');
+                    if let Some(len) = len {
+                        declarator.push_str(&len.to_string());
+                    }
+                    declarator.push(']');
+                    pointer_declarator = false;
+                    ty = *elem;
+                }
+                ResolvedType::Function { ret, params } => {
+                    base_const |= ty.is_const;
+                    base_volatile |= ty.is_volatile;
+                    if pointer_declarator {
+                        declarator = format!("({declarator})");
+                    }
+                    declarator.push('(');
+                    if let ParamTypes::Prototype { params, is_variadic } = params {
+                        if params.is_empty() {
+                            declarator.push_str("void");
+                        } else {
+                            for (i, param) in params.iter().enumerate() {
+                                if i > 0 {
+                                    declarator.push_str(", ");
+                                }
+                                declarator.push_str(&param.display(self.sema).to_string());
+                            }
+                        }
+                        if *is_variadic {
+                            declarator.push_str(", ...");
+                        }
+                    }
+                    declarator.push(')');
+                    pointer_declarator = false;
+                    ty = *ret;
+                }
+                resolved => break resolved,
+            }
+        };
+
+        base_const |= ty.is_const;
+        base_volatile |= ty.is_volatile;
+        if base_const {
             f.write_str("const ")?;
         }
-        if ty.is_volatile {
+        if base_volatile {
             f.write_str("volatile ")?;
         }
-        match ty.id.resolve_with(self.sema) {
-            ResolvedType::Void => f.write_str("void"),
-            ResolvedType::Char => f.write_str("char"),
-            ResolvedType::SignedChar => f.write_str("signed char"),
-            ResolvedType::UnsignedChar => f.write_str("unsigned char"),
-            ResolvedType::Short => f.write_str("short"),
-            ResolvedType::UnsignedShort => f.write_str("unsigned short"),
-            ResolvedType::Int => f.write_str("int"),
-            ResolvedType::UnsignedInt => f.write_str("unsigned int"),
-            ResolvedType::Long => f.write_str("long"),
-            ResolvedType::UnsignedLong => f.write_str("unsigned long"),
-            ResolvedType::Float => f.write_str("float"),
-            ResolvedType::Double => f.write_str("double"),
-            ResolvedType::LongDouble => f.write_str("long double"),
-            ResolvedType::Pointer(inner) => {
-                match inner.id.resolve_with(self.sema) {
-                    ResolvedType::Function { .. } | ResolvedType::Array { .. } => {
-                        write!(f, "({})", inner.display(self.sema))?
-                    }
-                    _ => write!(f, "{}", inner.display(self.sema))?,
-                }
-                f.write_str(" *")
-            }
+        match base {
+            ResolvedType::Void => f.write_str("void")?,
+            ResolvedType::Char => f.write_str("char")?,
+            ResolvedType::SignedChar => f.write_str("signed char")?,
+            ResolvedType::UnsignedChar => f.write_str("unsigned char")?,
+            ResolvedType::Short => f.write_str("short")?,
+            ResolvedType::UnsignedShort => f.write_str("unsigned short")?,
+            ResolvedType::Int => f.write_str("int")?,
+            ResolvedType::UnsignedInt => f.write_str("unsigned int")?,
+            ResolvedType::Long => f.write_str("long")?,
+            ResolvedType::UnsignedLong => f.write_str("unsigned long")?,
+            ResolvedType::Float => f.write_str("float")?,
+            ResolvedType::Double => f.write_str("double")?,
+            ResolvedType::LongDouble => f.write_str("long double")?,
             &ResolvedType::Tag(id) => {
                 let def = id.resolve_with(self.sema);
                 let name = def.name.map_or("<anonymous>", |n| n.id.resolve().as_str());
-                write!(f, "{} {}", def.kind.symbol_kind(), name)
+                write!(f, "{} {}", def.kind.symbol_kind(), name)?;
             }
-            ResolvedType::Array { elem, len } => {
-                let mut base = elem;
-                while let ResolvedType::Array { elem: inner, .. } = base.id.resolve_with(self.sema) {
-                    base = inner;
-                }
-                write!(f, "{}", base.display(self.sema))?;
-                let (mut elem, mut len) = (elem, len);
-                loop {
-                    f.write_str("[")?;
-                    if let Some(len) = len {
-                        write!(f, "{len}")?;
-                    }
-                    f.write_str("]")?;
-                    let ResolvedType::Array { elem: inner, len: size } = elem.id.resolve_with(self.sema) else {
-                        break;
-                    };
-                    (elem, len) = (inner, size);
-                }
-                Ok(())
-            }
-            ResolvedType::Function { ret, params } => {
-                write!(f, "{}(", ret.display(self.sema))?;
-                if let ParamTypes::Prototype { params, is_variadic } = params {
-                    if params.is_empty() {
-                        f.write_str("void")?;
-                    } else {
-                        for (i, param) in params.iter().enumerate() {
-                            if i > 0 {
-                                f.write_str(", ")?;
-                            }
-                            write!(f, "{}", param.display(self.sema))?;
-                        }
-                    }
-                    if *is_variadic {
-                        f.write_str(", ...")?;
-                    }
-                }
-                f.write_str(")")
-            }
+            ResolvedType::Array { .. } | ResolvedType::Function { .. } | ResolvedType::Pointer(_) => unreachable!(),
         }
+        if has_pointer {
+            f.write_str(" ")?;
+        }
+        f.write_str(&declarator)
     }
 }
