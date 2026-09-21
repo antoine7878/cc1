@@ -269,9 +269,11 @@ impl Visitor for Resolver<'_> {
     fn visit_init_declarator(&mut self, node: &InitDeclaratorNode) {
         let decl = &node.declarator;
         let Some(&sym) = self.sema.declarations.get(&decl.id) else { return };
-        let ty = sym.resolve_with(self.sema).ty;
+        let Symbol { ty, kind, .. } = *sym.resolve_with(self.sema);
         self.visit_declarator(&node.declarator);
-        if let Some(init) = &node.initializer {
+        if let Some(init) = &node.initializer
+            && kind == SymbolKind::Variable
+        {
             declaration::resolve_initializer(self, sym, ty, init);
         }
     }

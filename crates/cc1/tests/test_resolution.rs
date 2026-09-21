@@ -548,3 +548,23 @@ recover!(
     &[]
 );
 accept!(shift_count_in_range, "void f(void){ int i = 1; i <<= 31; }");
+
+// 6.5.7 The type of the entity to be initialized shall be an object type: a typedef name or a
+// function cannot carry an initializer. gcc: "typedef 'T' is initialized" / "function 'f' is
+// initialized like a variable". The declaration itself still takes effect, so a later use of the
+// name adds no diagnostic.
+recover!(typedef_with_initializer, "typedef int T = 1;", [Diagnostic::NonVarInit], &[]);
+
+recover!(typedef_array_with_initializer, "typedef int A[2] = { 1, 2 };", [Diagnostic::NonVarInit], &[]);
+
+recover!(block_typedef_with_initializer, "int f(void) { typedef int T = 1; return 0; }", [Diagnostic::NonVarInit], &[]);
+
+recover!(function_with_initializer, "int f(void) = 1;", [Diagnostic::NonVarInit], &[]);
+
+recover!(block_function_with_initializer, "int g(void) { int f(void) = 0; return 0; }", [Diagnostic::NonVarInit], &[]);
+
+recover!(initialized_typedef_stays_declared, "typedef int T = 1; T x; int f(void) { return x; }", [Diagnostic::NonVarInit], &[]);
+
+recover!(initialized_function_stays_declared, "int f(void) = 1; int g(void) { return f(); }", [Diagnostic::NonVarInit], &[]);
+
+accept!(file_scope_extern_with_initializer, "extern int x = 1;");

@@ -173,6 +173,7 @@ pub enum Diagnostic {
     NonConstantInitializer,
     InitDiscardedQualifiers(QualifiedType, QualifiedType),
     InitIncompatibleTypes(QualifiedType, QualifiedType),
+    NonVarInit,
 
     // 6.6.1
 
@@ -351,6 +352,7 @@ impl DiagnosticNode {
             Diagnostic::ConstMemberAssignment(ty) => format!("cannot assign to '{}' because it has a const-qualified member", ty.display(sema)),
             Diagnostic::AssignmentDiscardedQualifiers(to, from) => format!("assigning to '{}' from '{}' discards qualifiers", to.display(sema), from.display(sema)),
             Diagnostic::AssignmentIncompatibleTypes(to, from) => format!("assignment to '{}' from incompatible pointer type '{}'", to.display(sema), from.display(sema)),
+            Diagnostic::NonVarInit => "illegal initializer (only variables can be initialized)".to_string(),
 
             // 6.4
             Diagnostic::ConstantOverflow => "overflow in constant expression".to_string(),

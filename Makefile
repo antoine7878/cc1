@@ -9,7 +9,7 @@ C_Y = crates/cc1/src/parser/c.y
 LEX_RS =  crates/cc1/src/parser/lex.rs
 YACC_RS = crates/cc1/src/parser/yacc.rs
 
-all: $(LEX_RS) $(YACC_RS) ## build cc1
+all: $(LEX_RS) $(YACC_RS)
 	cargo build -p cc1
 
 $(FT_LEX) $(FT_YACC):
@@ -23,18 +23,18 @@ $(YACC_RS): $(C_Y)
 
 # ----- test --------------------
 
-test: all llvm ## emit LLVM IR for rscs/hello.c to stdout
+test: all
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
-	./fcc.py -e ./rscs/hello.c -o /dev/stdout
+	./fcc -c ./rscs/hello.c
 
-ctest: all ## run the cc1 test suite
+ctest: all
 	cargo nextest run -p cc1
 	python3 -m unittest test/test_fcc.py
 
-ttest: all ## run every test in the workspace
+ttest: all
 	cargo nextest run
 
-ftest: all cc ## compile and run rscs/hello.c with fcc.py
+ftest: all cc
 	./fcc.py ./rscs/hello.c -o ./rscs/a.out
 	./rscs/a.out || echo $$?
 
@@ -42,15 +42,15 @@ ftest: all cc ## compile and run rscs/hello.c with fcc.py
 
 CFF = -m32 -std=iso9899:1990 -pedantic-errors
 
-c: ## compile rscs/hello.c with gcc
+c:
 	gcc -c $(CFF) rscs/hello.c -o /dev/null
 
-cc: ## compile and run rscs/hello.c with gcc
+cc:
 	gcc $(CFF) rscs/hello.c
 	./a.out || echo $$?
 	rm ./a.out
 
-llvm: ## emit reference LLVM IR for rscs/hello.c with clang -O0
+llvm:
 	clang $(CFF) -O0 -S -emit-llvm rscs/hello.c -o ./rscs/hello.ll
 
 empty :=
@@ -68,16 +68,13 @@ COV_SKIP = \
 	crates/cc1/src/parser/driver.rs \
 	crates/cc1/src/ast/type_specifier.rs
 
-coverage: all ## run tests coverage report
+coverage: all
 	cargo llvm-cov nextest --ignore-filename-regex '$(subst $(space),|,$(strip $(COV_SKIP)))'
 
-clean: ## clean generated and compiled files
+clean:
 	cargo clean
 	rm -f $(LEX_RS) $(YACC_RS)
 
-re: clean all ## clean and rebuild
-
-help: ## show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
+re: clean all
 
 .PHONY: all clean re test ctest ttest ftest c cc coverage $(FT_LEX) $(FT_YACC) llvm

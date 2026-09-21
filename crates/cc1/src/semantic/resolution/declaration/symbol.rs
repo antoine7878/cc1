@@ -98,8 +98,12 @@ pub fn declare_init_declarator(
 ) -> Option<()> {
     let (ty, core, already_diagnosed) = declared_type_or_poison(resolver, qualif, &init_declarator.declarator)?;
     let name = core.name()?;
-    let has_initializer = init_declarator.initializer.is_some();
     let (storage, kind) = classify_symbol(resolver, ty, declared_storage, &core.span);
+    let bad_initializer = kind != SymbolKind::Variable && init_declarator.initializer.is_some();
+    if bad_initializer {
+        resolver.add_diag(Diag::err((), Diagnostic::NonVarInit), &init_declarator.span);
+    }
+    let has_initializer = init_declarator.initializer.is_some() && !bad_initializer;
     if kind == SymbolKind::Variable
         && !already_diagnosed
         && requires_complete_object(resolver, ty, storage, has_initializer)
