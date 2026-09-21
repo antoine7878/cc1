@@ -122,6 +122,19 @@ constant!(literal_char_multi_is_packed, "'ab'", "Int(24930)");
 constant!(literal_wide_char, "L'a'", "Int(97)");
 constant!(literal_wide_char_is_not_sign_extended, "L'\\xff'", "Int(255)");
 
+// 6.1.3.4 The value of an octal or hexadecimal escape sequence shall be in the range of
+// representable values for the type unsigned char for an integer character constant, or the
+// unsigned type corresponding to wchar_t for a wide character constant.
+escape_out_of_range!(literal_char_octal_escape_out_of_range, "'\\777'", "Int(-1)");
+escape_out_of_range!(literal_char_octal_escape_just_out_of_range, "'\\400'", "Int(0)");
+escape_out_of_range!(literal_char_hex_escape_out_of_range, "'\\x100'", "Int(0)");
+escape_out_of_range!(literal_char_hex_escape_far_out_of_range, "'\\x1ff'", "Int(-1)");
+escape_out_of_range!(literal_multi_char_escape_out_of_range, "'a\\x100'", "Int(24832)");
+constant!(literal_char_octal_escape_at_range_limit, "'\\377'", "Int(-1)");
+constant!(literal_char_hex_escape_at_range_limit, "'\\xff'", "Int(-1)");
+constant!(literal_wide_char_hex_escape_above_char_range, "L'\\x100'", "Int(256)");
+constant!(literal_wide_char_hex_escape_uses_wchar_range, "L'\\xffff'", "Int(65535)");
+
 fold!(add_int, binary(&ResolvedType::Int, BinaryOp::Add, ConstValue::Int(1), ConstValue::Int(2)), "Int(3)");
 fold_overflow!(
     add_wraps,

@@ -394,6 +394,11 @@ reports!(
 reports!(report_stray_at_sign, "int x = 1; @", ["<test>:1:12: error: stray '@' in program"]);
 reports!(report_stray_backtick, "int x = 1; `", ["<test>:1:12: error: stray '`' in program"]);
 reports!(report_stray_dollar, "int x = 1; $", ["<test>:1:12: error: stray '$' in program"]);
+reports!(
+    report_char_constant_escape_out_of_range,
+    "int c = '\\777';",
+    ["<test>:1:9: error: escape sequence is out of range for the character type"]
+);
 reports!(report_stray_non_ascii, "int x = 1; é", ["<test>:1:12: error: stray '\\u{e9}' in program"]);
 reports!(
     report_stray_backslash,

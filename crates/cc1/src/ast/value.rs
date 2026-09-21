@@ -116,28 +116,31 @@ impl ConstValue {
         }
     }
 
-    fn parse_char(s: &str) -> Self {
+    fn parse_char(s: &str) -> Diag<Self> {
         let prefix = if s.starts_with("L") { "L" } else { "" };
         let s = &s[(prefix.len() + 1)..(s.len() - 1)];
         let narrow = prefix.is_empty();
-        let (value, count) = Self::char_sequence(s.as_bytes(), narrow);
-        if narrow && count == 1 && ResolvedType::Char.is_signed() && value & 0x80 != 0 {
+        let (value, count, out_of_range) = Self::char_sequence(s.as_bytes(), narrow);
+        let value = if narrow && count == 1 && ResolvedType::Char.is_signed() && value & 0x80 != 0 {
             ConstValue::Int((value | 0xffffff00) as i32)
         } else {
             ConstValue::Int(value as i32)
-        }
+        };
+        Diag::new(value, out_of_range.then_some(Diagnostic::EscapeOutOfRange))
     }
 
-    fn char_sequence(bytes: &[u8], narrow: bool) -> (u32, usize) {
+    fn char_sequence(bytes: &[u8], narrow: bool) -> (u32, usize, bool) {
         let mut i = 0;
         let mut value: u32 = 0;
         let mut count = 0;
+        let mut out_of_range = false;
         while i < bytes.len() {
             let c = escape::next(bytes, &mut i);
+            out_of_range |= narrow && c > 0xff;
             value = if narrow { (value << 8) | (c & 0xff) } else { c };
             count += 1;
         }
-        (value, count)
+        (value, count, out_of_range)
     }
 
     fn parse_integer(s: &str) -> Diag<Self> {
@@ -167,7 +170,7 @@ impl ConstValue {
     pub fn parse(s: &str) -> Diag<Self> {
         let lower = s.to_lowercase();
         if s.contains('\'') {
-            Diag::ok(Self::parse_char(s))
+            Self::parse_char(s)
         } else if !lower.starts_with("0x") && (lower.contains('.') || lower.contains('e')) {
             Diag::ok(Self::parse_float(s))
         } else {
