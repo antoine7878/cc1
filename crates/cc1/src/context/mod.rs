@@ -86,7 +86,7 @@ impl Context {
                 continue;
             }
             let physical = marker.physical + (line_no - marker.logical);
-            if self.line_markers.get(i + 1).is_none_or(|next| physical < next.physical) {
+            if self.line_markers.get(i + 1).is_none_or(|next| physical + 1 < next.physical) {
                 found.push(physical);
             }
         }

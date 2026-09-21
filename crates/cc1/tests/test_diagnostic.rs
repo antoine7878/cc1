@@ -479,7 +479,10 @@ fn excerpt_of_a_line_marked_file_is_the_parsed_line() {
     let dir = TmpDir::new("cc1-line-marker");
     let unit = compile_file(&dir, "# 7 \"orig.c\"\nint main(void) { EXPANDED_MACRO x = 1; return x; }\n");
     let rendered = strip_ansi(&unit.render());
-    assert!(rendered.starts_with("orig.c:7:33: error: syntax error, unexpected IDENTIFIER, expecting ',' or ';'\n"), "{rendered}");
+    assert!(
+        rendered.starts_with("orig.c:7:33: error: syntax error, unexpected IDENTIFIER, expecting ',' or ';'\n"),
+        "{rendered}"
+    );
     let (excerpt, caret) = excerpt_and_caret(&rendered);
     assert!(excerpt.ends_with("int main(void) { EXPANDED_MACRO x = 1; return x; }"), "{rendered}");
     assert_eq!(excerpt.find("x = 1"), Some(caret), "{rendered}");
@@ -497,6 +500,18 @@ fn excerpt_follows_a_return_to_the_main_file() {
     let (excerpt, caret) = excerpt_and_caret(&rendered);
     assert!(excerpt.ends_with("int d = ;"), "{rendered}");
     assert_eq!(excerpt.find(';'), Some(caret), "{rendered}");
+}
+
+#[test]
+fn excerpt_of_the_first_line_skips_the_preamble_markers() {
+    let dir = TmpDir::new("cc1-line-marker-preamble");
+    let src = "# 1 \"e1.c\"\n# 1 \"<built-in>\" 1\n# 1 \"<built-in>\" 3\n# 1 \"<command line>\" 1\n# 1 \"<built-in>\" 2\n# 1 \"e1.c\" 2\nint main(void) { return x; }\n";
+    let unit = compile_file(&dir, src);
+    let rendered = strip_ansi(&unit.render());
+    assert!(rendered.starts_with("e1.c:1:25: error: Use of undeclared identifier 'x'\n"), "{rendered}");
+    let (excerpt, caret) = excerpt_and_caret(&rendered);
+    assert!(excerpt.ends_with("int main(void) { return x; }"), "{rendered}");
+    assert_eq!(excerpt.find("x;"), Some(caret), "{rendered}");
 }
 
 #[test]
