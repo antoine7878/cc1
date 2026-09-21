@@ -20,6 +20,26 @@ exits!(
 );
 exits!(logical_and_or, "int main(void) { return (1 && 2) + (0 || 3) + 40; }", 42);
 exits!(
+    logical_in_entry_block_with_params,
+    "int both(int a, int b) { return a && b; } int either(int a, int b) { return a || b; } int main(void) { return both(1, 2) * 10 + both(1, 0) * 20 + either(0, 0) * 40 + either(0, 3); }",
+    11
+);
+exits!(
+    logical_in_entry_block_with_sret,
+    "struct s { int v; }; struct s mk(int a, int b) { struct s r; r.v = a && b || !a; return r; } int main(void) { return mk(1, 2).v * 10 + mk(0, 5).v * 20 + mk(1, 0).v * 40 + 12; }",
+    42
+);
+exits!(
+    logical_condition_in_entry_block,
+    "int digit(char c) { if (c >= 48 && c <= 57) return 1; return 0; } int main(void) { return digit(53) * 40 + digit(65) * 20 + 2; }",
+    42
+);
+emits!(
+    entry_block_phi_predecessor_follows_params,
+    "int both(int a, int b) { return a && b; } int main(void) { return both(1, 1); }",
+    "phi i1 [ false, %2 ]"
+);
+exits!(
     nested_logical_operators,
     "int main(void) { int a = 5, b = 3, c = 0; return (a && b || c) + (c || a && b) * 2 + (a && b && c) * 4 + (c || c || a) * 8 + ((a || c) && (c || b)) * 16 + 10; }",
     37

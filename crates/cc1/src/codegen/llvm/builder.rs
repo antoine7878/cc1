@@ -45,7 +45,7 @@ impl<W: Write> Builder<W> {
 
     pub fn reset(&mut self, counter: usize) {
         self.has_block_ret = false;
-        self.current_block = LlvmName::SSA(0);
+        self.current_block = LlvmName::SSA(counter);
         self.ssa_counter = counter;
         self.label_counter = 0;
     }
