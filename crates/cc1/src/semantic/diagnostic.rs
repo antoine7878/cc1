@@ -19,6 +19,7 @@ pub enum Diagnostic {
 
     BadArguments(String),
     InputError(String),
+    OutputError(String),
     Poisoned,
     Invariant(&'static str),
     InvalidOperand,
@@ -289,6 +290,7 @@ impl DiagnosticNode {
             Diagnostic::TooFewArguments(expected, have) => format!("too few arguments to function call, expected {expected}, have {have}"),
             Diagnostic::BadArguments(error) => error.clone(),
             Diagnostic::InputError(error) => format!("cannot read input file: {error}"),
+            Diagnostic::OutputError(error) => format!("cannot write output file: {error}"),
             Diagnostic::ArgumentDiscardedQualifiers(n, to, from) => format!("passing '{}' to parameter {n} of type '{}' discards qualifiers", from.display(sema), to.display(sema)),
             Diagnostic::ArgumentIncompatibleTypes(n, to, from) => format!("passing '{}' to parameter {n} of incompatible type '{}'", from.display(sema), to.display(sema)),
 

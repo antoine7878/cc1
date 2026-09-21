@@ -1,6 +1,6 @@
 use std::io::{Write, stdout};
 
-use libft::Span;
+use libft::{Position, Span};
 
 use crate::ast::statement::StatementId;
 use crate::ast::visit::{walk_statement, walk_translation_unit};
@@ -19,6 +19,11 @@ pub fn generate() -> Vec<DiagnosticNode> {
 pub fn generate_to<W: Write>(w: W) -> Vec<DiagnosticNode> {
     let mut generator = Generator::new(w);
     generator.visit_translation_unit(&ctx().ast);
+    if let Some(error) = generator.builder.finish() {
+        let diagnostic = Diagnostic::OutputError(error.to_string());
+        let no_file = Position { file: usize::MAX, ..Position::default() };
+        generator.diagnostics.push(DiagnosticNode::new(diagnostic, Span::new(no_file, no_file)));
+    }
     generator.diagnostics
 }
 
@@ -73,7 +78,7 @@ impl<W: Write> Generator<W> {
                 let layout = sema().layout(&qty.id);
                 self.builder.memcpy(self.locals[id].name, src.name, layout);
             }
-            Initializer::Address(_) => todo!("address init"),
+            Initializer::Address(_) => unreachable!(),
         }
     }
 

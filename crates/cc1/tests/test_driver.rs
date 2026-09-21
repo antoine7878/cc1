@@ -1,11 +1,13 @@
 use std::fs;
+use std::io::{self, Write};
 use std::process::Command;
 
+use cc1::codegen::generate_to;
 use cc1::context::Context;
 use cc1::parser::parse_source;
 use cc1::semantic::Diagnostic;
 
-use crate::common::strip_ansi;
+use crate::common::{Unit, strip_ansi};
 
 struct Run {
     status: i32,
@@ -113,6 +115,38 @@ test_case!(valid_unit_emits_and_exits_zero, {
     assert_eq!(run.status, 0, "stderr: {}", run.stderr);
     assert!(run.stderr.is_empty(), "stderr: {}", run.stderr);
     assert!(run.stdout.contains("define i32 @main"));
+});
+
+struct FailingWriter;
+
+impl Write for FailingWriter {
+    fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+        Err(io::Error::other("no space left on device"))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+test_case!(output_write_failure_is_diagnostic, {
+    let unit = Unit::compile("int main(void) { return 0; }");
+    assert!(unit.accepts());
+    let diagnostics = generate_to(FailingWriter);
+    assert!(
+        matches!(diagnostics.as_slice(), [diag] if matches!(&diag.inner, Diagnostic::OutputError(e) if e.contains("no space"))),
+        "{diagnostics:?}"
+    );
+});
+
+#[cfg(target_os = "linux")]
+test_case!(output_write_failure_fails_the_run, {
+    let path = std::env::temp_dir().join(format!("cc1_driver_{}_full.c", std::process::id()));
+    fs::write(&path, "int main(void) { return 0; }\n").expect("write source");
+    let run = cc1(&[path.to_str().expect("utf-8 path"), "-o", "/dev/full"]);
+    let _ = fs::remove_file(&path);
+    assert_eq!(run.status, 1, "stderr: {}", run.stderr);
+    assert!(run.stderr.contains("cannot write output file"), "stderr: {}", run.stderr);
 });
 
 test_case!(dash_output_is_stdout, {

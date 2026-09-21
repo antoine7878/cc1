@@ -1,5 +1,5 @@
 use std::fmt::{self, Display};
-use std::io::Write;
+use std::io::{self, Write};
 use std::iter::once;
 
 use crate::ast::{StringConstant, Tag};
@@ -21,11 +21,26 @@ pub struct Builder<W: Write> {
     label_counter: usize,
     pub current_block: LlvmName,
     pub has_block_ret: bool,
+    error: Option<io::Error>,
 }
 
 impl<W: Write> Builder<W> {
     pub fn new(w: W) -> Self {
-        Self { w, ssa_counter: 0, label_counter: 0, current_block: LlvmName::SSA(0), has_block_ret: false }
+        Self { w, ssa_counter: 0, label_counter: 0, current_block: LlvmName::SSA(0), has_block_ret: false, error: None }
+    }
+
+    fn record(&mut self, result: io::Result<()>) {
+        if let Err(error) = result
+            && self.error.is_none()
+        {
+            self.error = Some(error);
+        }
+    }
+
+    pub fn finish(&mut self) -> Option<&io::Error> {
+        let flushed = self.w.flush();
+        self.record(flushed);
+        self.error.as_ref()
     }
 
     pub fn reset(&mut self, counter: usize) {
@@ -46,14 +61,16 @@ impl<W: Write> Builder<W> {
     }
 
     fn write_str(&mut self, str: &str) {
-        if !self.has_block_ret {
-            let _ = self.w.write_all(str.as_bytes());
+        if !self.has_block_ret && self.error.is_none() {
+            let written = self.w.write_all(str.as_bytes());
+            self.record(written);
         }
     }
 
     fn write_fmt(&mut self, args: fmt::Arguments<'_>) {
-        if !self.has_block_ret {
-            let _ = self.w.write_fmt(args);
+        if !self.has_block_ret && self.error.is_none() {
+            let written = self.w.write_fmt(args);
+            self.record(written);
         }
     }
 
@@ -103,7 +120,10 @@ impl<W: Write> Builder<W> {
                 ReturnAttr::Direct(_) => self.ret(LlvmSymbol::zero(ret)),
             }
         }
-        let _ = self.w.write_all(b"}\n");
+        if self.error.is_none() {
+            let written = self.w.write_all(b"}\n");
+            self.record(written);
+        }
     }
 
     pub fn alloca(&mut self, ty: LlvmType) -> LlvmSymbol {
