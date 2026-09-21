@@ -332,8 +332,8 @@ impl<W: Write> Generator<W> {
     ) -> Result<LlvmSymbol, Diagnostic> {
         let l1 = self.builder.fresh_label();
         let l2 = self.builder.fresh_label();
-        let initial_block = self.builder.current_block;
         let v = self.emit_condition(lhs)?;
+        let lhs_block = self.builder.current_block;
         match op {
             BinaryOp::LogicalAnd => self.builder.br_cond(v, l1, l2),
             BinaryOp::LogicalOr => self.builder.br_cond(v, l2, l1),
@@ -346,7 +346,7 @@ impl<W: Write> Generator<W> {
         self.builder.br(l2);
 
         self.builder.label(l2);
-        Ok(self.builder.phi((*op == BinaryOp::LogicalOr).into(), initial_block, v, rhs_block))
+        Ok(self.builder.phi((*op == BinaryOp::LogicalOr).into(), lhs_block, v, rhs_block))
     }
 
     fn assign(

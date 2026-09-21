@@ -19,6 +19,21 @@ exits!(
     42
 );
 exits!(logical_and_or, "int main(void) { return (1 && 2) + (0 || 3) + 40; }", 42);
+exits!(
+    nested_logical_operators,
+    "int main(void) { int a = 5, b = 3, c = 0; return (a && b || c) + (c || a && b) * 2 + (a && b && c) * 4 + (c || c || a) * 8 + ((a || c) && (c || b)) * 16 + 10; }",
+    37
+);
+exits!(
+    nested_logical_short_circuit,
+    "int n = 0; int t(void) { return ++n; } int main(void) { int r = (t() && t() || t()) + (0 && t() || t()) * 2; return r * 10 + n; }",
+    33
+);
+exits!(
+    nested_logical_in_conditions,
+    "int main(void) { int a = 1, b = 0, r = 0; if (a && b || a) r += 1; while (b || a && r < 3) r++; return r * 10 + ((a ? b : a) || a && b); }",
+    30
+);
 exits!(ternary, "int main(void) { return 1 ? 42 : 7; }", 42);
 exits!(ternary_false, "int main(void) { return 0 ? 7 : 42; }", 42);
 exits!(comma, "int main(void) { return (7, 42); }", 42);
