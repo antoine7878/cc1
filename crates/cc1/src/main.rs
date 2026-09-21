@@ -31,7 +31,7 @@ fn compile() -> i32 {
     Analyzer::end(sema);
 
     let (codegen, wrote_output) = if analyzed {
-        match outfile {
+        match outfile.filter(|path| path != "-") {
             Some(path) => match File::create(&path) {
                 Ok(file) => (generate_to(file), true),
                 Err(error) => {

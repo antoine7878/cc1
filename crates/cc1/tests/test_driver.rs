@@ -115,6 +115,25 @@ test_case!(valid_unit_emits_and_exits_zero, {
     assert!(run.stdout.contains("define i32 @main"));
 });
 
+test_case!(dash_output_is_stdout, {
+    let cwd = std::env::temp_dir().join(format!("cc1_driver_dash_{}", std::process::id()));
+    fs::create_dir_all(&cwd).expect("create cwd");
+    let input = cwd.join("dash.c");
+    fs::write(&input, "int main(void) { return 0; }\n").expect("write source");
+
+    let out = Command::new(env!("CARGO_BIN_EXE_cc1"))
+        .current_dir(&cwd)
+        .args(["dash.c", "-o-"])
+        .output()
+        .expect("run cc1");
+    let dash_file = cwd.join("-").exists();
+    let _ = fs::remove_dir_all(&cwd);
+
+    assert_eq!(out.status.code(), Some(0), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("define i32 @main"));
+    assert!(!dash_file, "`-o-` must write to stdout, not to a file named `-`");
+});
+
 test_case!(valid_unit_writes_requested_output, {
     let dir = std::env::temp_dir();
     let base = format!("cc1_driver_output_{}", std::process::id());
