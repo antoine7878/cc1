@@ -37,6 +37,28 @@ pub fn try_fold(sema: &mut Sema, expr: &ExpressionNode) -> Option<ConstValue> {
     evaluate(sema, expr, &mut VecSink(&mut Vec::new())).ok()
 }
 
+/// 6.4 Each constant expression shall evaluate to a constant that is in the range of representable
+/// values for its type: an initializer that folds keeps the overflow diagnostics of its evaluation,
+/// and a floating value that does not fit the integer object it initializes is an overflow too.
+pub fn fold_initializer(sema: &mut Sema, ty: QualifiedType, expr: &ExpressionNode) -> Option<ConstValue> {
+    let mut collected = Vec::new();
+    let value = evaluate(sema, expr, &mut VecSink(&mut collected)).ok()?;
+    sema.diagnostics.append(&mut collected);
+    if !fits(&scalar_ty(sema, ty), value) {
+        sema.add_diag(Diag::err((), Diagnostic::ConstantOverflow), &expr.span);
+    }
+    Some(value)
+}
+
+fn fits(ty: &ResolvedType, value: ConstValue) -> bool {
+    let (Some(min), Some(max)) = (ty.min_value(), ty.max_value()) else { return true };
+    if !value.is_floating() {
+        return true;
+    }
+    let v = value.to_f64();
+    !v.is_nan() && v > min as f64 - 1.0 && v < max as f64 + 1.0
+}
+
 fn scalar_ty(sema: &Sema, qty: QualifiedType) -> ResolvedType {
     let ty = qty.id.resolve_with(sema);
     if let ResolvedType::Tag(id) = ty

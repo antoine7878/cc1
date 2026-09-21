@@ -243,7 +243,7 @@ impl ConstValue {
         }
     }
 
-    fn to_f64(self) -> f64 {
+    pub fn to_f64(self) -> f64 {
         match self {
             ConstValue::Int(v) => v as f64,
             ConstValue::UnsignedInt(v) => v as f64,

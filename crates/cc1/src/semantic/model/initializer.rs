@@ -57,7 +57,7 @@ fn single(resolver: &mut Resolver, ty: QualifiedType, e: &ExpressionNode, consta
     if !constant {
         return Initializer::Expr(e.clone());
     }
-    if let Some(value) = fold::try_fold(resolver.sema, e) {
+    if let Some(value) = fold::fold_initializer(resolver.sema, ty, e) {
         return Initializer::Value(value);
     }
     if let Some(at) = address::address_constant(resolver.sema, e) {

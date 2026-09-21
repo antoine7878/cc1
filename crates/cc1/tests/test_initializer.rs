@@ -1,5 +1,7 @@
 // 6.5.7 Initialization
 
+use cc1::semantic::Diagnostic;
+
 accept!(init_struct_list, "struct S { int a; int b; }; struct S s = { 1, 2 };");
 accept!(init_struct_partial, "struct S { int a; int b; }; struct S s = { 1 };");
 accept!(init_struct_brace_elision, "struct S { int a; int b[2]; int c; }; struct S s = { 1, 2, 3, 4 };");
@@ -69,3 +71,41 @@ reject!(init_address_read_through_a_pointer_variable, "struct S { int x; } s; st
 reject!(init_address_of_an_automatic_object, "void f(void) { int x; static int *p = &x; }");
 reject!(init_static_struct_from_a_variable, "struct S { int a; } x; struct S y = x;");
 inits!(init_long_double_constant, "long double x = 3.3L;", &[("x", "LongDouble(3.3)")]);
+
+// 6.4 Each constant expression shall evaluate to a constant that is in the range of representable
+// values for its type; initializers of static objects and of aggregates are constant expressions.
+// gcc: "overflow in constant expression".
+recover!(init_static_int_overflows, "int x = 2147483647 + 1;", [Diagnostic::ArithmeticOverflow], &[]);
+recover!(init_static_int_underflows, "int x = -2147483647 - 2;", [Diagnostic::ArithmeticOverflow], &[]);
+recover!(init_static_long_overflows, "long x = 2147483647L + 1L;", [Diagnostic::ArithmeticOverflow], &[]);
+recover!(
+    init_static_overflow_is_kept_after_folding_back_in_range,
+    "int x = 2147483647 * 2 / 2;",
+    [Diagnostic::ArithmeticOverflow],
+    &[]
+);
+recover!(init_block_static_overflows, "int f(void) { static int x = 2147483647 + 1; return x; }", [Diagnostic::ArithmeticOverflow], &[]);
+recover!(
+    init_automatic_aggregate_element_overflows,
+    "int f(void) { int a[2] = { 2147483647 + 1 }; return a[0]; }",
+    [Diagnostic::ArithmeticOverflow],
+    &[]
+);
+recover!(init_static_int_from_out_of_range_double, "int x = 1e10;", [Diagnostic::ConstantOverflow], &[]);
+recover!(init_static_int_from_out_of_range_negative_double, "int x = -1e10;", [Diagnostic::ConstantOverflow], &[]);
+recover!(init_static_unsigned_from_negative_double, "unsigned x = -1.5;", [Diagnostic::ConstantOverflow], &[]);
+recover!(init_static_unsigned_from_too_large_double, "unsigned x = 4294967296.0;", [Diagnostic::ConstantOverflow], &[]);
+recover!(init_static_char_from_out_of_range_double, "char c = 1e3;", [Diagnostic::ConstantOverflow], &[]);
+recover!(
+    init_automatic_struct_member_from_out_of_range_double,
+    "int f(void) { struct { int a; } s = { 1e10 }; return s.a; }",
+    [Diagnostic::ConstantOverflow],
+    &[]
+);
+// Unsigned arithmetic wraps, integer narrowing is implementation-defined, and a floating value that
+// truncates into range is fine; none of these is an overflow.
+accept!(init_unsigned_wraps, "unsigned x = 4294967295u + 1;");
+accept!(init_integer_narrowing_is_not_overflow, "char c = 300; int x = (int)2147483648u;");
+accept!(init_double_truncates_into_range, "int x = 2147483647.9; int y = -2147483648.9; unsigned u = 4294967295.0; unsigned z = 0.5;");
+accept!(init_floating_targets_do_not_overflow, "float f = 1e39; double d = 1e10;");
+accept!(init_automatic_scalar_overflow_is_not_a_constant_expression, "int f(void) { int x = 2147483647 + 1; int y = 1e10; return x + y; }");
