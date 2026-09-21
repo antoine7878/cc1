@@ -39,7 +39,8 @@ pub fn of(sema: &mut Sema, id: ResolvedTypeId) -> Option<Layout> {
         ResolvedType::Array { elem, len } => {
             let len = *len;
             let elem = of(sema, elem.id)?;
-            Layout::new(elem.size * len.unwrap_or(0) as u32, elem.align)
+            let size = u64::from(elem.size).saturating_mul(len.unwrap_or(0) as u64);
+            Layout::new(size.min(u64::from(u32::MAX)) as u32, elem.align)
         }
         ty => ty.layout()?,
     };

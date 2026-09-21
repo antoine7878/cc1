@@ -16,7 +16,7 @@ impl QualifiedType {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LlvmType {
     I1,
     I8,

@@ -8,7 +8,7 @@ use crate::ast::{Expression, ExpressionId, ExpressionNode, FunctionDefinitionNod
 use crate::codegen::{
     Builder, Frozen, LlvmName, LlvmParam, LlvmSymbol, LlvmType, ParamAttr, ReturnAttr, classify_param,
 };
-use crate::semantic::{DeclaredParams, Duration, FunctionHeader, SymbolId, sema};
+use crate::semantic::{DeclaredParams, Duration, FunctionHeader, QualifiedType, ResolvedType, SymbolId, sema};
 
 #[derive(Debug, Default)]
 pub struct Locals {
@@ -64,15 +64,39 @@ impl Locals {
             self.sret = Some(slot);
             self.params.push(LlvmParam::new(slot, ParamAttr::SRet { ty, align }));
         }
+        let old_style = matches!(self.header.params, DeclaredParams::Names(_));
         for &sym in &def.params {
             self.order.push(sym);
-            let (ty, attr) = classify_param(sym.resolve().ty);
+            let (mut ty, attr) = classify_param(sym.resolve().ty);
+            if old_style && matches!(attr, ParamAttr::Direct) {
+                ty = Self::promoted(sym.resolve().ty);
+            }
             let v = LlvmSymbol::new(ty, LlvmName::SSA(next));
             if matches!(attr, ParamAttr::ByVal { .. }) {
                 self.symbols.insert(sym, v);
             }
             self.params.push(LlvmParam::new(v, attr));
             next += 1;
+        }
+    }
+
+    fn promoted(qty: QualifiedType) -> LlvmType {
+        match qty.id.resolve() {
+            ResolvedType::Char
+            | ResolvedType::SignedChar
+            | ResolvedType::UnsignedChar
+            | ResolvedType::Short
+            | ResolvedType::UnsignedShort => LlvmType::int(),
+            ResolvedType::Float => LlvmType::F64,
+            _ => qty.llvm(),
+        }
+    }
+
+    fn narrow<W: Write>(builder: &mut Builder<W>, v: LlvmSymbol, to: LlvmType) -> LlvmSymbol {
+        match (v.ty, to) {
+            (from, to) if from == to => v,
+            (LlvmType::F64, LlvmType::F32) => builder.convert("fptrunc", v, to),
+            _ => builder.convert("trunc", v, to),
         }
     }
 
@@ -107,7 +131,8 @@ impl Locals {
         for (param, id) in iter::zip(params, &self.order) {
             if let ParamAttr::Direct = param.attr {
                 let local = self.symbols[id];
-                builder.store(param.sym, local);
+                let v = Self::narrow(builder, param.sym, id.resolve().ty.llvm());
+                builder.store(v, local);
             }
         }
     }

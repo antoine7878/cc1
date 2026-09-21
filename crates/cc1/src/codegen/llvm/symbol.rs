@@ -1,6 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
-use crate::ast::ConstValue;
+use crate::ast::{ConstValue, F80};
 use crate::codegen::{LlvmName, LlvmType};
 use crate::semantic::{QualifiedType, sema};
 
@@ -39,7 +39,7 @@ impl LlvmSymbol {
         if qty.is_pointer(sema) {
             Self::null()
         } else if qty.is_floating(sema) {
-            Self::cst(qty.llvm(), ConstValue::Double(0.0))
+            Self::floating(qty.llvm(), 0.0)
         } else {
             Self::cst(qty.llvm(), ConstValue::Int(0))
         }
@@ -47,10 +47,19 @@ impl LlvmSymbol {
 
     pub fn one(qty: QualifiedType) -> Self {
         if qty.is_floating(sema()) {
-            Self::cst(qty.llvm(), ConstValue::Double(1.0))
+            Self::floating(qty.llvm(), 1.0)
         } else {
             Self::cst(LlvmType::int(), ConstValue::Int(1))
         }
+    }
+
+    fn floating(ty: LlvmType, value: f64) -> Self {
+        let value = match ty {
+            LlvmType::F32 => ConstValue::Float(value as f32),
+            LlvmType::F80 => ConstValue::LongDouble(F80::from(value)),
+            _ => ConstValue::Double(value),
+        };
+        Self::cst(ty, value)
     }
 }
 

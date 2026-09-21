@@ -7,6 +7,7 @@ use crate::ast::{
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     DeclaredParams, Diag, Diagnostic, DiagnosticSink, ParamInfo, QualifiedType, ResolvedType, Resolver, constraints,
+    layout,
 };
 
 pub fn base_type(resolver: &mut Resolver, specifiers: &[DeclarationSpecifier], span: &Span) -> Option<QualifiedType> {
@@ -80,6 +81,7 @@ fn extract_declarator(
                     .collect(resolver, &declarator.span);
             }
             let len = size.as_ref().and_then(|e| array_length(resolver, e));
+            let len = len.and_then(|len| array_size(resolver, inner_most, len, &declarator.span));
             let this_level_erred = size.is_some() && len.is_none();
             let id = resolver.sema.types.array(inner_most, len);
             extract_declarator(resolver, inner, QualifiedType::plain(id), this_level_erred)
@@ -136,14 +138,20 @@ fn resolve_param(resolver: &mut Resolver, param: &ParameterDeclaration) -> Optio
     Some(ParamInfo { name: decl.name(), ty, storage, span: *span })
 }
 
-/// 6.5.4.2 The expression delimited by [ and ] (which specifies the size of an array) shall be an
-/// integral constant expression that has a value greater than zero.
+fn array_size(resolver: &mut Resolver, elem: QualifiedType, len: usize, span: &Span) -> Option<usize> {
+    let Some(layout) = layout::of(resolver.sema, elem.id) else { return Some(len) };
+    let size = u64::from(layout.size).saturating_mul(len as u64);
+    if size > i32::MAX as u64 {
+        return resolver.add_diag(Diag::err(None, Diagnostic::ArrayTooLarge(size)), span);
+    }
+    Some(len)
+}
+
 fn array_length(resolver: &mut Resolver, expr: &ExpressionNode) -> Option<usize> {
     let value = resolver.eval_constant(expr)?;
     let Some(len) = value.get_integer_value() else {
         return resolver.add_diag(Diag::err(None, Diagnostic::NonIntArraySize), &expr.span);
     };
-    // `get_integer_value` reinterprets the representation, so the sign is read off the value.
     if value.is_negative() {
         return resolver.add_diag(Diag::err(None, Diagnostic::NegativeArraySize), &expr.span);
     }

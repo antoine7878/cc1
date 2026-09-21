@@ -153,6 +153,7 @@ pub enum Diagnostic {
     NonIntArraySize,
     NegativeArraySize,
     ZeroArraySize,
+    ArrayTooLarge(u64),
     InvalidElementType(QualifiedType),
 
     // 6.5.4.3
@@ -386,6 +387,7 @@ impl DiagnosticNode {
             Diagnostic::NonIntArraySize => "Array len has non-integral type".to_string(),
             Diagnostic::NegativeArraySize => "size of array is negative".to_string(),
             Diagnostic::ZeroArraySize => "size of array is zero".to_string(),
+            Diagnostic::ArrayTooLarge(size) => format!("size '{size}' of array exceeds maximum object size '{}'", i32::MAX),
             Diagnostic::InvalidElementType(ty) => format!("array has incomplete or function element type '{}'", ty.display(sema)),
 
             // 6.5.4.3

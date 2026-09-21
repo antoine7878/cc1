@@ -306,6 +306,23 @@ recover!(a_member_array_size_is_zero, "struct S { int a[0]; };", [Diagnostic::Ze
 
 recover!(an_inner_array_size_is_zero, "int a[1][0];", [Diagnostic::ZeroArraySize], &[]);
 
+// gcc: "size of array exceeds maximum object size '2147483647'"; the limit is the largest object
+// the i386 address space can hold, so the product of the levels is what is checked.
+recover!(array_size_exceeds_object_size, "char a[2147483648u];", [Diagnostic::ArrayTooLarge(2147483648)], &[]);
+
+recover!(array_size_product_exceeds_object_size, "int a[536870912];", [Diagnostic::ArrayTooLarge(2147483648)], &[]);
+
+recover!(nested_array_size_exceeds_object_size, "int a[65536][65536];", [Diagnostic::ArrayTooLarge(17179869184)], &[]);
+
+recover!(
+    array_of_typedef_exceeds_object_size,
+    "typedef char T[2147483647]; T t[2];",
+    [Diagnostic::ArrayTooLarge(4294967294)],
+    &[]
+);
+
+accept!(array_size_at_object_size_limit, "char a[2147483647]; int b[536870911];");
+
 // An abstract declarator carries the same constraint; the size it could not take leaves the array
 // incomplete, which is what the sizeof then reports.
 recover!(

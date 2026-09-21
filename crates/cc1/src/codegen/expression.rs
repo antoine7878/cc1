@@ -487,8 +487,8 @@ impl<W: Write> Generator<W> {
             ResolvedType::Tag(_) => self.member_place(node, object, ty)?,
             _ => unreachable!(),
         };
-        let qty = sema().expressions[node.id].ty;
-        match re.kind == ValueCategory::RValue && qty.is_scalar(sema()) {
+        let &ResolvedExpression { ty: qty, kind, .. } = &sema().expressions[node.id];
+        match kind == ValueCategory::RValue && qty.is_scalar(sema()) {
             true => Ok(self.emit_load(place, qty, Self::bitfield_of(node).as_ref())),
             false => Ok(place),
         }

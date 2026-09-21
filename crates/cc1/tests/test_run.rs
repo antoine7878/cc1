@@ -183,6 +183,16 @@ exits!(
     "int main(void) { return (9007199254740992.0L + 1.0L != 9007199254740992.0L) + 41; }",
     42
 );
+exits!(
+    long_double_inc_dec,
+    "int main(void) { long double d = 40.5L; d++; ++d; d--; return (int) (d * 2); }",
+    83
+);
+exits!(
+    floating_inc_dec_values,
+    "int main(void) { long double d = 1.5L; float f = 1.5f; double e = 1.5; int r; r = (int) (d++ * 2); r += (int) ++f; r += (int) e--; r += (int) (--d * 4); return r + 30; }",
+    42
+);
 exits!(global_negative, "int g = -42; int main(void) { return -g; }", 42);
 exits!(global_const, "const int g = 42; int main(void) { return g; }", 42);
 exits!(global_enum, "enum e { A = 40, B }; enum e g = B; int main(void) { return g + 1; }", 42);
@@ -501,6 +511,21 @@ exits!(string_literal_char, "int main(void) { return \"*\"[0]; }", 42);
 exits!(null_pointer_initializer, "int main(void) { int *p = 0; int x; x = 42; return x; }", 42);
 exits!(null_pointer_assign, "int main(void) { int *p; int x; p = 0; x = 42; return x; }", 42);
 exits!(null_pointer_cast, "int main(void) { int *p; int x; p = (int *) 0; x = 42; return x; }", 42);
+exits!(
+    member_through_cast_pointer,
+    "struct s { char *key; int val; }; int f(void *p) { return ((struct s *) p)->val; } int g(const void *p) { return ((const struct s *) p)->val; } int main(void) { struct s v = { \"k\", 21 }; return f(&v) + g(&v); }",
+    42
+);
+exits!(
+    member_through_cast_of_member,
+    "struct s { int a; struct s *next; }; int main(void) { struct s v = { 42, 0 }; struct s w; w.next = &v; return ((struct s *) w.next)->a; }",
+    42
+);
+exits!(
+    member_through_qualifier_cast,
+    "struct s { int a; }; struct s g = { 42 }; int main(void) { const struct s *p = &g; return ((struct s *) p)->a; }",
+    42
+);
 exits!(char_to_pointer_sign_extends, "int main(void) { char c; c = -1; return ((int) (char *) c >> 8) + 43; }", 42);
 
 exits!(float_arithmetic, "int main(void) { double d; d = 21.0; return d * 2; }", 42);
@@ -527,6 +552,18 @@ exits!(
     "int f(a, b) int a; char b; { return a + b; } int g(); int main(void) { return f(40, 2) + g(); } int g() { return 0; }",
     42
 );
+exits!(
+    old_style_char_and_float_params_are_promoted,
+    "int f(a, b) char a; float b; { return a + (int) b; } int main(void) { return f(40, 2.9f); }",
+    42
+);
+exits!(
+    old_style_short_and_unsigned_char_params_are_promoted,
+    "int f(s, u) short s; unsigned char u; { return s + u; } int main(void) { return f(-8, 50); }",
+    42
+);
+exits!(old_style_float_param_narrowed, "double f(x) float x; { return x * 2; } int main(void) { return (int) f(21.25f); }", 42);
+exits!(old_style_char_param_narrowed, "char f(c) char c; { return c + 1; } int main(void) { return f(41); }", 42);
 
 exits!(initializer_evaluated_once, "int main(void) { int x = 40; int y = x++; return x + y; }", 81);
 
@@ -1054,5 +1091,19 @@ exits_linked!(
     abi_sret_forwarded_from_gcc,
     "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); struct big fwd(int n) { return gmk(n); } int gsum(struct big v); int main(void) { return gsum(fwd(21)); }",
     BIG_HELPER,
+    42
+);
+
+/* 16. old-style definitions receive promoted arguments (6.7.1) */
+exits_linked!(
+    abi_old_style_params_from_gcc,
+    "int kr(a, f) char a; float f; { return a + (int) f; } int call(void); int main(void) { return call(); }",
+    "int kr(); int call(void) { return kr(40, 2.75f); }",
+    42
+);
+exits_linked!(
+    abi_old_style_params_to_gcc,
+    "int kr(); int main(void) { return kr(40.5f, 2); }",
+    "int kr(f, c) float f; char c; { return (int) f + c; }",
     42
 );

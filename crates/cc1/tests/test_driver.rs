@@ -30,6 +30,46 @@ fn compile(name: &str, src: &str) -> Run {
     run
 }
 
+fn compile_bytes(name: &str, src: &[u8]) -> Run {
+    let path = std::env::temp_dir().join(format!("cc1_driver_{}_{name}.c", std::process::id()));
+    fs::write(&path, src).expect("write source");
+    let run = cc1(&[path.to_str().expect("utf-8 path")]);
+    let _ = fs::remove_file(&path);
+    run
+}
+
+test_case!(invalid_utf8_input_is_a_stray_character, {
+    let run = compile_bytes("bad_utf8", b"int x = 1; \xff\xfe\n");
+    assert_eq!(run.status, 1, "stderr: {}", run.stderr);
+    assert!(run.stderr.contains("stray"), "stderr: {}", run.stderr);
+    assert!(!run.stderr.contains("panicked"), "stderr: {}", run.stderr);
+});
+
+test_case!(random_bytes_do_not_crash, {
+    let bytes: Vec<u8> = (0..20000u32).map(|i| (i.wrapping_mul(2654435761) >> 13) as u8).collect();
+    let run = compile_bytes("random_bytes", &bytes);
+    assert_eq!(run.status, 1, "stderr: {}", run.stderr);
+    assert!(!run.stderr.contains("panicked"), "stderr: {}", run.stderr);
+});
+
+test_case!(null_characters_are_ignored, {
+    let run = compile_bytes("nul", b"int main(v\0oid) { return 0; }\n");
+    assert_eq!(run.status, 0, "stderr: {}", run.stderr);
+    assert!(run.stdout.contains("define i32 @main"));
+});
+
+test_case!(deeply_nested_expression_does_not_overflow_the_stack, {
+    let src = format!("int main(void) {{ int x = {}1; return x; }}", "1 + ".repeat(20000));
+    let run = compile("deep_expression", &src);
+    assert_eq!(run.status, 0, "stderr: {}", run.stderr);
+});
+
+test_case!(deeply_nested_statements_do_not_overflow_the_stack, {
+    let src = format!("int main(void) {{ int i = 0; {}i = 1; return i; }}", "if (i) ".repeat(10000));
+    let run = compile("deep_statements", &src);
+    assert_eq!(run.status, 0, "stderr: {}", run.stderr);
+});
+
 test_case!(no_argument_fails_without_emitting, {
     let run = cc1(&[]);
     assert_eq!(run.status, 1);

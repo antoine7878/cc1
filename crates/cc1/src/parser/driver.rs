@@ -1,6 +1,6 @@
 use std::fmt::Display;
-use std::fs::File;
-use std::io::{BufReader, Read};
+use std::fs::read;
+use std::io::{Cursor, Read};
 
 use libft::Span;
 
@@ -9,8 +9,12 @@ use crate::parser::{YYLex, Yacc};
 use crate::semantic::{Diagnostic, DiagnosticNode, ExpectedTokens};
 
 pub fn parse_source(ctx: Context) -> Context {
-    match File::open(&ctx.file_name) {
-        Ok(file) => parse_reader(ctx, BufReader::new(file)).0,
+    match read(&ctx.file_name) {
+        Ok(bytes) => {
+            let bytes: Vec<u8> = bytes.into_iter().filter(|&b| b != 0).collect();
+            let text = String::from_utf8_lossy(&bytes).into_owned();
+            parse_reader(ctx, Cursor::new(text)).0
+        }
         Err(error) => {
             let mut ctx = ctx;
             ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::InputError(error.to_string()), Span::default()));
