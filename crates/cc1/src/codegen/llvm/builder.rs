@@ -5,7 +5,7 @@ use std::iter::once;
 use crate::ast::{StringConstant, Tag};
 use crate::codegen::{
     Frozen, LlvmInit, LlvmName, LlvmParam, LlvmSymbol, LlvmType, ParamAttr, ReturnAttr, classify_param,
-    struct_elements,
+    struct_elements, union_widest,
 };
 use crate::semantic::{
     DefinitionState, Initializer, Layout, Linkage, QualifiedType, ResolvedType, SymbolId, TagDef, TagDefId, sema,
@@ -115,10 +115,7 @@ impl<W: Write> Builder<W> {
         if !self.has_block_ret {
             let sym = f.resolve();
             let &ResolvedType::Function { ret, .. } = sym.ty.id.resolve() else { unreachable!() };
-            match ReturnAttr::classify_return(ret) {
-                ReturnAttr::Void | ReturnAttr::Sret { .. } => self.ret_void(),
-                ReturnAttr::Direct(_) => self.ret(LlvmSymbol::zero(ret)),
-            }
+            self.ret_default(ret);
         }
         if self.error.is_none() {
             let written = self.w.write_all(b"}\n");
@@ -175,6 +172,13 @@ impl<W: Write> Builder<W> {
     pub fn ret_void(&mut self) {
         self.write_line(format_args!("  ret void"));
         self.has_block_ret = true;
+    }
+
+    pub fn ret_default(&mut self, ret: QualifiedType) {
+        match ReturnAttr::classify_return(ret) {
+            ReturnAttr::Void | ReturnAttr::Sret { .. } => self.ret_void(),
+            ReturnAttr::Direct(_) => self.ret(LlvmSymbol::zero(ret)),
+        }
     }
 
     pub fn br_cond(&mut self, cond: LlvmSymbol, l1: LlvmName, l2: LlvmName) {
@@ -286,8 +290,7 @@ impl<W: Write> Builder<W> {
 
     fn union_def(&mut self, ty: LlvmType, def: &TagDef) {
         let size = ty.size();
-        let members = def.members.iter().filter_map(|member| member.symbol).map(|sym| sym.resolve().ty);
-        let Some(widest) = members.max_by_key(|qty| sema().layout(&qty.id).align) else {
+        let Some(widest) = union_widest(def) else {
             return self.write_line(format_args!("{ty} = type {{ [{size} x {}] }}", LlvmType::char()));
         };
         match size - sema().layout(&widest.id).size {

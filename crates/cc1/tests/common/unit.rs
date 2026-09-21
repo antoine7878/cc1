@@ -97,6 +97,11 @@ impl Unit {
         self.parsed() && self.diagnostics().is_empty()
     }
 
+    pub fn only_warns(&self) -> bool {
+        let diagnostics = self.diagnostics();
+        !diagnostics.is_empty() && diagnostics.iter().all(|d| !d.is_error())
+    }
+
     pub fn enumerators(&self) -> Vec<(String, String)> {
         self.sema.expect("Unit::compile required")
             .symbols

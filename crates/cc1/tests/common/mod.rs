@@ -5,7 +5,7 @@ mod facts;
 mod types;
 mod unit;
 
-pub use exec::{run_emits, run_exit, run_exit_linked};
+pub use exec::{run_emits, run_emits_warns, run_exit, run_exit_linked, run_exit_warns};
 pub use facts::run_facts;
 pub use types::{Shape, Ty, ints, lv, none, rv};
 pub use unit::{

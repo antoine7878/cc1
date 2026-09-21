@@ -63,6 +63,11 @@ macro_rules! exits {
             $crate::common::run_exit(stringify!($name), $src, $expected);
         });
     };
+    (warns $name:ident, $src:expr, $expected:expr) => {
+        test_case!($name, {
+            $crate::common::run_exit_warns(stringify!($name), $src, $expected);
+        });
+    };
 }
 
 #[macro_export]
@@ -84,6 +89,16 @@ macro_rules! emits {
     (not $name:ident, $src:expr, $needle:literal) => {
         test_case!($name, {
             $crate::common::run_emits(stringify!($name), $src, $needle, false);
+        });
+    };
+    (warns $name:ident, $src:expr, $needle:literal) => {
+        test_case!($name, {
+            $crate::common::run_emits_warns(stringify!($name), $src, $needle, true);
+        });
+    };
+    (warns not $name:ident, $src:expr, $needle:literal) => {
+        test_case!($name, {
+            $crate::common::run_emits_warns(stringify!($name), $src, $needle, false);
         });
     };
 }

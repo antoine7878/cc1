@@ -1300,11 +1300,18 @@ shaped!(
     vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int)),]
 );
 
-// 6.3.2.4 the value of the result has the type of the operand: it is not promoted.
+// 6.3.2.4 the operand is promoted for the addition, but the value of the result has the
+// type of the operand.
 shaped!(
     post_increment_keeps_the_type_of_its_operand,
     "char c; void f(void) { c++; }",
-    vec![lv(Ty::Char).then(LValueToRValue, Ty::Char), rv(Ty::Char)]
+    vec![
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int)
+            .result(IntegerConversion, Ty::Char),
+        rv(Ty::Char),
+    ]
 );
 
 // 6.3.2.4 The operand shall have qualified or unqualified scalar type and shall be a
@@ -1362,10 +1369,18 @@ shaped!(
     vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int)),]
 );
 
+// 6.3.2.4 the operand is promoted for the addition, but the value of the result has the
+// type of the operand.
 shaped!(
     pre_increment_keeps_the_type_of_its_operand,
     "char c; void f(void) { ++c; }",
-    vec![lv(Ty::Char).then(LValueToRValue, Ty::Char), rv(Ty::Char)]
+    vec![
+        lv(Ty::Char)
+            .then(LValueToRValue, Ty::Char)
+            .then(IntegerPromotion, Ty::Int)
+            .result(IntegerConversion, Ty::Char),
+        rv(Ty::Char),
+    ]
 );
 
 // 6.3.3.1 The expression ++E is equivalent to (E += 1): its result is not an lvalue.

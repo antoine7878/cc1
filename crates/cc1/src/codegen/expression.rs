@@ -187,12 +187,16 @@ impl<W: Write> Generator<W> {
             _ => BinaryOp::Sub,
         };
         let one = LlvmSymbol::one(qty);
-        let v_after = self.arithmetic(&bop, v_before, qty, one, QualifiedType::plain(sema().builtins.int))?;
+        let mut v_after = self.arithmetic(&bop, v_before, qty, one, QualifiedType::plain(sema().builtins.int))?;
+        if let Some(cast) = &re_operand.result_cast {
+            v_after = self.convert(v_after, qty, cast, None)?;
+        }
         let bf = Self::bitfield_of(operand);
         let v_after = self.emit_store(v_after, loc, bf.as_ref());
-        match op {
-            UnaryOp::PreDec | UnaryOp::PreInc => Ok(v_after),
-            _ => Ok(v_before),
+        match (op, &re_operand.result_cast) {
+            (UnaryOp::PreDec | UnaryOp::PreInc, _) => Ok(v_after),
+            (_, Some(cast)) => self.convert(v_before, qty, cast, None),
+            (_, None) => Ok(v_before),
         }
     }
 

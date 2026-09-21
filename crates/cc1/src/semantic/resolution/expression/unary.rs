@@ -15,7 +15,10 @@ pub fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> ExprResult {
             _ => None,
         };
         constraints::expression::check_inc_dec(op, re.ty.is_scalar(sema), non_object_pointee, re.ty).into_result()?;
-        Ok((re.casted_ty(), RValue))
+        let target = re.ty.unqualified();
+        cast::promote(sema, re);
+        re.result_cast = cast::arithmetic_conversion(sema, re.casted_ty(), target);
+        Ok((target, RValue))
     })
 }
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from argparse import Namespace, ArgumentParser
 import argparse
-from contextlib import nullcontext
 import os
 import subprocess
 import sys
@@ -80,7 +79,7 @@ def cc1_path() -> str:
 
 
 def compile_argv(step: Step, _: Namespace) -> list[str]:
-    return [cc1_path(), step.input]
+    return [cc1_path(), step.input, "-o", step.output]
 
 
 def lower_argv(step: Step, args: Namespace) -> list[str]:
@@ -319,15 +318,12 @@ def plan(
     return steps
 
 
-def run(name: str, argv: list, redirect: "str | None" = None) -> None:
+def run(name: str, argv: list) -> None:
     try:
-        with open(redirect, "wb") if redirect else nullcontext() as out:
-            result = subprocess.run(argv, stdout=out)
+        result = subprocess.run(argv)
     except OSError as e:
         raise Exception(f"{name}: {e.filename}: {e.strerror}")
     if result.returncode != 0:
-        if redirect:
-            os.unlink(redirect)
         raise Exception(f"{name} failed")
 
 
@@ -338,9 +334,8 @@ def compile(
     if steps is None:
         return path
     for step in steps:
-        redirect = step.output if step.stage == Stage.COMPILE else None
         argv = tool_argv(step, args)
-        run(argv[0], argv, redirect)
+        run(argv[0], argv)
     if args.last == Stage.LINK and steps:
         return steps[-1].output
     return None

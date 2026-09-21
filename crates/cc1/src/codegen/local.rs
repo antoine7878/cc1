@@ -108,6 +108,10 @@ impl Locals {
         &self.params
     }
 
+    pub fn return_ty(&self) -> QualifiedType {
+        self.header.id.resolve().return_ty
+    }
+
     pub fn is_variadic(&self) -> bool {
         matches!(self.header.params, DeclaredParams::Prototype { is_variadic: true, .. })
     }

@@ -13,6 +13,7 @@ pub use generator::{Generator, generate, generate_to};
 pub use global::Globals;
 pub use llvm::{
     Builder, LlvmElement, LlvmInit, LlvmName, LlvmOperator, LlvmParam, LlvmSymbol, LlvmType, struct_elements,
+    union_widest,
 };
 pub use local::Locals;
 

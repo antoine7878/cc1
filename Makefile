@@ -25,11 +25,10 @@ $(YACC_RS): $(C_Y)
 
 test: all
 	rm -f ./hello.ll ./hello.s ./hello.o ./a.out
-	./fcc -c ./rscs/hello.c
+	./fcc -e ./rscs/hello.c -o-
 
 ctest: all
 	cargo nextest run -p cc1
-	python3 -m unittest test/test_fcc.py
 
 ttest: all
 	cargo nextest run

@@ -163,10 +163,21 @@ fn run_gcc_and_ir(src: &str, ir: &str, helper: Option<&str>) -> (Run, Run) {
 }
 
 fn run_exit_with(name: &str, src: &str, helper: Option<&str>, expected: i32) {
+    run_exit_checked(name, src, helper, expected, false);
+}
+
+fn check_diagnostics(name: &str, unit: &Unit, src: &str, warns: bool) {
+    assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
+    match warns {
+        false => assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{src}\n{}", unit.render()),
+        true => assert!(unit.only_warns(), "`{name}` expected only warnings:\n{src}\n{}", unit.render()),
+    }
+}
+
+fn run_exit_checked(name: &str, src: &str, helper: Option<&str>, expected: i32, warns: bool) {
     let unit = Unit::compile(src);
 
-    assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
-    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{src}\n{}", unit.render());
+    check_diagnostics(name, &unit, src, warns);
     assert_eq!(unit.missing_facts(), Vec::<String>::new(), "`{name}` is missing facts a code generator needs:\n{src}");
 
     let helper_text = helper.map(|h| format!("\n{h}")).unwrap_or_default();
@@ -180,11 +191,22 @@ pub fn run_exit(name: &str, src: &str, expected: i32) {
     run_exit_with(name, src, None, expected);
 }
 
+pub fn run_exit_warns(name: &str, src: &str, expected: i32) {
+    run_exit_checked(name, src, None, expected, true);
+}
+
 pub fn run_emits(name: &str, src: &str, needle: &str, expected: bool) {
+    run_emits_checked(name, src, needle, expected, false);
+}
+
+pub fn run_emits_warns(name: &str, src: &str, needle: &str, expected: bool) {
+    run_emits_checked(name, src, needle, expected, true);
+}
+
+fn run_emits_checked(name: &str, src: &str, needle: &str, expected: bool, warns: bool) {
     let unit = Unit::compile(src);
 
-    assert!(unit.parsed(), "`{name}` failed to parse:\n{src}");
-    assert!(unit.diagnostics().is_empty(), "`{name}` unexpected diagnostic:\n{src}\n{}", unit.render());
+    check_diagnostics(name, &unit, src, warns);
 
     let ir = unit.ir();
     assert_eq!(

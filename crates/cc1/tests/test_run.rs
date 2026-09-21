@@ -229,6 +229,54 @@ exits!(
     42
 );
 exits!(global_negative, "int g = -42; int main(void) { return -g; }", 42);
+exits!(warns return_without_value_from_int, "int f(int n) { if (n) return; return 42; } int main(void) { return f(0); }", 42);
+exits!(warns return_without_value_from_long, "long f(int n) { if (n) return; return 42; } int main(void) { return f(0); }", 42);
+exits!(
+    warns return_without_value_from_double,
+    "double f(int n) { if (n) return; return 42; } int main(void) { return (int) f(0); }",
+    42
+);
+exits!(warns return_without_value_from_char, "char f(int n) { if (n) return; return 42; } int main(void) { return f(0); }", 42);
+exits!(
+    warns return_without_value_from_pointer,
+    "int *f(int n) { if (n) return; return 0; } int main(void) { return f(0) == 0 ? 42 : 0; }",
+    42
+);
+exits!(
+    warns return_without_value_from_struct,
+    "struct s { int a; }; struct s f(int n) { struct s r; r.a = 42; if (n) return; return r; } int main(void) { return f(0).a; }",
+    42
+);
+exits!(return_without_value_from_void, "void f(int n) { if (n) return; } int main(void) { f(1); return 42; }", 42);
+emits!(
+    warns return_without_value_in_int_function_returns_a_value,
+    "int f(int n) { if (n) return; return 42; }",
+    "ret i32 0"
+);
+emits!(warns not return_without_value_in_int_function_never_returns_void, "int f(int n) { if (n) return; return 42; }", "ret void");
+exits!(enum_inc_dec, "enum e { A = 40, B, C }; int main(void) { enum e v = A; v++; ++v; return v; }", 42);
+exits!(
+    enum_dec_through_pointer,
+    "enum e { A = 40, B, C }; int main(void) { enum e v = C; enum e *p = &v; p[0]--; return --v + (v == A); }",
+    41
+);
+exits!(
+    enum_post_inc_value,
+    "enum e { A = 40, B, C }; int main(void) { enum e v = B; int r = v++; return r + (v == C); }",
+    42
+);
+exits!(
+    narrow_inc_dec_wraps,
+    "int main(void) { char c = 127; unsigned char u = 255; short s = -32768; c++; u++; s--; return (c == -128) + (u == 0) + (s == 32767) + 39; }",
+    42
+);
+exits!(narrow_post_inc_value, "int main(void) { char c = 127; int r = c++; return r - 85; }", 42);
+exits!(narrow_pre_inc_value, "int main(void) { unsigned char u = 200; unsigned r = ++u * 2; return r - 360; }", 42);
+exits!(
+    bitfield_inc_wraps,
+    "struct b { unsigned a : 3; int s : 2; }; int main(void) { struct b v; v.a = 7; v.s = 1; v.a++; v.s++; return (v.a == 0) + (v.s == -2) + 40; }",
+    42
+);
 exits!(global_const, "const int g = 42; int main(void) { return g; }", 42);
 exits!(global_enum, "enum e { A = 40, B }; enum e g = B; int main(void) { return g + 1; }", 42);
 exits!(global_tentative, "int g; int g; int main(void) { return g + 42; }", 42);
@@ -282,6 +330,46 @@ exits!(
     42
 );
 exits!(global_struct_zero, "struct s { char c; int a; } v; int *p = &v.a; int main(void) { return *p + 42; }", 42);
+exits!(
+    global_union_in_struct_keeps_first_member,
+    "union u { int i; double d; }; struct s { int tag; union u v; } g = { 1, { 41 } }; int main(void) { return g.tag + g.v.i; }",
+    42
+);
+exits!(
+    global_union_array_with_zero_tail,
+    "union u { int i; double d; }; union u a[3] = { { 20 }, { 22 } }; int main(void) { return a[0].i + a[1].i + a[2].i; }",
+    42
+);
+exits!(
+    global_union_string_member_in_struct,
+    "union u { char c[3]; int i; }; struct s { union u v; short t; } g = { { \"*\" }, 2 }; int main(void) { return g.v.c[0] + g.v.c[1] + g.t - 2; }",
+    42
+);
+exits!(
+    global_union_nested_in_union_in_struct,
+    "union a { int i; double d; }; union b { union a a; int x; }; struct s { char c; union b b; } g = { 2, { { 40 } } }; int main(void) { return g.c + g.b.a.i; }",
+    42
+);
+exits!(
+    local_struct_with_union_member_init,
+    "union u { int i; double d; }; struct s { char c; union u v; }; int main(void) { static struct s g = { 2, { 40 } }; struct s l = { 1, { 41 } }; return g.c + g.v.i + l.c + l.v.i - 42; }",
+    42
+);
+exits!(
+    global_anonymous_union_member_init,
+    "struct s { union { int i; long double ld; } u; int k; } g = { { 40 }, 2 }; int main(void) { return g.u.i + g.k; }",
+    42
+);
+emits!(
+    union_in_struct_initializer_uses_a_literal_type,
+    "union u { int i; double d; }; struct s { int tag; union u v; } g = { 1, { 41 } }; int main(void) { return g.v.i; }",
+    "@g = global <{ i32, { i32, [4 x i8] } }> <{ i32 1, { i32, [4 x i8] } { i32 41, [4 x i8] zeroinitializer } }>"
+);
+emits!(
+    union_matching_its_widest_member_keeps_its_name,
+    "union u { int i; char c; }; struct s { union u v; } g = { { 42 } }; int main(void) { return g.v.i; }",
+    "@g = global %struct.s <{ %union.u { i32 42 } }>"
+);
 exits!(
     global_struct_ptr_member,
     "int x = 42; struct s { int *p; } v = {&x}; int **pp = &v.p; int main(void) { return **pp; }",

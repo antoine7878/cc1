@@ -147,7 +147,7 @@ impl<W: Write> Generator<W> {
     pub fn emit_jump_statement(&mut self, id: StatementId, node: &JumpStatementNode) -> Result<(), Diagnostic> {
         match &node.stmt {
             JumpStatement::Return(Some(e)) => self.return_(e)?,
-            JumpStatement::Return(None) => self.builder.ret_void(),
+            JumpStatement::Return(None) => self.builder.ret_default(self.locals.return_ty()),
             JumpStatement::Break => {
                 let &ResolvedStatement::Break(target) = &sema().statements[id] else {
                     return Err(Diagnostic::Invariant("break target"));

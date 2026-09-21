@@ -16,7 +16,7 @@ impl<'a> LlvmInit<'a> {
     }
 
     fn zero(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{} zeroinitializer", self.ty.llvm())
+        write!(f, "{} zeroinitializer", repr(self.ty))
     }
 
     fn value(&self, f: &mut Formatter<'_>, value: ConstValue) -> fmt::Result {
@@ -73,7 +73,7 @@ impl<'a> LlvmInit<'a> {
     }
 
     fn array(&self, f: &mut Formatter<'_>, elem: QualifiedType, len: usize, items: &[Initializer]) -> fmt::Result {
-        write!(f, "{} [", self.ty.llvm())?;
+        write!(f, "[{len} x {}] [", repr(elem))?;
         for i in 0..len {
             let sep = if i == 0 { "" } else { ", " };
             write!(f, "{sep}{}", LlvmInit::new(elem, items.get(i)))?;
@@ -83,7 +83,7 @@ impl<'a> LlvmInit<'a> {
 
     fn structure(&self, f: &mut Formatter<'_>, def: &TagDef, items: &[Initializer]) -> fmt::Result {
         let size = sema().layout(&self.ty.id).size;
-        write!(f, "{} <{{ ", self.ty.llvm())?;
+        write!(f, "{} <{{ ", repr(self.ty))?;
         for (i, element) in struct_elements(def, size).iter().enumerate() {
             let sep = if i == 0 { "" } else { ", " };
             write!(f, "{sep}")?;
@@ -139,19 +139,79 @@ impl<'a> LlvmInit<'a> {
     }
 
     fn union(&self, f: &mut Formatter<'_>, def: &TagDef, items: &[Initializer]) -> fmt::Result {
-        let Some(first) = def.members.iter().find_map(|member| member.symbol) else {
+        let Some(first) = union_first(def) else {
             return self.zero(f);
         };
-        let first = first.resolve().ty;
-        let pad = sema().layout(&self.ty.id).size - sema().layout(&first.id).size;
         let init = LlvmInit::new(first, items.first());
-        match pad {
-            0 => write!(f, "{{ {} }} {{ {init} }}", first.llvm()),
-            pad => {
-                let padding = format!("[{pad} x {}]", LlvmType::char());
-                write!(f, "{{ {}, {padding} }} {{ {init}, {padding} zeroinitializer }}", first.llvm())
+        match union_pad(self.ty, first) {
+            0 => write!(f, "{} {{ {init} }}", repr(self.ty)),
+            pad => write!(f, "{} {{ {init}, [{pad} x {}] zeroinitializer }}", repr(self.ty), LlvmType::char()),
+        }
+    }
+}
+
+pub fn union_first(def: &TagDef) -> Option<QualifiedType> {
+    def.members.iter().find_map(|member| member.symbol).map(|sym| sym.resolve().ty)
+}
+
+pub fn union_widest(def: &TagDef) -> Option<QualifiedType> {
+    let members = def.members.iter().filter_map(|member| member.symbol).map(|sym| sym.resolve().ty);
+    members.max_by_key(|qty| sema().layout(&qty.id).align)
+}
+
+fn union_pad(union: QualifiedType, member: QualifiedType) -> u32 {
+    sema().layout(&union.id).size - sema().layout(&member.id).size
+}
+
+fn needs_literal(qty: QualifiedType) -> bool {
+    match qty.id.resolve() {
+        ResolvedType::Array { elem, .. } => needs_literal(*elem),
+        ResolvedType::Tag(id) => {
+            let def = id.resolve();
+            match def.kind {
+                Tag::Struct => def.members.iter().filter_map(|m| m.symbol).any(|sym| needs_literal(sym.resolve().ty)),
+                Tag::Union => match (union_first(def), union_widest(def)) {
+                    (Some(first), Some(widest)) => first.llvm() != widest.llvm() || needs_literal(first),
+                    _ => false,
+                },
+                Tag::Enum => false,
             }
         }
+        _ => false,
+    }
+}
+
+fn repr(qty: QualifiedType) -> String {
+    if !needs_literal(qty) {
+        return qty.llvm().to_string();
+    }
+    match qty.id.resolve() {
+        ResolvedType::Array { elem, len } => format!("[{} x {}]", len.unwrap_or(0), repr(*elem)),
+        ResolvedType::Tag(id) => {
+            let def = id.resolve();
+            match def.kind {
+                Tag::Struct => {
+                    let size = sema().layout(&qty.id).size;
+                    let elements = struct_elements(def, size)
+                        .iter()
+                        .map(|element| match *element {
+                            LlvmElement::Member { ty, .. } => repr(ty),
+                            element => element.ty().to_string(),
+                        })
+                        .collect::<Vec<_>>();
+                    format!("<{{ {} }}>", elements.join(", "))
+                }
+                Tag::Union => {
+                    let first = union_first(def).unwrap();
+                    match union_pad(qty, first) {
+                        0 => format!("{{ {} }}", repr(first)),
+                        pad => format!("{{ {}, [{pad} x {}] }}", repr(first), LlvmType::char()),
+                    }
+                }
+                Tag::Enum => unreachable!("literal type of an enum"),
+            }
+        }
+        _ => unreachable!("literal type of a scalar"),
     }
 }
 

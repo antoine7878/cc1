@@ -9,7 +9,7 @@ pub mod types;
 
 pub use aggregate::{LlvmElement, struct_elements};
 pub use builder::Builder;
-pub use init::LlvmInit;
+pub use init::{LlvmInit, union_widest};
 pub use name::LlvmName;
 pub use operator::LlvmOperator;
 pub use param::LlvmParam;

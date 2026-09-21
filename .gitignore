@@ -1,6 +1,7 @@
 crates/*/src/parser/lex.rs
 crates/*/src/parser/yacc.rs
 tarpaulin-report.*
+cc1.pdf
 
 # Other
 samples/
