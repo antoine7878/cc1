@@ -136,7 +136,7 @@ impl Locals {
             if let ParamAttr::Direct = param.attr {
                 let local = self.symbols[id];
                 let v = Self::narrow(builder, param.sym, id.resolve().ty.llvm());
-                builder.store(v, local);
+                builder.store(v, local, id.resolve().ty.is_volatile);
             }
         }
     }
@@ -154,12 +154,25 @@ impl Visitor for Locals {
     }
 
     fn visit_expression(&mut self, node: &ExpressionNode) {
+        if let Expression::FunctionCall(_, args) = node.id.resolve() {
+            for arg in args {
+                let Some(re) = sema().expressions.get(arg.id) else { continue };
+                if re.ty.is_record(sema())
+                    && re.ty.is_volatile
+                    && !self.spill_order.iter().any(|(id, _)| *id == arg.id)
+                {
+                    self.spill_order.push((arg.id, re.ty.llvm()));
+                }
+            }
+        }
         walk_expression(self, node);
         let Expression::FunctionCall(_, _) = node.id.resolve() else { return };
         let Some(re) = sema().expressions.get(node.id) else { return };
         if !re.ty.is_record(sema()) {
             return;
         }
-        self.spill_order.push((node.id, re.ty.llvm()));
+        if !self.spill_order.iter().any(|(id, _)| *id == node.id) {
+            self.spill_order.push((node.id, re.ty.llvm()));
+        }
     }
 }

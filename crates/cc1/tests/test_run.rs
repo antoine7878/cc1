@@ -2,6 +2,122 @@ exits!(return_constant, "int main(void) { return 42; }", 42);
 exits!(return_zero, "int main(void) { return 0; }", 0);
 exits!(return_negative_wraps, "int main(void) { return -1; }", 255);
 
+exits!(
+    volatile_scalar_execution,
+    "volatile int x = 40; int main(void) { x++; return x + 1; }",
+    42
+);
+emits!(
+    volatile_global_load_is_volatile,
+    "volatile int x; int f(void) { return x; }",
+    "load volatile i32, ptr @x"
+);
+emits!(
+    volatile_global_store_is_volatile,
+    "volatile int x; void f(void) { x = 42; }",
+    "store volatile i32 42, ptr @x"
+);
+emits!(
+    volatile_parameter_initialization_is_volatile,
+    "int f(volatile int x) { return x; }",
+    "store volatile i32 %0"
+);
+emits!(
+    volatile_local_initialization_is_volatile,
+    "int f(void) { volatile int x = 42; return x; }",
+    "store volatile i32 42"
+);
+emits!(
+    volatile_pointer_object_loads_the_pointer_volatile,
+    "int x; int * volatile p = &x; int f(void) { return *p; }",
+    "load volatile ptr, ptr @p"
+);
+emits!(
+    not volatile_pointer_object_does_not_qualify_the_pointee,
+    "int x; int * volatile p = &x; int f(void) { return *p; }",
+    "load volatile i32"
+);
+emits!(
+    pointer_to_volatile_loads_the_pointee_volatile,
+    "volatile int x; volatile int *p = &x; int f(void) { return *p; }",
+    "load volatile i32"
+);
+emits!(
+    volatile_structure_qualifies_member_access,
+    "struct S { int x; }; volatile struct S s; int f(void) { return s.x; }",
+    "load volatile i32"
+);
+emits!(
+    volatile_member_access_is_volatile,
+    "struct S { volatile int x; }; struct S s; int f(void) { return s.x; }",
+    "load volatile i32"
+);
+emits!(
+    const_volatile_global_has_mutable_storage,
+    "const volatile int x = 42; int f(void) { return x; }",
+    "@x = global i32 42"
+);
+emits!(
+    not const_volatile_global_is_not_an_llvm_constant,
+    "const volatile int x = 42; int f(void) { return x; }",
+    "@x = constant"
+);
+emits!(
+    volatile_aggregate_copy_uses_volatile_memcpy,
+    "struct S { int x; }; volatile struct S a; struct S b; void f(void) { a = b; b = a; }",
+    "i32 4, i1 true"
+);
+emits!(
+    volatile_aggregate_argument_uses_volatile_memcpy,
+    "struct S { int x; }; void take(struct S); volatile struct S s; void f(void) { take(s); }",
+    "i32 4, i1 true"
+);
+emits!(
+    volatile_aggregate_parameter_access_is_volatile,
+    "struct S { int x; }; int f(volatile struct S s) { return s.x; }",
+    "load volatile i32"
+);
+emits!(
+    volatile_aggregate_return_uses_volatile_memcpy,
+    "struct S { int x; }; volatile struct S s; struct S f(void) { return s; }",
+    "i32 4, i1 true"
+);
+emits!(
+    not ordinary_aggregate_copy_uses_nonvolatile_memcpy,
+    "struct S { int x; }; struct S a; struct S b; void f(void) { a = b; }",
+    "i32 4, i1 true"
+);
+emits!(
+    volatile_aggregate_list_initialization_uses_volatile_memcpy,
+    "struct S { int x; }; int f(void) { volatile struct S s = { 42 }; return s.x; }",
+    "i32 4, i1 true"
+);
+emits!(
+    volatile_array_typedef_qualifies_element_access,
+    "typedef int A[2]; volatile A a; int f(void) { a[0] = 42; return a[0]; }",
+    "store volatile i32 42"
+);
+
+#[test]
+fn volatile_bitfield_update_reads_and_writes_once() {
+    let unit = crate::common::Unit::compile(
+        "struct S { unsigned int x : 3; }; volatile struct S s; void f(void) { s.x++; }",
+    );
+    let ir = unit.ir();
+    assert_eq!(ir.matches("load volatile i32").count(), 1, "{ir}");
+    assert_eq!(ir.matches("store volatile i32").count(), 1, "{ir}");
+}
+
+#[test]
+fn volatile_bitfield_compound_assignment_reads_and_writes_once() {
+    let unit = crate::common::Unit::compile(
+        "struct S { unsigned int x : 3; }; volatile struct S s; void f(void) { s.x += 1; }",
+    );
+    let ir = unit.ir();
+    assert_eq!(ir.matches("load volatile i32").count(), 1, "{ir}");
+    assert_eq!(ir.matches("store volatile i32").count(), 1, "{ir}");
+}
+
 exits!(add, "int main(void) { return 40 + 2; }", 42);
 exits!(sub, "int main(void) { return 50 - 8; }", 42);
 exits!(mul, "int main(void) { return 6 * 7; }", 42);

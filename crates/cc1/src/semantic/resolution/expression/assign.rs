@@ -41,7 +41,7 @@ pub fn simple_assignment(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNo
     with_assign_ops(sema, e1, e2, |sema, lhs, rhs| {
         constraints::expression::check_assignable(sema, lhs.kind, lhs.ty).into_result()?;
         let q = cast::assignment_conversion(sema, lhs, rhs, is_null, AssignmentContext::Assignment)?;
-        Ok((q, RValue))
+        Ok((q.unqualified(), RValue))
     })
 }
 

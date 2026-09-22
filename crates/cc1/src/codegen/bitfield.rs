@@ -30,19 +30,36 @@ impl<W: Write> Generator<W> {
 
     pub fn emit_load(&mut self, loc: LlvmSymbol, qty: QualifiedType, bf: Option<&BitField>) -> LlvmSymbol {
         match bf {
-            None => self.builder.load(qty.llvm(), loc),
-            Some(bf) => {
-                let v = self.builder.load(bf.unit, loc);
-                self.extract(v, bf)
-            }
+            None => self.builder.load(qty.llvm(), loc, qty.is_volatile),
+            Some(bf) => self.emit_bitfield_load(loc, qty, bf).0,
         }
     }
 
-    pub fn emit_store(&mut self, src: LlvmSymbol, loc: LlvmSymbol, bf: Option<&BitField>) -> LlvmSymbol {
+    pub fn emit_bitfield_load(
+        &mut self,
+        loc: LlvmSymbol,
+        qty: QualifiedType,
+        bf: &BitField,
+    ) -> (LlvmSymbol, LlvmSymbol) {
+        let unit = self.builder.load(bf.unit, loc, qty.is_volatile);
+        (self.extract(unit, bf), unit)
+    }
+
+    pub fn emit_store(
+        &mut self,
+        src: LlvmSymbol,
+        loc: LlvmSymbol,
+        qty: QualifiedType,
+        bf: Option<&BitField>,
+        bitfield_unit: Option<LlvmSymbol>,
+    ) -> LlvmSymbol {
         match bf {
-            None => self.builder.store(src, loc),
+            None => self.builder.store(src, loc, qty.is_volatile),
             Some(bf) => {
-                let old = self.builder.load(bf.unit, loc);
+                let old = match bitfield_unit {
+                    Some(unit) => unit,
+                    None => self.builder.load(bf.unit, loc, qty.is_volatile),
+                };
                 let mask = ((1u64 << bf.width) - 1) << bf.bit_offset;
 
                 let cst = LlvmSymbol::cst(bf.unit, ConstValue::Int(!mask as u32 as i32));
@@ -54,7 +71,7 @@ impl<W: Write> Generator<W> {
                 let field = self.builder.binop("and", v, cst);
 
                 let v = self.builder.binop("or", cleared, field);
-                self.builder.store(v, loc);
+                self.builder.store(v, loc, qty.is_volatile);
                 self.extract(v, bf)
             }
         }

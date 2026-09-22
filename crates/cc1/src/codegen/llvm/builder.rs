@@ -129,15 +129,25 @@ impl<W: Write> Builder<W> {
         LlvmSymbol::ptr(r)
     }
 
-    pub fn load(&mut self, ty: LlvmType, slot: LlvmSymbol) -> LlvmSymbol {
+    pub fn load(&mut self, ty: LlvmType, slot: LlvmSymbol, is_volatile: bool) -> LlvmSymbol {
         let r = self.fresh();
-        self.write_line(format_args!("  {r} = load {ty}, {slot}"));
+        let volatile = if is_volatile { " volatile" } else { "" };
+        self.write_line(format_args!("  {r} = load{volatile} {ty}, {slot}"));
         LlvmSymbol::new(ty, r)
     }
 
-    pub fn store(&mut self, src: LlvmSymbol, dst: LlvmSymbol) -> LlvmSymbol {
-        self.write_line(format_args!("  store {src}, {dst}"));
+    pub fn store(&mut self, src: LlvmSymbol, dst: LlvmSymbol, is_volatile: bool) -> LlvmSymbol {
+        let volatile = if is_volatile { " volatile" } else { "" };
+        self.write_line(format_args!("  store{volatile} {src}, {dst}"));
         src
+    }
+
+    pub fn memcpy(&mut self, dst: LlvmName, src: LlvmName, layout: Layout, is_volatile: bool) {
+        let Layout { size, align } = layout;
+        let ptr_len = LlvmType::int();
+        self.write_line(format_args!(
+            "  call void @llvm.memcpy.p0.p0.{ptr_len}(ptr align {align} {dst}, ptr align {align} {src}, {ptr_len} {size}, i1 {is_volatile})"
+        ));
     }
 
     pub fn binop(&mut self, op: &'static str, lhs: LlvmSymbol, rhs: LlvmSymbol) -> LlvmSymbol {
@@ -325,7 +335,7 @@ impl<W: Write> Builder<W> {
         let sym = sym_id.resolve();
         let name = LlvmName::Global(sym_id);
         let align = sema().layout(&sym.ty.id).align;
-        let kind = if sym.ty.is_const { "constant" } else { "global" };
+        let kind = if sym.ty.is_const && !sym.ty.is_volatile { "constant" } else { "global" };
         if sym.definition == DefinitionState::Declared {
             return self.write_line(format_args!("{name} = external {kind} {}, align {align}", sym.ty.llvm()));
         }
@@ -344,13 +354,5 @@ impl<W: Write> Builder<W> {
         }
         self.write_line(format_args!("  ]"));
         self.has_block_ret = true;
-    }
-
-    pub fn memcpy(&mut self, dst: LlvmName, src: LlvmName, layout: Layout) {
-        let Layout { size, align } = layout;
-        let ptr_len = LlvmType::int();
-        self.write_line(format_args!(
-            "  call void @llvm.memcpy.p0.p0.{ptr_len}(ptr align {align} {dst}, ptr align {align} {src}, {ptr_len} {size}, i1 false)"
-        ));
     }
 }

@@ -909,6 +909,12 @@ shaped!(
 );
 
 shaped!(
+    assigning_to_a_volatile_object_has_unqualified_result,
+    "volatile int x; void f(void) { x = 1; }",
+    vec![lv(Ty::vol(Ty::Int)), rv(Ty::Int), rv(Ty::Int)]
+);
+
+shaped!(
     assignment_converts_the_right_operand_to_the_left_operands_type,
     "int x; void f(void) { x = 3.5; }",
     vec![lv(Ty::Int), rv(Ty::Double).then(FloatingToInteger, Ty::Int), rv(Ty::Int)]

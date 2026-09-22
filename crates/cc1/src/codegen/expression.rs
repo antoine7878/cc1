@@ -30,15 +30,33 @@ impl<W: Write> Generator<W> {
         self.builder.convert("inttoptr", LlvmSymbol::cst(LlvmType::int(), value), qty.llvm())
     }
 
-    fn apply_casts(&mut self, mut s: LlvmSymbol, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
+    fn apply_casts(&mut self, s: LlvmSymbol, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
+        let (value, _) = self.apply_casts_for_update(s, node)?;
+        Ok(value)
+    }
+
+    fn apply_casts_for_update(
+        &mut self,
+        mut s: LlvmSymbol,
+        node: &ExpressionNode,
+    ) -> Result<(LlvmSymbol, Option<LlvmSymbol>), Diagnostic> {
         let re = &sema().expressions[node.id];
         let mut from = re.ty;
         let bf = Self::bitfield_of(node);
+        let mut bitfield_unit = None;
         for cast in &re.casts {
-            s = self.convert(s, from, cast, bf)?;
+            if cast.kind == CastKind::LValueToRValue
+                && let Some(bf) = &bf
+            {
+                let (value, unit) = self.emit_bitfield_load(s, from, bf);
+                s = value;
+                bitfield_unit = Some(unit);
+            } else {
+                s = self.convert(s, from, cast, bf)?;
+            }
             from = cast.to;
         }
-        Ok(s)
+        Ok((s, bitfield_unit))
     }
 
     fn convert(
@@ -53,7 +71,7 @@ impl<W: Write> Generator<W> {
         let conv = match cast.kind {
             CastKind::ArrayToPointer | CastKind::FunctionToPointer | CastKind::PointerConversion => return Ok(v),
             CastKind::LValueToRValue if to.is_record(sema()) => return Ok(v),
-            CastKind::LValueToRValue => return Ok(self.emit_load(v, to, bf.as_ref())),
+            CastKind::LValueToRValue => return Ok(self.emit_load(v, from, bf.as_ref())),
             CastKind::ToVoid => return Ok(LlvmSymbol::void()),
             CastKind::NullPointer => return Ok(LlvmSymbol::null()),
             CastKind::IntegerPromotion | CastKind::IntegerConversion => Self::i_to_i(from, to),
@@ -181,7 +199,7 @@ impl<W: Write> Generator<W> {
         let re_operand = &sema().expressions[operand.id];
         let qty = re_operand.casted_ty();
         let loc = self.emit_operation(operand)?;
-        let v_before = self.apply_casts(loc, operand)?;
+        let (v_before, bitfield_unit) = self.apply_casts_for_update(loc, operand)?;
         let bop = match op {
             UnaryOp::PreInc | UnaryOp::PostInc => BinaryOp::Add,
             _ => BinaryOp::Sub,
@@ -192,7 +210,7 @@ impl<W: Write> Generator<W> {
             v_after = self.convert(v_after, qty, cast, None)?;
         }
         let bf = Self::bitfield_of(operand);
-        let v_after = self.emit_store(v_after, loc, bf.as_ref());
+        let v_after = self.emit_store(v_after, loc, re_operand.ty, bf.as_ref(), bitfield_unit);
         match (op, &re_operand.result_cast) {
             (UnaryOp::PreDec | UnaryOp::PreInc, _) => Ok(v_after),
             (_, Some(cast)) => self.convert(v_before, qty, cast, None),
@@ -360,7 +378,7 @@ impl<W: Write> Generator<W> {
         rhs: &ExpressionNode,
     ) -> Result<LlvmSymbol, Diagnostic> {
         let rl = &sema().expressions[lhs.id];
-        let qty = rl.casted_ty();
+        let qty = rl.ty;
 
         let loc = self.emit_operation(lhs)?;
         match qty.is_record(sema()) {
@@ -378,26 +396,29 @@ impl<W: Write> Generator<W> {
         rl: &ResolvedExpression,
     ) -> Result<LlvmSymbol, Diagnostic> {
         let mut vr = self.emit_expression(rhs)?;
+        let bf = Self::bitfield_of(lhs);
+        let mut bitfield_unit = None;
 
         if let Some(op) = op {
-            let vl = self.apply_casts(loc, lhs)?;
+            let (vl, unit) = self.apply_casts_for_update(loc, lhs)?;
+            bitfield_unit = unit;
             vr = self.arithmetic(op, vl, rl.casted_ty(), vr, sema().expressions[rhs.id].casted_ty())?;
             if let Some(cast) = &rl.result_cast {
                 vr = self.convert(vr, rl.casted_ty(), cast, None)?;
             }
         }
-        let bf = Self::bitfield_of(lhs);
-        Ok(self.emit_store(vr, loc, bf.as_ref()))
+        Ok(self.emit_store(vr, loc, rl.ty, bf.as_ref(), bitfield_unit))
     }
 
     pub fn emit_copy_aggregate(
         &mut self,
         loc: LlvmSymbol,
         rhs: &ExpressionNode,
-        qty: QualifiedType,
+        dst_qty: QualifiedType,
     ) -> Result<LlvmSymbol, Diagnostic> {
         let src = self.emit_expression(rhs)?;
-        self.builder.memcpy(loc.name, src.name, sema().layout(&qty.id));
+        let src_qty = sema().expressions[rhs.id].ty;
+        self.builder.memcpy(loc.name, src.name, sema().layout(&dst_qty.id), dst_qty.is_volatile || src_qty.is_volatile);
         Ok(loc)
     }
 
@@ -459,9 +480,15 @@ impl<W: Write> Generator<W> {
     }
 
     fn emit_argument(&mut self, e: &ExpressionNode) -> Result<LlvmParam, Diagnostic> {
-        let qty = sema().expressions[e.id].casted_ty();
-        let v = self.emit_expression(e)?;
+        let re = &sema().expressions[e.id];
+        let qty = re.casted_ty();
+        let mut v = self.emit_expression(e)?;
         let (_, attr) = classify_param(qty);
+        if matches!(attr, ParamAttr::ByVal { .. }) && re.ty.is_volatile {
+            let copy = self.locals.spill(e.id);
+            self.builder.memcpy(copy.name, v.name, sema().layout(&qty.id), true);
+            v = copy;
+        }
         Ok(LlvmParam::new(v, attr))
     }
 

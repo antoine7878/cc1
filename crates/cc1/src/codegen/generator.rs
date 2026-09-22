@@ -57,11 +57,11 @@ impl<W: Write> Generator<W> {
         let qty = sym.ty;
         match init.resolve() {
             Initializer::Zero => {
-                let _ = self.builder.store(LlvmSymbol::zero(qty), self.locals[id]);
+                let _ = self.builder.store(LlvmSymbol::zero(qty), self.locals[id], qty.is_volatile);
             }
             Initializer::Value(v) => {
                 let v = self.emit_constant(qty, *v);
-                self.builder.store(v, self.locals[id]);
+                self.builder.store(v, self.locals[id], qty.is_volatile);
             }
             Initializer::Expr(e) if qty.is_record(sema()) => {
                 let res = self.emit_copy_aggregate(self.locals[id], e, qty).map(|_| ());
@@ -69,14 +69,14 @@ impl<W: Write> Generator<W> {
             }
             Initializer::Expr(e) => {
                 let res = self.emit_expression(e).map(|v| {
-                    let _ = self.builder.store(v, self.locals[id]);
+                    let _ = self.builder.store(v, self.locals[id], qty.is_volatile);
                 });
                 self.collect_diag(res, &e.span);
             }
             Initializer::List(_) | Initializer::String(_) => {
                 let src = self.globals.aggregates[&id];
                 let layout = sema().layout(&qty.id);
-                self.builder.memcpy(self.locals[id].name, src.name, layout);
+                self.builder.memcpy(self.locals[id].name, src.name, layout, qty.is_volatile);
             }
             Initializer::Address(_) => unreachable!(),
         }

@@ -53,7 +53,8 @@ pub fn function_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
 
 pub fn array_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
     let ResolvedType::Array { elem, .. } = re.ty.id.resolve_with(sema) else { return };
-    let to = QualifiedType::plain(sema.types.pointer(*elem));
+    let elem = QualifiedType::new(elem.id, elem.is_const || re.ty.is_const, elem.is_volatile || re.ty.is_volatile);
+    let to = QualifiedType::plain(sema.types.pointer(elem));
     re.casts.push(ImplicitCast::new(CastKind::ArrayToPointer, to))
 }
 
@@ -221,7 +222,11 @@ pub fn assignment_conversion(
     let r = rhs_ty.id.resolve_with(sema);
     match (l, r) {
         (l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => (),
-        (&ResolvedType::Tag(id), _) if !id.resolve_with(sema).is_enum() && lhs.ty.is_compatible(sema, &rhs_ty) => (),
+        (&ResolvedType::Tag(id), _)
+            if !id.resolve_with(sema).is_enum() && lhs.ty.is_compatible_ignoring_qualifiers(sema, &rhs_ty) =>
+        {
+            ()
+        }
         (ResolvedType::Pointer(lp), ResolvedType::Pointer(rp)) if can_assign_pointer(sema, *lp, *rp) => {
             if !lp.has_qualifiers_of(rp) {
                 return Err(assign_ctx.discarded(lhs.ty, rhs_ty));
