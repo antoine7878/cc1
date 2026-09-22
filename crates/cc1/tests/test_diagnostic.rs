@@ -1,4 +1,11 @@
 use libft::SourceMap;
+use libft::TmpDir;
+use std::fs;
+use std::fs::File;
+
+use cc1::context::Context;
+use cc1::parser::parse_reader;
+use cc1::semantic::Analyzer;
 
 use crate::common::{Unit, strip_ansi};
 
@@ -231,8 +238,6 @@ reports!(
     ["<test>:1:14: error: integer overflow in constant expression"]
 );
 
-// 6.3.7 An out-of-range shift count is undefined behaviour, not a constraint violation,
-// so it is a warning and the shift still yields the promoted type of its left operand.
 reports!(
     report_shift_count_out_of_range,
     "enum E { A = 1 << 32 };",
@@ -347,11 +352,6 @@ reports!(
     ["<test>:1:30: error: Use of undeclared identifier 'x'"]
 );
 
-use std::fs;
-
-use cc1::context::Context;
-use libft::TmpDir;
-
 fn scratch_file(dir: &TmpDir, contents: &str) -> std::path::PathBuf {
     let path = dir.join("src.c");
     fs::write(&path, contents).unwrap();
@@ -463,12 +463,6 @@ reports!(
     "int f(void)\n{\n\t\tint y = ;\n}",
     ["<test>:3:11: error: syntax error, unexpected ';'"]
 );
-
-use std::fs::File;
-
-use cc1::context::install_context;
-use cc1::parser::parse_reader;
-use cc1::semantic::Analyzer;
 
 fn compile_file(dir: &TmpDir, contents: &str) -> Unit {
     let path = scratch_file(dir, contents);

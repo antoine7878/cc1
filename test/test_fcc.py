@@ -35,6 +35,16 @@ class LinkItemsTest(unittest.TestCase):
         got = fcc.link_argv(args, {"main.c": ["main.o"], "helper.o": ["helper.o"]})
         self.assertEqual(got, ["clang", "-m32", "main.o", "-lfoo", "helper.o", "-o", "a.out"])
 
+    def test_link_forwards_strip_option(self):
+        fcc = load_fcc()
+        args = Namespace(
+            strip=True,
+            outfile="a.out",
+            link_items=fcc.link_items(["main.o", "-s"]),
+        )
+        got = fcc.link_argv(args, {"main.o": ["main.o"]})
+        self.assertEqual(got, ["clang", "-m32", "-s", "main.o", "-o", "a.out"])
+
 
 if __name__ == "__main__":
     unittest.main()

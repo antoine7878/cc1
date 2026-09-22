@@ -12,13 +12,13 @@ YACC_RS = crates/cc1/src/parser/yacc.rs
 all: $(LEX_RS) $(YACC_RS)
 	cargo build -p cc1
 
-$(FT_LEX) $(FT_YACC):
+parser-tools:
 	cargo build --release -p ft_lex -p ft_yacc
 
-$(LEX_RS): $(C_L) | $(FT_LEX)
+$(LEX_RS): $(C_L) | parser-tools
 	$(FT_LEX) -c $< -o $@
 
-$(YACC_RS): $(C_Y)
+$(YACC_RS): $(C_Y) | parser-tools
 	$(FT_YACC) $< -o $@
 
 # ----- test --------------------
@@ -34,7 +34,7 @@ ttest: all
 	cargo nextest run
 
 ftest: all cc
-	./fcc.py ./rscs/hello.c -o ./rscs/a.out
+	./fcc ./rscs/hello.c -o ./rscs/a.out
 	./rscs/a.out || echo $$?
 
 # ----- reference --------------------
@@ -76,4 +76,4 @@ clean:
 
 re: clean all
 
-.PHONY: all clean re test ctest ttest ftest c cc coverage $(FT_LEX) $(FT_YACC) llvm
+.PHONY: all clean re test ctest ttest ftest c cc coverage parser-tools llvm

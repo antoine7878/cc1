@@ -1,6 +1,5 @@
-int printf(const char *, ...);
 
 int main(void) {
-	printf("coucou\n");
-	return 0;
+	volatile int a = 1;
+	return a + 1;
 }
