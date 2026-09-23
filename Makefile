@@ -12,13 +12,13 @@ YACC_RS = crates/cc1/src/parser/yacc.rs
 all: $(LEX_RS) $(YACC_RS)
 	cargo build -p cc1
 
-parser-tools:
+generators:
 	cargo build --release -p ft_lex -p ft_yacc
 
-$(LEX_RS): $(C_L) | parser-tools
+$(LEX_RS): $(C_L) | generators
 	$(FT_LEX) -c $< -o $@
 
-$(YACC_RS): $(C_Y) | parser-tools
+$(YACC_RS): $(C_Y) | generators
 	$(FT_YACC) $< -o $@
 
 # ----- test --------------------

@@ -102,9 +102,9 @@ fn an_identifier_binds_to_the_innermost_declaration() {
 fn an_identifier_binds_to_a_parameter() {
     let unit = accepted("void f(int a) { a = 1; }");
     let symbols = unit.symbols();
-    assert_eq!((symbols[1].0.as_str(), symbols[1].1.as_str()), ("a", "parameter"));
+    assert_eq!((symbols[0].0.as_str(), symbols[0].1.as_str()), ("a", "parameter"));
     assert_eq!(unit.symbol_ty_tree("a"), Ty::Int);
-    assert_eq!(unit.bindings(), vec![("a".to_string(), Some(1))]);
+    assert_eq!(unit.bindings(), vec![("a".to_string(), Some(0))]);
 }
 
 #[test]
@@ -281,8 +281,8 @@ fn symbols_are_recorded_in_declaration_order_with_their_kind() {
             ("T".to_string(), "typedef".to_string()),
             ("a".to_string(), "member".to_string()),
             ("s".to_string(), "variable".to_string()),
-            ("f".to_string(), "function".to_string()),
             ("p".to_string(), "parameter".to_string()),
+            ("f".to_string(), "function".to_string()),
             ("l".to_string(), "variable".to_string()),
         ]
     );

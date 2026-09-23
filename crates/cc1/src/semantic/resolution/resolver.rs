@@ -4,7 +4,8 @@ use libft::Span;
 
 use crate::ast::statement::StatementId;
 use crate::ast::visit::{
-    Visitor, walk_compound_statement, walk_declaration, walk_expression, walk_statement, walk_translation_unit,
+    Visitor, walk_compound_statement, walk_declaration, walk_declarator, walk_expression, walk_statement,
+    walk_translation_unit,
 };
 use crate::ast::{
     CompoundStatementNode, ConstValue, DeclarationNode, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode,
@@ -77,6 +78,10 @@ impl Resolver<'_> {
 
     pub fn leave_scope(&mut self) {
         self.sym_scopes.pop();
+    }
+
+    pub fn bind(&mut self, name: NameId, sym: SymbolId) {
+        self.sym_scopes.insert_ordinary(name, sym);
     }
 
     pub fn lookup_ordinary(&self, name: NameId) -> Option<SymbolId> {
@@ -270,7 +275,7 @@ impl Visitor for Resolver<'_> {
         let decl = &node.declarator;
         let Some(&sym) = self.sema.declarations.get(&decl.id) else { return };
         let Symbol { ty, kind, .. } = *sym.resolve_with(self.sema);
-        self.visit_declarator(&node.declarator);
+        walk_declarator(self, &node.declarator);
         if let Some(init) = &node.initializer
             && kind == SymbolKind::Variable
         {

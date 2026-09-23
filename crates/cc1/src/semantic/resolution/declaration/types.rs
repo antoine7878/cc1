@@ -2,12 +2,12 @@ use libft::Span;
 
 use crate::ast::{
     DeclarationSpecifier, Declarator, DeclaratorNode, ExpressionNode, FunctionParameters, FunctionParametersNode,
-    ParameterDeclaration, Tag, TypeSpecifier,
+    ParameterDeclaration, Storage, Tag, TypeSpecifier,
 };
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
-    DeclaredParams, Diag, Diagnostic, DiagnosticSink, ParamInfo, QualifiedType, ResolvedType, Resolver, constraints,
-    layout,
+    DeclaredParams, Diag, Diagnostic, DiagnosticSink, ParamInfo, QualifiedType, ResolvedType, Resolver, Symbol,
+    SymbolId, constraints, layout,
 };
 
 pub fn base_type(resolver: &mut Resolver, specifiers: &[DeclarationSpecifier], span: &Span) -> Option<QualifiedType> {
@@ -117,7 +117,12 @@ fn resolve_prototype(resolver: &mut Resolver, params: &[ParameterDeclaration], i
     {
         return DeclaredParams::Prototype { params: Vec::new(), is_variadic };
     }
-    let params: Vec<ParamInfo> = params.iter().filter_map(|param| resolve_param(resolver, param)).collect();
+    let mut params: Vec<ParamInfo> = params.iter().filter_map(|param| resolve_param(resolver, param)).collect();
+    resolver.enter_prototype();
+    for param in &mut params {
+        param.symbol = declare_param(resolver, param);
+    }
+    resolver.leave_scope();
     for param in &params {
         let is_void = matches!(param.ty.id.resolve_with(resolver.sema), ResolvedType::Void);
         let is_special_case = params.len() == 1 && param.name.is_some();
@@ -135,7 +140,13 @@ fn resolve_param(resolver: &mut Resolver, param: &ParameterDeclaration) -> Optio
     if let Some(storage) = storage {
         constraints::param::check_param_storage(storage).collect(resolver, span);
     }
-    Some(ParamInfo { name: decl.name(), ty, storage, span: *span })
+    Some(ParamInfo { name: decl.name(), ty, storage, span: *span, symbol: None })
+}
+
+fn declare_param(resolver: &mut Resolver, param: &ParamInfo) -> Option<SymbolId> {
+    let name = param.name?;
+    let storage = param.storage.unwrap_or(Storage::Auto);
+    Some(resolver.declare(Symbol::param(name, param.ty, storage), &name.span))
 }
 
 fn array_size(resolver: &mut Resolver, elem: QualifiedType, len: usize, span: &Span) -> Option<usize> {

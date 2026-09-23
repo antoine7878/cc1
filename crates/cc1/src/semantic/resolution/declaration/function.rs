@@ -92,7 +92,7 @@ fn with_param_types(sema: &mut Sema, ty: QualifiedType, params: ParamTypes) -> Q
     QualifiedType::new(sema.types.function(ret, params), ty.is_const, ty.is_volatile)
 }
 
-fn check_identifier_list(
+pub fn check_identifier_list(
     sema: &mut Sema,
     declared: &ParamTypes,
     declared_params: &DeclaredParams,
@@ -139,14 +139,13 @@ fn param_prototype(
         constraints::param::check_complete_param(param.ty.is_complete(resolver.sema), param.ty)
             .collect(resolver, &param.span);
     }
-    params.iter().filter_map(|param| add_param(resolver, param)).collect()
+    params.iter().filter_map(|param| bind_param(resolver, param)).collect()
 }
 
-fn add_param(resolver: &mut Resolver, param: &ParamInfo) -> Option<SymbolId> {
-    let name = param.name?;
-    let storage = param.storage.unwrap_or(Storage::Auto);
-    let sym = Symbol::param(name, param.ty, storage);
-    Some(resolver.declare(sym, &name.span))
+fn bind_param(resolver: &mut Resolver, param: &ParamInfo) -> Option<SymbolId> {
+    let (name, sym) = (param.name?, param.symbol?);
+    resolver.bind(name.id, sym);
+    Some(sym)
 }
 
 fn param_old_style(

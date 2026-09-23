@@ -90,6 +90,7 @@ pub struct ParamInfo {
     pub ty: QualifiedType,
     pub storage: Option<Storage>,
     pub span: Span,
+    pub symbol: Option<SymbolId>,
 }
 
 #[derive(Clone, Debug)]

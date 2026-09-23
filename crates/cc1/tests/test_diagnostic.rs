@@ -109,6 +109,35 @@ reports!(
 );
 
 reports!(
+    report_duplicate_parameter_in_prototype,
+    "void f(int a, int a, int b, int b);",
+    [
+        "<test>:1:19: error: duplicate declaration of parameter `a'",
+        "<test>:1:33: error: duplicate declaration of parameter `b'"
+    ]
+);
+
+reports!(
+    report_duplicate_parameter_in_nested_prototype,
+    "void g(int (*h)(int x, int x));",
+    ["<test>:1:28: error: duplicate declaration of parameter `x'"]
+);
+
+reports!(
+    report_duplicate_parameter_in_definition_nested_prototype,
+    "void g(int (*h)(int x, int x)) { }",
+    ["<test>:1:28: error: duplicate declaration of parameter `x'"]
+);
+
+reports!(accept_distinct_prototype_parameters, "void f(int a, int b); void g(int, int);", [] as [&str; 0]);
+
+reports!(
+    accept_same_parameter_name_in_distinct_prototypes,
+    "void f(int a, int (*h)(int a)); void g(int a) { }",
+    [] as [&str; 0]
+);
+
+reports!(
     report_declarator_is_not_a_function,
     "int (*f)(void) { return 0; }",
     ["<test>:1:5: error: Declarator shall be function type"]
