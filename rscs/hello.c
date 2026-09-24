@@ -1,5 +1,4 @@
-
-int main(void) {
-	volatile int a = 1;
-	return a + 1;
+void f(a, b) int b;
+void a;
+{
 }

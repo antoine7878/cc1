@@ -198,7 +198,9 @@ fn add_param_declarator(
         constraints::param::check_param_storage(storage).collect(resolver, span)?;
     }
     let name = decl.name()?;
-    if !ty.is_void(resolver.sema) {
+    if ty.is_void(resolver.sema) {
+        constraints::param::check_void_param(true).collect(resolver, &decl.span);
+    } else {
         constraints::param::check_complete_param(ty.is_complete(resolver.sema), ty).collect(resolver, &decl.span);
     }
     let storage = declared_storage.unwrap_or(Storage::Auto);

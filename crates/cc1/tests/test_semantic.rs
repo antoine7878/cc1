@@ -414,6 +414,18 @@ reject!(incomplete_parameter_prototype, "struct S; void h(struct S p) { (void)0;
 
 reject!(incomplete_parameter_old_style, "struct S; void h(p) struct S p; { (void)0; }");
 
+reject!(void_parameter_old_style, "void h(p) void p; { }");
+
+reject!(void_parameter_old_style_second, "void h(a, b) int b; void a; { }");
+
+reject!(void_parameter_old_style_typedef, "typedef void V; void h(p) V p; { }");
+
+reject!(void_parameter_old_style_qualified, "void h(p) const void p; { }");
+
+reject!(void_parameter_old_style_register, "void h(p) register void p; { }");
+
+accept!(void_pointer_parameter_old_style, "void h(p) void *p; { }");
+
 // ---- 6.7.1 a function definition's return type shall be void or complete -
 
 reject!(incomplete_return_type, "struct S; struct S r(void) { struct S v; return v; }");

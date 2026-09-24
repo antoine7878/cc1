@@ -91,6 +91,12 @@ reports!(
 reports!(report_named_void_parameter, "void f(void x) { }", ["<test>:1:8: error: Parameter shall not have void type"]);
 
 reports!(
+    report_old_style_void_parameter,
+    "void f(a, b) int b; void a; { }",
+    ["<test>:1:26: error: Parameter shall not have void type"]
+);
+
+reports!(
     report_parameter_storage_class,
     "void f(static int a) { }",
     ["<test>:1:8: error: Parameter shall only by declared with register storage"]
