@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use libft::Span;
 
 use crate::ast::{
@@ -115,20 +117,20 @@ fn resolve_prototype(resolver: &mut Resolver, params: &[ParameterDeclaration], i
         && !is_variadic
         && only.is_abstract_void()
     {
-        return DeclaredParams::Prototype { params: Vec::new(), is_variadic };
+        return DeclaredParams::Prototype { params: Vec::new(), is_variadic, tags: HashMap::new() };
     }
-    let mut params: Vec<ParamInfo> = params.iter().filter_map(|param| resolve_param(resolver, param)).collect();
     resolver.enter_prototype();
+    let mut params: Vec<ParamInfo> = params.iter().filter_map(|param| resolve_param(resolver, param)).collect();
     for param in &mut params {
         param.symbol = declare_param(resolver, param);
     }
-    resolver.leave_scope();
+    let tags = resolver.leave_scope().into_tags();
     for param in &params {
         let is_void = matches!(param.ty.id.resolve_with(resolver.sema), ResolvedType::Void);
         let is_special_case = params.len() == 1 && param.name.is_some();
         constraints::param::check_void_param(is_void && !is_special_case).collect(resolver, &param.span);
     }
-    DeclaredParams::Prototype { params, is_variadic }
+    DeclaredParams::Prototype { params, is_variadic, tags }
 }
 
 fn resolve_param(resolver: &mut Resolver, param: &ParameterDeclaration) -> Option<ParamInfo> {

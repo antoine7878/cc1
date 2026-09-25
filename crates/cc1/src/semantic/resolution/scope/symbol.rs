@@ -22,6 +22,10 @@ impl SymbolScope {
     fn new(kind: ScopeKind) -> Self {
         Self { tags: HashMap::new(), ordinaries: HashMap::new(), kind }
     }
+
+    pub fn into_tags(self) -> HashMap<NameId, TagDefId> {
+        self.tags
+    }
 }
 
 #[derive(Default, Debug)]
@@ -32,8 +36,8 @@ impl SymbolScopes {
         self.0.push(SymbolScope::new(kind));
     }
 
-    pub fn pop(&mut self) {
-        self.0.pop();
+    pub fn pop(&mut self) -> Option<SymbolScope> {
+        self.0.pop()
     }
 
     pub fn is_empty(&self) -> bool {

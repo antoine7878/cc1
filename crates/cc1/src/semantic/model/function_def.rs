@@ -1,11 +1,12 @@
+use std::collections::HashMap;
 use std::iter::zip;
 
 use libft::Span;
 
-use crate::ast::{Name, Storage};
+use crate::ast::{Name, NameId, Storage};
 use crate::define_arena;
 use crate::semantic::model::cast::default_argument_promotions;
-use crate::semantic::{QualifiedType, ResolvedExpression, Sema, SymbolId, ValueCategory};
+use crate::semantic::{QualifiedType, ResolvedExpression, Sema, SymbolId, TagDefId, ValueCategory};
 
 define_arena!(FunctionDef, FunctionDefArena, FunctionDefId);
 
@@ -97,14 +98,14 @@ pub struct ParamInfo {
 pub enum DeclaredParams {
     Unspecified,
     Names(Vec<Name>),
-    Prototype { params: Vec<ParamInfo>, is_variadic: bool },
+    Prototype { params: Vec<ParamInfo>, is_variadic: bool, tags: HashMap<NameId, TagDefId> },
 }
 
 impl DeclaredParams {
     pub fn types(&self) -> ParamTypes {
         match self {
             DeclaredParams::Unspecified | DeclaredParams::Names(_) => ParamTypes::Unspecified,
-            DeclaredParams::Prototype { params, is_variadic } => ParamTypes::Prototype {
+            DeclaredParams::Prototype { params, is_variadic, .. } => ParamTypes::Prototype {
                 params: params.iter().map(|param| param.ty).collect(),
                 is_variadic: *is_variadic,
             },

@@ -15,7 +15,7 @@ use crate::context::ctx;
 use crate::semantic::resolution::{expression, statement};
 use crate::semantic::{
     Diag, Diagnostic, DiagnosticNode, DiagnosticSink, FunctionDefId, Linkage, QualifiedType, ScopeKind, Sema,
-    StatementScopes, Symbol, SymbolId, SymbolKind, SymbolScopes, TagDefId, constraints, declaration, fold,
+    StatementScopes, Symbol, SymbolId, SymbolKind, SymbolScope, SymbolScopes, TagDefId, constraints, declaration, fold,
 };
 
 #[derive(Debug)]
@@ -76,12 +76,16 @@ impl Resolver<'_> {
         }
     }
 
-    pub fn leave_scope(&mut self) {
-        self.sym_scopes.pop();
+    pub fn leave_scope(&mut self) -> SymbolScope {
+        self.sym_scopes.pop().expect("a symbol scope to leave")
     }
 
     pub fn bind(&mut self, name: NameId, sym: SymbolId) {
         self.sym_scopes.insert_ordinary(name, sym);
+    }
+
+    pub fn bind_tag(&mut self, name: NameId, tag: TagDefId) {
+        self.sym_scopes.insert_tag(name, tag);
     }
 
     pub fn lookup_ordinary(&self, name: NameId) -> Option<SymbolId> {

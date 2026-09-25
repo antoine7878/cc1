@@ -20,6 +20,14 @@ accept!(tag_reference_in_inner_scope, "struct S { int a; }; void f(void) { struc
 
 accept!(tag_shadowed_in_inner_scope, "struct S { int a; }; void f(void) { struct S { char b; } s; s.b = 0; }");
 
+// 6.1.2.1 A tag declared in a parameter list has function prototype scope, or block scope in a function definition.
+reject!(prototype_tag_not_visible_after_declaration, "void f(struct S { int a; } *p); struct S s;");
+reject!(prototype_tag_differs_from_later_file_tag, "void g(struct T *p); struct T { int x; }; void g(struct T *p);");
+reject!(nested_prototype_tag_not_visible_after_declaration, "void k(void (*fp)(struct V { int a; } *)); struct V v;");
+accept!(prototype_tag_hides_file_tag, "struct W { int a; }; void m(struct W { char c; } *p);");
+accept!(definition_parameter_tag_visible_in_body, "void h(struct U { int a; } x) { struct U y; y.a = x.a; }");
+reject!(definition_parameter_tag_not_visible_after_body, "void h(struct U { int a; } x) { } struct U z;");
+
 reject!(tag_duplicate_member, "struct S { int a; int a; };");
 
 accept!(bit_field_width_below_the_type_width, "struct S { int a : 3; };");
