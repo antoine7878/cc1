@@ -568,3 +568,23 @@ recover!(initialized_typedef_stays_declared, "typedef int T = 1; T x; int f(void
 recover!(initialized_function_stays_declared, "int f(void) = 1; int g(void) { return f(); }", [Diagnostic::NonVarInit], &[]);
 
 accept!(file_scope_extern_with_initializer, "extern int x = 1;");
+
+// 6.1.2.6 For an identifier with external linkage, if a declaration at block scope disagrees
+// with the type of a declaration reachable elsewhere for the same identifier, the behaviour is
+// undefined; gcc diagnoses it as conflicting types.
+reject!(external_declaration_disagrees_with_prior_type_across_scopes, "int x; void f(void){ extern long x; }");
+reject!(external_declarations_disagree_across_two_functions, "void f(void){ extern int y; } void g(void){ extern long y; }");
+reject!(
+    external_function_declaration_disagrees_with_its_definition,
+    "void f(void){ extern int h(int); } long h(int a){ return a; }"
+);
+reject!(
+    external_function_declaration_disagrees_with_its_definitions_parameter,
+    "void f(void){ extern int h(int); } int h(long a){ return 0; }"
+);
+accept!(external_incomplete_array_completed_at_file_scope, "void g(void){ extern int z[]; } int z[3];");
+accept!(external_declaration_agrees_with_prior_type_across_scopes, "int x; void f(void){ extern int x; }");
+accept!(
+    external_function_declaration_agrees_with_its_definition,
+    "void f(void){ extern int h(); } int h(int a){ return a; }"
+);

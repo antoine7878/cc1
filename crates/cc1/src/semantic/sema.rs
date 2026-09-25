@@ -174,7 +174,7 @@ impl Sema {
         Some(id.resolve_with(self).linkage)
     }
 
-    pub fn register_external(&mut self, sym: Symbol, span: &Span, lexical: Option<SymbolId>) -> SymbolId {
+    pub fn register_external(&mut self, sym: Symbol, span: &Span, lexical: Option<SymbolId>, check_types: bool) -> SymbolId {
         let name = sym.name;
         let linkage = sym.linkage;
         let definition = sym.definition;
@@ -198,8 +198,10 @@ impl Sema {
         }
 
         let old_ty = entry_symbol.resolve_with(self).ty;
-        if let Some(merged) = old_ty.composite(self, &new_ty) {
-            entry_symbol.resolve_mut(self).ty = merged;
+        match old_ty.composite(self, &new_ty) {
+            Some(merged) => entry_symbol.resolve_mut(self).ty = merged,
+            None if check_types => self.add_diag(Diag::err((), Diagnostic::ConflictingTypes(name)), span),
+            None => (),
         }
 
         let old_definition = entry_symbol.resolve_with(self).definition;

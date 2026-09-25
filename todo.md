@@ -8,6 +8,7 @@ Compiler defects:
     - empty declarations.
 
 5. Incompatible external redeclarations across scopes are accepted.
+
 6. An inner bare tag declaration does not hide the outer tag.
 7. Tags declared in parameter lists leak outside prototype scope.
 8. Empty and unknown escape sequences such as '\x' and '\q' are accepted.

@@ -29,6 +29,12 @@ reports!(
     ["<test>:2:6: error: duplicate declaration of variable `x'"]
 );
 
+reports!(
+    report_conflicting_types_across_scopes,
+    "int x; void f(void){ extern long x; }",
+    ["<test>:1:34: error: conflicting types for 'x'"]
+);
+
 reports!(report_non_constant_expression, "int x; enum E { A = x };", ["<test>:1:21: error: Non constant expression"]);
 
 reports!(

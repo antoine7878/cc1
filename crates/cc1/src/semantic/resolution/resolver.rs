@@ -174,9 +174,13 @@ impl Resolver<'_> {
 
     pub fn declare(&mut self, sym: Symbol, span: &Span) -> SymbolId {
         let name = sym.name;
-        let lexical = self.dedup(&sym, span);
+        let (lexical, check_types) = match self.dedup(&sym, span) {
+            Dedup::Fresh => (None, true),
+            Dedup::Merged(id) => (Some(id), false),
+            Dedup::Rejected => (None, false),
+        };
         let sym_id = if sym.linkage != Linkage::None {
-            self.sema.register_external(sym, span, lexical)
+            self.sema.register_external(sym, span, lexical, check_types)
         } else {
             lexical.unwrap_or_else(|| self.sema.symbols.alloc(sym))
         };
@@ -184,8 +188,8 @@ impl Resolver<'_> {
         sym_id
     }
 
-    fn dedup(&mut self, sym: &Symbol, span: &Span) -> Option<SymbolId> {
-        let old_id = self.sym_scopes.lookup_current(sym.name.id)?;
+    fn dedup(&mut self, sym: &Symbol, span: &Span) -> Dedup {
+        let Some(old_id) = self.sym_scopes.lookup_current(sym.name.id) else { return Dedup::Fresh };
         let old_symbol = old_id.resolve_with(self.sema);
         if sym.kind != SymbolKind::Typedef
             && (self.sym_scopes.kind() == ScopeKind::File
@@ -193,10 +197,17 @@ impl Resolver<'_> {
             && old_symbol.is_compatible(self.sema, sym)
             && !(sym.has_initializer && old_symbol.has_initializer)
         {
-            return Some(old_id);
+            return Dedup::Merged(old_id);
         }
-        self.add_diag(Diag::err(Some(old_id), Diagnostic::DuplicateDeclaration(sym.kind, sym.name)), span)
+        self.add_diag(Diag::err(Some(old_id), Diagnostic::DuplicateDeclaration(sym.kind, sym.name)), span);
+        Dedup::Rejected
     }
+}
+
+enum Dedup {
+    Fresh,
+    Merged(SymbolId),
+    Rejected,
 }
 
 // ----- Labels ----------------------------

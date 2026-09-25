@@ -33,6 +33,7 @@ pub enum Diagnostic {
 
     // 6.1.2.2
     ConflictingLinkage(Name),
+    ConflictingTypes(Name),
 
     // 6.1.3.2
     IntegerConstantTooLarge,
@@ -264,6 +265,7 @@ impl DiagnosticNode {
 
             // 6.1.2.2
             Diagnostic::ConflictingLinkage(name) => format!("declaration of '{}' conflicts with the linkage of a previous declaration", name.id.resolve()),
+            Diagnostic::ConflictingTypes(name) => format!("conflicting types for '{}'", name.id.resolve()),
 
             // 6.1.3.2
             Diagnostic::IntegerConstantTooLarge => "integer constant is too large for any integer type".to_string(),
