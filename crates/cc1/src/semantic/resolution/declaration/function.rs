@@ -157,9 +157,18 @@ fn param_old_style(
     let declared_names: Vec<_> = declarations
         .iter()
         .flat_map(|DeclarationNode { span, specifiers, init_declarators }| {
+            if constraints::param::check_declares_parameter(!init_declarators.is_empty())
+                .collect(resolver, span)
+                .is_none()
+            {
+                return Vec::new();
+            }
             init_declarators
                 .iter()
                 .map(|decl| {
+                    if let Some(init) = &decl.initializer {
+                        constraints::param::check_param_initializer(true).collect(resolver, &init.span);
+                    }
                     add_param_declarator(resolver, specifiers, &decl.declarator, span)
                         .map(|sym_id| sym_id.resolve_with(resolver.sema).name.id)
                 })

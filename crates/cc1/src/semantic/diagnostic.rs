@@ -199,6 +199,8 @@ pub enum Diagnostic {
     UnnamedPrototypeParameter,
     ParameterTypeListWithList,
     MissingParameterInOldStyle,
+    InitializedParameter,
+    DeclarationWithoutParameter,
     IncompleteParameter(QualifiedType),
     IncompleteReturn(QualifiedType),
 }
@@ -435,6 +437,8 @@ impl DiagnosticNode {
             Diagnostic::UnnamedPrototypeParameter => "Parameter shall include an identifier".to_string(),
             Diagnostic::ParameterTypeListWithList => "Parameter style function declration shall not be followed by a declaration list".to_string(),
             Diagnostic::MissingParameterInOldStyle => "Missing parameter".to_string(),
+            Diagnostic::InitializedParameter => "parameter cannot have an initializer".to_string(),
+            Diagnostic::DeclarationWithoutParameter => "declaration does not declare a parameter".to_string(),
             Diagnostic::IncompleteParameter(ty) => format!("parameter has incomplete type '{}'", ty.display(sema)),
             Diagnostic::IncompleteReturn(ty) => format!("function definition has incomplete return type '{}'", ty.display(sema)),
         }

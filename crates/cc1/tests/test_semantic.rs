@@ -426,6 +426,24 @@ reject!(void_parameter_old_style_register, "void h(p) register void p; { }");
 
 accept!(void_pointer_parameter_old_style, "void h(p) void *p; { }");
 
+// ---- 6.7.1 no initializations in the declaration list -------------------
+
+reject!(initialized_parameter_old_style, "int f(a) int a = 1; { return a; }");
+
+reject!(initialized_parameter_old_style_first_of_two, "int f(a, b) int a = 1, b; { return a; }");
+
+// ---- 6.7.1 only the identifiers of the list shall be declared -----------
+
+reject!(empty_declaration_old_style, "int f(a) int; int a; { return a; }");
+
+reject!(empty_register_declaration_old_style, "int f(a) register; int a; { return a; }");
+
+reject!(tag_declaration_old_style, "int f(a) struct S; int a; { return a; }");
+
+reject!(struct_definition_old_style, "int f(a) struct S { int x; }; int a; { return a; }");
+
+reject!(enum_definition_old_style, "int f(a) enum E { A }; int a; { return a; }");
+
 // ---- 6.7.1 a function definition's return type shall be void or complete -
 
 reject!(incomplete_return_type, "struct S; struct S r(void) { struct S v; return v; }");

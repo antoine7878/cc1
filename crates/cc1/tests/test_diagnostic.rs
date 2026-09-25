@@ -97,6 +97,18 @@ reports!(
 );
 
 reports!(
+    report_old_style_initialized_parameter,
+    "int f(a) int a = 1; { return a; }",
+    ["<test>:1:18: error: parameter cannot have an initializer"]
+);
+
+reports!(
+    report_old_style_declaration_without_parameter,
+    "int f(a) int; int a; { return a; }",
+    ["<test>:1:10: error: declaration does not declare a parameter"]
+);
+
+reports!(
     report_parameter_storage_class,
     "void f(static int a) { }",
     ["<test>:1:8: error: Parameter shall only by declared with register storage"]

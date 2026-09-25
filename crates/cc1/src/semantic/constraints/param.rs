@@ -18,6 +18,20 @@ pub fn check_complete_param(is_complete: bool, ty: QualifiedType) -> Diag<()> {
     }
 }
 
+pub fn check_param_initializer(has_initializer: bool) -> Diag<()> {
+    match has_initializer {
+        true => Diag::err((), Diagnostic::InitializedParameter),
+        false => Diag::ok(()),
+    }
+}
+
+pub fn check_declares_parameter(has_declarator: bool) -> Diag<Option<()>> {
+    match has_declarator {
+        true => Diag::ok(Some(())),
+        false => Diag::err(None, Diagnostic::DeclarationWithoutParameter),
+    }
+}
+
 pub fn check_param_storage(storage: Storage) -> Diag<Option<()>> {
     match storage {
         Storage::Register => Diag::ok(Some(())),
