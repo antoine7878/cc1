@@ -1,13 +1,14 @@
 use libft::Span;
 
 use crate::ast::{
-    DeclarationNode, DeclarationSpecifier, DeclaratorNode, InitDeclaratorNode, InitializerNode, Storage, TypeSpecifier,
+    DeclarationNode, DeclarationSpecifier, DeclaratorNode, InitDeclaratorNode, InitializerNode, Storage, Tag,
+    TypeSpecifier,
 };
 use crate::semantic::model::initializer;
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     Diag, Diagnostic, DiagnosticSink, QualifiedType, ResolvedType, Resolver, ScopeKind, Symbol, SymbolId, SymbolKind,
-    constraints,
+    TagUse, constraints,
 };
 
 pub fn requires_complete_object(
@@ -129,6 +130,32 @@ pub fn resolve_initializer(resolver: &mut Resolver, sym_id: SymbolId, ty: Qualif
     }
     let id = resolver.sema.initializers.alloc(init);
     sym_id.resolve_mut(resolver.sema).initializer = Some(id);
+}
+
+pub fn forward_tag(resolver: &mut Resolver, node: &DeclarationNode) {
+    if !node.init_declarators.is_empty() {
+        return;
+    }
+    let mut types = node.specifiers.iter().filter_map(|specifier| match specifier {
+        DeclarationSpecifier::Type(ty) => Some(ty),
+        _ => None,
+    });
+    let (Some(ty), None) = (types.next(), types.next()) else { return };
+    let (kind, name, declarations) = match ty {
+        TypeSpecifier::Struct(id) => {
+            let node = id.resolve();
+            (Tag::Struct, node.name, &node.declarations)
+        }
+        TypeSpecifier::Union(id) => {
+            let node = id.resolve();
+            (Tag::Union, node.name, &node.declarations)
+        }
+        _ => return,
+    };
+    if name.is_none() || !declarations.is_empty() {
+        return;
+    }
+    resolver.declare_tag(kind, name, TagUse::Forward, &node.span);
 }
 
 pub fn declares_tag(specifiers: &[DeclarationSpecifier]) -> bool {

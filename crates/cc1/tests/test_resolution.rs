@@ -496,6 +496,23 @@ accept!(tag_defined_in_a_compared_cast_is_declared_once, "int f(void *q) { retur
 
 accept!(enum_defined_in_a_compared_cast_is_declared_once, "int f(void *q) { return q == (enum E { A } *) 0; }");
 
+accept!(
+    inner_bare_tag_declaration_hides_outer_tag,
+    "struct s { int a; }; int f(void) { struct s; struct t { struct s *q; }; struct s { double d; } x; struct t y; y.q = &x; return sizeof(*y.q) == sizeof(double); }"
+);
+
+reject!(
+    inner_bare_tag_declaration_is_incomplete,
+    "struct s { int a; }; void f(void) { struct s; struct s *p; p->a = 1; }"
+);
+
+accept!(file_scope_bare_tag_then_definition, "struct s; struct s { int a; }; struct s v;");
+
+accept!(
+    qualified_bare_tag_declaration_hides_outer_tag,
+    "struct s { int a; }; int f(void) { const struct s; struct t { struct s *q; }; struct s { double d; } x; struct t y; y.q = &x; return 0; }"
+);
+
 accept!(a_void_pointer_cast_of_zero_stays_a_null_pointer_constant, "int f(int *p) { return p == (void *) 0; }");
 
 reject!(a_non_void_pointer_cast_of_zero_is_not_a_null_pointer_constant, "int f(int *p) { return p == (char *) 0; }");

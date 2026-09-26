@@ -3,7 +3,8 @@ use libft::Span;
 use crate::ast::{EnumId, ExpressionNode, Name, StructDeclaration, Tag};
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
-    Diag, Diagnostic, DiagnosticSink, Member, QualifiedType, Resolver, Symbol, SymbolKind, TagDefId, constraints,
+    Diag, Diagnostic, DiagnosticSink, Member, QualifiedType, Resolver, Symbol, SymbolKind, TagDefId, TagUse,
+    constraints,
 };
 
 pub fn struct_or_union_tag(
@@ -14,7 +15,8 @@ pub fn struct_or_union_tag(
     span: &Span,
 ) -> TagDefId {
     let is_definition = !declarations.is_empty();
-    let tag = resolver.declare_tag(kind, name, is_definition, span);
+    let use_ = if is_definition { TagUse::Definition } else { TagUse::Reference };
+    let tag = resolver.declare_tag(kind, name, use_, span);
     if !is_definition {
         return tag;
     }
@@ -77,7 +79,8 @@ pub fn struct_or_union_tag(
 pub fn enum_tag(resolver: &mut Resolver, id: EnumId) -> Option<TagDefId> {
     let enum_node = id.resolve();
     let is_definition = !enum_node.enumerators.is_empty();
-    let tag = resolver.declare_tag(Tag::Enum, enum_node.name, is_definition, &enum_node.span);
+    let use_ = if is_definition { TagUse::Definition } else { TagUse::Reference };
+    let tag = resolver.declare_tag(Tag::Enum, enum_node.name, use_, &enum_node.span);
     if !is_definition {
         let is_complete = tag.resolve_with(resolver.sema).is_complete;
         constraints::types::check_enum_reference(is_complete, enum_node.name).collect(resolver, &enum_node.span);

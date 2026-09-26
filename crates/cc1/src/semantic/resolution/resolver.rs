@@ -160,12 +160,12 @@ impl Resolver<'_> {
         Some(QualifiedType::new(base.id, base.is_const || is_const, base.is_volatile || is_volatile))
     }
 
-    pub fn declare_tag(&mut self, kind: Tag, name: Option<Name>, is_definition: bool, span: &Span) -> TagDefId {
+    pub fn declare_tag(&mut self, kind: Tag, name: Option<Name>, use_: TagUse, span: &Span) -> TagDefId {
         let Some(name) = name else { return self.sema.tags.declare(kind, None) };
 
-        if let Some(id) = self.sym_scopes.lookup_tag(name.id, is_definition) {
+        if let Some(id) = self.sym_scopes.lookup_tag(name.id, use_ != TagUse::Reference) {
             let def = id.resolve_with(self.sema);
-            if def.kind != kind || (is_definition && def.is_complete) {
+            if def.kind != kind || (use_ == TagUse::Definition && def.is_complete) {
                 self.add_diag(Diag::err((), Diagnostic::DuplicateDeclaration(def.kind.symbol_kind(), name)), span)
             }
             return id;
@@ -212,6 +212,13 @@ enum Dedup {
     Fresh,
     Merged(SymbolId),
     Rejected,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TagUse {
+    Reference,
+    Forward,
+    Definition,
 }
 
 // ----- Labels ----------------------------
@@ -278,6 +285,7 @@ impl Visitor for Resolver<'_> {
         let specifiers = &node.specifiers;
         let span = &node.span;
         declaration::check_declaration(self, node);
+        declaration::forward_tag(self, node);
         let declared_storage = constraints::specifier::storage_of(specifiers).collect(self, span);
         let qualif = declaration::base_type(self, specifiers, span);
         for init_declarator in &node.init_declarators {

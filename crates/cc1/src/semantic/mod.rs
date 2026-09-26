@@ -14,5 +14,5 @@ pub use eval::fold;
 pub use layout::Layout;
 pub use model::*;
 pub use resolution::scope::{ScopeKind, StatementScope, StatementScopes, SymbolScope, SymbolScopes};
-pub use resolution::{Resolver, declaration, finish_externals, mark_uses};
+pub use resolution::{Resolver, TagUse, declaration, finish_externals, mark_uses};
 pub use sema::{Sema, install_sema, sema};

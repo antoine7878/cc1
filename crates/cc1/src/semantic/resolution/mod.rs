@@ -8,5 +8,5 @@ pub mod uses;
 
 pub use expression::resolve_expression;
 pub use externals::finish_externals;
-pub use resolver::Resolver;
+pub use resolver::{Resolver, TagUse};
 pub use uses::mark_uses;
