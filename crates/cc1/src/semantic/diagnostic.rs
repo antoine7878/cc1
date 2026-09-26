@@ -40,6 +40,8 @@ pub enum Diagnostic {
 
     // 6.1.3.4
     EscapeOutOfRange,
+    EscapeNoHexDigits,
+    UnknownEscape(char),
 
     // 6.1.4
     MixedWideStringConcat,
@@ -272,6 +274,8 @@ impl DiagnosticNode {
 
             // 6.1.3.4
             Diagnostic::EscapeOutOfRange => "escape sequence is out of range for the character type".to_string(),
+            Diagnostic::EscapeNoHexDigits => "\\x used with no following hex digits".to_string(),
+            Diagnostic::UnknownEscape(c) => format!("unknown escape sequence: '\\{}'", c),
 
             // 6.1.4
             Diagnostic::MixedWideStringConcat => "concatenation of a wide and a narrow string literal is undefined".to_string(),

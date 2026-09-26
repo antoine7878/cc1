@@ -378,6 +378,21 @@ macro_rules! escape_out_of_range {
 }
 
 #[macro_export]
+macro_rules! escape_invalid {
+    ($name:ident, $src:expr, $expected:expr, $diagnostic:pat) => {
+        test_case!($name, {
+            let cc1::semantic::Diag { res: value, diagnostic } = cc1::ast::ConstValue::parse($src);
+            assert_eq!($crate::common::repr(Some(value)), $expected, "ConstValue::parse({:?})", $src);
+            assert!(
+                matches!(diagnostic, Some($diagnostic)),
+                "ConstValue::parse({:?}) reported {diagnostic:?}",
+                $src
+            );
+        });
+    };
+}
+
+#[macro_export]
 macro_rules! too_large {
     ($name:ident, $src:expr, $expected:expr) => {
         test_case!($name, {

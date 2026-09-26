@@ -468,6 +468,16 @@ reports!(
     "int c = '\\777';",
     ["<test>:1:9: error: escape sequence is out of range for the character type"]
 );
+reports!(
+    report_char_constant_escape_no_hex_digits,
+    "int c = '\\x';",
+    ["<test>:1:9: error: \\x used with no following hex digits"]
+);
+reports!(
+    report_char_constant_unknown_escape,
+    "int c = '\\q';",
+    ["<test>:1:9: error: unknown escape sequence: '\\q'"]
+);
 reports!(report_stray_non_ascii, "int x = 1; é", ["<test>:1:12: error: stray '\\u{e9}' in program"]);
 reports!(
     report_stray_backslash,

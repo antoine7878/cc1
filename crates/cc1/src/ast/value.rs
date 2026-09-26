@@ -120,27 +120,30 @@ impl ConstValue {
         let prefix = if s.starts_with("L") { "L" } else { "" };
         let s = &s[(prefix.len() + 1)..(s.len() - 1)];
         let narrow = prefix.is_empty();
-        let (value, count, out_of_range) = Self::char_sequence(s.as_bytes(), narrow);
+        let (value, count, diagnostic) = Self::char_sequence(s.as_bytes(), narrow);
         let value = if narrow && count == 1 && ResolvedType::Char.is_signed() && value & 0x80 != 0 {
             ConstValue::Int((value | 0xffffff00) as i32)
         } else {
             ConstValue::Int(value as i32)
         };
-        Diag::new(value, out_of_range.then_some(Diagnostic::EscapeOutOfRange))
+        Diag::new(value, diagnostic)
     }
 
-    fn char_sequence(bytes: &[u8], narrow: bool) -> (u32, usize, bool) {
+    fn char_sequence(bytes: &[u8], narrow: bool) -> (u32, usize, Option<Diagnostic>) {
         let mut i = 0;
         let mut value: u32 = 0;
         let mut count = 0;
-        let mut out_of_range = false;
+        let mut diagnostic = None;
         while i < bytes.len() {
-            let c = escape::next(bytes, &mut i);
-            out_of_range |= narrow && c > 0xff;
+            let (c, diag) = escape::next(bytes, &mut i);
+            diagnostic = diagnostic.or(diag);
+            if narrow && c > 0xff {
+                diagnostic = diagnostic.or(Some(Diagnostic::EscapeOutOfRange));
+            }
             value = if narrow { (value << 8) | (c & 0xff) } else { c };
             count += 1;
         }
-        (value, count, out_of_range)
+        (value, count, diagnostic)
     }
 
     fn parse_integer(s: &str) -> Diag<Self> {

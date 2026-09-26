@@ -20,6 +20,12 @@ literal!(string_escape_decodes_backslash, "char *s = \"\\\\\";", "\\x5c");
 reject!(string_escape_hex_out_of_range, "char *s = \"\\x1ff\";");
 reject!(string_escape_octal_out_of_range, "char *s = \"\\777\";");
 
+// 6.1.3.4 \x shall be followed by one or more hexadecimal digits, and only the
+// listed escape sequences are defined.
+reject!(string_escape_hex_no_digits, "char *s = \"\\x\";");
+reject!(string_escape_unknown, "char *s = \"a\\qb\";");
+accept!(string_escape_question_mark, "char t[sizeof \"\\?\" == 2 ? 1 : -1];");
+
 // ---- 5.1.1.2 escapes are converted in phase 5, concatenation is phase 6 ----
 
 accept!(string_concat_after_hex_escape, "char t[sizeof \"\\x1\" \"2\" == 3 ? 1 : -1];");

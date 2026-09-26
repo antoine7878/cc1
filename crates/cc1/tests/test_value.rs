@@ -134,6 +134,37 @@ constant!(literal_char_octal_escape_at_range_limit, "'\\377'", "Int(-1)");
 constant!(literal_char_hex_escape_at_range_limit, "'\\xff'", "Int(-1)");
 constant!(literal_wide_char_hex_escape_above_char_range, "L'\\x100'", "Int(256)");
 constant!(literal_wide_char_hex_escape_uses_wchar_range, "L'\\xffff'", "Int(65535)");
+constant!(literal_char_escape_question_mark, "'\\?'", "Int(63)");
+constant!(literal_char_escape_double_quote, "'\\\"'", "Int(34)");
+
+// 6.1.3.4 \x shall be followed by one or more hexadecimal digits.
+escape_invalid!(
+    literal_char_hex_escape_no_digits,
+    "'\\x'",
+    "Int(0)",
+    cc1::semantic::Diagnostic::EscapeNoHexDigits
+);
+escape_invalid!(
+    literal_char_hex_escape_bad_digit,
+    "'\\xg'",
+    "Int(103)",
+    cc1::semantic::Diagnostic::EscapeNoHexDigits
+);
+escape_invalid!(
+    literal_wide_char_hex_escape_no_digits,
+    "L'\\x'",
+    "Int(0)",
+    cc1::semantic::Diagnostic::EscapeNoHexDigits
+);
+
+// 6.1.3.4 the escape sequences listed are the only ones defined.
+escape_invalid!(
+    literal_char_unknown_escape,
+    "'\\q'",
+    "Int(113)",
+    cc1::semantic::Diagnostic::UnknownEscape('q')
+);
+escape_invalid!(literal_char_escape_e_is_unknown, "'\\e'", "Int(101)", cc1::semantic::Diagnostic::UnknownEscape('e'));
 
 fold!(add_int, binary(&ResolvedType::Int, BinaryOp::Add, ConstValue::Int(1), ConstValue::Int(2)), "Int(3)");
 fold_overflow!(
