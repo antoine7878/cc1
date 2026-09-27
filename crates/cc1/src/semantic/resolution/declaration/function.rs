@@ -133,10 +133,6 @@ fn param_prototype(
     if !constraints::param::is_valid_param_style(params, declarations).collect(resolver, span) {
         return Vec::new();
     }
-    if let [only] = params {
-        let is_void = matches!(only.ty.id.resolve_with(resolver.sema), ResolvedType::Void);
-        constraints::param::check_void_param(is_void).collect(resolver, &only.span);
-    }
     for param in params {
         if param.ty.is_void(resolver.sema) {
             continue;

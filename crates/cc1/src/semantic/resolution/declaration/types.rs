@@ -127,8 +127,7 @@ fn resolve_prototype(resolver: &mut Resolver, params: &[ParameterDeclaration], i
     let tags = resolver.leave_scope().into_tags();
     for param in &params {
         let is_void = matches!(param.ty.id.resolve_with(resolver.sema), ResolvedType::Void);
-        let is_special_case = params.len() == 1 && param.name.is_some();
-        constraints::param::check_void_param(is_void && !is_special_case).collect(resolver, &param.span);
+        constraints::param::check_void_param(is_void).collect(resolver, &param.span);
     }
     DeclaredParams::Prototype { params, is_variadic, tags }
 }

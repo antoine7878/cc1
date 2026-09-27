@@ -97,6 +97,24 @@ reports!(
 reports!(report_named_void_parameter, "void f(void x) { }", ["<test>:1:8: error: Parameter shall not have void type"]);
 
 reports!(
+    report_named_void_parameter_in_prototype,
+    "int f(void x);",
+    ["<test>:1:7: error: Parameter shall not have void type"]
+);
+
+reports!(
+    report_named_typedef_void_parameter_in_prototype,
+    "typedef void V; int f(V x);",
+    ["<test>:1:23: error: Parameter shall not have void type"]
+);
+
+reports!(
+    report_named_void_parameter_in_nested_prototype,
+    "void g(void) { int f(void x); }",
+    ["<test>:1:22: error: Parameter shall not have void type"]
+);
+
+reports!(
     report_old_style_void_parameter,
     "void f(a, b) int b; void a; { }",
     ["<test>:1:26: error: Parameter shall not have void type"]
