@@ -478,6 +478,21 @@ reports!(
     "int c = '\\q';",
     ["<test>:1:9: error: unknown escape sequence: '\\q'"]
 );
+reports!(
+    report_wide_char_constant_hex_escape_wrap,
+    "int c = L'\\x100000041';",
+    ["<test>:1:9: error: escape sequence is out of range for the character type"]
+);
+reports!(
+    report_string_hex_escape_wrap,
+    "char a[] = \"\\x100000041\";",
+    ["<test>:1:12: error: escape sequence is out of range for the character type"]
+);
+reports!(
+    report_wide_string_hex_escape_wrap,
+    "long c[] = L\"\\x100000041\";",
+    ["<test>:1:12: error: escape sequence is out of range for the character type"]
+);
 reports!(report_stray_non_ascii, "int x = 1; é", ["<test>:1:12: error: stray '\\u{e9}' in program"]);
 reports!(
     report_stray_backslash,

@@ -130,8 +130,12 @@ escape_out_of_range!(literal_char_octal_escape_just_out_of_range, "'\\400'", "In
 escape_out_of_range!(literal_char_hex_escape_out_of_range, "'\\x100'", "Int(0)");
 escape_out_of_range!(literal_char_hex_escape_far_out_of_range, "'\\x1ff'", "Int(-1)");
 escape_out_of_range!(literal_multi_char_escape_out_of_range, "'a\\x100'", "Int(24832)");
+escape_out_of_range!(literal_char_hex_escape_grossly_out_of_range, "'\\x100000041'", "Int(65)");
+escape_out_of_range!(literal_wide_char_hex_escape_grossly_out_of_range, "L'\\x100000041'", "Int(65)");
 constant!(literal_char_octal_escape_at_range_limit, "'\\377'", "Int(-1)");
 constant!(literal_char_hex_escape_at_range_limit, "'\\xff'", "Int(-1)");
+constant!(literal_wide_char_hex_escape_at_range_limit, "L'\\xffffffff'", "Int(-1)");
+constant!(literal_char_hex_escape_extra_leading_zeros, "'\\x0000000000041'", "Int(65)");
 constant!(literal_wide_char_hex_escape_above_char_range, "L'\\x100'", "Int(256)");
 constant!(literal_wide_char_hex_escape_uses_wchar_range, "L'\\xffff'", "Int(65535)");
 constant!(literal_char_escape_question_mark, "'\\?'", "Int(63)");

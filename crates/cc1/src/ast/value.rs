@@ -137,10 +137,11 @@ impl ConstValue {
         while i < bytes.len() {
             let (c, diag) = escape::next(bytes, &mut i);
             diagnostic = diagnostic.or(diag);
-            if narrow && c > 0xff {
+            let limit = if narrow { 0xff } else { u32::MAX as u64 };
+            if c > limit {
                 diagnostic = diagnostic.or(Some(Diagnostic::EscapeOutOfRange));
             }
-            value = if narrow { (value << 8) | (c & 0xff) } else { c };
+            value = if narrow { (value << 8) | (c & 0xff) as u32 } else { c as u32 };
             count += 1;
         }
         (value, count, diagnostic)
