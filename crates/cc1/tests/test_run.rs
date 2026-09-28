@@ -1346,3 +1346,163 @@ exits_linked!(
     "int kr(f, c) float f; char c; { return (int) f + c; }",
     42
 );
+
+exits_linked!(
+    abi_variadic_struct_to_gcc,
+    "struct S { int a; char b; double d; }; int take(int n, ...); int main(void) { struct S s; s.a = 1; s.b = 2; s.d = 3.5; return take(1, s, 7); }",
+    "#include <stdarg.h>\nstruct S { int a; char b; double d; }; int take(int n, ...) { va_list ap; struct S s; int x; va_start(ap, n); s = va_arg(ap, struct S); x = va_arg(ap, int); va_end(ap); return s.a + s.b + (int)(s.d * 2) + x; }",
+    17
+);
+exits_linked!(
+    abi_variadic_long_double_to_gcc,
+    "int take(int n, ...); int main(void) { long double ld = 2.5L; return take(1, ld, 9); }",
+    "#include <stdarg.h>\nint take(int n, ...) { va_list ap; long double x; int y; va_start(ap, n); x = va_arg(ap, long double); y = va_arg(ap, int); va_end(ap); return (int)(x * 4) + y; }",
+    19
+);
+exits_linked!(
+    abi_float_returns_from_gcc,
+    "float rf(void); double rd(void); long double rld(void); int main(void) { return (int)((rf() + rd() + (double)rld()) * 4); }",
+    "float rf(void) { return 1.25f; } double rd(void) { return 2.5; } long double rld(void) { return 3.75L; }",
+    30
+);
+exits_linked!(
+    abi_float_returns_to_gcc,
+    "float rf(void) { return 1.25f; } double rd(void) { return 2.5; } long double rld(void) { return 3.75L; } int sum(void); int main(void) { return sum(); }",
+    "float rf(void); double rd(void); long double rld(void); int sum(void) { return (int)((rf() + rd() + (double)rld()) * 4); }",
+    30
+);
+exits_linked!(
+    abi_bitfield_layout_read_from_gcc,
+    "struct B { unsigned a : 3; int b : 5; unsigned c : 7; char d; unsigned e : 20; int f : 12; }; extern struct B g; int size(void); int main(void) { return sizeof(struct B) == size() && g.a == 5 && g.b == -9 && g.c == 100 && g.d == 'x' && g.e == 999999 && g.f == -2000; }",
+    "struct B { unsigned a : 3; int b : 5; unsigned c : 7; char d; unsigned e : 20; int f : 12; }; struct B g = { 5, -9, 100, 'x', 999999, -2000 }; int size(void) { return sizeof(struct B); }",
+    1
+);
+exits_linked!(
+    abi_bitfield_layout_written_for_gcc,
+    "struct B { unsigned a : 30; unsigned b : 4; char c; int x : 4; unsigned d : 31; }; struct B g; int check(void); int main(void) { g.a = 0x3ffffffe; g.b = 9; g.c = 1; g.x = -3; g.d = 0x7ffffff0; return check(); }",
+    "struct B { unsigned a : 30; unsigned b : 4; char c; int x : 4; unsigned d : 31; }; extern struct B g; int check(void) { return g.a == 0x3ffffffe && g.b == 9 && g.c == 1 && g.x == -3 && g.d == 0x7ffffff0; }",
+    1
+);
+
+exits!(
+    double_to_unsigned_above_int_max,
+    "int main(void) { volatile double d = 3000000000.0; volatile long double ld = 4000000000.0L; unsigned u = (unsigned)d; unsigned long ul = (unsigned long)ld; return u == 3000000000u && ul == 4000000000UL; }",
+    1
+);
+exits!(
+    unsigned_max_to_floating,
+    "int main(void) { volatile unsigned u = 4294967295u; volatile double d = u; volatile float f = u; return d == 4294967295.0 && f == 4294967296.0f; }",
+    1
+);
+exits!(
+    nan_comparisons,
+    "int main(void) { volatile double z = 0.0; double n = z / z; return (n == n) + 2 * (n != n) + 4 * (n < 1) + 8 * !(n >= 1); }",
+    10
+);
+exits!(
+    infinity_and_negative_zero,
+    "int main(void) { volatile double z = 0.0; double i = 1.0 / z, m = -z; return (i > 1e308) + 2 * (1.0 / m < 0) + 4 * (m == 0.0); }",
+    7
+);
+exits!(
+    pointer_difference_large_elements,
+    "struct B { char c[12]; }; int main(void) { struct B a[10]; return &a[7] - &a[2]; }",
+    5
+);
+exits!(sizeof_does_not_evaluate_operand, "int main(void) { int i = 0; int s = sizeof(i++); return i * 10 + s; }", 4);
+exits!(sizeof_comma_decays_array, "int main(void) { char a[10]; return sizeof(0, a); }", 4);
+exits!(
+    duffs_device,
+    "int main(void) { int n = 13, count = 0; int i = (n + 3) / 4; switch (n % 4) { case 0: do { count++; case 3: count++; case 2: count++; case 1: count++; } while (--i > 0); } return count; }",
+    13
+);
+exits!(
+    switch_default_in_middle,
+    "int main(void) { int x = 9, r = 0; switch (x) { case 1: r += 1; default: r += 10; case 2: r += 100; break; case 3: r += 1000; } return r; }",
+    110
+);
+exits!(
+    switch_case_inside_dead_if,
+    "int main(void) { int x = 2, r = 0; switch (x) { case 1: if (0) { case 2: r = 3; } else { r = 4; } } return r; }",
+    3
+);
+exits!(
+    switch_extreme_int_cases,
+    "int f(int x) { switch (x) { case -2147483647 - 1: return 1; case 2147483647: return 2; case 0: return 3; case -1: return 4; default: return 5; } } int main(void) { return f(-2147483647 - 1) == 1 && f(2147483647) == 2 && f(0) == 3 && f(-1) == 4 && f(9) == 5; }",
+    1
+);
+exits!(
+    switch_extreme_unsigned_cases,
+    "int f(unsigned x) { switch (x) { case 4294967295u: return 1; case 2147483648u: return 2; case 0: return 3; default: return 5; } } int main(void) { return f(4294967295u) == 1 && f(2147483648u) == 2 && f(0) == 3 && f(9) == 5; }",
+    1
+);
+exits!(
+    switch_negative_case_on_char,
+    "int f(char c) { switch (c) { case -1: return 1; case 127: return 2; default: return 3; } } int main(void) { return f((char)255) * 100 + f(127) * 10 + f(0); }",
+    123
+);
+exits!(
+    struct_self_assignment,
+    "struct S { int a[4]; }; int main(void) { struct S s; s.a[0] = 1; s.a[3] = 4; s = s; return s.a[0] * 10 + s.a[3]; }",
+    14
+);
+exits!(
+    struct_return_chained,
+    "struct S { int a, b, c; }; struct S f(int x) { struct S s; s.a = x; s.b = x + 1; s.c = x + 2; return s; } struct S g(struct S s) { s.a *= 10; return s; } int main(void) { struct S r = g(g(f(1))); return r.a + r.b + f(5).c; }",
+    109
+);
+exits!(
+    struct_return_ignored,
+    "struct S { int a[4]; }; int n; struct S f(void) { struct S s; n++; s.a[0] = n; return s; } int main(void) { f(); f(); return n; }",
+    2
+);
+exits!(
+    struct_conditional,
+    "struct S { int a; double d; }; int main(void) { struct S x, y, z; int c = 0; x.a = 1; x.d = 1.5; y.a = 2; y.d = 2.5; z = c ? x : y; return z.a * 10 + (int)(z.d * 2); }",
+    25
+);
+exits!(
+    struct_assignment_rvalue_member,
+    "struct S { int x; char c[4]; } a, b; int main(void) { b.x = 7; return (a = b).x * 10 + a.x; }",
+    77
+);
+exits!(
+    typedef_name_as_member,
+    "typedef int T; struct S { int T; } s; int main(void) { struct S *p = &s; s.T = 3; p->T += 1; return s.T; }",
+    4
+);
+exits!(
+    typedef_cast_versus_multiplication,
+    "typedef int T; int main(void) { int x = 3, *p = &x, r; { int T = 2; r = (T)*x; } r += (T)*p; return r; }",
+    9
+);
+exits!(
+    enum_tag_in_sizeof_stays_visible,
+    "int x = sizeof(enum { Q = 5 }); int y = Q; int main(void) { return x + y; }",
+    9
+);
+exits!(
+    struct_tag_in_sizeof_stays_visible,
+    "int main(void) { int n = sizeof(struct S { int a; char b; }); struct S s; return n + sizeof s; }",
+    16
+);
+exits!(
+    enum_constant_in_struct_is_file_scope,
+    "struct S { enum { A = 3, B } e; int x; }; int y = B; int main(void) { return y; }",
+    4
+);
+exits!(
+    strings_in_nested_aggregates,
+    "char a[2][4] = { \"ab\", \"cd\" }; char b[][3] = { \"ab\", \"cd\", \"e\" }; int main(void) { return a[1][1] + sizeof b + b[2][0]; }",
+    210
+);
+exits!(
+    function_pointer_table,
+    "int a1(int x) { return x + 1; } int a2(int x) { return x * 2; } int a3(int x) { return x - 3; } int (*tab[3])(int) = { a1, a2, a3 }; int main(void) { int i, v = 10; for (i = 0; i < 3; i++) v = tab[i](v); return v; }",
+    19
+);
+exits!(
+    old_style_main,
+    "int main(argc, argv) int argc; char **argv; { return argc + (argv[argc] == 0); }",
+    2
+);

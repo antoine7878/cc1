@@ -9,6 +9,7 @@ mod test_driver;
 mod test_f80;
 mod test_facts;
 mod test_fold;
+mod test_gcc_gaps;
 mod test_global;
 mod test_initializer;
 mod test_layout;
