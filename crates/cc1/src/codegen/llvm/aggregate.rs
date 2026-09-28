@@ -50,7 +50,7 @@ pub fn struct_elements(def: &TagDef, size: u32) -> Vec<LlvmElement> {
                 let ty = id.resolve().ty;
                 pad(&mut elements, &mut cur, member.offset);
                 elements.push(LlvmElement::Member { index, ty });
-                cur = member.offset + sema().layout(&ty.id).size;
+                cur = member.offset + sema().layout(&ty.id).unwrap().size;
             }
             Some(width) => {
                 let begin = member.offset * 8 + member.bit_offset;

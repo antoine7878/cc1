@@ -26,15 +26,15 @@ pub fn classify_param(qty: QualifiedType) -> (LlvmType, ParamAttr) {
 }
 
 impl ReturnAttr {
-    pub fn classify_return(qty: QualifiedType) -> ReturnAttr {
+    pub fn classify_return(qty: QualifiedType) -> Option<ReturnAttr> {
         let sema = sema();
-        match qty.id.resolve() {
+        Some(match qty.id.resolve() {
             ResolvedType::Void => ReturnAttr::Void,
             ResolvedType::Tag(t) if t.resolve().kind != Tag::Enum => {
-                ReturnAttr::Sret { ty: qty.llvm(), align: sema.layout(&qty.id).align }
+                ReturnAttr::Sret { ty: qty.llvm(), align: sema.layout(&qty.id)?.align }
             }
             _ => ReturnAttr::Direct(qty.llvm()),
-        }
+        })
     }
 
     pub fn ret_llvm(&self) -> LlvmType {

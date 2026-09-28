@@ -88,11 +88,11 @@ impl<W: Write> Generator<W> {
     }
 
     fn i_to_i(from: QualifiedType, to: QualifiedType) -> Option<&'static str> {
-        Self::i_to_i_size(from, sema().layout(&to.id).size)
+        Self::i_to_i_size(from, sema().layout(&to.id).unwrap().size)
     }
 
     fn i_to_i_size(from: QualifiedType, to_size: u32) -> Option<&'static str> {
-        match u32::cmp(&sema().layout(&from.id).size, &to_size) {
+        match u32::cmp(&sema().layout(&from.id).unwrap().size, &to_size) {
             Ordering::Less if from.is_signed(sema()) => Some("sext"),
             Ordering::Less => Some("zext"),
             Ordering::Greater => Some("trunc"),
@@ -109,7 +109,7 @@ impl<W: Write> Generator<W> {
     }
 
     fn f_to_f(from: QualifiedType, to: QualifiedType) -> Option<&'static str> {
-        match u32::cmp(&sema().layout(&from.id).size, &sema().layout(&to.id).size) {
+        match u32::cmp(&sema().layout(&from.id).unwrap().size, &sema().layout(&to.id).unwrap().size) {
             Ordering::Less => Some("fpext"),
             Ordering::Greater => Some("fptrunc"),
             Ordering::Equal => None,
@@ -306,7 +306,7 @@ impl<W: Write> Generator<W> {
         let a = self.builder.convert("ptrtoint", v1, LlvmType::int());
         let b = self.builder.convert("ptrtoint", v2, LlvmType::int());
         let d = self.builder.binop("sub", a, b);
-        let size = sema().layout(&elem.id).size;
+        let size = sema().layout(&elem.id).unwrap().size;
         if size == 1 {
             return Ok(d);
         }
@@ -418,7 +418,12 @@ impl<W: Write> Generator<W> {
     ) -> Result<LlvmSymbol, Diagnostic> {
         let src = self.emit_expression(rhs)?;
         let src_qty = sema().expressions[rhs.id].ty;
-        self.builder.memcpy(loc.name, src.name, sema().layout(&dst_qty.id), dst_qty.is_volatile || src_qty.is_volatile);
+        self.builder.memcpy(
+            loc.name,
+            src.name,
+            sema().layout(&dst_qty.id).unwrap(),
+            dst_qty.is_volatile || src_qty.is_volatile,
+        );
         Ok(loc)
     }
 
@@ -461,7 +466,7 @@ impl<W: Write> Generator<W> {
         let ResolvedType::Function { ret, .. } = qty.id.resolve() else {
             return Err(Diagnostic::Invariant("call of non-function"));
         };
-        let ret_attr = ReturnAttr::classify_return(*ret);
+        let ret_attr = ReturnAttr::classify_return(*ret).unwrap();
         let f = self.emit_expression(f)?;
         let mut params: Vec<LlvmParam> = vec![];
 
@@ -486,7 +491,7 @@ impl<W: Write> Generator<W> {
         let (_, attr) = classify_param(qty);
         if matches!(attr, ParamAttr::ByVal { .. }) && re.ty.is_volatile {
             let copy = self.locals.spill(e.id);
-            self.builder.memcpy(copy.name, v.name, sema().layout(&qty.id), true);
+            self.builder.memcpy(copy.name, v.name, sema().layout(&qty.id).unwrap(), true);
             v = copy;
         }
         Ok(LlvmParam::new(v, attr))
@@ -512,7 +517,7 @@ impl<W: Write> Generator<W> {
     fn member(&mut self, node: &ExpressionNode, object_node: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
         let re = &sema().expressions[object_node.id];
         let object = self.emit_expression(object_node)?;
-        let ty = re.ty.id;
+        let ty = re.casted_ty().id;
         let place = match ty.resolve() {
             ResolvedType::Pointer(qty) => self.member_place(node, object, qty.id)?,
             ResolvedType::Tag(_) => self.member_place(node, object, ty)?,

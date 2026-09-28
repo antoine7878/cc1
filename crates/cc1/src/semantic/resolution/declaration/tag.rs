@@ -3,22 +3,22 @@ use libft::Span;
 use crate::ast::{EnumId, ExpressionNode, Name, StructDeclaration, Tag};
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
-    Diag, Diagnostic, DiagnosticSink, Member, QualifiedType, Resolver, Symbol, SymbolKind, TagDefId, TagUse,
-    constraints,
+    Diag, Diagnostic, DiagnosticSink, Member, QualifiedType, ResolvedType, ResolvedTypeId, Resolver, Symbol,
+    SymbolKind, TagDefId, TagUse, constraints,
 };
 
 pub fn struct_or_union_tag(
     resolver: &mut Resolver,
     kind: Tag,
-    name: Option<Name>,
+    tag_name: Option<Name>,
     declarations: &[StructDeclaration],
     span: &Span,
 ) -> TagDefId {
     let is_definition = !declarations.is_empty();
     let use_ = if is_definition { TagUse::Definition } else { TagUse::Reference };
-    let tag = resolver.declare_tag(kind, name, use_, span);
+    let tag_id = resolver.declare_tag(kind, tag_name, use_, span);
     if !is_definition {
-        return tag;
+        return tag_id;
     }
 
     let mut members: Vec<Member> = Vec::new();
@@ -34,6 +34,10 @@ pub fn struct_or_union_tag(
             let Some((ty, node)) = declared_type(resolver, qual, decl) else { continue };
             let already_diagnosed = resolver.sema.diagnostics.len() != diag_count_before;
             let name = node.name();
+            if &ResolvedType::Tag(tag_id) == ty.id.resolve_with(&*resolver.sema) {
+                resolver.add_diag(Diag::err((), Diagnostic::NestedRedefinition(tag_name.unwrap())), &declaration.span);
+                return tag_id;
+            }
             let bit_width = declarator.bit_width.as_ref().and_then(|e| {
                 let value = resolver.eval_constant(e);
                 let sema = &*resolver.sema;
@@ -72,8 +76,8 @@ pub fn struct_or_union_tag(
     if !has_rejected_member && (members.is_empty() || members.iter().all(|m| m.symbol.is_none())) {
         resolver.add_diag(Diag::err((), Diagnostic::TagWithoutMember(kind.symbol_kind())), span);
     }
-    resolver.sema.tags.complete(tag, members);
-    tag
+    resolver.sema.tags.complete(tag_id, members);
+    tag_id
 }
 
 pub fn enum_tag(resolver: &mut Resolver, id: EnumId) -> Option<TagDefId> {

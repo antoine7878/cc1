@@ -92,7 +92,7 @@ impl<W: Write> Builder<W> {
         let ResolvedType::Function { ret, .. } = sym_id.resolve().ty.id.resolve() else {
             unreachable!("define on a non-function")
         };
-        let ret_attr = ReturnAttr::classify_return(*ret);
+        let Some(ret_attr) = ReturnAttr::classify_return(*ret) else { return };
         self.blank();
         self.reset(params.len());
         self.write_fmt(format_args!("define {} {}", ret_attr.ret_llvm(), LlvmName::Global(sym_id)));
@@ -185,7 +185,7 @@ impl<W: Write> Builder<W> {
     }
 
     pub fn ret_default(&mut self, ret: QualifiedType) {
-        match ReturnAttr::classify_return(ret) {
+        match ReturnAttr::classify_return(ret).unwrap() {
             ReturnAttr::Void | ReturnAttr::Sret { .. } => self.ret_void(),
             ReturnAttr::Direct(_) => self.ret(LlvmSymbol::zero(ret)),
         }
@@ -303,7 +303,7 @@ impl<W: Write> Builder<W> {
         let Some(widest) = union_widest(def) else {
             return self.write_line(format_args!("{ty} = type {{ [{size} x {}] }}", LlvmType::char()));
         };
-        match size - sema().layout(&widest.id).size {
+        match size - sema().layout(&widest.id).unwrap().size {
             0 => self.write_line(format_args!("{ty} = type {{ {} }}", widest.llvm())),
             pad => self.write_line(format_args!("{ty} = type {{ {}, [{pad} x {}] }}", widest.llvm(), LlvmType::char())),
         }
@@ -314,7 +314,9 @@ impl<W: Write> Builder<W> {
         let ResolvedType::Function { ret, params } = sym.ty.id.resolve() else {
             unreachable!("declare on a non-function")
         };
-        let ret_attr = ReturnAttr::classify_return(*ret);
+        let Some(ret_attr) = ReturnAttr::classify_return(*ret) else {
+            return self.write_line(format_args!("declare void {}()", LlvmName::Global(sym_id)));
+        };
         let args = ret_attr
             .params(
                 params,
@@ -334,11 +336,17 @@ impl<W: Write> Builder<W> {
     pub fn define_global(&mut self, sym_id: SymbolId) {
         let sym = sym_id.resolve();
         let name = LlvmName::Global(sym_id);
-        let align = sema().layout(&sym.ty.id).align;
+        let layout = sema().layout(&sym.ty.id);
         let kind = if sym.ty.is_const && !sym.ty.is_volatile { "constant" } else { "global" };
         if sym.definition == DefinitionState::Declared {
-            return self.write_line(format_args!("{name} = external {kind} {}, align {align}", sym.ty.llvm()));
+            let ty = sym.ty.llvm();
+            return match layout {
+                Some(layout) => self.write_line(format_args!("{name} = external {kind} {ty}, align {}", layout.align)),
+                None => self.write_line(format_args!("{name} = external {kind} {ty}")),
+            };
         }
+        let Some(layout) = layout else { return };
+        let align = layout.align;
         let linkage = match sym.linkage {
             Linkage::External => "",
             Linkage::Internal | Linkage::None => "internal ",

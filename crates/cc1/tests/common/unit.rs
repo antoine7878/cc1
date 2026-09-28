@@ -44,7 +44,7 @@ fn preprocess(src: &str) -> String {
     }
 
     let mut child = Command::new("clang")
-        .args(["-E", "-std=c89", "-xc", "-"])
+        .args(["-E", "-std=c89", "--target=i686-linux-gnu", "-xc", "-"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

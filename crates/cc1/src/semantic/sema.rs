@@ -174,7 +174,13 @@ impl Sema {
         Some(id.resolve_with(self).linkage)
     }
 
-    pub fn register_external(&mut self, sym: Symbol, span: &Span, lexical: Option<SymbolId>, check_types: bool) -> SymbolId {
+    pub fn register_external(
+        &mut self,
+        sym: Symbol,
+        span: &Span,
+        lexical: Option<SymbolId>,
+        check_types: bool,
+    ) -> SymbolId {
         let name = sym.name;
         let linkage = sym.linkage;
         let definition = sym.definition;
@@ -217,9 +223,9 @@ impl Sema {
         entry_symbol
     }
 
-    pub fn layout(&self, id: &ResolvedTypeId) -> Layout {
+    pub fn layout(&self, id: &ResolvedTypeId) -> Option<Layout> {
         let ty = self.types.get(*id);
-        ty.layout().unwrap_or_else(|| self.layouts[id])
+        ty.layout().or_else(|| self.layouts.get(id).cloned())
     }
 }
 

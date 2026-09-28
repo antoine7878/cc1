@@ -85,7 +85,7 @@ impl LlvmType {
             LlvmType::Array(len, elem) => *len as u32 * elem.llvm().size(),
             LlvmType::Tag(id) => {
                 let ty = sema().types.lookup(&ResolvedType::Tag(*id)).expect("unregistered tag type");
-                sema().layout(&ty).size
+                sema().layout(&ty).unwrap().size
             }
         }
     }
@@ -118,9 +118,9 @@ impl From<&ResolvedTypeId> for LlvmType {
             | ResolvedType::Long
             | ResolvedType::UnsignedInt
             | ResolvedType::UnsignedLong
-            | ResolvedType::Int => LlvmType::integer(sema().layout(value).size),
+            | ResolvedType::Int => LlvmType::integer(sema().layout(value).unwrap().size),
             ResolvedType::Float | ResolvedType::Double | ResolvedType::LongDouble => {
-                LlvmType::float(sema().layout(value).size)
+                LlvmType::float(sema().layout(value).unwrap().size)
             }
             ResolvedType::Void => LlvmType::Void,
             ResolvedType::Pointer(_) => LlvmType::Ptr,
@@ -154,7 +154,7 @@ fn function_type(f: &mut fmt::Formatter<'_>, id: ResolvedTypeId) -> fmt::Result 
     let ResolvedType::Function { ret, params } = id.resolve() else {
         unreachable!("LlvmType::Function on a non-function")
     };
-    let ret_attr = ReturnAttr::classify_return(*ret);
+    let ret_attr = ReturnAttr::classify_return(*ret).unwrap();
 
     let mut has_param = false;
 

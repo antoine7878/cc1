@@ -25,6 +25,8 @@ impl Analyzer {
     }
 
     pub fn analyze(ctx: Context) -> &'static Sema {
-        Self::end(Self::run_passes(Self::begin(ctx)))
+        let sema = Self::begin(ctx);
+        let sema = Self::run_passes(sema);
+        Self::end(sema)
     }
 }

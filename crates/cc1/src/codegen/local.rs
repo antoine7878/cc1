@@ -58,7 +58,7 @@ impl Locals {
         let def = self.header.id.resolve();
         let mut next = 0;
 
-        if let ReturnAttr::Sret { ty, align } = ReturnAttr::classify_return(def.return_ty) {
+        if let ReturnAttr::Sret { ty, align } = ReturnAttr::classify_return(def.return_ty).unwrap() {
             next = 1;
             let slot = LlvmSymbol::ptr(LlvmName::SSA(0));
             self.sret = Some(slot);
@@ -157,9 +157,7 @@ impl Visitor for Locals {
         if let Expression::FunctionCall(_, args) = node.id.resolve() {
             for arg in args {
                 let Some(re) = sema().expressions.get(arg.id) else { continue };
-                if re.ty.is_record(sema())
-                    && re.ty.is_volatile
-                    && !self.spill_order.iter().any(|(id, _)| *id == arg.id)
+                if re.ty.is_record(sema()) && re.ty.is_volatile && !self.spill_order.iter().any(|(id, _)| *id == arg.id)
                 {
                     self.spill_order.push((arg.id, re.ty.llvm()));
                 }

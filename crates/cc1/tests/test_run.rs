@@ -1135,6 +1135,34 @@ emits!(
     "call i32 (ptr) @sum(ptr byval(%struct.big) align 4 %"
 );
 
+emits!(
+    incomplete_extern_object_declared,
+    "struct S; extern struct S s; void *p = &s;",
+    "@s = external global %struct.S\n"
+);
+emits!(
+    incomplete_return_function_declared,
+    "struct S; struct S f(void); struct S (*g(void))(void) { return f; }",
+    "declare void @f()"
+);
+exits_linked!(
+    incomplete_extern_object_address,
+    "struct S; extern struct S s; struct S *addr_s(void); void *p = &s; int main(void) { return p == (void *)addr_s() ? 42 : 1; }",
+    "struct S { int a; }; struct S s; struct S *addr_s(void) { return &s; }",
+    42
+);
+exits_linked!(
+    incomplete_return_function_address,
+    "struct S; struct S f(void); struct S (*addr_f(void))(void); int main(void) { return f == addr_f() ? 42 : 1; }",
+    "struct S { int a; }; struct S f(void) { struct S r; r.a = 0; return r; } struct S (*addr_f(void))(void) { return f; }",
+    42
+);
+exits_linked!(
+    incomplete_extern_object_completed_later,
+    "struct S; extern struct S s; struct S { int a; }; int main(void) { return s.a; }",
+    "struct S { int a; }; struct S s = { 42 };",
+    42
+);
 exits_linked!(
     abi_sret_from_gcc,
     "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int main(void) { struct big v; v = gmk(21); return v.a + v.e; }",
@@ -1505,4 +1533,10 @@ exits!(
     old_style_main,
     "int main(argc, argv) int argc; char **argv; { return argc + (argv[argc] == 0); }",
     2
+);
+
+exits!(
+    preprocess_targets_i386_limits,
+    "#include <limits.h>\nint main(void) { return (CHAR_MIN < 0) + (LONG_MAX == 2147483647L) * 2; }",
+    3
 );

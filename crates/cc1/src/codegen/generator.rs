@@ -76,7 +76,7 @@ impl<W: Write> Generator<W> {
             Initializer::List(_) | Initializer::String(_) => {
                 let src = self.globals.aggregates[&id];
                 let layout = sema().layout(&qty.id);
-                self.builder.memcpy(self.locals[id].name, src.name, layout, qty.is_volatile);
+                self.builder.memcpy(self.locals[id].name, src.name, layout.unwrap(), qty.is_volatile);
             }
             Initializer::Address(_) => unreachable!(),
         }

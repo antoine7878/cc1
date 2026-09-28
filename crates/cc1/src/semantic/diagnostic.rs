@@ -9,6 +9,7 @@ use crate::semantic::{QualifiedType, Sema, SymbolKind, sema};
 
 #[derive(Clone, Debug)]
 pub enum Diagnostic {
+    NestedRedefinition(Name),
     OutsideSwitch(&'static str),
     DuplicateCase(ConstValue),
     DuplicateDefault,
@@ -245,7 +246,8 @@ impl DiagnosticNode {
     #[rustfmt::skip]
     pub fn message(&self, sema: &Sema) -> String {
         match &self.inner {
-            Diagnostic::OutsideSwitch(s) =>format!("'{}' statement not in switch statement", s),
+            Diagnostic::NestedRedefinition(name) =>  format!("nested redefinition of '{}'", name.id.resolve()),
+            Diagnostic::OutsideSwitch(s) => format!("'{}' statement not in switch statement", s),
             Diagnostic::DuplicateCase(value) => format!("duplicate case value '{}'", value.to_u64()),
             Diagnostic::DuplicateDefault => "multiple default labels in one switch".to_string(),
             Diagnostic::BreakNotInLoop => "'break' statement not in loop or switch statement".to_string(),

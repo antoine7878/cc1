@@ -82,7 +82,7 @@ impl<'a> LlvmInit<'a> {
     }
 
     fn structure(&self, f: &mut Formatter<'_>, def: &TagDef, items: &[Initializer]) -> fmt::Result {
-        let size = sema().layout(&self.ty.id).size;
+        let size = sema().layout(&self.ty.id).unwrap().size;
         write!(f, "{} <{{ ", repr(self.ty))?;
         for (i, element) in struct_elements(def, size).iter().enumerate() {
             let sep = if i == 0 { "" } else { ", " };
@@ -156,11 +156,11 @@ pub fn union_first(def: &TagDef) -> Option<QualifiedType> {
 
 pub fn union_widest(def: &TagDef) -> Option<QualifiedType> {
     let members = def.members.iter().filter_map(|member| member.symbol).map(|sym| sym.resolve().ty);
-    members.max_by_key(|qty| sema().layout(&qty.id).align)
+    members.max_by_key(|qty| sema().layout(&qty.id).unwrap().align)
 }
 
 fn union_pad(union: QualifiedType, member: QualifiedType) -> u32 {
-    sema().layout(&union.id).size - sema().layout(&member.id).size
+    sema().layout(&union.id).unwrap().size - sema().layout(&member.id).unwrap().size
 }
 
 fn needs_literal(qty: QualifiedType) -> bool {
@@ -191,7 +191,7 @@ fn repr(qty: QualifiedType) -> String {
             let def = id.resolve();
             match def.kind {
                 Tag::Struct => {
-                    let size = sema().layout(&qty.id).size;
+                    let size = sema().layout(&qty.id).unwrap().size;
                     let elements = struct_elements(def, size)
                         .iter()
                         .map(|element| match *element {
