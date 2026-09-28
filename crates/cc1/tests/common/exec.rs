@@ -7,13 +7,8 @@ use std::sync::OnceLock;
 
 use crate::common::Unit;
 
-const CONTAINER: &str = "linux-cross-cont";
 const GCC_FLAGS: &str =
     "-std=iso9899:1990 -pedantic-errors -Wno-deprecated-non-prototype -Wno-strict-prototypes -fno-asm -fno-builtin";
-
-fn native_i386() -> bool {
-    cfg!(all(target_os = "linux", target_arch = "x86_64"))
-}
 
 struct Toolchain {
     gcc: &'static str,
@@ -21,46 +16,34 @@ struct Toolchain {
     run: &'static str,
 }
 
-const NATIVE: Toolchain = Toolchain { gcc: "gcc -m32", clang_ir: "clang -m32 -w -x ir", run: "" };
-const CROSS: Toolchain = Toolchain {
+const TOOLCHAIN: Toolchain = Toolchain {
     gcc: "i686-linux-gnu-gcc",
     clang_ir: "clang --target=i686-linux-gnu -w -x ir",
     run: "qemu-i386 -L /usr/i686-linux-gnu",
 };
 
-fn toolchain() -> &'static Toolchain {
-    if native_i386() { &NATIVE } else { &CROSS }
-}
-
 fn i386_shell(script: &str, stdin: &str) -> Output {
-    let mut cmd = if native_i386() {
-        let mut c = Command::new("sh");
-        c.args(["-c", script]);
-        c
-    } else {
-        let mut c = Command::new("docker");
-        c.args(["exec", "-i", CONTAINER, "sh", "-c", script]);
-        c
-    };
+    assert!(cfg!(target_os = "linux"), "the suite runs inside the Lima VM: make -f lima.mk ctest");
 
-    let mut child = cmd
+    let mut child = Command::new("sh")
+        .args(["-c", script])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .unwrap_or_else(|e| panic!("spawn i386 shell ({e}) — is the `{CONTAINER}` container up?"));
+        .expect("spawn i386 shell");
 
     child.stdin.take().expect("stdin").write_all(stdin.as_bytes()).expect("write stdin");
     child.wait_with_output().expect("wait")
 }
 
 fn stage(compile: &str, obj: &str, bin: &str, helper_obj: &str) -> String {
-    let Toolchain { gcc, run, .. } = toolchain();
+    let Toolchain { gcc, run, .. } = TOOLCHAIN;
     format!("{compile} -c $d/{obj} -o $d/{obj}.o && {gcc} -o $d/{bin} $d/{obj}.o{helper_obj} && {run} $d/{bin}")
 }
 
 fn helper_stage(helper: Option<&str>) -> (String, &'static str) {
-    let Toolchain { gcc, .. } = toolchain();
+    let Toolchain { gcc, .. } = TOOLCHAIN;
     match helper {
         Some(helper) => (
             format!(
@@ -84,12 +67,12 @@ fn build_and_run(compile: &str, input: &str, helper: Option<&str>) -> Output {
 
 fn build_and_run_both(src: &str, ir: &str, helper: Option<&str>) -> (Run, Run) {
     let (helper_build, helper_obj) = helper_stage(helper);
-    let gcc = format!("{} {GCC_FLAGS} -x c", toolchain().gcc);
+    let gcc = format!("{} {GCC_FLAGS} -x c", TOOLCHAIN.gcc);
     let script = format!(
         "d=$(mktemp -d) && cat > $d/in && cat > $d/src.c <<'SRC_EOF'\n{src}\nSRC_EOF\n{helper_build}\
          {}; echo gcc=$?; {}; s=$?; rm -rf $d; exit $s",
         stage(&gcc, "src.c", "gcc_bin", helper_obj),
-        stage(toolchain().clang_ir, "in", "bin", helper_obj),
+        stage(TOOLCHAIN.clang_ir, "in", "bin", helper_obj),
     );
     let out = i386_shell(&script, ir);
     let stdout = String::from_utf8_lossy(&out.stdout);
@@ -108,7 +91,7 @@ fn run_of(out: Output) -> Run {
 }
 
 fn run_ir(ir: &str, helper: Option<&str>) -> Run {
-    run_of(build_and_run(toolchain().clang_ir, ir, helper))
+    run_of(build_and_run(TOOLCHAIN.clang_ir, ir, helper))
 }
 
 fn oracle_dir() -> &'static Path {

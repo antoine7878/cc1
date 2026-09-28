@@ -1,0 +1,50 @@
+minimumLimaVersion: 2.0.0
+
+base:
+- template:_images/ubuntu-24.04
+
+vmType: vz
+arch: aarch64
+cpus: 8
+memory: 8GiB
+disk: 30GiB
+
+mountType: virtiofs
+
+containerd:
+  system: false
+  user: false
+
+provision:
+- mode: system
+  script: |
+    #!/bin/sh
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y --no-install-recommends \
+      build-essential ca-certificates binutils bison flex clang llvm \
+      wget curl make python3 file zsh git vim gdb gdb-multiarch kitty-terminfo ncurses-term \
+      gcc-i686-linux-gnu libc6-dev-i386-cross qemu-user
+    usermod -s /usr/bin/zsh "{{.User}}"
+- mode: user
+  script: |
+    #!/bin/sh
+    set -eux
+    if [ ! -x "$HOME/.cargo/bin/cargo" ]; then
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+      "$HOME/.cargo/bin/cargo" install cargo-nextest --locked
+    fi
+    if [ ! -d "$HOME/.oh-my-zsh" ]; then
+      sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+      git clone https://github.com/jeffreytse/zsh-vi-mode "$HOME/.oh-my-zsh/custom/plugins/zsh-vi-mode"
+      cat >> "$HOME/.zshrc" <<'EOF'
+    plugins+=(zsh-vi-mode)
+    source $ZSH/oh-my-zsh.sh
+    . "$HOME/.cargo/env"
+    export CARGO_TARGET_DIR=$HOME/target
+    alias make="make CC1=$CARGO_TARGET_DIR/debug/cc1 FT_LEX=$CARGO_TARGET_DIR/release/ft_lex FT_YACC=$CARGO_TARGET_DIR/release/ft_yacc"
+    alias t="make test"
+    alias re="make re"
+    EOF
+    fi

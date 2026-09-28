@@ -41,11 +41,13 @@ IN_EXTENTION = {
     "so": Stage.LINK,
 }
 
+I386 = ["--target=i686-linux-gnu"]
+
 TOOL = {
     Stage.PREPROCESS: "clang",
     Stage.COMPILE: "cc1",
     Stage.LOWER: "llc",
-    Stage.ASSEMBLE: "as",
+    Stage.ASSEMBLE: "i686-linux-gnu-as",
     Stage.LINK: "clang",
 }
 
@@ -64,7 +66,7 @@ class LinkItem:
 
 
 def preprocess_argv(step: Step, args: Namespace) -> list[str]:
-    argv = ["clang", "-E", "-std=c89", "-m32"]
+    argv = ["clang", "-E", "-std=c89", *I386]
     argv.extend(f"-D{name}" for name in args.defines)
     argv.extend(f"-U{name}" for name in args.undefines)
     argv.extend(f"-I{dir}" for dir in args.includes)
@@ -91,11 +93,11 @@ def lower_argv(step: Step, args: Namespace) -> list[str]:
 
 
 def assemble_argv(step: Step, _: Namespace) -> list[str]:
-    return ["as", "--32", "-o", step.output, step.input]
+    return ["i686-linux-gnu-as", "--32", "-o", step.output, step.input]
 
 
 def link_argv(args: argparse.Namespace, outputs: dict[str, list[str]]) -> list:
-    argv = ["clang", "-m32"]
+    argv = ["clang", *I386]
     if args.strip:
         argv.append("-s")
     for item in args.link_items:

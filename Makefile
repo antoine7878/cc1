@@ -35,22 +35,25 @@ ttest: all
 
 ftest: all cc
 	./fcc ./rscs/hello.c -o ./rscs/a.out
-	./rscs/a.out || echo $$?
+	$(I386_RUN) ./rscs/a.out || echo $$?
 
 # ----- reference --------------------
 
-CFF = -m32 -std=iso9899:1990 -pedantic-errors
+CFF = -std=iso9899:1990 -pedantic-errors
+
+I386_CC  = i686-linux-gnu-gcc
+I386_RUN = qemu-i386 -L /usr/i686-linux-gnu
 
 c:
-	gcc -c $(CFF) rscs/hello.c -o /dev/null
+	$(I386_CC) -c $(CFF) rscs/hello.c -o /dev/null
 
 cc:
-	gcc $(CFF) rscs/hello.c
-	./a.out || echo $$?
+	$(I386_CC) $(CFF) rscs/hello.c
+	$(I386_RUN) ./a.out || echo $$?
 	rm ./a.out
 
 llvm:
-	clang $(CFF) -O0 -S -emit-llvm rscs/hello.c -o ./rscs/hello.ll
+	clang --target=i686-linux-gnu $(CFF) -O0 -S -emit-llvm rscs/hello.c -o ./rscs/hello.ll
 
 empty :=
 space := $(empty) $(empty)

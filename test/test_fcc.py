@@ -33,7 +33,7 @@ class LinkItemsTest(unittest.TestCase):
             link_items=fcc.link_items(["main.c", "-lfoo", "helper.o"]),
         )
         got = fcc.link_argv(args, {"main.c": ["main.o"], "helper.o": ["helper.o"]})
-        self.assertEqual(got, ["clang", "-m32", "main.o", "-lfoo", "helper.o", "-o", "a.out"])
+        self.assertEqual(got, ["clang", "--target=i686-linux-gnu", "main.o", "-lfoo", "helper.o", "-o", "a.out"])
 
     def test_link_forwards_strip_option(self):
         fcc = load_fcc()
@@ -43,7 +43,20 @@ class LinkItemsTest(unittest.TestCase):
             link_items=fcc.link_items(["main.o", "-s"]),
         )
         got = fcc.link_argv(args, {"main.o": ["main.o"]})
-        self.assertEqual(got, ["clang", "-m32", "-s", "main.o", "-o", "a.out"])
+        self.assertEqual(got, ["clang", "--target=i686-linux-gnu", "-s", "main.o", "-o", "a.out"])
+
+
+class StageArgvTest(unittest.TestCase):
+    def test_preprocess_targets_i386(self):
+        fcc = load_fcc()
+        args = Namespace(defines=["N=1"], undefines=[], includes=["inc"])
+        got = fcc.preprocess_argv(fcc.Step(fcc.Stage.PREPROCESS, "a.c", "a.i"), args)
+        self.assertEqual(got, ["clang", "-E", "-std=c89", "--target=i686-linux-gnu", "-DN=1", "-Iinc", "-o", "a.i", "a.c"])
+
+    def test_assemble_targets_i386(self):
+        fcc = load_fcc()
+        got = fcc.assemble_argv(fcc.Step(fcc.Stage.ASSEMBLE, "a.s", "a.o"), Namespace())
+        self.assertEqual(got, ["i686-linux-gnu-as", "--32", "-o", "a.o", "a.s"])
 
 
 if __name__ == "__main__":

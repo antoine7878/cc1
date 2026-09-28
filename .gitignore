@@ -1,4 +1,3 @@
-*.ll
 crates/*/src/parser/lex.rs
 crates/*/src/parser/yacc.rs
 tarpaulin-report.*
