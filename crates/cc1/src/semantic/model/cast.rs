@@ -223,10 +223,7 @@ pub fn assignment_conversion(
     match (l, r) {
         (l, r) if l.is_arithmetic(sema) && r.is_arithmetic(sema) => (),
         (&ResolvedType::Tag(id), _)
-            if !id.resolve_with(sema).is_enum() && lhs.ty.is_compatible_ignoring_qualifiers(sema, &rhs_ty) =>
-        {
-            ()
-        }
+            if !id.resolve_with(sema).is_enum() && lhs.ty.is_compatible_ignoring_qualifiers(sema, &rhs_ty) => {}
         (ResolvedType::Pointer(lp), ResolvedType::Pointer(rp)) if can_assign_pointer(sema, *lp, *rp) => {
             if !lp.has_qualifiers_of(rp) {
                 return Err(assign_ctx.discarded(lhs.ty, rhs_ty));

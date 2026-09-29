@@ -22,9 +22,12 @@ impl Default for FunctionHeader {
 
 pub fn bind_function_params(resolver: &mut Resolver, node: &FunctionDefinitionNode, header: &FunctionHeader) {
     resolver.enter_prototype();
-    if let DeclaredParams::Prototype { tags, .. } = &header.params {
+    if let DeclaredParams::Prototype { tags, enumerators, .. } = &header.params {
         for (&name, &tag) in tags {
             resolver.bind_tag(name, tag);
+        }
+        for (&name, &sym) in enumerators {
+            resolver.bind(name, sym);
         }
     }
     let declarations = &node.old_style_declarations;

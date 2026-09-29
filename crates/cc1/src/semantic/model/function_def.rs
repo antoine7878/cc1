@@ -98,7 +98,12 @@ pub struct ParamInfo {
 pub enum DeclaredParams {
     Unspecified,
     Names(Vec<Name>),
-    Prototype { params: Vec<ParamInfo>, is_variadic: bool, tags: HashMap<NameId, TagDefId> },
+    Prototype {
+        params: Vec<ParamInfo>,
+        is_variadic: bool,
+        tags: HashMap<NameId, TagDefId>,
+        enumerators: HashMap<NameId, SymbolId>,
+    },
 }
 
 impl DeclaredParams {

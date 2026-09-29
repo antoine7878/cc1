@@ -320,7 +320,7 @@ impl DiagnosticNode {
             Diagnostic::RegisterAddress => "address of register variable requested".to_string(),
             Diagnostic::RValueAddress(ty) => format!( "cannot take the address of an rvalue of type '{}'", ty.display(sema)),
             Diagnostic::IndirectionNotPointer(ty) => format!("indirection requires pointer operand ('{}' invalid)", ty.display(sema)),
-            Diagnostic::IndirectionToVoid => "ISO C does not allow indirection on operand of type 'void *'".to_string(),
+            Diagnostic::IndirectionToVoid => "indirection on operand of type 'void *'".to_string(),
 
             // 6.3.3.3
             Diagnostic::InvalidUnary(ty) => format!("invalid argument type '{}' to unary expression", ty.display(sema)),

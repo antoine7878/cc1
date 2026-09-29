@@ -58,7 +58,7 @@ pub fn indirection(sema: &mut Sema, e: &ExpressionNode) -> ExprResult {
             return Err(Diagnostic::IndirectionNotPointer(re.ty));
         };
         if inner.is_void(sema) {
-            return Err(Diagnostic::IndirectionToVoid);
+            return Ok((*inner, RValue));
         }
         let kind = if inner.is_function(sema) { RValue } else { LValue };
         Ok((*inner, kind))

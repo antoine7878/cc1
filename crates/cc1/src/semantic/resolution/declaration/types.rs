@@ -9,7 +9,7 @@ use crate::ast::{
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     DeclaredParams, Diag, Diagnostic, DiagnosticSink, ParamInfo, QualifiedType, ResolvedType, Resolver, Symbol,
-    SymbolId, constraints, layout,
+    SymbolId, SymbolKind, constraints, layout,
 };
 
 pub fn base_type(resolver: &mut Resolver, specifiers: &[DeclarationSpecifier], span: &Span) -> Option<QualifiedType> {
@@ -115,21 +115,30 @@ fn resolve_params(resolver: &mut Resolver, params: &FunctionParametersNode) -> D
 fn resolve_prototype(resolver: &mut Resolver, params: &[ParameterDeclaration], is_variadic: bool) -> DeclaredParams {
     if let [only] = params
         && !is_variadic
-        && only.is_abstract_void()
+        && only.is_abstract_void(resolver)
     {
-        return DeclaredParams::Prototype { params: Vec::new(), is_variadic, tags: HashMap::new() };
+        return DeclaredParams::Prototype {
+            params: Vec::new(),
+            is_variadic,
+            tags: HashMap::new(),
+            enumerators: HashMap::new(),
+        };
     }
     resolver.enter_prototype();
     let mut params: Vec<ParamInfo> = params.iter().filter_map(|param| resolve_param(resolver, param)).collect();
     for param in &mut params {
         param.symbol = declare_param(resolver, param);
     }
-    let tags = resolver.leave_scope().into_tags();
+    let (tags, ordinaries) = resolver.leave_scope().into_parts();
+    let enumerators = ordinaries
+        .into_iter()
+        .filter(|&(_, sym)| sym.resolve_with(resolver.sema).kind == SymbolKind::Enumerator)
+        .collect();
     for param in &params {
         let is_void = matches!(param.ty.id.resolve_with(resolver.sema), ResolvedType::Void);
         constraints::param::check_void_param(is_void).collect(resolver, &param.span);
     }
-    DeclaredParams::Prototype { params, is_variadic, tags }
+    DeclaredParams::Prototype { params, is_variadic, tags, enumerators }
 }
 
 fn resolve_param(resolver: &mut Resolver, param: &ParameterDeclaration) -> Option<ParamInfo> {

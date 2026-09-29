@@ -23,8 +23,8 @@ impl SymbolScope {
         Self { tags: HashMap::new(), ordinaries: HashMap::new(), kind }
     }
 
-    pub fn into_tags(self) -> HashMap<NameId, TagDefId> {
-        self.tags
+    pub fn into_parts(self) -> (HashMap<NameId, TagDefId>, HashMap<NameId, SymbolId>) {
+        (self.tags, self.ordinaries)
     }
 }
 

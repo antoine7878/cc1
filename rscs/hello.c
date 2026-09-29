@@ -1,3 +1,5 @@
-void f(void) {
-	"\x";
+typedef void V;
+
+int main(V) {
+	return 0;
 }

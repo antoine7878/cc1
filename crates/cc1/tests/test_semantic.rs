@@ -24,6 +24,10 @@ accept!(tag_shadowed_in_inner_scope, "struct S { int a; }; void f(void) { struct
 reject!(prototype_tag_not_visible_after_declaration, "void f(struct S { int a; } *p); struct S s;");
 reject!(prototype_tag_differs_from_later_file_tag, "void g(struct T *p); struct T { int x; }; void g(struct T *p);");
 reject!(nested_prototype_tag_not_visible_after_declaration, "void k(void (*fp)(struct V { int a; } *)); struct V v;");
+accept!(prototype_enumerator_visible_in_body, "int f(enum E { A, B } x) { return x + B; }");
+reject!(prototype_enumerator_not_visible_after_declaration, "void f(enum E { A } x); int y = A;");
+reject!(nested_prototype_enumerator_not_visible_in_body, "int f(void (*g)(enum E { A } y)) { return A; }");
+reject!(prototype_enumerator_conflicts_with_param, "int f(enum E { A } A) { return 0; }");
 accept!(prototype_tag_hides_file_tag, "struct W { int a; }; void m(struct W { char c; } *p);");
 accept!(definition_parameter_tag_visible_in_body, "void h(struct U { int a; } x) { struct U y; y.a = x.a; }");
 reject!(definition_parameter_tag_not_visible_after_body, "void h(struct U { int a; } x) { } struct U z;");
