@@ -426,7 +426,28 @@ recover!(
 recover!(
     a_cast_of_a_floating_expression_is_not_constant,
     "enum E { A = (int)(1.5 + 1) };",
-    [Diagnostic::NonConstantExpression],
+    [Diagnostic::NonIntegerConstantExpression],
+    &[]
+);
+
+recover!(
+    a_cast_hiding_floating_operands_is_not_integral,
+    "enum E { A = (int)(1.0 < 2.0) };",
+    [Diagnostic::NonIntegerConstantExpression],
+    &[]
+);
+
+recover!(
+    parentheses_hiding_floating_operands_are_not_integral,
+    "enum E { A = (1.0 < 2.0) + 1 };",
+    [Diagnostic::NonIntegerConstantExpression],
+    &[]
+);
+
+recover!(
+    an_array_size_cast_of_a_floating_expression_is_not_integral,
+    "int a[(int)(2.5 * 2)];",
+    [Diagnostic::NonIntegerConstantExpression],
     &[]
 );
 

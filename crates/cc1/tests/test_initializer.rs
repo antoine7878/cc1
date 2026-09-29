@@ -108,4 +108,13 @@ accept!(init_unsigned_wraps, "unsigned x = 4294967295u + 1;");
 accept!(init_integer_narrowing_is_not_overflow, "char c = 300; int x = (int)2147483648u;");
 accept!(init_double_truncates_into_range, "int x = 2147483647.9; int y = -2147483648.9; unsigned u = 4294967295.0; unsigned z = 0.5;");
 accept!(init_floating_targets_do_not_overflow, "float f = 1e39; double d = 1e10;");
+accept!(
+    init_static_cast_of_a_floating_expression,
+    "int i = (int)(2.5 * 2); double d = (float)(1.0 / 3); int j = (int)-2.5; int k = (int)(1.0 < 2.0) + (char)3.5 * 2.0;"
+);
+exits!(
+    init_static_cast_of_a_floating_expression_values,
+    "int i = (int)(2.5 * 2); int j = (int)-2.5; double d = (float)(1.0 / 4); int main(void) { return i * 10 - j + (int)(d * 4); }",
+    53
+);
 accept!(init_automatic_scalar_overflow_is_not_a_constant_expression, "int f(void) { int x = 2147483647 + 1; int y = 1e10; return x + y; }");

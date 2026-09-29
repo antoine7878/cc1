@@ -118,12 +118,6 @@ exits!(
     1
 );
 
-exits!(
-    gap_static_init_cast_of_float_expression,
-    "int i = (int)(2.5 * 2); int j = (int)-2.5; double d = (float)(1.0 / 4); int main(void) { return i * 10 - j + (int)(d * 4); }",
-    53
-);
-
 exits!(gap_enum_constant_in_parameter_list, "int f(enum E { A, B } x) { return x + B; } int main(void) { return f(0); }", 1);
 
 exits!(warns gap_deref_void_pointer_discarded, "int main(void) { int x = 1; void *p = &x; *p; (void)*p; return 0; }", 0);

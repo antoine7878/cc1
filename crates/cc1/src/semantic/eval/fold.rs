@@ -120,10 +120,11 @@ fn evaluate(sema: &mut Sema, expr: &ExpressionNode, sink: &mut VecSink) -> Resul
 
 fn integral_operands(sema: &Sema, expr: &ExpressionNode) -> Result<(), Diagnostic> {
     let operands: Vec<&ExpressionNode> = match expr.id.resolve() {
-        Expression::Cast(_, _) | Expression::SizeofExpr(_) | Expression::SizeofType(_) => {
-            return Ok(());
+        Expression::SizeofExpr(_) | Expression::SizeofType(_) => return Ok(()),
+        Expression::Cast(_, e) if is_constant(e) => return Ok(()),
+        Expression::ConstantExpression(e) | Expression::Unary(_, e) | Expression::Cast(_, e) | Expression::Block(e) => {
+            vec![e]
         }
-        Expression::ConstantExpression(e) | Expression::Unary(_, e) => vec![e],
         Expression::Binary(_, e1, e2) => vec![e1, e2],
         Expression::Ternary(condition, e1, e2) => vec![condition, e1, e2],
         _ => Vec::new(),
@@ -279,17 +280,13 @@ fn cast(
     if node_ty(sema, expr)?.is_void(sema) {
         return Err(Diagnostic::NonIntegerConstantExpression);
     }
-    let operand_ty = node_ty(sema, e)?;
-    if operand_ty.is_floating(sema) && !a(e) {
-        return Err(Diagnostic::NonConstantExpression);
-    }
     operand(sema, e, sink)
 }
 
-fn a(e: &ExpressionNode) -> bool {
+fn is_constant(e: &ExpressionNode) -> bool {
     match e.id.resolve() {
         Expression::Constant(_) => true,
-        Expression::Block(e) => a(e),
+        Expression::Block(e) => is_constant(e),
         _ => false,
     }
 }
