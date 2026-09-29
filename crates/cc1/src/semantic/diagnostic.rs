@@ -53,6 +53,7 @@ pub enum Diagnostic {
 
     // 6.2.2.1
     IncompleteType(QualifiedType),
+    NonLValueArray,
 
     // 6.3
     ArithmeticOverflow,
@@ -293,6 +294,7 @@ impl DiagnosticNode {
 
             // 6.2.2.1
             Diagnostic::IncompleteType(ty) => format!("incomplete definition of type '{}'", ty.display(sema)),
+            Diagnostic::NonLValueArray => "invalid use of non-lvalue array".to_string(),
 
             // 6.3
             Diagnostic::ArithmeticOverflow => "integer overflow in constant expression".to_string(),

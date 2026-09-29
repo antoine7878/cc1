@@ -41,7 +41,7 @@ pub enum CastKind {
 
 pub fn convert_operand(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
     function_to_pointer(sema, re);
-    array_to_pointer(sema, re);
+    array_to_pointer(sema, re, span);
     lvalue_to_rvalue(sema, re, span);
 }
 
@@ -51,8 +51,11 @@ pub fn function_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
     re.casts.push(ImplicitCast::new(CastKind::FunctionToPointer, to));
 }
 
-pub fn array_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression) {
-    let ResolvedType::Array { elem, .. } = re.ty.id.resolve_with(sema) else { return };
+pub fn array_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
+    let &ResolvedType::Array { elem, .. } = re.ty.id.resolve_with(sema) else { return };
+    if re.kind == ValueCategory::RValue {
+        sema.add_diag(Diag::err((), Diagnostic::NonLValueArray), span);
+    }
     let elem = QualifiedType::new(elem.id, elem.is_const || re.ty.is_const, elem.is_volatile || re.ty.is_volatile);
     let to = QualifiedType::plain(sema.types.pointer(elem));
     re.casts.push(ImplicitCast::new(CastKind::ArrayToPointer, to))
