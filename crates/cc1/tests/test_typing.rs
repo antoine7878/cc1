@@ -583,9 +583,15 @@ accept!(indirection_on_an_array_designates_its_first_element, "int a[3]; void f(
 // 6.2.2.1 a function designator is converted to a pointer to function, so *g designates g.
 accept!(indirection_on_a_function_designator_designates_the_function, "int g(void); void f(void) { (*g)(); }");
 
-// 6.3.3.2 If the operand points to an object, the result is an lvalue designating the object:
-// void is not an object type.
-reject!(indirection_on_a_pointer_to_void_is_rejected, "void *v; void f(void) { *v; }");
+shaped!(
+    indirection_on_a_pointer_to_void_is_a_void_expression,
+    "void f(void *v) { *v; }",
+    vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), rv(Ty::Void)]
+);
+
+reject!(the_value_of_an_indirection_on_a_pointer_to_void_is_rejected, "void f(void *v) { int i = *v; }");
+
+reject!(assigning_through_a_pointer_to_void_is_rejected, "void f(void *v) { *v = 0; }");
 
 // ---- 6.3.3.3 unary arithmetic operators ----------------------------------
 
@@ -1312,10 +1318,7 @@ shaped!(
     post_increment_keeps_the_type_of_its_operand,
     "char c; void f(void) { c++; }",
     vec![
-        lv(Ty::Char)
-            .then(LValueToRValue, Ty::Char)
-            .then(IntegerPromotion, Ty::Int)
-            .result(IntegerConversion, Ty::Char),
+        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int).result(IntegerConversion, Ty::Char),
         rv(Ty::Char),
     ]
 );
@@ -1381,10 +1384,7 @@ shaped!(
     pre_increment_keeps_the_type_of_its_operand,
     "char c; void f(void) { ++c; }",
     vec![
-        lv(Ty::Char)
-            .then(LValueToRValue, Ty::Char)
-            .then(IntegerPromotion, Ty::Int)
-            .result(IntegerConversion, Ty::Char),
+        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int).result(IntegerConversion, Ty::Char),
         rv(Ty::Char),
     ]
 );

@@ -109,7 +109,7 @@ pub fn declare_init_declarator(
     let has_initializer = init_declarator.initializer.is_some() && !bad_initializer;
     if kind == SymbolKind::Variable
         && !already_diagnosed
-        && storage == Storage::Auto
+        && storage != Storage::Extern
         && requires_complete_object(resolver, ty, storage, has_initializer)
     {
         constraints::types::check_complete_object(ty.is_complete(resolver.sema), ty).collect(resolver, &core.span);
