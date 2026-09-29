@@ -16,6 +16,7 @@ H			[a-fA-F0-9]
 E			[Ee][+-]?{D}+
 FS			(f|F|l|L)
 IS			(u|U|l|L|ul|UL|Ul|uL|lu|LU|lU|Lu)
+PP			"."?{D}({D}|{L}|[eE][+-]|".")*
 
 %%
 
@@ -66,6 +67,7 @@ L?''                        { empty_constant(self); }
 
 {D}*"."{D}+({E})?{FS}?	    { return YYToken::CONSTANT(alloc_constant(self)); }
 {D}+"."{D}*({E})?{FS}?	    { return YYToken::CONSTANT(alloc_constant(self)); }
+{PP}			            { return YYToken::CONSTANT(invalid_number(self)); }
 
 L?\"(\\.|[^\\"\n])*\"	    { return YYToken::STRING_LITERAL(alloc_string(self)); }
 L?\"(\\.|[^\\"\n])*	        { unterminated(self); }
@@ -155,6 +157,13 @@ fn alloc_constant<R: Read>(lex: &mut YYLex<R>) -> ConstValueNode {
         lex.ctx.diagnostics.push(DiagnosticNode::new(diagnostic, span));
     }
     ConstValueNode::new(value, span)
+}
+
+fn invalid_number<R: Read>(lex: &mut YYLex<R>) -> ConstValueNode {
+    let span = lex.span;
+    let text = lex.yytext.clone();
+    lex.ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::InvalidNumber(text), span));
+    ConstValueNode::new(ConstValue::Int(0), span)
 }
 
 fn alloc_string<R: Read>(lex: &mut YYLex<R>) -> StringLiteralNode {

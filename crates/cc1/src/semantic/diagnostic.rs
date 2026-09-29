@@ -31,6 +31,7 @@ pub enum Diagnostic {
     StrayCharacter(String),
     MissingTerminatingCharacter(char),
     EmptyCharacterConstant,
+    InvalidNumber(String),
 
     // 6.1.2.1
     DuplicateDeclaration(SymbolKind, Name),
@@ -270,6 +271,7 @@ impl DiagnosticNode {
             Diagnostic::StrayCharacter(text) => format!("stray '{}' in program", text.escape_default()),
             Diagnostic::MissingTerminatingCharacter(quote) => format!("missing terminating {quote} character"),
             Diagnostic::EmptyCharacterConstant => "empty character constant".to_string(),
+            Diagnostic::InvalidNumber(text) => format!("invalid numeric constant '{}'", text),
 
             // 6.1.2.1
             Diagnostic::DuplicateDeclaration(kind, name) => format!("duplicate declaration of {} `{}'", kind, name.id.resolve()),

@@ -493,3 +493,9 @@ recover!(
     [Diagnostic::InvalidMemberType(_)],
     &[]
 );
+
+value!(
+    pp_number_valid_constants_unchanged,
+    "enum e { A = (int)1.e+1, B = 0x1E, C = 0x1E - 1, D = (int)(.5e+1f), E = 0x1eUL, F = (int)1E-1 };",
+    &[("A", "10"), ("B", "30"), ("C", "29"), ("D", "5"), ("E", "30"), ("F", "0")]
+);
