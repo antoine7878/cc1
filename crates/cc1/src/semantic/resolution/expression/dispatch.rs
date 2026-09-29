@@ -31,7 +31,7 @@ fn type_of(resolver: &mut Resolver, node: &ExpressionNode) -> ExprResult {
         Expression::ArraySubscripting(e1, e2) => array_subscript(sema, e1, e2),
         Expression::FunctionCall(fn_node, args) => function_call(sema, fn_node, args),
         Expression::Member(op, e, name) => member(sema, node, *op, e, name),
-        Expression::Unary(op, e) => unary_op(sema, *op, e),
+        Expression::Unary(op, e) => unary_op(sema, node, *op, e),
         Expression::SizeofExpr(e) => sizeof_expr(sema, node, e),
         Expression::SizeofType(ty) => sizeof_type(resolver, node, ty, &node.span),
         Expression::Binary(op, e1, e2) => binary_op(sema, op, e1, e2),
@@ -55,12 +55,12 @@ pub fn binary_op(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &Expre
     }
 }
 
-fn unary_op(sema: &mut Sema, op: UnaryOp, e: &ExpressionNode) -> ExprResult {
+fn unary_op(sema: &mut Sema, node: &ExpressionNode, op: UnaryOp, e: &ExpressionNode) -> ExprResult {
     match op {
         UnaryOp::PostInc | UnaryOp::PostDec | UnaryOp::PreInc | UnaryOp::PreDec => inc_dec(sema, e, op),
         UnaryOp::Plus | UnaryOp::Minus => unary_sign(sema, e),
         UnaryOp::Addr => address(sema, e),
-        UnaryOp::Deref => indirection(sema, e),
+        UnaryOp::Deref => indirection(sema, e, &node.span),
         UnaryOp::BitNot => bit_not(sema, e),
         UnaryOp::LogicalNot => logical_not(sema, e),
     }

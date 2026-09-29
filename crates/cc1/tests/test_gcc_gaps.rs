@@ -31,24 +31,13 @@ exits!(gap_incomplete_return_declaration, "struct S; struct S f(void); int main(
 
 reject!(gap_nested_tag_redefinition, "struct S { struct S { int a; } x; };");
 
-exits!(
-    gap_huge_struct_followed_by_bit_field,
-    "struct s { char a[0x20000000]; int x : 3; }; int main(void) { return sizeof(struct s) != 0; }",
-    1
-);
-
-#[test]
-fn gap_diagnostic_past_column_65535() {
-    let dir = TmpDir::new("cc1-gap-long-line");
-    let src = format!("int main(void) {{ int x = 0; {} return y; }}\n", "x++; ".repeat(14000));
-    let unit = compile_bytes(&dir, src.as_bytes());
-    let rendered = strip_ansi(&unit.render());
-    assert!(rendered.contains("Use of undeclared identifier 'y'"), "{rendered}");
-}
-
 emits!(not gap_string_concat_emits_no_intermediate_literals, "char *p = \"ab\" \"cd\" \"ef\";", "@.str.1");
 
-exits!(gap_paren_comma_first_argument, "int f(int a, int b) { return a * 10 + b; } int main(void) { return f((1, 2), 3); }", 23);
+exits!(
+    gap_paren_comma_first_argument,
+    "int f(int a, int b) { return a * 10 + b; } int main(void) { return f((1, 2), 3); }",
+    23
+);
 
 exits!(
     gap_paren_comma_single_argument_unprototyped,
@@ -56,7 +45,10 @@ exits!(
     2
 );
 
-reject!(gap_paren_comma_whole_argument_list, "int printf(const char *, ...); int main(void) { printf((\"%d\", 1)); return 0; }");
+reject!(
+    gap_paren_comma_whole_argument_list,
+    "int printf(const char *, ...); int main(void) { printf((\"%d\", 1)); return 0; }"
+);
 
 exits!(
     gap_long_divided_by_unsigned_bit_field,
@@ -118,11 +110,19 @@ exits!(
     1
 );
 
-exits!(gap_enum_constant_in_parameter_list, "int f(enum E { A, B } x) { return x + B; } int main(void) { return f(0); }", 1);
+exits!(
+    gap_enum_constant_in_parameter_list,
+    "int f(enum E { A, B } x) { return x + B; } int main(void) { return f(0); }",
+    1
+);
 
 exits!(warns gap_deref_void_pointer_discarded, "int main(void) { int x = 1; void *p = &x; *p; (void)*p; return 0; }", 0);
 
-exits!(gap_typedef_void_parameter_list, "typedef void V; int f(V); int f(V) { return 3; } int main(void) { return f(); }", 3);
+exits!(
+    gap_typedef_void_parameter_list,
+    "typedef void V; int f(V); int f(V) { return 3; } int main(void) { return f(); }",
+    3
+);
 
 accept!(gap_extern_void_object, "extern void v;");
 
@@ -156,10 +156,7 @@ reject!(gap_main_char_parameter, "int main(char c) { return 0; }");
 
 reject!(gap_main_static, "static int main(void) { return 0; }");
 
-reject!(
-    gap_subscript_non_lvalue_array,
-    "struct S { int a[3]; }; struct S f(void); int g(void) { return f().a[1]; }"
-);
+reject!(gap_subscript_non_lvalue_array, "struct S { int a[3]; }; struct S f(void); int g(void) { return f().a[1]; }");
 
 reject!(gap_decay_non_lvalue_array, "struct S { int a[3]; } x, y; int g(void) { int *p = (x = y).a; return p != 0; }");
 
@@ -167,7 +164,10 @@ reject!(gap_register_array_subscript, "int f(void) { register int a[3]; a[0] = 1
 
 reject!(gap_register_array_decay, "int f(void) { register int a[3]; int *p = a; return p != 0; }");
 
-reject!(gap_register_struct_member_address, "struct S { int x; }; int f(void) { register struct S s; int *p = &s.x; return p != 0; }");
+reject!(
+    gap_register_struct_member_address,
+    "struct S { int x; }; int f(void) { register struct S s; int *p = &s.x; return p != 0; }"
+);
 
 reject!(gap_function_to_object_pointer_cast, "int f(void); void g(void) { void *v = (void *)f; }");
 

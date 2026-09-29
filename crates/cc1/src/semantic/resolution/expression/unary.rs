@@ -1,9 +1,11 @@
+use libft::Span;
+
 use crate::arena::OptionPoisoned;
 use crate::ast::{Expression, ExpressionNode, MemberOp, Storage, TypeName, UnaryOp};
 use crate::semantic::ValueCategory::{LValue, RValue};
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{
-    Diagnostic, QualifiedType, ResolvedExpression, ResolvedType, Resolver, Sema, SymbolId, cast, constraints,
+    Diag, Diagnostic, DiagnosticSink, QualifiedType, ResolvedExpression, ResolvedType, Resolver, Sema, SymbolId, cast, constraints,
     declaration,
 };
 
@@ -65,16 +67,17 @@ fn address_type(
     Ok((qty, RValue))
 }
 
-pub fn indirection(sema: &mut Sema, e: &ExpressionNode) -> ExprResult {
+pub fn indirection(sema: &mut Sema, e: &ExpressionNode, span: &Span) -> ExprResult {
     with_converted(sema, [e], |sema, [re]| {
-        let ResolvedType::Pointer(inner) = re.casted_ty().id.resolve_with(sema) else {
+        let &ResolvedType::Pointer(inner) = re.casted_ty().id.resolve_with(sema) else {
             return Err(Diagnostic::IndirectionNotPointer(re.ty));
         };
         if inner.is_void(sema) {
-            return Ok((*inner, RValue));
+            sema.add_diag(Diag::err((), Diagnostic::IndirectionToVoid), span);
+            return Ok((inner, RValue));
         }
         let kind = if inner.is_function(sema) { RValue } else { LValue };
-        Ok((*inner, kind))
+        Ok((inner, kind))
     })
 }
 

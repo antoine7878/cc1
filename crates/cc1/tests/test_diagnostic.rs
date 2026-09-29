@@ -469,7 +469,7 @@ reports!(
 reports!(
     report_indirection_on_a_pointer_to_void,
     "void *v; void f(void) { *v; }",
-    ["<test>:1:25: error: ISO C does not allow indirection on operand of type 'void *'"]
+    ["<test>:1:25: warning: dereferencing 'void *' pointer"]
 );
 
 reports!(

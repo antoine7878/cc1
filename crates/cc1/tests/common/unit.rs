@@ -153,7 +153,7 @@ impl Unit {
     pub fn fold_values(&self) -> Vec<String> {
         (0..self.sema.expect("Unit::compile required").expr_consts.len())
             .map(ExpressionId::from)
-            .filter(|&id| !matches!(id.resolve(), Expression::Constant(_)))
+            .filter(|&id| !matches!(id.resolve(), Expression::Constant(_) | Expression::Block(_)))
             .filter_map(|id| self.sema.expect("Unit::compile required").expr_consts.get(id).copied())
             .map(|value| repr(Some(value)))
             .collect()

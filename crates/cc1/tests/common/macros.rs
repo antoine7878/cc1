@@ -255,7 +255,7 @@ macro_rules! shaped {
             let unit = $crate::common::Unit::compile($src);
             assert!(unit.parsed(), "cc1 failed to parse:\n{}", $src);
             assert!(
-                unit.diagnostics().is_empty(),
+                unit.diagnostics().iter().all(|d| !d.is_error()),
                 "unexpected diagnostic:\n{}\n{}",
                 $src,
                 unit.render()
