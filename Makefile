@@ -53,7 +53,7 @@ cc:
 	rm ./a.out
 
 llvm:
-	clang --target=i686-linux-gnu $(CFF) -O0 -S -emit-llvm rscs/hello.c -o ./rscs/hello.ll
+	clang --target=i686-linux-gnu $(CFF) -O0 -S -emit-llvm rscs/hello.c -o /dev/stdout
 
 empty :=
 space := $(empty) $(empty)
