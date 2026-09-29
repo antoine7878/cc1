@@ -3,8 +3,8 @@ use libft::Span;
 use crate::ast::{EnumId, ExpressionNode, Name, StructDeclaration, Tag};
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
-    Diag, Diagnostic, DiagnosticSink, Member, QualifiedType, ResolvedType, ResolvedTypeId, Resolver, Symbol,
-    SymbolKind, TagDefId, TagUse, constraints,
+    Diag, Diagnostic, DiagnosticSink, Member, QualifiedType, ResolvedType, Resolver, Symbol, SymbolKind, TagDefId,
+    TagUse, constraints,
 };
 
 pub fn struct_or_union_tag(

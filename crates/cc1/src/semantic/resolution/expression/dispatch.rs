@@ -39,6 +39,7 @@ fn type_of(resolver: &mut Resolver, node: &ExpressionNode) -> ExprResult {
         Expression::Assign(op, e1, e2) => assignment(sema, op, e1, e2),
         Expression::Cast(ty_node, operand) => cast(resolver, node, ty_node, operand),
         Expression::List(es) => list(sema, es),
+        Expression::Block(e) => with_ops(sema, [e], |_, [re]| Ok((re.ty, re.kind))),
     }
 }
 

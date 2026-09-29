@@ -315,6 +315,7 @@ pub fn walk_expression<V: Visitor + ?Sized>(v: &mut V, node: &ExpressionNode) {
                 v.visit_expression(e);
             }
         }
+        Expression::Block(node) => v.visit_expression(node),
     }
 }
 

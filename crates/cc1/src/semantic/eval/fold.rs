@@ -13,8 +13,6 @@ impl DiagnosticSink for VecSink<'_> {
     }
 }
 
-/// Folds an already resolved expression. Binding happens in the resolution pass, so a caller that
-/// is still binding must go through `Resolver::eval_constant`.
 pub fn eval_constant(sema: &mut Sema, expr: &ExpressionNode) -> Option<ConstValue> {
     if sema.expr_consts.contains(expr.id) {
         return sema.expr_consts.get(expr.id).copied();
@@ -37,9 +35,6 @@ pub fn try_fold(sema: &mut Sema, expr: &ExpressionNode) -> Option<ConstValue> {
     evaluate(sema, expr, &mut VecSink(&mut Vec::new())).ok()
 }
 
-/// 6.4 Each constant expression shall evaluate to a constant that is in the range of representable
-/// values for its type: an initializer that folds keeps the overflow diagnostics of its evaluation,
-/// and a floating value that does not fit the integer object it initializes is an overflow too.
 pub fn fold_initializer(sema: &mut Sema, ty: QualifiedType, expr: &ExpressionNode) -> Option<ConstValue> {
     let mut collected = Vec::new();
     let value = evaluate(sema, expr, &mut VecSink(&mut collected)).ok()?;
@@ -112,10 +107,11 @@ fn evaluate(sema: &mut Sema, expr: &ExpressionNode, sink: &mut VecSink) -> Resul
         Expression::Binary(op, e1, e2) => binary_op(sema, expr, *op, e1, e2, sink),
         Expression::Ternary(condition, e1, e2) => conditional(sema, condition, e1, e2, sink),
         Expression::Cast(_, e) => cast(sema, expr, e, sink),
+        Expression::Block(e) => evaluate(sema, e, sink),
         Expression::SizeofExpr(_) | Expression::SizeofType(_) => Err(Diagnostic::Poisoned),
         Expression::StringLiteral(_)
-        | Expression::Assign(_, _, _)
         | Expression::List(_)
+        | Expression::Assign(_, _, _)
         | Expression::ArraySubscripting(_, _)
         | Expression::FunctionCall(_, _)
         | Expression::Member(_, _, _) => Err(Diagnostic::NonConstantExpression),
@@ -124,7 +120,9 @@ fn evaluate(sema: &mut Sema, expr: &ExpressionNode, sink: &mut VecSink) -> Resul
 
 fn integral_operands(sema: &Sema, expr: &ExpressionNode) -> Result<(), Diagnostic> {
     let operands: Vec<&ExpressionNode> = match expr.id.resolve() {
-        Expression::Cast(_, _) | Expression::SizeofExpr(_) | Expression::SizeofType(_) => return Ok(()),
+        Expression::Cast(_, _) | Expression::SizeofExpr(_) | Expression::SizeofType(_) => {
+            return Ok(());
+        }
         Expression::ConstantExpression(e) | Expression::Unary(_, e) => vec![e],
         Expression::Binary(_, e1, e2) => vec![e1, e2],
         Expression::Ternary(condition, e1, e2) => vec![condition, e1, e2],
@@ -282,8 +280,16 @@ fn cast(
         return Err(Diagnostic::NonIntegerConstantExpression);
     }
     let operand_ty = node_ty(sema, e)?;
-    if operand_ty.is_floating(sema) && !matches!(e.id.resolve(), Expression::Constant(_)) {
+    if operand_ty.is_floating(sema) && !a(e) {
         return Err(Diagnostic::NonConstantExpression);
     }
     operand(sema, e, sink)
+}
+
+fn a(e: &ExpressionNode) -> bool {
+    match e.id.resolve() {
+        Expression::Constant(_) => true,
+        Expression::Block(e) => a(e),
+        _ => false,
+    }
 }

@@ -30,6 +30,7 @@ pub enum Expression {
     SizeofExpr(ExpressionNode),
     SizeofType(TypeName),
     Cast(TypeName, ExpressionNode),
+    Block(ExpressionNode),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -96,6 +97,10 @@ impl ExpressionArena {
 
     pub fn array_access(&mut self, lhs: ExpressionNode, index: ExpressionNode, span: Span) -> ExpressionNode {
         ExpressionNode::new(self.alloc(Expression::ArraySubscripting(lhs, index)), span)
+    }
+
+    pub fn block(&mut self, node: ExpressionNode, span: Span) -> ExpressionNode {
+        ExpressionNode::new(self.alloc(Expression::Block(node)), span)
     }
 
     pub fn push_comma(&mut self, mut lhs: ExpressionNode, rhs: ExpressionNode) -> ExpressionNode {

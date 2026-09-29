@@ -172,6 +172,7 @@ impl Display for Expression {
             Expression::Member(op, _, _) => write!(f, "{}", op),
             Expression::SizeofExpr(_) | Expression::SizeofType(_) => write!(f, "Sizeof"),
             Expression::Cast(_, _) => write!(f, "Cast"),
+            Expression::Block(_) => write!(f, "Block"),
         }
     }
 }

@@ -139,6 +139,7 @@ impl<W: Write> Generator<W> {
             Expression::ArraySubscripting(array, idx) => self.array_subscript(array, idx),
             Expression::Member(_, object, _) => self.member(node, object),
             Expression::Cast(_, e) => self.explicit_cast(node, e),
+            Expression::Block(e) => self.emit_expression(e),
             Expression::ConstantExpression(_) | Expression::SizeofExpr(_) | Expression::SizeofType(_) => {
                 Err(Diagnostic::Invariant("non folded constant expression"))
             }
@@ -146,11 +147,7 @@ impl<W: Write> Generator<W> {
     }
 
     fn list(&mut self, items: &[ExpressionNode]) -> Result<LlvmSymbol, Diagnostic> {
-        let mut last = LlvmSymbol::from(0);
-        for e in items {
-            last = self.emit_expression(e)?;
-        }
-        Ok(last)
+        items.iter().try_fold(LlvmSymbol::from(0), |_, e| self.emit_expression(e))
     }
 
     fn identifier(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {

@@ -74,13 +74,14 @@ pub fn lvalue_to_rvalue(sema: &mut Sema, re: &mut ResolvedExpression, span: &Spa
 }
 
 pub fn promote(sema: &Sema, re: &mut ResolvedExpression) {
+    let int_bits = (layout::INT.size * layout::CHAR_BIT) as i32;
     match re.casted_ty().id.resolve_with(sema) {
         ResolvedType::Char
         | ResolvedType::SignedChar
         | ResolvedType::UnsignedChar
         | ResolvedType::Short
         | ResolvedType::UnsignedShort => (),
-        ResolvedType::UnsignedInt if re.bit_width.is_some_and(|w| w < (layout::INT.size * layout::CHAR_BIT) as i32) => (),
+        ResolvedType::UnsignedInt if re.bit_width.is_some_and(|w| w < int_bits) => (),
         &ResolvedType::Tag(id) if id.resolve_with(sema).kind == ast::Tag::Enum => (),
         _ => return,
     }
@@ -145,19 +146,18 @@ pub fn usual_arithmetic(
 ) -> Result<(QualifiedType, ValueCategory), Diagnostic> {
     use ResolvedType as R;
 
-    let l = lhs.casted_ty().id.resolve_with(sema);
-    let r = rhs.casted_ty().id.resolve_with(sema);
-    if !l.is_arithmetic(sema) || !r.is_arithmetic(sema) {
+    let ty = |re: &ResolvedExpression| re.casted_ty().id.resolve_with(sema);
+    if !ty(lhs).is_arithmetic(sema) || !ty(rhs).is_arithmetic(sema) {
         return Ok((lhs.casted_ty(), RValue));
     }
-    if l.is_integral(sema) && r.is_integral(sema) {
+    if ty(lhs).is_integral(sema) && ty(rhs).is_integral(sema) {
         promote(sema, lhs);
         promote(sema, rhs);
     }
     if lhs.casted_ty().id == rhs.casted_ty().id {
         return Ok((lhs.casted_ty(), RValue));
     }
-    let to = match (l, r) {
+    let to = match (ty(lhs), ty(rhs)) {
         (R::LongDouble, _) | (_, R::LongDouble) => sema.builtins.long_double,
         (R::Double, _) | (_, R::Double) => sema.builtins.double,
         (R::Float, _) | (_, R::Float) => sema.builtins.float,

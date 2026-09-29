@@ -179,7 +179,7 @@ string_literal /* StringLiteralNode */
       ;
 
 expression /* ExpressionNode */
-    : '(' expression ')'                                                                    { $2 }
+    : '(' expression ')'                                                                    { node_span!(self, expressions, block, $2) }
     | IDENTIFIER                                                                            { node_span!(self, expressions, identifier, $1) }
     | CONSTANT                                                                              { node_span!(self, expressions, constant, $1)}
     | string_literal                                                                        { node_span!(self, expressions, string_literal, $1) }

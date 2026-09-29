@@ -103,7 +103,8 @@ impl Unit {
     }
 
     pub fn enumerators(&self) -> Vec<(String, String)> {
-        self.sema.expect("Unit::compile required")
+        self.sema
+            .expect("Unit::compile required")
             .symbols
             .iter()
             .filter(|symbol| symbol.kind == SymbolKind::Enumerator)
@@ -221,7 +222,8 @@ impl Unit {
     }
 
     pub fn symbol_ty(&self, name: &str) -> QualifiedType {
-        self.sema.expect("Unit::compile required")
+        self.sema
+            .expect("Unit::compile required")
             .symbols
             .iter()
             .find(|symbol| symbol.name.id.resolve().as_str() == name)
@@ -304,7 +306,8 @@ impl Unit {
     }
 
     pub fn labels(&self) -> Vec<(String, Vec<String>)> {
-        self.sema.expect("Unit::compile required")
+        self.sema
+            .expect("Unit::compile required")
             .functions
             .iter()
             .map(|def| {
@@ -327,7 +330,9 @@ impl Unit {
             }
             Initializer::Address(at) => {
                 let base = match at.base {
-                    AddressBase::Symbol(sym) => self.sema.expect("Unit::compile required").symbols.get(sym).name.id.resolve().clone(),
+                    AddressBase::Symbol(sym) => {
+                        self.sema.expect("Unit::compile required").symbols.get(sym).name.id.resolve().clone()
+                    }
                     AddressBase::String(id) => string_quoted(id.resolve()),
                     AddressBase::Absolute => "abs".to_string(),
                 };
@@ -341,7 +346,8 @@ impl Unit {
     }
 
     pub fn initializers(&self) -> Vec<(String, String)> {
-        self.sema.expect("Unit::compile required")
+        self.sema
+            .expect("Unit::compile required")
             .symbols
             .iter()
             .filter_map(|symbol| {
@@ -356,7 +362,9 @@ impl Unit {
         let sema = self.sema.expect("Unit::compile required");
         sema.symbols
             .iter()
-            .map(|symbol| (symbol.name.id.resolve().clone(), symbol.kind.to_string(), symbol.ty.display(sema).to_string()))
+            .map(|symbol| {
+                (symbol.name.id.resolve().clone(), symbol.kind.to_string(), symbol.ty.display(sema).to_string())
+            })
             .collect()
     }
 
@@ -365,7 +373,8 @@ impl Unit {
     }
 
     pub fn uses(&self) -> Vec<(String, bool)> {
-        self.sema.expect("Unit::compile required")
+        self.sema
+            .expect("Unit::compile required")
             .symbols
             .iter()
             .filter(|symbol| matches!(symbol.kind, SymbolKind::Variable | SymbolKind::Function))
@@ -374,7 +383,8 @@ impl Unit {
     }
 
     pub fn placements(&self) -> Vec<(String, String, String, String)> {
-        self.sema.expect("Unit::compile required")
+        self.sema
+            .expect("Unit::compile required")
             .symbols
             .iter()
             .filter(|symbol| matches!(symbol.kind, SymbolKind::Variable | SymbolKind::Function))
@@ -407,7 +417,6 @@ impl Unit {
             .collect()
     }
 
-    /// Absolute bit position of each named member, the quantity the ABI actually fixes.
     pub fn member_bits(&self, tag: &str) -> Vec<(String, u32)> {
         self.tag_members(tag).into_iter().map(|(name, offset, bit)| (name, offset * 8 + bit)).collect()
     }
