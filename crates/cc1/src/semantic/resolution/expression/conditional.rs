@@ -26,7 +26,7 @@ pub fn conditional(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode, e3
         }
         let were_pointers = both_pointers(sema, lhs, rhs);
         match reconcile_pointers(sema, lhs, rhs, null2, null3) {
-            Some(PointerMatch::Converted) => Ok((lhs.casted_ty(), RValue)),
+            Some(PointerMatch::Converted) => Ok((merge_qualifiers(sema, lhs.casted_ty(), l_ty, r_ty), RValue)),
             Some(PointerMatch::Compatible(i1, i2)) => {
                 let inner = i1.unqualified().composite(sema, &i2.unqualified()).ok_poisoned()?;
                 let inner = QualifiedType::new(inner.id, i1.is_const || i2.is_const, i1.is_volatile || i2.is_volatile);
@@ -37,4 +37,16 @@ pub fn conditional(sema: &mut Sema, e1: &ExpressionNode, e2: &ExpressionNode, e3
             None => Err(Diagnostic::IncompatibleOperands(lhs.ty, rhs.ty)),
         }
     })
+}
+
+fn merge_qualifiers(sema: &mut Sema, ty: QualifiedType, l_ty: QualifiedType, r_ty: QualifiedType) -> QualifiedType {
+    let (Some(inner), Some(i1), Some(i2)) = (
+        ty.id.resolve_with(sema).pointee(),
+        l_ty.id.resolve_with(sema).pointee(),
+        r_ty.id.resolve_with(sema).pointee(),
+    ) else {
+        return ty;
+    };
+    let inner = QualifiedType::new(inner.id, i1.is_const || i2.is_const, i1.is_volatile || i2.is_volatile);
+    QualifiedType::plain(sema.types.pointer(inner))
 }
