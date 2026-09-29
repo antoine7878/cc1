@@ -47,11 +47,7 @@ pub fn check_element_type(is_object: bool, ty: QualifiedType) -> Diag<()> {
     }
 }
 
-pub fn check_bit_width(
-    ty: &ResolvedType,
-    value: Option<ConstValue>,
-    name: Option<Name>,
-) -> Diag<Option<i32>> {
+pub fn check_bit_width(ty: &ResolvedType, value: Option<ConstValue>, name: Option<Name>) -> Diag<Option<i32>> {
     if !matches!(ty, ResolvedType::Int | ResolvedType::UnsignedInt) {
         return Diag::err(None, Diagnostic::NonIntBitFieldType);
     };
