@@ -39,6 +39,9 @@ pub fn function_call(sema: &mut Sema, fn_node: &ExpressionNode, args: &[Expressi
         if !returned.is_void() && !returned.is_complete(sema) {
             return Err(Diagnostic::CallingIncompleteReturn(ret));
         }
+        if returned.is_void() && (ret.is_const || ret.is_volatile) {
+            return Err(Diagnostic::CallingQualifiedVoidReturn(ret));
+        }
         let (params, is_variadic) = match params {
             ParamTypes::Prototype { params, is_variadic } => (params, is_variadic),
             ParamTypes::Unspecified => (vec![], true),

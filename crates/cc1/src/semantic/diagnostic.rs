@@ -67,6 +67,7 @@ pub enum Diagnostic {
     // 6.3.2.2
     CallingNotFunction(QualifiedType),
     CallingIncompleteReturn(QualifiedType),
+    CallingQualifiedVoidReturn(QualifiedType),
     TooManyArguments(usize, usize),
     TooFewArguments(usize, usize),
     ArgumentDiscardedQualifiers(usize, QualifiedType, QualifiedType),
@@ -308,6 +309,7 @@ impl DiagnosticNode {
             // 6.3.2.2
             Diagnostic::CallingNotFunction(ty) => format!("called object type '{}' is not a function or function pointer", ty.display(sema)),
             Diagnostic::CallingIncompleteReturn(ty) => format!("calling a function with incomplete return type '{}'", ty.display(sema)),
+            Diagnostic::CallingQualifiedVoidReturn(ty) => format!("calling a function with qualified void return type '{}'", ty.display(sema)),
             Diagnostic::TooManyArguments(expected, have) => format!("too many arguments to function call, expected {expected}, have {have}"),
             Diagnostic::TooFewArguments(expected, have) => format!("too few arguments to function call, expected {expected}, have {have}"),
             Diagnostic::BadArguments(error) => error.clone(),
