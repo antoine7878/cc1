@@ -1,5 +1,5 @@
 use crate::arena::OptionPoisoned;
-use crate::ast::{ExpressionNode, Storage, TypeName, UnaryOp};
+use crate::ast::{Expression, ExpressionNode, MemberOp, Storage, TypeName, UnaryOp};
 use crate::semantic::ValueCategory::{LValue, RValue};
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{
@@ -34,11 +34,24 @@ pub fn unary_sign(sema: &mut Sema, e: &ExpressionNode) -> ExprResult {
 
 pub fn address(sema: &mut Sema, e: &ExpressionNode) -> ExprResult {
     let id = sema.expr_bindings.get(e.id).copied();
-    with_ops(sema, [e], |sema, [re]| address_type(sema, re, id))
+    let object = object_symbol(sema, e);
+    with_ops(sema, [e], |sema, [re]| address_type(sema, re, id, object))
 }
 
-fn address_type(sema: &mut Sema, re: &mut ResolvedExpression, sym: Option<SymbolId>) -> ExprResult {
-    let is_register = sym.is_some_and(|id| id.resolve_with(sema).storage == Some(Storage::Register));
+fn object_symbol(sema: &Sema, e: &ExpressionNode) -> Option<SymbolId> {
+    match e.id.resolve() {
+        Expression::Member(MemberOp::Dot, base, _) | Expression::Block(base) => object_symbol(sema, base),
+        _ => sema.expr_bindings.get(e.id).copied(),
+    }
+}
+
+fn address_type(
+    sema: &mut Sema,
+    re: &mut ResolvedExpression,
+    sym: Option<SymbolId>,
+    object: Option<SymbolId>,
+) -> ExprResult {
+    let is_register = object.is_some_and(|id| id.resolve_with(sema).storage == Some(Storage::Register));
     constraints::expression::check_address_of(
         re.kind,
         re.casted_ty().is_function(sema),
