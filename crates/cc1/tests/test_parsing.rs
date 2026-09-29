@@ -396,3 +396,6 @@ test_case!(stray_character_is_dropped_and_lexing_continues, {
     assert!(!unit.parsed());
     assert_eq!(unit.messages()[0], "<test>:1:7: error: stray '@' in program");
 });
+
+accept!(escaped_newline_in_string_literal, "char *s = \"ab\\ncd\";");
+accept!(escaped_newline_in_char_constant, "int c = '\\n';");

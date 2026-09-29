@@ -482,6 +482,38 @@ reports!(report_stray_at_sign, "int x = 1; @", ["<test>:1:12: error: stray '@' i
 reports!(report_stray_backtick, "int x = 1; `", ["<test>:1:12: error: stray '`' in program"]);
 reports!(report_stray_dollar, "int x = 1; $", ["<test>:1:12: error: stray '$' in program"]);
 reports!(
+    report_newline_in_string_literal,
+    "char *s = \"ab\ncd\";",
+    [
+        "<test>:1:11: error: missing terminating \" character",
+        "<test>:2:3: error: missing terminating \" character",
+        "<test>:2:5: error: syntax error, unexpected end of file, expecting ',' or ';'"
+    ]
+);
+reports!(
+    report_newline_in_wide_string_literal,
+    "char *s = L\"ab\ncd\";",
+    [
+        "<test>:1:11: error: missing terminating \" character",
+        "<test>:2:3: error: missing terminating \" character",
+        "<test>:2:5: error: syntax error, unexpected end of file, expecting ',' or ';'"
+    ]
+);
+reports!(
+    report_newline_in_char_constant,
+    "int c = 'a\n';",
+    [
+        "<test>:1:9: error: missing terminating ' character",
+        "<test>:2:1: error: missing terminating ' character",
+        "<test>:2:3: error: syntax error, unexpected end of file"
+    ]
+);
+reports!(
+    report_empty_char_constant,
+    "int c = '';",
+    ["<test>:1:9: error: empty character constant", "<test>:1:11: error: syntax error, unexpected ';'"]
+);
+reports!(
     report_char_constant_escape_out_of_range,
     "int c = '\\777';",
     ["<test>:1:9: error: escape sequence is out of range for the character type"]

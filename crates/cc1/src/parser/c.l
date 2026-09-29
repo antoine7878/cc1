@@ -19,9 +19,8 @@ IS			(u|U|l|L|ul|UL|Ul|uL|lu|LU|lU|Lu)
 
 %%
 
-^#[ \t]*[0-9]+.*\n         { line_marker(self); }
-#.*                         {}
-"//".*                      {}
+^#[ \t]*[0-9]+.*\n          { line_marker(self); }
+"//".*                      { self.ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::CPPStyleComment, self.span)); }
 "auto"			            { return YYToken::AUTO; }
 "break"			            { return YYToken::BREAK; }
 "case"			            { return YYToken::CASE; }
@@ -57,7 +56,9 @@ IS			(u|U|l|L|ul|UL|Ul|uL|lu|LU|lU|Lu)
 
 {L}({L}|{D})*		        { let name = alloc_ident(self); return self.ctx.parse.classify_identifier(name); }
 
-L?'(\\.|[^\\'])+'	        { return YYToken::CONSTANT(alloc_constant(self)); }
+L?'(\\.|[^\\'\n])+'	    { return YYToken::CONSTANT(alloc_constant(self)); }
+L?'(\\.|[^\\'\n])*	        { unterminated(self); }
+L?''                        { empty_constant(self); }
 0[xX]{H}+{IS}?		        { return YYToken::CONSTANT(alloc_constant(self)); }
 0{D}+{IS}?		            { return YYToken::CONSTANT(alloc_constant(self)); }
 {D}+{IS}?		            { return YYToken::CONSTANT(alloc_constant(self)); }
@@ -66,7 +67,8 @@ L?'(\\.|[^\\'])+'	        { return YYToken::CONSTANT(alloc_constant(self)); }
 {D}*"."{D}+({E})?{FS}?	    { return YYToken::CONSTANT(alloc_constant(self)); }
 {D}+"."{D}*({E})?{FS}?	    { return YYToken::CONSTANT(alloc_constant(self)); }
 
-L?\"(\\.|[^\\"])*\"	        { return YYToken::STRING_LITERAL(alloc_string(self)); }
+L?\"(\\.|[^\\"\n])*\"	    { return YYToken::STRING_LITERAL(alloc_string(self)); }
+L?\"(\\.|[^\\"\n])*	        { unterminated(self); }
 
 "..."			            { return YYToken::ELLIPSIS; }
 ">>="			            { return YYToken::RIGHT_ASSIGN; }
@@ -96,24 +98,24 @@ L?\"(\\.|[^\\"])*\"	        { return YYToken::STRING_LITERAL(alloc_string(self))
 "="			                { return YYToken::Char('='); }
 "("			                { return YYToken::Char('('); }
 ")"			                { return YYToken::Char(')'); }
-("["|"<:"|"??(")            { return YYToken::Char('['); }
-("]"|":>"|"??)")            { return YYToken::Char(']'); }
+"["			                { return YYToken::Char('['); }
+"]"			                { return YYToken::Char(']'); }
 "."			                { return YYToken::Char('.'); }
 "&"			                { return YYToken::Char('&'); }
 "!"			                { return YYToken::Char('!'); }
-("~"|"??-")	                { return YYToken::Char('~'); }
+"~"			                { return YYToken::Char('~'); }
 "-"			                { return YYToken::Char('-'); }
 "+"			                { return YYToken::Char('+'); }
 "*"			                { return YYToken::Char('*'); }
 "/"			                { return YYToken::Char('/'); }
 "%"			                { return YYToken::Char('%'); }
 "<"			                { return YYToken::Char('<'); }
-(">"|"??'")	                { return YYToken::Char('>'); }
+">"			                { return YYToken::Char('>'); }
 "^"			                { return YYToken::Char('^'); }
-("|"|"??!")	                { return YYToken::Char('|'); }
+"|"			                { return YYToken::Char('|'); }
 "?"			                { return YYToken::Char('?'); }
-("{"|"<%"|"??<")            { return YYToken::Char('{'); }
-("}"|"%>")|"??>"            { return YYToken::Char('}'); }
+"{"			                { return YYToken::Char('{'); }
+"}"			                { return YYToken::Char('}'); }
 [ \t\v\n\f]		            { }
 [\xc0-\xff][\x80-\xbf]*     { stray(self); }
 .			                { stray(self); }
@@ -169,4 +171,15 @@ fn stray<R: Read>(lex: &mut YYLex<R>) {
     let span = lex.span;
     let text = lex.yytext.clone();
     lex.ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::StrayCharacter(text), span));
+}
+
+fn empty_constant<R: Read>(lex: &mut YYLex<R>) {
+    let span = lex.span;
+    lex.ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::EmptyCharacterConstant, span));
+}
+
+fn unterminated<R: Read>(lex: &mut YYLex<R>) {
+    let span = lex.span;
+    let quote = lex.yytext.trim_start_matches('L').chars().next().unwrap_or_default();
+    lex.ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::MissingTerminatingCharacter(quote), span));
 }

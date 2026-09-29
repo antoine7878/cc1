@@ -9,6 +9,7 @@ use crate::semantic::{QualifiedType, Sema, SymbolKind, sema};
 
 #[derive(Clone, Debug)]
 pub enum Diagnostic {
+    CPPStyleComment,
     NestedRedefinition(Name),
     OutsideSwitch(&'static str),
     DuplicateCase(ConstValue),
@@ -28,6 +29,8 @@ pub enum Diagnostic {
 
     // 6.1
     StrayCharacter(String),
+    MissingTerminatingCharacter(char),
+    EmptyCharacterConstant,
 
     // 6.1.2.1
     DuplicateDeclaration(SymbolKind, Name),
@@ -216,6 +219,7 @@ impl Diagnostic {
             Diagnostic::MixedWideStringConcat
             | Diagnostic::ReturnWithoutValue
             | Diagnostic::ShiftCountNegative
+            | Diagnostic::VoidParameter
             | Diagnostic::ShiftCountOutOfRange => Severity::Warning,
             _ => Severity::Error
         }
@@ -246,6 +250,7 @@ impl DiagnosticNode {
     #[rustfmt::skip]
     pub fn message(&self, sema: &Sema) -> String {
         match &self.inner {
+            Diagnostic::CPPStyleComment => "C++ style comments are not allowed in ISO C90".to_string(),
             Diagnostic::NestedRedefinition(name) =>  format!("nested redefinition of '{}'", name.id.resolve()),
             Diagnostic::OutsideSwitch(s) => format!("'{}' statement not in switch statement", s),
             Diagnostic::DuplicateCase(value) => format!("duplicate case value '{}'", value.to_u64()),
@@ -263,6 +268,8 @@ impl DiagnosticNode {
 
             // 6.1
             Diagnostic::StrayCharacter(text) => format!("stray '{}' in program", text.escape_default()),
+            Diagnostic::MissingTerminatingCharacter(quote) => format!("missing terminating {quote} character"),
+            Diagnostic::EmptyCharacterConstant => "empty character constant".to_string(),
 
             // 6.1.2.1
             Diagnostic::DuplicateDeclaration(kind, name) => format!("duplicate declaration of {} `{}'", kind, name.id.resolve()),
