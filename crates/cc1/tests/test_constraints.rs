@@ -1,6 +1,6 @@
 use cc1::ast::declaration::DeclaratorId;
 use cc1::ast::{
-    ConstValue, DeclarationSpecifier, DeclaratorNode, InitDeclaratorNode, Initializer, InitializerNode, Name, NameId,
+    ConstValue, DeclarationSpecifier, DeclaratorNode, F80, InitDeclaratorNode, Initializer, InitializerNode, Name, NameId,
     Qualifier, Storage, TypeSpecifier,
 };
 use cc1::semantic::constraints::param::{check_complete_param, check_param_storage, is_valid_old_style};
@@ -123,7 +123,7 @@ fn a_bit_field_must_have_int_type() {
 
 #[test]
 fn a_bit_field_width_must_be_an_integer_constant() {
-    let diag = width(&ResolvedType::Int, Some(ConstValue::Double(1.0)));
+    let diag = width(&ResolvedType::Int, Some(ConstValue::Double(F80::from(1.0))));
     assert_eq!(diag.res, None);
     assert_eq!(reported(&diag), "NonIntegerConstantExpression");
 }

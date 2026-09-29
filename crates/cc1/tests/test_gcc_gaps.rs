@@ -80,14 +80,6 @@ exits!(
     5
 );
 
-exits!(gap_float_constant_excess_precision_compare, "double g = 55.1; int main(void) { return g != 55.1; }", 1);
-
-exits!(
-    gap_float_constant_excess_precision_fold,
-    "double d = 0.1 + 0.2; double e = 0.3; int main(void) { return d == e; }",
-    1
-);
-
 exits!(
     gap_enum_constant_in_parameter_list,
     "int f(enum E { A, B } x) { return x + B; } int main(void) { return f(0); }",

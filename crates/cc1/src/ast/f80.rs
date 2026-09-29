@@ -84,6 +84,38 @@ impl F80 {
         }
         Some(u128::from(mantissa) >> (-exp))
     }
+
+    pub fn round_double(self) -> Self {
+        self.round_to(53, -1022, 1023)
+    }
+
+    pub fn round_float(self) -> Self {
+        self.round_to(24, -126, 127)
+    }
+
+    fn round_to(self, precision: i32, min_exp: i32, max_exp: i32) -> Self {
+        if !self.is_finite() || self.is_zero() {
+            return self;
+        }
+        let (mantissa, exp) = self.normalized();
+        let kept = precision - (min_exp - (exp + 63)).max(0);
+        let drop = (64 - kept).clamp(0, 65) as u32;
+        if drop == 0 {
+            return self;
+        }
+        let wide = u128::from(mantissa);
+        let lost = wide & ((1 << drop) - 1);
+        let half = 1 << (drop - 1);
+        let mut rounded = wide >> drop;
+        if lost > half || (lost == half && rounded & 1 != 0) {
+            rounded += 1;
+        }
+        let value = round_pack(self.sign, rounded, exp + drop as i32, false);
+        match !value.is_zero() && value.exponent as i32 - BIAS > max_exp {
+            true => Self::infinity(self.sign),
+            false => value,
+        }
+    }
 }
 
 fn scale(mut value: f64, mut exp: i32) -> f64 {
@@ -266,6 +298,7 @@ impl From<F80> for f64 {
         if value.is_nan() {
             return f64::NAN;
         }
+        let value = value.round_double();
         if value.is_infinite() {
             return if value.sign { f64::NEG_INFINITY } else { f64::INFINITY };
         }

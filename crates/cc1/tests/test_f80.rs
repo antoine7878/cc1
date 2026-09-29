@@ -149,7 +149,54 @@ fn a_long_double_literal_reaches_value_as_f80() {
         panic!("expected a long double");
     };
     assert_eq!(format!("{v:X}"), "0xK4000D333333333333333");
-    assert_eq!(ConstValue::parse("1.0").res, ConstValue::Double(1.0));
+    assert_eq!(ConstValue::parse("1.0").res, ConstValue::Double(F80::from(1.0)));
+}
+
+// ---- rounding to narrower formats -----------------------------------------
+
+#[test]
+fn f80_rounds_to_double_precision() {
+    let cases = [
+        ("0.1", 0.1),
+        ("55.1", 55.1),
+        ("9007199254740993", 9007199254740992.0),
+        ("9007199254740995", 9007199254740996.0),
+        ("1.7976931348623157e308", f64::MAX),
+        ("4.9406564584124654e-324", 5e-324),
+        ("2.2250738585072011e-308", 2.225073858507201e-308),
+    ];
+    for (src, expected) in cases {
+        let rounded = F80::from(src).round_double();
+        assert_eq!(f64::from(rounded).to_bits(), f64::to_bits(expected), "{src}");
+        assert_eq!(rounded, F80::from(expected), "{src}");
+    }
+}
+
+#[test]
+fn f80_rounds_ties_to_even() {
+    assert_eq!(F80::from("9007199254740993").round_double(), F80::from(9007199254740992.0));
+    assert_eq!(F80::from("9007199254740995").round_double(), F80::from(9007199254740996.0));
+    assert_eq!(F80::from("16777217").round_float(), F80::from(16777216.0));
+    assert_eq!(F80::from("16777219").round_float(), F80::from(16777220.0));
+    assert!(F80::from("2.4703282292062327e-324").round_double().is_zero());
+    assert_eq!(F80::from("2.4703282292062328e-324").round_double(), F80::from(5e-324));
+}
+
+#[test]
+fn f80_rounding_overflows_to_infinity() {
+    assert!(F80::from("1.7976931348623159e308").round_double().is_infinite());
+    assert!(F80::from("1e39").round_float().is_infinite());
+    assert!(!F80::from("3.4028234e38").round_float().is_infinite());
+}
+
+#[test]
+fn f80_rounds_to_float_precision() {
+    let cases = ["0.1", "3.3", "1e-40", "1e-45", "3.4028234e38", "1.17549435e-38"];
+    for src in cases {
+        let rounded = F80::from(src).round_float();
+        let expected = src.parse::<f32>().unwrap();
+        assert_eq!((f64::from(rounded) as f32).to_bits(), expected.to_bits(), "{src}");
+    }
 }
 
 // ---- special values ------------------------------------------------------

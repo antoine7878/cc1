@@ -226,7 +226,7 @@ fold!(
 
 fold!(neg_int, unary(&ResolvedType::Int, UnaryOp::Minus, ConstValue::Int(1)), "Int(-1)");
 fold_overflow!(neg_wraps, unary(&ResolvedType::Int, UnaryOp::Minus, ConstValue::Int(i32::MIN)), "Int(-2147483648)");
-fold!(neg_double, unary(&ResolvedType::Double, UnaryOp::Minus, ConstValue::Double(1.5)), "Double(-1.5)");
+fold!(neg_double, unary(&ResolvedType::Double, UnaryOp::Minus, ConstValue::Double(F80::from(1.5))), "Double(-1.5)");
 fold!(bitnot_int, unary(&ResolvedType::Int, UnaryOp::BitNot, ConstValue::Int(0)), "Int(-1)");
 fold!(
     bitnot_unsigned,
@@ -247,13 +247,13 @@ fold!(
     "Long(0)"
 );
 fold!(convert_to_double, convert(&ResolvedType::Double, ConstValue::Int(3)), "Double(3.0)");
-fold!(convert_from_double_truncates, convert(&ResolvedType::Int, ConstValue::Double(3.9)), "Int(3)");
+fold!(convert_from_double_truncates, convert(&ResolvedType::Int, ConstValue::Double(F80::from(3.9))), "Int(3)");
 
 #[test]
 fn logical_not_tests_against_zero() {
     assert_eq!(repr(ConstValue::Int(0).logical_not()), "Int(1)");
     assert_eq!(repr(ConstValue::Int(42).logical_not()), "Int(0)");
-    assert_eq!(repr(ConstValue::Double(0.0).logical_not()), "Int(1)");
+    assert_eq!(repr(ConstValue::Double(F80::from(0.0)).logical_not()), "Int(1)");
     assert_eq!(repr(ConstValue::from(true)), "Int(1)");
     assert_eq!(repr(ConstValue::from(false)), "Int(0)");
 }
@@ -262,15 +262,15 @@ fn logical_not_tests_against_zero() {
 fn is_true_follows_zero_test() {
     assert!(ConstValue::Int(1).is_true());
     assert!(!ConstValue::Int(0).is_true());
-    assert!(ConstValue::Double(0.5).is_true());
-    assert!(!ConstValue::Double(0.0).is_true());
+    assert!(ConstValue::Double(F80::from(0.5)).is_true());
+    assert!(!ConstValue::Double(F80::from(0.0)).is_true());
     assert!(!ConstValue::UnsignedLong(0).is_true());
 }
 
 #[test]
 fn is_floating_covers_real_types() {
-    assert!(ConstValue::Float(0.0).is_floating());
-    assert!(ConstValue::Double(0.0).is_floating());
+    assert!(ConstValue::Float(F80::from(0.0)).is_floating());
+    assert!(ConstValue::Double(F80::from(0.0)).is_floating());
     assert!(ConstValue::LongDouble(F80::from(0.0)).is_floating());
     assert!(!ConstValue::Int(0).is_floating());
     assert!(!ConstValue::UnsignedLong(0).is_floating());
@@ -281,8 +281,8 @@ fn get_integer_value_rejects_real_types() {
     assert_eq!(ConstValue::Int(1).get_integer_value(), Some(1));
     assert_eq!(ConstValue::Int(-1).get_integer_value(), Some(u64::MAX));
     assert_eq!(ConstValue::UnsignedLong(u64::MAX).get_integer_value(), Some(u64::MAX));
-    assert_eq!(ConstValue::Double(1.0).get_integer_value(), None);
-    assert_eq!(ConstValue::Float(1.0).get_integer_value(), None);
+    assert_eq!(ConstValue::Double(F80::from(1.0)).get_integer_value(), None);
+    assert_eq!(ConstValue::Float(F80::from(1.0)).get_integer_value(), None);
     assert_eq!(ConstValue::LongDouble(F80::from(1.0)).get_integer_value(), None);
 }
 
@@ -291,15 +291,15 @@ fn to_i64_and_to_u64_reinterpret() {
     assert_eq!(ConstValue::Int(-1).to_i64(), -1);
     assert_eq!(ConstValue::Int(-1).to_u64(), u64::MAX);
     assert_eq!(ConstValue::UnsignedInt(u32::MAX).to_i64(), u32::MAX as i64);
-    assert_eq!(ConstValue::Double(3.9).to_i64(), 3);
-    assert_eq!(ConstValue::Double(-3.9).to_i64(), -3);
+    assert_eq!(ConstValue::Double(F80::from(3.9)).to_i64(), 3);
+    assert_eq!(ConstValue::Double(F80::from(-3.9)).to_i64(), -3);
 }
 
 #[test]
 fn equality_compares_same_type_operands() {
     let fold = ConstFolder;
     assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(1)), Some(Ordering::Equal)));
-    assert!(matches!(fold.compare(ConstValue::Double(1.0), ConstValue::Double(1.0)), Some(Ordering::Equal)));
+    assert!(matches!(fold.compare(ConstValue::Double(F80::from(1.0)), ConstValue::Double(F80::from(1.0))), Some(Ordering::Equal)));
     assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(2)), Some(Ordering::Less | Ordering::Greater)));
 }
 
@@ -307,7 +307,7 @@ fn equality_compares_same_type_operands() {
 fn ordering_compares_same_type_operands() {
     let fold = ConstFolder;
     assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(2)), Some(Ordering::Less)));
-    assert!(matches!(fold.compare(ConstValue::Double(1.0), ConstValue::Double(1.5)), Some(Ordering::Less)));
+    assert!(matches!(fold.compare(ConstValue::Double(F80::from(1.0)), ConstValue::Double(F80::from(1.5))), Some(Ordering::Less)));
     assert!(matches!(fold.compare(ConstValue::UnsignedInt(1), ConstValue::UnsignedInt(0)), Some(Ordering::Greater)));
     assert!(matches!(fold.compare(ConstValue::Long(-1), ConstValue::Long(0)), Some(Ordering::Less)));
     assert!(matches!(fold.compare(ConstValue::Int(2), ConstValue::Int(2)), Some(Ordering::Less | Ordering::Equal)));
@@ -377,12 +377,12 @@ fold_overflow!(
 
 fold!(
     double_sub,
-    binary(&ResolvedType::Double, BinaryOp::Sub, ConstValue::Double(1.5), ConstValue::Double(0.25)),
+    binary(&ResolvedType::Double, BinaryOp::Sub, ConstValue::Double(F80::from(1.5)), ConstValue::Double(F80::from(0.25))),
     "Double(1.25)"
 );
 fold!(
     double_mul,
-    binary(&ResolvedType::Double, BinaryOp::Mul, ConstValue::Double(1.5), ConstValue::Double(2.0)),
+    binary(&ResolvedType::Double, BinaryOp::Mul, ConstValue::Double(F80::from(1.5)), ConstValue::Double(F80::from(2.0))),
     "Double(3.0)"
 );
 fold!(
@@ -395,12 +395,47 @@ fold!(
     ),
     "LongDouble(3.0)"
 );
-// 6.2.1.4 a float result carries only the precision of a float: 16777216 + 1 is not representable.
-fold!(
-    float_arithmetic_rounds_to_float_precision,
-    binary(&ResolvedType::Float, BinaryOp::Add, ConstValue::Float(16777216.0), ConstValue::Float(1.0)),
-    "Float(16777216.0)"
-);
+// 6.2.1.5 a float result may be represented in greater precision: 16777216 + 1 survives until rounded.
+#[test]
+fn float_arithmetic_keeps_excess_precision() {
+    let sum = ConstFolder.binary(
+        &ResolvedType::Float,
+        BinaryOp::Add,
+        ConstValue::Float(F80::from(16777216.0)),
+        ConstValue::Float(F80::from(1.0)),
+    );
+    assert_eq!(sum.res, ConstValue::Float(F80::from(16777217.0)));
+    assert_eq!(repr(sum.res.rounded()), "Float(16777216.0)");
+}
+
+#[test]
+fn double_constant_keeps_excess_precision() {
+    let value = ConstValue::parse("0.1").res;
+    assert_eq!(value, ConstValue::Double(F80::from("0.1")));
+    assert_ne!(value, ConstValue::Double(F80::from(0.1)));
+    assert_eq!(value.rounded(), ConstValue::Double(F80::from(0.1)));
+}
+
+#[test]
+fn float_constant_keeps_excess_precision() {
+    let value = ConstValue::parse("0.1f").res;
+    assert_eq!(value, ConstValue::Float(F80::from("0.1")));
+    assert_eq!(value.rounded(), ConstValue::Float(F80::from(f64::from(0.1f32))));
+}
+
+#[test]
+fn widening_conversion_keeps_excess_precision() {
+    let value = ConstValue::Float(F80::from("0.1"));
+    assert_eq!(ConstFolder.convert(&ResolvedType::Double, value), Some(ConstValue::Double(F80::from("0.1"))));
+}
+
+#[test]
+fn narrowing_conversion_rounds() {
+    let value = ConstValue::LongDouble(F80::from("0.1"));
+    assert_eq!(ConstFolder.convert(&ResolvedType::Double, value), Some(ConstValue::Double(F80::from(0.1))));
+    let value = ConstValue::Double(F80::from("0.1"));
+    assert_eq!(ConstFolder.convert(&ResolvedType::Float, value), Some(ConstValue::Float(F80::from(f64::from(0.1f32)))));
+}
 
 fold!(
     neg_unsigned_wraps,
@@ -411,7 +446,7 @@ fold!(neg_long, unary(&ResolvedType::Long, UnaryOp::Minus, ConstValue::Long(-1))
 // The negation of a floating zero is a negative zero.
 fold!(
     neg_floating_zero_keeps_its_sign,
-    unary(&ResolvedType::Double, UnaryOp::Minus, ConstValue::Double(0.0)),
+    unary(&ResolvedType::Double, UnaryOp::Minus, ConstValue::Double(F80::from(0.0))),
     "Double(-0.0)"
 );
 fold!(bitnot_long, unary(&ResolvedType::Long, UnaryOp::BitNot, ConstValue::Long(0)), "Long(-1)");
@@ -424,7 +459,7 @@ fold!(
 );
 fold!(convert_to_long_double, convert(&ResolvedType::LongDouble, ConstValue::Int(3)), "LongDouble(3.0)");
 // 6.2.1.4 a value converted to float takes the nearest representable value.
-fold!(convert_to_float_rounds, convert(&ResolvedType::Float, ConstValue::Double(16777217.0)), "Float(16777216.0)");
+fold!(convert_to_float_rounds, convert(&ResolvedType::Float, ConstValue::Double(F80::from(16777217.0))), "Float(16777216.0)");
 
 #[test]
 fn convert_rejects_a_type_that_holds_no_value() {
@@ -436,7 +471,7 @@ fn convert_rejects_a_type_that_holds_no_value() {
 #[test]
 fn comparing_unconverted_operands_yields_no_ordering() {
     let fold = ConstFolder;
-    assert_eq!(fold.compare(ConstValue::Int(1), ConstValue::Double(1.0)), None);
+    assert_eq!(fold.compare(ConstValue::Int(1), ConstValue::Double(F80::from(1.0))), None);
 }
 
 // 6.3 only the additive and multiplicative operators can leave the range of their type; a shift,
@@ -494,7 +529,7 @@ fold!(
 
 fold!(
     double_div,
-    binary(&ResolvedType::Double, BinaryOp::Div, ConstValue::Double(3.0), ConstValue::Double(2.0)),
+    binary(&ResolvedType::Double, BinaryOp::Div, ConstValue::Double(F80::from(3.0)), ConstValue::Double(F80::from(2.0))),
     "Double(1.5)"
 );
 fold!(
@@ -516,12 +551,12 @@ fold!(convert_an_unsigned_long_to_double, convert(&ResolvedType::Double, ConstVa
 fn compare_orders_every_representation() {
     let fold = ConstFolder;
     assert_eq!(fold.compare(ConstValue::UnsignedLong(1), ConstValue::UnsignedLong(2)), Some(Ordering::Less));
-    assert_eq!(fold.compare(ConstValue::Float(1.0), ConstValue::Float(2.0)), Some(Ordering::Less));
+    assert_eq!(fold.compare(ConstValue::Float(F80::from(1.0)), ConstValue::Float(F80::from(2.0))), Some(Ordering::Less));
     assert_eq!(
         fold.compare(ConstValue::LongDouble(F80::from(2.0)), ConstValue::LongDouble(F80::from(2.0))),
         Some(Ordering::Equal)
     );
-    assert_eq!(fold.compare(ConstValue::Double(f64::NAN), ConstValue::Double(1.0)), None);
+    assert_eq!(fold.compare(ConstValue::Double(F80::from(f64::NAN)), ConstValue::Double(F80::from(1.0))), None);
 }
 
 // 6.3.7 The right operand of a shift shall be nonnegative: the check reaches every representation
@@ -530,8 +565,8 @@ fn compare_orders_every_representation() {
 fn is_negative_covers_every_representation() {
     assert!(ConstValue::Int(-1).is_negative());
     assert!(ConstValue::Long(-1).is_negative());
-    assert!(ConstValue::Float(-1.0).is_negative());
-    assert!(ConstValue::Double(-1.0).is_negative());
+    assert!(ConstValue::Float(F80::from(-1.0)).is_negative());
+    assert!(ConstValue::Double(F80::from(-1.0)).is_negative());
     assert!(ConstValue::LongDouble(F80::from(-1.0)).is_negative());
     assert!(!ConstValue::Int(1).is_negative());
     assert!(!ConstValue::UnsignedInt(1).is_negative());
@@ -543,26 +578,26 @@ fn is_greater_or_eq_covers_every_representation() {
     assert!(ConstValue::Int(5).is_greater_or_eq(4));
     assert!(ConstValue::UnsignedInt(5).is_greater_or_eq(4));
     assert!(ConstValue::UnsignedLong(4).is_greater_or_eq(4));
-    assert!(ConstValue::Float(4.5).is_greater_or_eq(4));
+    assert!(ConstValue::Float(F80::from(4.5)).is_greater_or_eq(4));
     assert!(ConstValue::LongDouble(F80::from(4.0)).is_greater_or_eq(4));
     assert!(!ConstValue::Long(3).is_greater_or_eq(4));
-    assert!(!ConstValue::Double(3.5).is_greater_or_eq(4));
+    assert!(!ConstValue::Double(F80::from(3.5)).is_greater_or_eq(4));
 }
 
 #[test]
 fn is_zero_covers_every_representation() {
-    assert!(ConstValue::Float(0.0).is_zero());
-    assert!(ConstValue::Double(0.0).is_zero());
+    assert!(ConstValue::Float(F80::from(0.0)).is_zero());
+    assert!(ConstValue::Double(F80::from(0.0)).is_zero());
     assert!(ConstValue::LongDouble(F80::from(0.0)).is_zero());
-    assert!(!ConstValue::Float(1.0).is_zero());
+    assert!(!ConstValue::Float(F80::from(1.0)).is_zero());
     assert!(!ConstValue::LongDouble(F80::from(1.0)).is_zero());
 }
 
 #[test]
 fn a_floating_value_reinterprets_as_an_integer_by_truncation() {
-    assert_eq!(ConstValue::Float(3.9).to_i64(), 3);
-    assert_eq!(ConstValue::Float(3.9).to_u64(), 3);
-    assert_eq!(ConstValue::Double(3.9).to_u64(), 3);
+    assert_eq!(ConstValue::Float(F80::from(3.9)).to_i64(), 3);
+    assert_eq!(ConstValue::Float(F80::from(3.9)).to_u64(), 3);
+    assert_eq!(ConstValue::Double(F80::from(3.9)).to_u64(), 3);
     assert_eq!(ConstValue::LongDouble(F80::from(3.9)).to_u64(), 3);
 }
 

@@ -54,9 +54,10 @@ impl LlvmSymbol {
     }
 
     fn floating(ty: LlvmType, value: f64) -> Self {
+        let value = F80::from(value);
         let value = match ty {
-            LlvmType::F32 => ConstValue::Float(value as f32),
-            LlvmType::F80 => ConstValue::LongDouble(F80::from(value)),
+            LlvmType::F32 => ConstValue::Float(value),
+            LlvmType::F80 => ConstValue::LongDouble(value),
             _ => ConstValue::Double(value),
         };
         Self::cst(ty, value)

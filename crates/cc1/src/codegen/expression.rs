@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::io::Write;
 
-use crate::ast::{BinaryOp, ConstValue, Expression, ExpressionNode, UnaryOp};
+use crate::ast::{BinaryOp, ConstFolder, ConstValue, Expression, ExpressionNode, UnaryOp};
 use crate::codegen::{
     BitField, Frozen, Generator, Invariant, LlvmOperator, LlvmParam, LlvmSymbol, LlvmType, ParamAttr, ReturnAttr,
     classify_param,
@@ -257,9 +257,52 @@ impl<W: Write> Generator<W> {
     ) -> Result<LlvmSymbol, Diagnostic> {
         let t1 = sema().expressions[lhs.id].casted_ty();
         let t2 = sema().expressions[rhs.id].casted_ty();
+        if Self::is_excess(t1) {
+            let v = self.wide_arithmetic(op, lhs, rhs)?;
+            return Ok(self.builder.convert("fptrunc", v, t1.llvm()));
+        }
         let v1 = self.emit_expression(lhs)?;
         let v2 = self.emit_expression(rhs)?;
         self.arithmetic(op, v1, t1, v2, t2)
+    }
+
+    fn is_excess(qty: QualifiedType) -> bool {
+        matches!(qty.id.resolve(), ResolvedType::Float | ResolvedType::Double)
+    }
+
+    fn wide_arithmetic(
+        &mut self,
+        op: &BinaryOp,
+        lhs: &ExpressionNode,
+        rhs: &ExpressionNode,
+    ) -> Result<LlvmSymbol, Diagnostic> {
+        let op = LlvmOperator::binary(op, sema().expressions[lhs.id].casted_ty())?;
+        let v1 = self.emit_wide(lhs)?;
+        let v2 = self.emit_wide(rhs)?;
+        Ok(self.builder.binop(op, v1, v2))
+    }
+
+    fn emit_wide(&mut self, node: &ExpressionNode) -> Result<LlvmSymbol, Diagnostic> {
+        let re = &sema().expressions[node.id];
+        if let Some(value) = sema().expr_consts.get(node.id) {
+            let value = ConstFolder.convert(re.casted_ty().id.resolve(), *value).invariant("non floating operand")?;
+            return Ok(LlvmSymbol::cst(LlvmType::F80, ConstValue::LongDouble(value.to_f80())));
+        }
+        if Self::is_excess(re.ty) && re.casts.iter().all(|cast| cast.kind == CastKind::FloatingConversion) {
+            match node.id.resolve() {
+                Expression::Binary(op @ (BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div), lhs, rhs) => {
+                    return self.wide_arithmetic(op, lhs, rhs);
+                }
+                Expression::Unary(UnaryOp::Minus, e) => {
+                    let v = self.emit_wide(e)?;
+                    return Ok(self.builder.unop("fneg", v));
+                }
+                Expression::Unary(UnaryOp::Plus, e) | Expression::Block(e) => return self.emit_wide(e),
+                _ => (),
+            }
+        }
+        let v = self.emit_expression(node)?;
+        Ok(self.builder.convert("fpext", v, LlvmType::F80))
     }
 
     fn arithmetic(
@@ -328,8 +371,10 @@ impl<W: Write> Generator<W> {
     ) -> Result<LlvmSymbol, Diagnostic> {
         let rel = &sema().expressions[lhs.id];
         let op = LlvmOperator::binary(op, rel.casted_ty())?;
-        let v1 = self.emit_expression(lhs)?;
-        let v2 = self.emit_expression(rhs)?;
+        let (v1, v2) = match Self::is_excess(rel.casted_ty()) {
+            true => (self.emit_wide(lhs)?, self.emit_wide(rhs)?),
+            false => (self.emit_expression(lhs)?, self.emit_expression(rhs)?),
+        };
         Ok(self.builder.cmp(op, v1, v2))
     }
 
@@ -392,14 +437,25 @@ impl<W: Write> Generator<W> {
         rhs: &ExpressionNode,
         rl: &ResolvedExpression,
     ) -> Result<LlvmSymbol, Diagnostic> {
-        let mut vr = self.emit_expression(rhs)?;
+        let wide = op.is_some() && Self::is_excess(rl.casted_ty());
+        let mut vr = match wide {
+            true => self.emit_wide(rhs)?,
+            false => self.emit_expression(rhs)?,
+        };
         let bf = Self::bitfield_of(lhs);
         let mut bitfield_unit = None;
 
         if let Some(op) = op {
             let (vl, unit) = self.apply_casts_for_update(loc, lhs)?;
             bitfield_unit = unit;
-            vr = self.arithmetic(op, vl, rl.casted_ty(), vr, sema().expressions[rhs.id].casted_ty())?;
+            vr = match wide {
+                true => {
+                    let vl = self.builder.convert("fpext", vl, LlvmType::F80);
+                    let v = self.builder.binop(LlvmOperator::binary(op, rl.casted_ty())?, vl, vr);
+                    self.builder.convert("fptrunc", v, rl.casted_ty().llvm())
+                }
+                false => self.arithmetic(op, vl, rl.casted_ty(), vr, sema().expressions[rhs.id].casted_ty())?,
+            };
             if let Some(cast) = &rl.result_cast {
                 vr = self.convert(vr, rl.casted_ty(), cast, None)?;
             }

@@ -39,10 +39,14 @@ pub fn fold_initializer(sema: &mut Sema, ty: QualifiedType, expr: &ExpressionNod
     let mut collected = Vec::new();
     let value = evaluate(sema, expr, &mut VecSink(&mut collected)).ok()?;
     sema.diagnostics.append(&mut collected);
-    if !fits(&scalar_ty(sema, ty), value) {
+    let ty = scalar_ty(sema, ty);
+    if !fits(&ty, value) {
         sema.add_diag(Diag::err((), Diagnostic::ConstantOverflow), &expr.span);
     }
-    Some(value)
+    match ty.is_floating() {
+        true => ConstFolder.convert(&ty, value).map(ConstValue::rounded),
+        false => Some(value),
+    }
 }
 
 fn fits(ty: &ResolvedType, value: ConstValue) -> bool {
@@ -280,7 +284,7 @@ fn cast(
     if node_ty(sema, expr)?.is_void(sema) {
         return Err(Diagnostic::NonIntegerConstantExpression);
     }
-    operand(sema, e, sink)
+    Ok(operand(sema, e, sink)?.rounded())
 }
 
 fn is_constant(e: &ExpressionNode) -> bool {

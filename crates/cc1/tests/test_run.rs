@@ -334,6 +334,51 @@ exits!(
     "int main(void) { return (9007199254740992.0L + 1.0L != 9007199254740992.0L) + 41; }",
     42
 );
+exits!(double_constant_keeps_excess_precision, "double g = 55.1; int main(void) { return g != 55.1; }", 1);
+exits!(float_constant_keeps_excess_precision, "float f = 0.1f; int main(void) { return f == 0.1f; }", 0);
+exits!(float_and_double_constants_share_precision, "int main(void) { return 0.1f == 0.1; }", 1);
+exits!(cast_rounds_excess_precision, "double g = 55.1; int main(void) { return (double)55.1 == g; }", 1);
+exits!(
+    static_initializer_rounds_folded_sum,
+    "double d = 0.1 + 0.2; double e = 0.3; int main(void) { return d == e; }",
+    1
+);
+exits!(
+    static_initializer_rounds_cast_sum,
+    "double d = (double)(0.1 + 0.2); double e = 0.3; int main(void) { return d == e; }",
+    1
+);
+exits!(
+    static_initializer_rounds_integer_to_float,
+    "float f = 16777217; int main(void) { return f == 16777216.0f; }",
+    1
+);
+exits!(
+    division_matches_folded_division,
+    "double x = 1.0, y = 3.0; int main(void) { return x / y == 1.0 / 3.0; }",
+    1
+);
+exits!(
+    negated_division_matches_folded_division,
+    "double x = 1.0, y = 3.0; int main(void) { return -(x / y) == -1.0 / 3.0; }",
+    1
+);
+exits!(
+    stored_quotient_loses_excess_precision,
+    "double x = 1.0, y = 3.0; int main(void) { double t = x / y; return t == x / y; }",
+    0
+);
+exits!(double_chain_keeps_excess_precision, "double x = 1e16, y = 1.0; int main(void) { return x + y - x == y; }", 1);
+exits!(
+    float_chain_keeps_excess_precision,
+    "float a = 16777216.0f, b = 1.0f; int main(void) { return a + b - a == b; }",
+    1
+);
+exits!(
+    compound_assignment_rounds_its_result,
+    "double a = 0.1; int main(void) { double d = 1.0; d += a * 3.0; return d == 1.0 + a * 3.0; }",
+    0
+);
 exits!(
     long_double_inc_dec,
     "int main(void) { long double d = 40.5L; d++; ++d; d--; return (int) (d * 2); }",

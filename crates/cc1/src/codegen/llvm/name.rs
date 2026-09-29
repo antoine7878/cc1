@@ -44,8 +44,8 @@ impl Display for LlvmName {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             LlvmName::SSA(id) => write!(f, "%{id}"),
-            LlvmName::Constant(ConstValue::Float(v)) => write!(f, "0x{:016X}", f64::from(*v).to_bits()),
-            LlvmName::Constant(ConstValue::Double(v)) => write!(f, "0x{:016X}", v.to_bits()),
+            LlvmName::Constant(ConstValue::Float(v)) => write!(f, "0x{:016X}", f64::from(v.round_float()).to_bits()),
+            LlvmName::Constant(ConstValue::Double(v)) => write!(f, "0x{:016X}", f64::from(*v).to_bits()),
             LlvmName::Constant(ConstValue::LongDouble(v)) => {
                 let (head, mantissa) = v.to_bits();
                 write!(f, "0xK{head:04X}{mantissa:016X}")

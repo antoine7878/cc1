@@ -5,14 +5,14 @@ use crate::ast::{BinaryOp, F80, UnaryOp, escape};
 use crate::ast_node;
 use crate::semantic::{Diag, Diagnostic, QualifiedType, ResolvedType, Sema};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum ConstValue {
     Int(i32),
     Long(i64),
     UnsignedLong(u64),
     UnsignedInt(u32),
-    Float(f32),
-    Double(f64),
+    Float(F80),
+    Double(F80),
     LongDouble(F80),
 }
 
@@ -44,9 +44,23 @@ impl fmt::Display for ConstValue {
             ConstValue::Long(i) => write!(f, "{}", i),
             ConstValue::UnsignedLong(i) => write!(f, "{}", i),
             ConstValue::UnsignedInt(i) => write!(f, "{}", i),
-            ConstValue::Float(i) => write!(f, "{}", i),
-            ConstValue::Double(i) => write!(f, "{}", i),
+            ConstValue::Float(i) => write!(f, "{}", f64::from(i.round_float()) as f32),
+            ConstValue::Double(i) => write!(f, "{}", f64::from(*i)),
             ConstValue::LongDouble(i) => write!(f, "{}", i),
+        }
+    }
+}
+
+impl fmt::Debug for ConstValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConstValue::Int(i) => write!(f, "Int({i:?})"),
+            ConstValue::Long(i) => write!(f, "Long({i:?})"),
+            ConstValue::UnsignedLong(i) => write!(f, "UnsignedLong({i:?})"),
+            ConstValue::UnsignedInt(i) => write!(f, "UnsignedInt({i:?})"),
+            ConstValue::Float(i) => write!(f, "Float({:?})", f64::from(i.round_float()) as f32),
+            ConstValue::Double(i) => write!(f, "Double({:?})", f64::from(*i)),
+            ConstValue::LongDouble(i) => write!(f, "LongDouble({i:?})"),
         }
     }
 }
@@ -110,9 +124,9 @@ impl ConstValue {
         let suffix = Self::get_float_suffix(s.as_str());
         let s = &s[0..(s.len() - suffix.len())];
         match suffix {
-            "f" => ConstValue::Float(s.parse::<f32>().unwrap()),
+            "f" => ConstValue::Float(F80::from(s)),
             "l" => ConstValue::LongDouble(F80::from(s)),
-            _ => ConstValue::Double(s.parse::<f64>().unwrap()),
+            _ => ConstValue::Double(F80::from(s)),
         }
     }
 
@@ -196,9 +210,7 @@ impl ConstValue {
             ConstValue::UnsignedInt(_) => false,
             ConstValue::Long(i) => i < 0,
             ConstValue::UnsignedLong(_) => false,
-            ConstValue::Float(i) => i < 0.,
-            ConstValue::Double(i) => i < 0.,
-            ConstValue::LongDouble(i) => i.is_negative(),
+            ConstValue::Float(i) | ConstValue::Double(i) | ConstValue::LongDouble(i) => i.is_negative(),
         }
     }
 
@@ -208,9 +220,7 @@ impl ConstValue {
             ConstValue::UnsignedInt(i) => i >= v,
             ConstValue::Long(i) => i >= v as i64,
             ConstValue::UnsignedLong(i) => i >= v as u64,
-            ConstValue::Float(i) => i >= v as f32,
-            ConstValue::Double(i) => i >= v as f64,
-            ConstValue::LongDouble(i) => i >= F80::from(u64::from(v)),
+            ConstValue::Float(i) | ConstValue::Double(i) | ConstValue::LongDouble(i) => i >= F80::from(u64::from(v)),
         }
     }
 
@@ -220,9 +230,7 @@ impl ConstValue {
             ConstValue::UnsignedInt(i) => i == 0,
             ConstValue::Long(i) => i == 0,
             ConstValue::UnsignedLong(i) => i == 0,
-            ConstValue::Float(i) => i == 0.,
-            ConstValue::Double(i) => i == 0.,
-            ConstValue::LongDouble(i) => i.is_zero(),
+            ConstValue::Float(i) | ConstValue::Double(i) | ConstValue::LongDouble(i) => i.is_zero(),
         }
     }
 
@@ -232,9 +240,7 @@ impl ConstValue {
             ConstValue::UnsignedInt(v) => v as i64,
             ConstValue::Long(v) => v,
             ConstValue::UnsignedLong(v) => v as i64,
-            ConstValue::Float(v) => v as i64,
-            ConstValue::Double(v) => v as i64,
-            ConstValue::LongDouble(v) => i64::from(v),
+            ConstValue::Float(v) | ConstValue::Double(v) | ConstValue::LongDouble(v) => i64::from(v),
         }
     }
 
@@ -244,9 +250,7 @@ impl ConstValue {
             ConstValue::UnsignedInt(v) => v as u64,
             ConstValue::Long(v) => v as u64,
             ConstValue::UnsignedLong(v) => v,
-            ConstValue::Float(v) => v as u64,
-            ConstValue::Double(v) => v as u64,
-            ConstValue::LongDouble(v) => u64::from(v),
+            ConstValue::Float(v) | ConstValue::Double(v) | ConstValue::LongDouble(v) => u64::from(v),
         }
     }
 
@@ -256,21 +260,17 @@ impl ConstValue {
             ConstValue::UnsignedInt(v) => v as f64,
             ConstValue::Long(v) => v as f64,
             ConstValue::UnsignedLong(v) => v as f64,
-            ConstValue::Float(v) => v as f64,
-            ConstValue::Double(v) => v,
-            ConstValue::LongDouble(v) => f64::from(v),
+            ConstValue::Float(v) | ConstValue::Double(v) | ConstValue::LongDouble(v) => f64::from(v),
         }
     }
 
-    fn to_f80(self) -> F80 {
+    pub fn to_f80(self) -> F80 {
         match self {
             ConstValue::Int(v) => F80::from(i64::from(v)),
             ConstValue::UnsignedInt(v) => F80::from(u64::from(v)),
             ConstValue::Long(v) => F80::from(v),
             ConstValue::UnsignedLong(v) => F80::from(v),
-            ConstValue::Float(v) => F80::from(f64::from(v)),
-            ConstValue::Double(v) => F80::from(v),
-            ConstValue::LongDouble(v) => v,
+            ConstValue::Float(v) | ConstValue::Double(v) | ConstValue::LongDouble(v) => v,
         }
     }
 
@@ -281,6 +281,14 @@ impl ConstValue {
             ConstValue::Long((raw | !mask) as i64)
         } else {
             ConstValue::Long(raw as i64)
+        }
+    }
+
+    pub fn rounded(self) -> ConstValue {
+        match self {
+            ConstValue::Float(v) => ConstValue::Float(v.round_float()),
+            ConstValue::Double(v) => ConstValue::Double(v.round_double()),
+            value => value,
         }
     }
 
@@ -302,8 +310,14 @@ pub struct ConstFolder;
 impl ConstFolder {
     pub fn convert(&self, ty: &ResolvedType, value: ConstValue) -> Option<ConstValue> {
         match ty {
-            ResolvedType::Float => Some(ConstValue::Float(value.to_f64() as f32)),
-            ResolvedType::Double => Some(ConstValue::Double(value.to_f64())),
+            ResolvedType::Float => Some(ConstValue::Float(match value {
+                ConstValue::Float(v) => v,
+                value => value.to_f80().round_float(),
+            })),
+            ResolvedType::Double => Some(ConstValue::Double(match value {
+                ConstValue::Float(v) | ConstValue::Double(v) => v,
+                value => value.to_f80().round_double(),
+            })),
             ResolvedType::LongDouble => Some(ConstValue::LongDouble(value.to_f80())),
             _ => ty.cast(value),
         }
@@ -341,17 +355,7 @@ impl ConstFolder {
     fn floating(&self, ty: &ResolvedType, op: BinaryOp, lhs: ConstValue, rhs: ConstValue) -> ConstValue {
         use BinaryOp::{Add, Div, Mul, Sub};
 
-        if matches!(ty, ResolvedType::LongDouble) {
-            let (a, b) = (lhs.to_f80(), rhs.to_f80());
-            return ConstValue::LongDouble(match op {
-                Add => a + b,
-                Sub => a - b,
-                Mul => a * b,
-                Div => a / b,
-                _ => unreachable!(),
-            });
-        }
-        let (a, b) = (lhs.to_f64(), rhs.to_f64());
+        let (a, b) = (lhs.to_f80(), rhs.to_f80());
         let r = match op {
             Add => a + b,
             Sub => a - b,
@@ -359,7 +363,15 @@ impl ConstFolder {
             Div => a / b,
             _ => unreachable!(),
         };
-        self.convert(ty, ConstValue::Double(r)).expect("a floating type")
+        self.excess(ty, r)
+    }
+
+    fn excess(&self, ty: &ResolvedType, value: F80) -> ConstValue {
+        match ty {
+            ResolvedType::Float => ConstValue::Float(value),
+            ResolvedType::Double => ConstValue::Double(value),
+            _ => ConstValue::LongDouble(value),
+        }
     }
 
     fn unsigned(&self, ty: &ResolvedType, op: BinaryOp, lhs: ConstValue, rhs: ConstValue) -> ConstValue {
@@ -415,12 +427,8 @@ impl ConstFolder {
     }
 
     fn neg(&self, ty: &ResolvedType, value: ConstValue) -> Diag<ConstValue> {
-        if matches!(ty, ResolvedType::LongDouble) {
-            return Diag::ok(ConstValue::LongDouble(-value.to_f80()));
-        }
         if ty.is_floating() {
-            let negated = self.convert(ty, ConstValue::Double(-value.to_f64()));
-            return Diag::ok(negated.expect("a floating type"));
+            return Diag::ok(self.excess(ty, -value.to_f80()));
         }
         self.binary(ty, BinaryOp::Sub, ConstValue::Int(0), value)
     }
@@ -442,9 +450,9 @@ impl ConstFolder {
             (ConstValue::UnsignedInt(a), ConstValue::UnsignedInt(b)) => a.partial_cmp(&b),
             (ConstValue::Long(a), ConstValue::Long(b)) => a.partial_cmp(&b),
             (ConstValue::UnsignedLong(a), ConstValue::UnsignedLong(b)) => a.partial_cmp(&b),
-            (ConstValue::Float(a), ConstValue::Float(b)) => a.partial_cmp(&b),
-            (ConstValue::Double(a), ConstValue::Double(b)) => a.partial_cmp(&b),
-            (ConstValue::LongDouble(a), ConstValue::LongDouble(b)) => a.partial_cmp(&b),
+            (ConstValue::Float(a), ConstValue::Float(b))
+            | (ConstValue::Double(a), ConstValue::Double(b))
+            | (ConstValue::LongDouble(a), ConstValue::LongDouble(b)) => a.partial_cmp(&b),
             _ => None,
         }
     }
