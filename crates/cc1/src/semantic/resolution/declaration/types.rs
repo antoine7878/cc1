@@ -52,7 +52,7 @@ pub fn declared_type(
     inner_most: Option<QualifiedType>,
     decl: &DeclaratorNode,
 ) -> Option<(QualifiedType, DeclaratorNode)> {
-    let (ty, declarator, _) = extract_declarator(resolver, decl, inner_most?, false);
+    let (ty, declarator, _) = extract_declarator(resolver, decl, inner_most?, false, false);
     Some((ty, declarator))
 }
 
@@ -61,7 +61,7 @@ pub fn declared_function(
     inner_most: Option<QualifiedType>,
     decl: &DeclaratorNode,
 ) -> Option<(QualifiedType, DeclaratorNode, Option<DeclaredParams>)> {
-    Some(extract_declarator(resolver, decl, inner_most?, false))
+    Some(extract_declarator(resolver, decl, inner_most?, false, true))
 }
 
 fn extract_declarator(
@@ -69,13 +69,14 @@ fn extract_declarator(
     declarator: &DeclaratorNode,
     inner_most: QualifiedType,
     inner_already_diagnosed: bool,
+    is_definition: bool,
 ) -> (QualifiedType, DeclaratorNode, Option<DeclaredParams>) {
     match declarator.id.resolve() {
         Declarator::Pointer { qualifiers, inner } => {
             let (is_const, is_volatile) = constraints::specifier::check_qualifiers(qualifiers.iter().copied())
                 .collect(resolver, &declarator.span);
             let id = resolver.sema.types.pointer(inner_most);
-            extract_declarator(resolver, inner, QualifiedType::new(id, is_const, is_volatile), false)
+            extract_declarator(resolver, inner, QualifiedType::new(id, is_const, is_volatile), false, is_definition)
         }
         Declarator::Array { declarator: inner, size } => {
             if !inner_already_diagnosed {
@@ -86,17 +87,22 @@ fn extract_declarator(
             let len = len.and_then(|len| array_size(resolver, inner_most, len, &declarator.span));
             let this_level_erred = size.is_some() && len.is_none();
             let id = resolver.sema.types.array(inner_most, len);
-            extract_declarator(resolver, inner, QualifiedType::plain(id), this_level_erred)
+            extract_declarator(resolver, inner, QualifiedType::plain(id), this_level_erred, is_definition)
         }
         Declarator::Function { declarator: inner, params } => {
             let list = resolve_params(resolver, params);
+            let is_attached = matches!(inner.id.resolve(), Declarator::Ident(_) | Declarator::Abstract);
+            let is_names = matches!(list, DeclaredParams::Names(_));
+            constraints::param::check_identifier_list(is_names && !(is_definition && is_attached))
+                .collect(resolver, &params.span);
             constraints::types::check_return_type(inner_most.id.resolve_with(resolver.sema), inner_most)
                 .collect(resolver, &declarator.span);
             let id = resolver.sema.types.function(inner_most, list.types());
-            let (ty, leaf, inner_list) = extract_declarator(resolver, inner, QualifiedType::plain(id), false);
-            match inner.id.resolve() {
-                Declarator::Ident(_) | Declarator::Abstract => (ty, leaf, Some(list)),
-                _ => (ty, leaf, inner_list),
+            let (ty, leaf, inner_list) =
+                extract_declarator(resolver, inner, QualifiedType::plain(id), false, is_definition);
+            match is_attached {
+                true => (ty, leaf, Some(list)),
+                false => (ty, leaf, inner_list),
             }
         }
         _ => (inner_most, declarator.clone(), None),

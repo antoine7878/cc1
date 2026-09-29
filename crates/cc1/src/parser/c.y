@@ -6,7 +6,7 @@ use crate::ast::{DeclarationNode, InitDeclaratorNode, DeclaratorNode, Initialize
 use crate::ast::{StructDeclaration, StructMemberDeclarator, EnumeratorId, EnumId, LabeledStatementNode, StatementNode, LabeledStatement, CompoundStatementNode};
 use crate::ast::{ExpressionStatementNode, SelectionStatementNode, IterationStatementNode, JumpStatementNode, JumpStatement};
 use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode, ConstValueNode, StringLiteralNode};
-use crate::ast::{BinaryOp, MemberOp, UnaryOp};
+use crate::ast::{BinaryOp, Expression, MemberOp, UnaryOp};
 
 use crate::context::Context;
 use libft::Span;
@@ -19,6 +19,13 @@ fn concat_string_literals(ctx: &mut Context, lhs: StringLiteralNode, rhs: String
         ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::MixedWideStringConcat, span));
     }
     ctx.arenas.strings.concat(lhs, rhs, span)
+}
+
+fn sizeof_expr(ctx: &mut Context, operand: ExpressionNode, span: Span) -> ExpressionNode {
+    if matches!(operand.id.resolve_with(&ctx.arenas), Expression::Cast(..)) {
+        ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::SizeofCastOperand, operand.span));
+    }
+    ctx.arenas.expressions.sizeof_expr(operand, span)
 }
 
 macro_rules! node{
@@ -189,7 +196,7 @@ expression /* ExpressionNode */
     | expression '.' IDENTIFIER                                                             { node_span!(self, expressions, member, $1, MemberOp::Dot, $3) }
     | expression PTR_OP IDENTIFIER                                                          { node_span!(self, expressions, member, $1, MemberOp::Arrow, $3) }
     | SIZEOF '(' type_name ')'                                                              { node_span!(self, expressions, sizeof_type, $3) }
-    | SIZEOF expression %prec PREC_UNARY                                                    { node_span!(self, expressions, sizeof_expr, $2) }
+    | SIZEOF expression %prec PREC_UNARY                                                    { with_span!(self, sizeof_expr, &mut self.lexer.ctx, $2) }
     | '(' type_name ')' expression %prec PREC_UNARY                                         { node_span!(self, expressions, cast, $2, $4) }
     | expression INC_OP                                                                     { node_span!(self, expressions, unary, UnaryOp::PostInc, $1) }
     | expression DEC_OP                                                                     { node_span!(self, expressions, unary, UnaryOp::PostDec, $1) }

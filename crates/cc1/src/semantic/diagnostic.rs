@@ -96,6 +96,7 @@ pub enum Diagnostic {
     SizeofIncomplete(QualifiedType),
     SizeofFunction,
     SizeofBitfield,
+    SizeofCastOperand,
 
     // 6.3.4
     CastToNonScalar,
@@ -173,6 +174,7 @@ pub enum Diagnostic {
     VoidParameter,
     ParameterNotRegister,
     DuplicateParameterName,
+    IdentifierListInDeclaration,
 
     // 6.5.6
     UnknownTypeName(Name),
@@ -343,6 +345,7 @@ impl DiagnosticNode {
             Diagnostic::SizeofIncomplete(ty) => format!("invalid application of 'sizeof' to an incomplete type '{}'", ty.display(sema)),
             Diagnostic::SizeofFunction => "invalid application of 'sizeof' to a function type".to_string(),
             Diagnostic::SizeofBitfield => "invalid application of 'sizeof' to bit-field".to_string(),
+            Diagnostic::SizeofCastOperand => "cast expression is not a valid operand of 'sizeof'".to_string(),
 
             // 6.3.4
             Diagnostic::CastToNonScalar => "Conversion to non scalar type".to_string(),
@@ -423,6 +426,7 @@ impl DiagnosticNode {
             Diagnostic::VoidParameter => "Parameter shall not have void type".to_string(),
             Diagnostic::ParameterNotRegister => "Parameter shall only by declared with register storage".to_string(),
             Diagnostic::DuplicateParameterName => "Duplicate paramter identifier".to_string(),
+            Diagnostic::IdentifierListInDeclaration => "parameter names (without types) in function declaration".to_string(),
 
             // 6.5.6
             Diagnostic::UnknownTypeName(name) => format!("unknown type name '{}'", name.id.resolve()),

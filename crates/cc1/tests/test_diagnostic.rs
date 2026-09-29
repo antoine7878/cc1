@@ -523,11 +523,7 @@ reports!(
     "int c = '\\x';",
     ["<test>:1:9: error: \\x used with no following hex digits"]
 );
-reports!(
-    report_char_constant_unknown_escape,
-    "int c = '\\q';",
-    ["<test>:1:9: error: unknown escape sequence: '\\q'"]
-);
+reports!(report_char_constant_unknown_escape, "int c = '\\q';", ["<test>:1:9: error: unknown escape sequence: '\\q'"]);
 reports!(
     report_wide_char_constant_hex_escape_wrap,
     "int c = L'\\x100000041';",
@@ -680,4 +676,8 @@ reports!(report_pp_number_hex_plus, "int x = 0x1e+1;", ["<test>:1:9: error: inva
 reports!(report_pp_number_two_dots, "double x = 1.2.3;", ["<test>:1:12: error: invalid numeric constant '1.2.3'"]);
 reports!(report_pp_number_letter_suffix, "int x = 123abc;", ["<test>:1:9: error: invalid numeric constant '123abc'"]);
 reports!(report_pp_number_hex_without_digits, "int x = 0x;", ["<test>:1:9: error: invalid numeric constant '0x'"]);
-reports!(report_pp_number_exponent_without_digits, "double x = 1e;", ["<test>:1:12: error: invalid numeric constant '1e'"]);
+reports!(
+    report_pp_number_exponent_without_digits,
+    "double x = 1e;",
+    ["<test>:1:12: error: invalid numeric constant '1e'"]
+);
