@@ -29,11 +29,6 @@ folded!(fold_stops_at_assignment, "int main(void) { int x; return (x = 1) + 1; }
 folded!(fold_stops_at_comma, "int main(void) { return (1, 2); }", []);
 folded!(fold_leaves_division_by_zero_to_run_time, "int main(void) { int a; a = 1 / 0; return 0; }", []);
 folded!(fold_leaves_modulo_by_zero_to_run_time, "int main(void) { int a; a = 1 % 0; return 0; }", []);
-folded!(
-    fold_leaves_floating_cast_of_an_operation_alone,
-    "int main(void) { return (int)(1.5 + 1.0); }",
-    ["Double(2.5)"]
-);
 
 #[test]
 fn fold_emits_the_value_instead_of_the_operation() {

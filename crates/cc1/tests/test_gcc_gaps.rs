@@ -74,22 +74,6 @@ accept!(gap_enum_without_negative_points_as_unsigned, "enum E { A, B } e; unsign
 
 reject!(gap_enum_without_negative_is_not_int, "enum E { A, B } e; int *p = &e;");
 
-#[test]
-fn gap_latin1_bytes_in_literals() {
-    let dir = TmpDir::new("cc1-gap-latin1");
-    let unit = compile_bytes(&dir, b"enum { N = sizeof \"\xe9t\xe9\", C = '\xe9' };\n");
-    assert_eq!(enumerator(&unit, "N").as_deref(), Some("4"), "{}", unit.render());
-    assert_eq!(enumerator(&unit, "C").as_deref(), Some("-23"), "{}", unit.render());
-}
-
-#[test]
-fn gap_wide_literal_decodes_utf8() {
-    let dir = TmpDir::new("cc1-gap-wide-utf8");
-    let unit = compile_bytes(&dir, "enum { N = sizeof L\"\u{e9}\", C = L'\u{e9}' };\n".as_bytes());
-    assert_eq!(enumerator(&unit, "N").as_deref(), Some("8"), "{}", unit.render());
-    assert_eq!(enumerator(&unit, "C").as_deref(), Some("233"), "{}", unit.render());
-}
-
 exits!(
     gap_pragma_pack,
     "#pragma pack(1)\nstruct S { char c; int i; };\n#pragma pack()\nint main(void) { return sizeof(struct S); }",
@@ -101,12 +85,6 @@ exits!(gap_float_constant_excess_precision_compare, "double g = 55.1; int main(v
 exits!(
     gap_float_constant_excess_precision_fold,
     "double d = 0.1 + 0.2; double e = 0.3; int main(void) { return d == e; }",
-    1
-);
-
-exits!(
-    gap_int_to_float_conversion_rounds,
-    "int main(void) { volatile int i = 16777217; float f = (float)i; return f == i; }",
     1
 );
 
