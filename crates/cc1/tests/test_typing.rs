@@ -1,837 +1,9 @@
+#![cfg_attr(rustfmt, rustfmt_skip)]
+
 use cc1::semantic::CastKind::*;
 use cc1::semantic::Diagnostic;
 
 use crate::common::{Ty, Unit, ints, lv, none, rv};
-
-// ---- 6.3.1 primary expressions -------------------------------------------
-
-shaped!(a_constant_is_an_rvalue, "void f(void) { 1; }", vec![rv(Ty::Int)]);
-
-shaped!(an_identifier_is_an_lvalue, "int i; void f(void) { i; }", vec![lv(Ty::Int)]);
-
-shaped!(an_enumeration_constant_is_an_rvalue, "enum E { A }; void f(void) { A; }", vec![rv(Ty::Int)]);
-
-shaped!(a_string_literal_is_an_array_lvalue, "void f(void) { \"ab\"; }", vec![lv(Ty::arr(Ty::Char, 3))]);
-
-// ---- 6.2.2.1 lvalue, array and function conversions ----------------------
-
-shaped!(
-    an_operand_is_converted_to_the_value_it_designates,
-    "int i; void f(void) { -i; }",
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]
-);
-
-rejects_shaped!(
-    an_array_operand_becomes_a_pointer_to_its_first_element,
-    "char a[10]; void f(void) { -a; }",
-    Diagnostic::InvalidUnary(_),
-    vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Char, 10)).then(ArrayToPointer, Ty::ptr(Ty::Char)), none(),]
-);
-
-rejects_shaped!(
-    a_function_designator_becomes_a_pointer_to_function,
-    "int g(); void f(void) { g + 1; }",
-    Diagnostic::InvalidOperand,
-    vec![rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))), rv(Ty::Int), none(),]
-);
-
-// ---- 6.2.1.1 integral promotions -----------------------------------------
-
-shaped!(
-    a_char_operand_promotes_to_int,
-    "char c; void f(void) { -c; }",
-    vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int),]
-);
-
-shaped!(
-    a_short_operand_promotes_to_int,
-    "short s; void f(void) { -s; }",
-    vec![lv(Ty::Short).then(LValueToRValue, Ty::Short).then(IntegerPromotion, Ty::Int), rv(Ty::Int),]
-);
-
-shaped!(
-    a_double_operand_is_left_alone,
-    "double d; void f(void) { -d; }",
-    vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Double)]
-);
-
-shaped!(
-    both_operands_of_an_addition_promote,
-    "char c; void f(void) { c + c; }",
-    vec![
-        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int),
-        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-// ---- 6.1.3.2, 6.1.3.1 the type of a constant --------------------------------
-
-// gcc: sizeof(1) == 4, sizeof(1u) == 4, sizeof(1l) == 4, sizeof(1.5f) == 4, sizeof(1.5) == 8,
-// sizeof(1.5l) == 12 on i386, and each suffix picks the type the constant is folded in.
-shaped!(
-    a_constant_carries_the_type_of_its_suffix,
-    "void f(void) { 1; 1u; 1l; 1ul; 1.5f; 1.5; 1.5l; }",
-    vec![rv(Ty::Int), rv(Ty::UInt), rv(Ty::Long), rv(Ty::ULong), rv(Ty::Float), rv(Ty::Double), rv(Ty::LDouble),]
-);
-
-// 6.1.3.4 An integer character constant has type int.
-shaped!(a_character_constant_is_an_int, "void f(void) { 'a'; }", vec![rv(Ty::Int)]);
-
-// ---- 6.2.1.5 usual arithmetic conversions --------------------------------
-
-shaped!(two_constants_stay_int, "void f(void) { 1 + 2; }", ints(3));
-
-shaped!(
-    an_integer_and_a_double_meet_at_double,
-    "int i; double d; void f(void) { i + d; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Double),
-        lv(Ty::Double).then(LValueToRValue, Ty::Double),
-        rv(Ty::Double),
-    ]
-);
-
-shaped!(
-    an_integer_and_a_float_meet_at_float,
-    "float g; int i; void f(void) { g + i; }",
-    vec![
-        lv(Ty::Float).then(LValueToRValue, Ty::Float),
-        lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Float),
-        rv(Ty::Float),
-    ]
-);
-
-shaped!(
-    an_int_converts_to_the_unsigned_int_it_meets,
-    "unsigned u; int i; void f(void) { u + i; }",
-    vec![
-        lv(Ty::UInt).then(LValueToRValue, Ty::UInt),
-        lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerConversion, Ty::UInt),
-        rv(Ty::UInt),
-    ]
-);
-
-// ---- 6.3.2.2 function calls ----------------------------------------------
-
-shaped!(
-    a_call_has_the_return_type_of_the_function_and_is_an_rvalue,
-    "int g(void); void f(void) { g(); }",
-    vec![rv(Ty::func0(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Int))), rv(Ty::Int),]
-);
-
-shaped!(
-    a_call_to_a_function_returning_void_has_type_void,
-    "void g(void); void f(void) { g(); }",
-    vec![rv(Ty::func0(Ty::Void)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Void))), rv(Ty::Void),]
-);
-
-shaped!(
-    a_call_returning_a_structure_is_an_rvalue,
-    "struct S { int a; }; struct S g(void); void f(void) { g(); }",
-    vec![
-        rv(Ty::func0(Ty::strukt("S"))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt("S")))),
-        rv(Ty::strukt("S")),
-    ]
-);
-
-shaped!(
-    an_argument_is_converted_as_if_by_assignment_to_its_parameter,
-    "int g(char, float); void f(void) { g(1, 2); }",
-    vec![
-        rv(Ty::func(Ty::Int, [Ty::Char, Ty::Float]))
-            .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Char, Ty::Float]))),
-        rv(Ty::Int).then(IntegerConversion, Ty::Char),
-        rv(Ty::Int).then(IntegerToFloating, Ty::Float),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    an_array_argument_becomes_a_pointer_to_its_first_element,
-    "int g(char *); char a[4]; void f(void) { g(a); }",
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        rv(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))
-            .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))),
-        lv(Ty::arr(Ty::Char, 4)).then(ArrayToPointer, Ty::ptr(Ty::Char)),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    a_structure_argument_is_passed_by_value,
-    "struct S { int a; }; int g(struct S); struct S s; void f(void) { g(s); }",
-    vec![
-        rv(Ty::func(Ty::Int, [Ty::strukt("S")])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::strukt("S")]))),
-        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    an_argument_pointer_may_gain_the_qualifiers_of_its_parameter,
-    "int g(const char *); char *p; void f(void) { g(p); }",
-    vec![
-        rv(Ty::func(Ty::Int, [Ty::ptr(Ty::konst(Ty::Char))]))
-            .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::konst(Ty::Char))])),),
-        lv(Ty::ptr(Ty::Char))
-            .then(LValueToRValue, Ty::ptr(Ty::Char))
-            .then(PointerConversion, Ty::ptr(Ty::konst(Ty::Char))),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    a_null_pointer_constant_may_be_passed_to_a_pointer_parameter,
-    "int g(char *); void f(void) { g(0); }",
-    vec![
-        rv(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))
-            .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))),
-        rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Char)),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.5.4.3 each parameter declared with qualified type is taken as having the unqualified
-// version of its declared type
-shaped!(
-    a_parameter_qualifier_is_not_part_of_the_function_type,
-    "int g(const int); void f(void) { g(1); }",
-    vec![
-        rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
-        rv(Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    an_enumeration_parameter_takes_an_integer_argument,
-    "enum E { A }; int g(enum E); void f(void) { g(A); }",
-    vec![
-        rv(Ty::func(Ty::Int, [Ty::enom("E")])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::enom("E")]))),
-        rv(Ty::Int).then(IntegerConversion, Ty::enom("E")),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    a_variadic_prototype_accepts_arguments_past_its_named_parameters,
-    "int g(int, ...); void f(void) { g(1, 2, 3); }",
-    vec![
-        rv(Ty::func_variadic(Ty::Int, [Ty::Int]))
-            .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
-        rv(Ty::Int),
-        rv(Ty::Int),
-        rv(Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    a_call_may_go_through_a_pointer_to_function,
-    "int (*p)(int); void f(void) { p(1); }",
-    vec![
-        lv(Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))).then(LValueToRValue, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
-        rv(Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    a_call_may_go_through_a_typedefed_function_pointer,
-    "typedef int F(int); F *q; void f(void) { q(1); }",
-    vec![
-        lv(Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))).then(LValueToRValue, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
-        rv(Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.2.2 The number of arguments shall agree with the number of parameters.
-rejects_shaped!(
-    calling_a_prototype_with_too_many_arguments_is_rejected,
-    "int g(int); void f(void) { g(1, 2); }",
-    Diagnostic::TooManyArguments(1, 2),
-    vec![
-        rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
-        rv(Ty::Int),
-        rv(Ty::Int),
-        none(),
-    ]
-);
-
-rejects_shaped!(
-    calling_a_prototype_with_too_few_arguments_is_rejected,
-    "int g(int, int); void f(void) { g(1); }",
-    Diagnostic::TooFewArguments(2, 1),
-    vec![
-        rv(Ty::func(Ty::Int, [Ty::Int, Ty::Int]))
-            .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int, Ty::Int])),),
-        rv(Ty::Int),
-        none(),
-    ]
-);
-
-rejects_shaped!(
-    a_prototype_with_no_parameters_takes_no_argument,
-    "int g(void); void f(void) { g(1); }",
-    Diagnostic::TooManyArguments(0, 1),
-    vec![rv(Ty::func0(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Int))), rv(Ty::Int), none(),]
-);
-
-rejects_shaped!(
-    a_variadic_call_still_needs_an_argument_for_each_named_parameter,
-    "int g(int, ...); void f(void) { g(); }",
-    Diagnostic::TooFewArguments(1, 0),
-    vec![
-        rv(Ty::func_variadic(Ty::Int, [Ty::Int]))
-            .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
-        none(),
-    ]
-);
-
-rejects_shaped!(
-    an_argument_incompatible_with_its_parameter_is_rejected,
-    "int g(char *); void f(void) { g(1); }",
-    Diagnostic::ArgumentIncompatibleTypes(1, _, _),
-    vec![
-        rv(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))
-            .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))),
-        rv(Ty::Int),
-        none(),
-    ]
-);
-
-rejects_shaped!(
-    a_void_argument_is_rejected,
-    "void v(void); int g(int); void f(void) { g(v()); }",
-    Diagnostic::ArgumentIncompatibleTypes(1, _, _),
-    vec![
-        rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
-        rv(Ty::func0(Ty::Void)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Void))),
-        rv(Ty::Void),
-        none(),
-    ]
-);
-
-// 6.3.2.2 The expression that denotes the called function shall have type pointer to function
-// returning void or returning an object type other than an array type.
-rejects_shaped!(
-    calling_an_object_is_rejected,
-    "double d; void f(void) { d(); }",
-    Diagnostic::CallingNotFunction(_),
-    vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), none()]
-);
-
-rejects_shaped!(
-    calling_an_array_is_rejected,
-    "int arr[3]; void f(void) { arr(); }",
-    Diagnostic::CallingNotFunction(_),
-    vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)), none(),]
-);
-
-rejects_shaped!(
-    calling_the_result_of_a_call_is_rejected,
-    "int g(int); void f(void) { g(1)(2); }",
-    Diagnostic::CallingNotFunction(_),
-    vec![
-        rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
-        rv(Ty::Int),
-        rv(Ty::Int),
-        rv(Ty::Int),
-        none(),
-    ]
-);
-
-rejects_shaped!(
-    calling_a_function_with_an_incomplete_return_type_is_rejected,
-    "struct S; struct S g(void); void f(void) { g(); }",
-    Diagnostic::CallingIncompleteReturn(_),
-    vec![
-        rv(Ty::func0(Ty::strukt_incomplete("S")))
-            .then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt_incomplete("S")))),
-        none(),
-    ]
-);
-
-shaped!(
-    calling_a_function_returning_a_completed_type_is_accepted,
-    "struct S { int x; }; struct S g(void); void f(void) { g(); }",
-    vec![
-        rv(Ty::func0(Ty::strukt("S"))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt("S")))),
-        rv(Ty::strukt("S")),
-    ]
-);
-
-shaped!(
-    the_result_of_a_call_is_an_unqualified_rvalue,
-    "const int g(void); void f(void) { g(); }",
-    vec![
-        rv(Ty::func0(Ty::konst(Ty::Int))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::konst(Ty::Int)))),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.2.2 The default argument promotions are performed on trailing arguments.
-shaped!(
-    a_trailing_argument_is_promoted,
-    "int g(int, ...); void f(void) { char c; float x; g(1, c, x); }",
-    vec![
-        rv(Ty::func_variadic(Ty::Int, [Ty::Int]))
-            .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
-        rv(Ty::Int),
-        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int),
-        lv(Ty::Float).then(LValueToRValue, Ty::Float).then(FloatingConversion, Ty::Double),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    a_trailing_array_argument_becomes_a_pointer,
-    "int g(int, ...); char a[4]; void f(void) { g(1, a); }",
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        rv(Ty::func_variadic(Ty::Int, [Ty::Int]))
-            .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
-        rv(Ty::Int),
-        lv(Ty::arr(Ty::Char, 4)).then(ArrayToPointer, Ty::ptr(Ty::Char)),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.2.2 If the expression that denotes the called function has a type that does not include a
-// prototype, the integral promotions are performed on each argument and arguments that have type
-// float are promoted to double.
-shaped!(
-    an_argument_of_a_call_without_a_prototype_is_promoted,
-    "int g(); void f(void) { char c; g(c); }",
-    vec![
-        rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))),
-        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-rejects_shaped!(
-    an_argument_without_a_type_does_not_cascade,
-    "int g(int); void f(void) { g(x); }",
-    Diagnostic::UndeclaredIdentifier(_),
-    vec![
-        rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
-        none(),
-        none(),
-    ]
-);
-
-// ---- 6.3.3.2 address and indirection operators ----------------------------
-
-// 6.3.3.2 The result of the unary & operator is a pointer to the object or function
-// designated by its operand.
-shaped!(
-    the_address_of_an_object_is_a_pointer_to_it,
-    "int i; void f(void) { &i; }",
-    vec![lv(Ty::Int), rv(Ty::ptr(Ty::Int))]
-);
-
-// 6.2.2.1 an lvalue operand of the unary & operator is not converted to the value it
-// designates, and an array operand does not become a pointer to its first element.
-shaped!(
-    the_address_of_an_array_is_a_pointer_to_the_array,
-    "int a[3]; void f(void) { &a; }",
-    vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Int, 3)), rv(Ty::ptr(Ty::arr(Ty::Int, 3))),]
-);
-
-// 6.3.3.2 The operand shall be either a function designator or an lvalue.
-shaped!(
-    the_address_of_a_function_is_a_pointer_to_function,
-    "int g(void); void f(void) { &g; }",
-    vec![rv(Ty::func0(Ty::Int)), rv(Ty::ptr(Ty::func0(Ty::Int)))]
-);
-
-// 6.3.3.2 If the operand has type "type", the result has type "pointer to type": the
-// qualifiers of the designated object are those of the pointed-to type.
-shaped!(
-    the_address_of_a_const_object_points_to_a_const_type,
-    "void f(void) { const int c; &c; }",
-    vec![lv(Ty::konst(Ty::Int)), rv(Ty::ptr(Ty::konst(Ty::Int)))]
-);
-
-shaped!(
-    the_address_of_a_volatile_object_points_to_a_volatile_type,
-    "void f(void) { volatile int v; &v; }",
-    vec![lv(Ty::vol(Ty::Int)), rv(Ty::ptr(Ty::vol(Ty::Int)))]
-);
-
-// 6.3.3.2 the result of the unary & operator is not itself an lvalue.
-rejects_shaped!(
-    assigning_to_an_address_is_rejected,
-    "int i, *p; void f(void) { &i = p; }",
-    Diagnostic::AssignToRValue,
-    vec![lv(Ty::Int), rv(Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none(),]
-);
-
-// 6.3.3.2 The operand shall be either a function designator or an lvalue.
-rejects_shaped!(
-    the_address_of_a_constant_is_rejected,
-    "void f(void) { &1; }",
-    Diagnostic::RValueAddress(_),
-    vec![rv(Ty::Int), none()]
-);
-
-rejects_shaped!(
-    the_address_of_an_enumeration_constant_is_rejected,
-    "enum E { A }; void f(void) { &A; }",
-    Diagnostic::RValueAddress(_),
-    vec![rv(Ty::Int), none()]
-);
-
-// 6.3.3.2 an lvalue that designates a member of a structure or an element of an array is
-// still an lvalue: its address may be taken.
-shaped!(
-    the_address_of_a_member_is_a_pointer_to_it,
-    "struct S { int x; } s; void f(void) { &s.x; }",
-    vec![lv(Ty::strukt("S")), lv(Ty::Int), rv(Ty::ptr(Ty::Int))]
-);
-
-shaped!(
-    the_address_of_an_array_element_is_a_pointer_to_it,
-    "int a[3]; void f(void) { &a[0]; }",
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)),
-        rv(Ty::Int),
-        lv(Ty::Int),
-        rv(Ty::ptr(Ty::Int)),
-    ]
-);
-
-shaped!(
-    the_address_of_a_string_literal_is_a_pointer_to_the_array,
-    "void f(void) { &\"ab\"; }",
-    vec![lv(Ty::arr(Ty::Char, 3)), rv(Ty::ptr(Ty::arr(Ty::Char, 3)))]
-);
-
-// 6.3.3.2 If the operand is the result of a unary * operator, neither that operator nor the &
-// operator is evaluated and the result is as if both were omitted.
-shaped!(
-    the_address_of_a_dereference_is_the_pointer_itself,
-    "int *p; void f(void) { &*p; }",
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::Int), rv(Ty::ptr(Ty::Int)),]
-);
-
-// 6.3.3.2 The operand shall be an lvalue that designates an object that is not a bit-field
-// and is not declared with the register storage-class specifier.
-reject!(the_address_of_a_bit_field_is_rejected, "struct S { int x : 3; } s; void f(void) { &s.x; }");
-
-reject!(
-    the_address_of_a_bit_field_reached_through_a_pointer_is_rejected,
-    "struct S { int x : 3; } *p; void f(void) { &p->x; }"
-);
-
-reject!(the_address_of_a_bit_field_of_a_union_is_rejected, "union U { int x : 3; } u; void f(void) { &u.x; }");
-
-// 6.3.3.2 only a bit-field member is excluded: a plain member of the same structure keeps an
-// address, and so does the structure itself.
-shaped!(
-    the_address_of_a_plain_member_beside_a_bit_field_is_accepted,
-    "struct S { int x : 3; int y; } s; void f(void) { &s.y; }",
-    vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::strukt("S")), lv(Ty::Int), rv(Ty::ptr(Ty::Int)),]
-);
-
-reject!(the_address_of_a_register_object_is_rejected, "void f(void) { register int i; &i; }");
-
-// 6.3.3.2 The operand of the unary * operator shall have pointer type.
-reject!(indirection_on_an_integer_is_rejected, "void f(void) { int i; *i; }");
-
-reject!(indirection_on_a_structure_is_rejected, "struct S { int x; } s; void f(void) { *s; }");
-
-// 6.3.3.2 If the operand points to an object, the result is an lvalue designating the object.
-shaped!(
-    indirection_through_a_pointer_designates_an_object,
-    "int *p; void f(void) { *p; }",
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::Int)]
-);
-
-// 6.2.2.1 An lvalue is an expression (with an object type or an incomplete type other than
-// void) that designates an object: an incomplete structure type still designates an object.
-shaped!(
-    indirection_through_a_pointer_to_an_incomplete_type_designates_an_object,
-    "struct S; struct S *p; void f(void) { *p; }",
-    vec![
-        lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
-        lv(Ty::strukt_incomplete("S")),
-    ]
-);
-
-// 6.3.3.2 If the operand is the result of a unary * operator, neither that operator nor the &
-// operator is evaluated and the result is as if both were omitted.
-accept!(
-    the_address_of_a_dereferenced_pointer_to_an_incomplete_type_is_accepted,
-    "struct S; struct S *p; struct S *f(void) { return &*p; }"
-);
-
-accept!(a_dereferenced_pointer_is_assignable, "int *p; void f(void) { *p = 1; }");
-
-// 6.2.2.1 the operand of unary * is converted: an array becomes a pointer to its first
-// element, so *a designates the first element of a.
-accept!(indirection_on_an_array_designates_its_first_element, "int a[3]; void f(void) { *a = 1; }");
-
-// 6.2.2.1 a function designator is converted to a pointer to function, so *g designates g.
-accept!(indirection_on_a_function_designator_designates_the_function, "int g(void); void f(void) { (*g)(); }");
-
-shaped!(
-    indirection_on_a_pointer_to_void_is_a_void_expression,
-    "void f(void *v) { *v; }",
-    vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), rv(Ty::Void)]
-);
-
-reject!(the_value_of_an_indirection_on_a_pointer_to_void_is_rejected, "void f(void *v) { int i = *v; }");
-
-reject!(assigning_through_a_pointer_to_void_is_rejected, "void f(void *v) { *v = 0; }");
-
-// ---- 6.3.3.3 unary arithmetic operators ----------------------------------
-
-rejects_shaped!(
-    minus_rejects_a_pointer,
-    "int *p; void f(void) { -p; }",
-    Diagnostic::InvalidUnary(_),
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]
-);
-
-rejects_shaped!(
-    minus_rejects_a_structure,
-    "struct S { int x; } s; void f(void) { -s; }",
-    Diagnostic::InvalidUnary(_),
-    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
-);
-
-// 6.3.3.3 The result of the unary + operator is the value of its operand. The integral
-// promotion is performed on the operand, and the result has the promoted type.
-shaped!(
-    unary_plus_yields_the_value_of_its_operand,
-    "int i; void f(void) { +i; }",
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]
-);
-
-shaped!(
-    unary_plus_promotes_its_operand,
-    "void f(void) { char c; +c; }",
-    vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int),]
-);
-
-// 6.3.3.3 The operand of the unary + or - operator shall have arithmetic type.
-rejects_shaped!(
-    unary_plus_rejects_a_pointer,
-    "int *p; void f(void) { +p; }",
-    Diagnostic::InvalidUnary(_),
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]
-);
-
-rejects_shaped!(
-    unary_plus_rejects_a_structure,
-    "struct S { int x; } s; void f(void) { +s; }",
-    Diagnostic::InvalidUnary(_),
-    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
-);
-
-// 6.3.3.3 The integral promotion is performed on the operand of ~, and the result has the
-// promoted type.
-shaped!(
-    a_complement_yields_the_promoted_type_of_its_operand,
-    "int i; void f(void) { ~i; }",
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]
-);
-
-shaped!(
-    a_complement_promotes_its_operand,
-    "void f(void) { char c; ~c; }",
-    vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int),]
-);
-
-shaped!(
-    a_complement_of_an_unsigned_operand_stays_unsigned,
-    "void f(void) { unsigned u; ~u; }",
-    vec![lv(Ty::UInt).then(LValueToRValue, Ty::UInt), rv(Ty::UInt)]
-);
-
-// 6.3.3.3 The operand of the ~ operator shall have integral type.
-rejects_shaped!(
-    a_complement_rejects_a_floating_operand,
-    "void f(void) { double d; ~d; }",
-    Diagnostic::InvalidUnary(_),
-    vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), none()]
-);
-
-rejects_shaped!(
-    a_complement_rejects_a_pointer,
-    "int *p; void f(void) { ~p; }",
-    Diagnostic::InvalidUnary(_),
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]
-);
-
-// 6.3.3.3 The result of the logical negation operator ! is 0 or 1: the result has type int.
-shaped!(
-    a_logical_negation_has_type_int,
-    "int i; void f(void) { !i; }",
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]
-);
-
-shaped!(
-    a_logical_negation_of_a_floating_operand_has_type_int,
-    "void f(void) { double d; !d; }",
-    vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Int)]
-);
-
-shaped!(
-    a_logical_negation_of_a_pointer_has_type_int,
-    "int *p; void f(void) { !p; }",
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int)]
-);
-
-// 6.3.3.3 the result of ! has type int whatever the operand is: the operand is not promoted.
-shaped!(
-    a_logical_negation_does_not_promote_its_operand,
-    "void f(void) { char c; !c; }",
-    vec![lv(Ty::Char).then(LValueToRValue, Ty::Char), rv(Ty::Int)]
-);
-
-// 6.3.3.3 The operand of the unary ! operator shall have scalar type.
-rejects_shaped!(
-    a_logical_negation_rejects_a_structure,
-    "struct S { int x; } s; void f(void) { !s; }",
-    Diagnostic::InvalidUnary(_),
-    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
-);
-
-// 6.2.2.1 the operand of ! is converted: an array becomes a pointer to its first element and
-// a function designator becomes a pointer to function, both of which are scalar.
-shaped!(
-    a_logical_negation_of_an_array_is_accepted,
-    "int a[3]; void f(void) { !a; }",
-    vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)), rv(Ty::Int),]
-);
-
-shaped!(
-    a_logical_negation_of_a_function_designator_is_accepted,
-    "int g(); void f(void) { !g; }",
-    vec![rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))), rv(Ty::Int),]
-);
-
-// ---- 6.3.6 additive operators --------------------------------------------
-
-rejects_shaped!(
-    add_rejects_two_structures,
-    "struct S { int x; } s; void f(void) { s + s; }",
-    Diagnostic::InvalidOperand,
-    vec![
-        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
-        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
-        none(),
-    ]
-);
-
-rejects_shaped!(
-    add_rejects_a_floating_index,
-    "int *p; void f(void) { p + 1.5; }",
-    Diagnostic::InvalidOperand,
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Double), none(),]
-);
-
-rejects_shaped!(
-    add_rejects_a_pointer_to_void,
-    "void *p; void f(void) { p + 1; }",
-    Diagnostic::InvalidOperand,
-    vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), rv(Ty::Int), none(),]
-);
-
-rejects_shaped!(
-    add_rejects_a_pointer_to_an_incomplete_type,
-    "struct S *p; void f(void) { p + 1; }",
-    Diagnostic::InvalidOperand,
-    vec![
-        lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
-        rv(Ty::Int),
-        none(),
-    ]
-);
-
-shaped!(
-    a_pointer_plus_an_integer_is_a_pointer,
-    "int *p; void f(void) { p + 1; }",
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), rv(Ty::ptr(Ty::Int)),]
-);
-
-shaped!(
-    an_integer_plus_a_pointer_is_a_pointer,
-    "int *p; void f(void) { 1 + p; }",
-    vec![rv(Ty::Int), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int)),]
-);
-
-shaped!(
-    an_array_plus_an_integer_is_a_pointer_to_the_element,
-    "char a[10]; void f(void) { a + 1; }",
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        lv(Ty::arr(Ty::Char, 10)).then(ArrayToPointer, Ty::ptr(Ty::Char)),
-        rv(Ty::Int),
-        rv(Ty::ptr(Ty::Char)),
-    ]
-);
-
-// ---- 6.3.4 cast operators --------------------------------------------------
-
-shaped!(
-    a_cast_result_is_always_an_rvalue,
-    "int i; void f(void) { (double)i; }",
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Double), rv(Ty::Double),]
-);
-
-shaped!(
-    a_pointer_may_be_cast_to_an_integer,
-    "int *p; void f(void) { (int)p; }",
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)).then(PointerToInteger, Ty::Int), rv(Ty::Int),]
-);
-
-shaped!(
-    an_integer_may_be_cast_to_a_pointer,
-    "int i; void f(void) { (int *)i; }",
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToPointer, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int)),]
-);
-
-shaped!(a_cast_to_void_discards_the_value, "void f(void) { (void)1; }", vec![rv(Ty::Int), rv(Ty::Void)]);
-
-rejects_shaped!(
-    cast_of_a_non_scalar_operand_is_rejected,
-    "struct S { int a; } s; void f(void) { (int)s; }",
-    Diagnostic::CastOfNonScalar,
-    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
-);
-
-rejects_shaped!(
-    cast_to_a_non_scalar_type_is_rejected,
-    "struct S { int a; }; void f(void) { (struct S)1; }",
-    Diagnostic::CastToNonScalar,
-    vec![rv(Ty::Int), none()]
-);
-
-rejects_shaped!(
-    cast_from_a_pointer_to_a_floating_type_is_rejected,
-    "int *p; void f(void) { (double)p; }",
-    Diagnostic::InvalidOperand,
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]
-);
-
-rejects_shaped!(
-    cast_from_a_floating_type_to_a_pointer_is_rejected,
-    "double d; void f(void) { (int *)d; }",
-    Diagnostic::InvalidOperand,
-    vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), none()]
-);
 
 #[test]
 fn cast_to_a_non_scalar_type_is_reported_once() {
@@ -845,1713 +17,329 @@ fn cast_to_a_non_scalar_type_is_reported_once() {
     );
 }
 
-// ---- 6.4 constant expressions --------------------------------------------
-
-shaped!(a_constant_expression_mirrors_its_operand, "int a[2 + 3];", ints(4));
-
-// ---- 6.3.6 additive operators: subtraction --------------------------------
-
-shaped!(
-    a_pointer_minus_an_integer_is_a_pointer,
-    "int *p; void f(void) { p - 1; }",
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), rv(Ty::ptr(Ty::Int)),]
-);
-
-shaped!(
-    two_compatible_pointers_subtract_to_ptrdiff_t,
-    "int *p, *q; void f(void) { p - q; }",
-    vec![
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    pointer_subtraction_works_for_any_compatible_object_type,
-    "char *p, *q; void f(void) { p - q; }",
-    vec![
-        lv(Ty::ptr(Ty::Char)).then(LValueToRValue, Ty::ptr(Ty::Char)),
-        lv(Ty::ptr(Ty::Char)).then(LValueToRValue, Ty::ptr(Ty::Char)),
-        rv(Ty::Int),
-    ]
-);
-
-rejects_shaped!(
-    an_integer_minus_a_pointer_is_rejected,
-    "int i; int *p; void f(void) { i - p; }",
-    Diagnostic::InvalidOperand,
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        none(),
-    ]
-);
-
-rejects_shaped!(
-    subtracting_pointers_to_an_incomplete_type_is_rejected,
-    "struct S *p, *q; void f(void) { p - q; }",
-    Diagnostic::InvalidOperand,
-    vec![
-        lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
-        lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
-        none(),
-    ]
-);
-
-rejects_shaped!(
-    subtracting_a_floating_index_is_rejected,
-    "int *p; void f(void) { p - 1.5; }",
-    Diagnostic::InvalidOperand,
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Double), none(),]
-);
-
-// ---- 6.3.16.1 simple assignment --------------------------------------------
-
-shaped!(
-    assigning_a_constant_keeps_the_lvalues_type,
-    "int x; void f(void) { x = 1; }",
-    vec![lv(Ty::Int), rv(Ty::Int), rv(Ty::Int)]
-);
-
-shaped!(
-    assigning_to_a_volatile_object_has_unqualified_result,
-    "volatile int x; void f(void) { x = 1; }",
-    vec![lv(Ty::vol(Ty::Int)), rv(Ty::Int), rv(Ty::Int)]
-);
-
-shaped!(
-    assignment_converts_the_right_operand_to_the_left_operands_type,
-    "int x; void f(void) { x = 3.5; }",
-    vec![lv(Ty::Int), rv(Ty::Double).then(FloatingToInteger, Ty::Int), rv(Ty::Int)]
-);
-
-shaped!(
-    zero_is_a_null_pointer_constant,
-    "int *p; void f(void) { p = 0; }",
-    vec![lv(Ty::ptr(Ty::Int)), rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int)),]
-);
-
-rejects_shaped!(
-    assigning_an_incompatible_pointer_is_rejected,
-    "char *p; int *q; void f(void) { q = p; }",
-    |u| Diagnostic::AssignmentIncompatibleTypes(to, from)
-        if *to == u.symbol_ty("q") && *from == u.symbol_ty("p"),
-    vec![
-        lv(Ty::ptr(Ty::Int)),
-        lv(Ty::ptr(Ty::Char)).then(LValueToRValue, Ty::ptr(Ty::Char)),
-        none(),
-    ]
-);
-
-rejects_shaped!(
-    assigning_away_const_through_a_pointer_is_rejected,
-    "const char *p; char *q; void f(void) { q = p; }",
-    Diagnostic::AssignmentDiscardedQualifiers(_, _),
-    vec![
-        lv(Ty::ptr(Ty::Char)),
-        lv(Ty::ptr(Ty::konst(Ty::Char))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Char))),
-        none(),
-    ]
-);
-
-shaped!(
-    assigning_a_pointer_that_gains_const_is_accepted,
-    "char *p; const char *q; void f(void) { q = p; }",
-    vec![
-        lv(Ty::ptr(Ty::konst(Ty::Char))),
-        lv(Ty::ptr(Ty::Char))
-            .then(LValueToRValue, Ty::ptr(Ty::Char))
-            .then(PointerConversion, Ty::ptr(Ty::konst(Ty::Char))),
-        rv(Ty::ptr(Ty::konst(Ty::Char))),
-    ]
-);
-
-shaped!(
-    a_compatible_structure_may_be_assigned,
-    "struct S { int a; } x, y; void f(void) { x = y; }",
-    vec![lv(Ty::strukt("S")), lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::strukt("S")),]
-);
-
-rejects_shaped!(
-    assigning_to_an_rvalue_is_rejected,
-    "void f(void) { 1 = 1; }",
-    Diagnostic::AssignToRValue,
-    vec![rv(Ty::Int), rv(Ty::Int), none()]
-);
-
-rejects_shaped!(
-    assigning_to_a_const_variable_is_rejected,
-    "void f(void) { const int x; x = 1; }",
-    Diagnostic::ConstAssignment(_),
-    vec![lv(Ty::konst(Ty::Int)), rv(Ty::Int), none()]
-);
-
-// ---- 6.5.7 initialization ---------------------------------------------
-
-shaped!(initializing_with_a_constant_keeps_its_type, "void f(void) { int x = 1; }", vec![rv(Ty::Int)]);
-
-shaped!(
-    initialization_converts_the_initializer_to_the_declared_type,
-    "void f(void) { int x = 3.5; }",
-    vec![rv(Ty::Double).then(FloatingToInteger, Ty::Int)]
-);
-
-shaped!(
-    zero_initializes_a_pointer_as_a_null_pointer_constant,
-    "void f(void) { int *p = 0; }",
-    vec![rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int))]
-);
-
-rejects_shaped!(
-    initializing_a_pointer_with_a_double_is_rejected,
-    "void f(void) { int *p = 3.5; }",
-    |u| Diagnostic::InitIncompatibleTypes(to, from)
-        if *to == u.symbol_ty("p") && *from == u.prim("double"),
-    vec![rv(Ty::Double)]
-);
-
-rejects_shaped!(
-    initializing_with_an_incompatible_pointer_is_rejected,
-    "void f(void) { char *p; int *q = p; }",
-    |u| Diagnostic::InitIncompatibleTypes(to, from)
-        if *to == u.symbol_ty("q") && *from == u.symbol_ty("p"),
-    vec![lv(Ty::ptr(Ty::Char)).then(LValueToRValue, Ty::ptr(Ty::Char))]
-);
-
-rejects_shaped!(
-    initializing_away_const_through_a_pointer_is_rejected,
-    "void f(void) { const char *p; char *q = p; }",
-    Diagnostic::InitDiscardedQualifiers(_, _),
-    vec![lv(Ty::ptr(Ty::konst(Ty::Char))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Char))),]
-);
-
-shaped!(
-    initializing_a_pointer_that_gains_const_is_accepted,
-    "void f(void) { char *p; const char *q = p; }",
-    vec![
-        lv(Ty::ptr(Ty::Char))
-            .then(LValueToRValue, Ty::ptr(Ty::Char))
-            .then(PointerConversion, Ty::ptr(Ty::konst(Ty::Char))),
-    ]
-);
-
-// ---- 6.5.7 array and scalar initializer lists -----------------------------
-
-shaped!(array_initializer_types_each_element, "void f(void) { int a[3] = {1,2,3}; }", ints(5));
-
-shaped!(array_initializer_may_have_fewer_elements_than_declared, "void f(void) { int a[3] = {1,2}; }", ints(4));
-
-rejects_shaped!(
-    array_initializer_with_too_many_elements_is_rejected,
-    "void f(void) { int a[2] = {1,2,3}; }",
-    Diagnostic::ArrayInitTooLong,
-    ints(4)
-);
-
-shaped!(incomplete_array_size_is_inferred_from_initializer, "void f(void) { int a[] = {1,2,3}; }", ints(3));
-
-shaped!(scalar_initializer_may_be_wrapped_in_braces, "void f(void) { int x = {1}; }", ints(1));
-
-rejects_shaped!(
-    scalar_initializer_with_too_many_elements_is_rejected,
-    "void f(void) { int x = {1,2}; }",
-    Diagnostic::ArrayInitTooLong,
-    ints(1)
-);
-
-shaped!(nested_array_initializer_types_every_element, "void f(void) { int a[2][2] = {{1,2},{3,4}}; }", ints(8));
-
-// Regression test: an excess element in one inner list must not corrupt the
-// element type used for a later sibling list.
-rejects_shaped!(
-    excess_elements_in_a_nested_list_do_not_affect_sibling_lists,
-    "void f(void) { int a[2][2] = {{1,2,3},{4,5}}; }",
-    Diagnostic::ArrayInitTooLong,
-    ints(8)
-);
-
-shaped!(
-    array_initializer_converts_each_element_to_the_declared_type,
-    "void f(void) { int a[2] = {1, 3.5}; }",
-    vec![rv(Ty::Int), rv(Ty::Int), rv(Ty::Int), rv(Ty::Double).then(FloatingToInteger, Ty::Int),]
-);
-
-shaped!(
-    array_of_pointers_initializer_accepts_null_pointer_constants,
-    "void f(void) { int *a[2] = {0, 0}; }",
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)),
-        rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)),
-    ]
-);
-
-// ---- resolution failures do not cascade ----------------------------------
-
-rejects_shaped!(
-    an_undeclared_identifier_has_no_type,
-    "void f(void) { x; }",
-    Diagnostic::UndeclaredIdentifier(_),
-    vec![none()]
-);
-
-rejects_shaped!(
-    an_operand_without_a_type_is_reported_once,
-    "void f(void) { x + 1; }",
-    Diagnostic::UndeclaredIdentifier(_),
-    vec![none(), rv(Ty::Int), none()]
-);
-
-// ---- 6.3.2.1 array subscripting -------------------------------------------
-
-// 6.3.2.1 The expression E1[E2] is identical (by definition) to (*((E1)+(E2))).
-shaped!(
-    subscripting_an_array_designates_an_element,
-    "int a[3]; void f(void) { a[0]; }",
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)),
-        rv(Ty::Int),
-        lv(Ty::Int),
-    ]
-);
-
-shaped!(
-    subscripting_a_pointer_designates_the_object_it_points_to,
-    "int *p; void f(void) { p[1]; }",
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), lv(Ty::Int),]
-);
-
-shaped!(
-    a_subscript_may_precede_the_array,
-    "int a[3]; void f(void) { 0[a]; }",
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        rv(Ty::Int),
-        lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)),
-        lv(Ty::Int),
-    ]
-);
-
-shaped!(
-    a_subscripted_element_is_assignable,
-    "int a[3]; void f(void) { a[0] = 1; }",
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)),
-        rv(Ty::Int),
-        lv(Ty::Int),
-        rv(Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    subscripting_an_array_of_arrays_designates_a_row,
-    "int a[2][3]; void f(void) { a[0]; }",
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        rv(Ty::Int),
-        rv(Ty::Int),
-        lv(Ty::arr(Ty::arr(Ty::Int, 3), 2)).then(ArrayToPointer, Ty::ptr(Ty::arr(Ty::Int, 3))),
-        rv(Ty::Int),
-        lv(Ty::arr(Ty::Int, 3)),
-    ]
-);
-
-rejects_shaped!(
-    subscripting_a_structure_is_rejected,
-    "struct S { int x; } s; void f(void) { s[0]; }",
-    Diagnostic::InvalidOperand,
-    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), none(),]
-);
-
-// ---- 6.3.2.3 structure and union members ----------------------------------
-
-// 6.2.2.1 Except when it is the operand of the sizeof operator, the unary & operator, the ++
-// operator, the -- operator, or the left operand of the . operator or an assignment operator,
-// an lvalue that does not have array type is converted to the value stored in the designated
-// object (and is no longer an lvalue).
-
-shaped!(
-    a_member_of_a_structure_lvalue_is_an_lvalue,
-    "struct S { int x; } s; void f(void) { s.x; }",
-    vec![lv(Ty::strukt("S")), lv(Ty::Int)]
-);
-
-shaped!(
-    a_member_reached_through_a_pointer_is_an_lvalue,
-    "struct S { int x; } *p; void f(void) { p->x; }",
-    vec![lv(Ty::ptr(Ty::strukt("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt("S"))), lv(Ty::Int),]
-);
-
-shaped!(
-    a_union_member_has_the_type_of_the_named_member,
-    "union U { int x; double y; } u; void f(void) { u.y; }",
-    vec![lv(Ty::union("U")), lv(Ty::Double)]
-);
-
-// 6.3.2.3 The value is that of the named member, and is an lvalue if the first expression is
-// an lvalue.
-shaped!(
-    a_member_of_an_rvalue_structure_is_an_rvalue,
-    "struct S { int x; }; struct S g(void); void f(void) { g().x; }",
-    vec![
-        rv(Ty::func0(Ty::strukt("S"))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt("S")))),
-        rv(Ty::strukt("S")),
-        rv(Ty::Int),
-    ]
-);
-
-rejects_shaped!(
-    assigning_to_a_member_of_an_rvalue_structure_is_rejected,
-    "struct S { int x; }; struct S g(void); void f(void) { g().x = 1; }",
-    Diagnostic::AssignToRValue,
-    vec![
-        rv(Ty::func0(Ty::strukt("S"))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt("S")))),
-        rv(Ty::strukt("S")),
-        rv(Ty::Int),
-        rv(Ty::Int),
-        none(),
-    ]
-);
-
-// 6.3.2.3 If the first expression is a pointer to a qualified type, the value has the
-// so-qualified version of the type of the designated member.
-reject!(
-    assigning_to_a_member_of_a_const_structure_is_rejected,
-    "struct S { int x; }; void f(void) { const struct S s; s.x = 1; }"
-);
-
-reject!(
-    assigning_to_a_member_through_a_pointer_to_const_is_rejected,
-    "struct S { int x; }; void f(void) { const struct S *p; p->x = 1; }"
-);
-
-// 6.3.2.3 The first operand of the . operator shall have qualified or unqualified structure or
-// union type, and the second operand shall name a member of that type.
-rejects_shaped!(
-    a_dot_applied_to_a_pointer_is_rejected,
-    "struct S { int x; } *p; void f(void) { p.x; }",
-    Diagnostic::AccessNotStuctOrUnion(_),
-    vec![lv(Ty::ptr(Ty::strukt("S"))), none()]
-);
-
-rejects_shaped!(
-    a_dot_applied_to_an_enumeration_is_rejected,
-    "enum E { A }; enum E e; void f(void) { e.x; }",
-    Diagnostic::AccessNotStuctOrUnion(_),
-    vec![lv(Ty::enom("E")), none()]
-);
-
-rejects_shaped!(
-    a_member_that_the_structure_does_not_have_is_rejected,
-    "struct S { int x; } s; void f(void) { s.y; }",
-    Diagnostic::AccessNotMember(_, _),
-    vec![lv(Ty::strukt("S")), none()]
-);
-
-// 6.3.2.3 The first operand of the -> operator shall have type pointer to qualified or
-// unqualified structure or pointer to qualified or unqualified union.
-rejects_shaped!(
-    an_arrow_applied_to_a_structure_is_rejected,
-    "struct S { int x; } s; void f(void) { s->x; }",
-    Diagnostic::AccessNotPointer(_),
-    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
-);
-
-reject!(a_member_of_an_incomplete_structure_is_rejected, "struct S; struct S *p; void f(void) { p->x; }");
-
-// 6.3.2.3 If the first expression is a pointer to a qualified type, the value has the
-// so-qualified version of the type of the designated member.
-shaped!(
-    a_member_of_a_const_structure_is_const,
-    "struct S { int x; }; void f(void) { const struct S s; s.x; }",
-    vec![lv(Ty::konst(Ty::strukt("S"))), lv(Ty::konst(Ty::Int))]
-);
-
-shaped!(
-    a_member_reached_through_a_pointer_to_const_is_const,
-    "struct S { int x; }; void f(void) { const struct S *p; p->x; }",
-    vec![
-        lv(Ty::ptr(Ty::konst(Ty::strukt("S")))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::strukt("S")))),
-        lv(Ty::konst(Ty::Int)),
-    ]
-);
-
-shaped!(
-    a_member_of_a_volatile_structure_is_volatile,
-    "volatile struct S { int x; } s; void f(void) { s.x; }",
-    vec![lv(Ty::vol(Ty::strukt("S"))), lv(Ty::vol(Ty::Int))]
-);
-
-// ---- 6.3.2.4 postfix increment and decrement operators --------------------
-
-// 6.3.2.4 The result of the postfix ++ operator is the value of the operand.
-shaped!(
-    post_increment_yields_the_value_of_its_operand,
-    "int i; void f(void) { i++; }",
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]
-);
-
-shaped!(
-    post_decrement_yields_the_value_of_its_operand,
-    "double d; void f(void) { d--; }",
-    vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Double)]
-);
-
-shaped!(
-    post_increment_of_a_pointer_is_a_pointer,
-    "int *p; void f(void) { p++; }",
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int)),]
-);
-
-// 6.3.2.4 the operand is promoted for the addition, but the value of the result has the
-// type of the operand.
-shaped!(
-    post_increment_keeps_the_type_of_its_operand,
-    "char c; void f(void) { c++; }",
-    vec![
-        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int).result(IntegerConversion, Ty::Char),
-        rv(Ty::Char),
-    ]
-);
-
-// 6.3.2.4 The operand shall have qualified or unqualified scalar type and shall be a
-// modifiable lvalue.
-reject!(post_increment_of_an_rvalue_is_rejected, "void f(void) { 1++; }");
-
-reject!(post_increment_of_a_const_object_is_rejected, "void f(void) { const int i; i++; }");
-
-reject!(post_increment_of_an_array_is_rejected, "int a[3]; void f(void) { a++; }");
-
-rejects_shaped!(
-    post_increment_of_a_structure_is_rejected,
-    "struct S { int x; } s; void f(void) { s++; }",
-    Diagnostic::BadPostIncDec(_, _),
-    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
-);
-
-// 6.3.2.4 The value of the operand is incremented: see the discussion of additive operators,
-// which requires a pointer to an object type (6.3.6).
-rejects_shaped!(
-    post_increment_of_a_pointer_to_an_incomplete_type_is_rejected,
-    "struct S; struct S *p; void f(void) { p++; }",
-    Diagnostic::IncompleteType(_),
-    vec![lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))), none(),]
-);
-
-rejects_shaped!(
-    post_increment_of_a_pointer_to_void_is_rejected,
-    "void *p; void f(void) { p++; }",
-    Diagnostic::IncompleteType(_),
-    vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), none()]
-);
-
-reject!(post_increment_of_a_pointer_to_a_function_is_rejected, "void (*p)(void); void f(void) { p++; }");
-
-reject!(post_decrement_of_a_pointer_to_a_function_is_rejected, "void (*p)(void); void f(void) { p--; }");
-
-// ---- 6.3.3.1 prefix increment and decrement operators ---------------------
-
-shaped!(
-    pre_increment_yields_the_value_of_its_operand,
-    "int i; void f(void) { ++i; }",
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]
-);
-
-shaped!(
-    pre_decrement_yields_the_value_of_its_operand,
-    "double d; void f(void) { --d; }",
-    vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Double)]
-);
-
-shaped!(
-    pre_increment_of_a_pointer_is_a_pointer,
-    "int *p; void f(void) { ++p; }",
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int)),]
-);
-
-// 6.3.2.4 the operand is promoted for the addition, but the value of the result has the
-// type of the operand.
-shaped!(
-    pre_increment_keeps_the_type_of_its_operand,
-    "char c; void f(void) { ++c; }",
-    vec![
-        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int).result(IntegerConversion, Ty::Char),
-        rv(Ty::Char),
-    ]
-);
-
-// 6.3.3.1 The expression ++E is equivalent to (E += 1): its result is not an lvalue.
-rejects_shaped!(
-    assigning_to_a_pre_increment_is_rejected,
-    "int i; void f(void) { ++i = 1; }",
-    Diagnostic::AssignToRValue,
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int), none(),]
-);
-
-// 6.3.3.1 The operand shall have qualified or unqualified scalar type and shall be a
-// modifiable lvalue.
-reject!(pre_increment_of_an_rvalue_is_rejected, "void f(void) { ++1; }");
-
-reject!(pre_increment_of_a_const_object_is_rejected, "void f(void) { const int i; ++i; }");
-
-reject!(pre_increment_of_an_array_is_rejected, "int a[3]; void f(void) { ++a; }");
-
-rejects_shaped!(
-    pre_increment_of_a_structure_is_rejected,
-    "struct S { int x; } s; void f(void) { ++s; }",
-    Diagnostic::BadPostIncDec(_, _),
-    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]
-);
-
-rejects_shaped!(
-    pre_decrement_of_a_pointer_to_an_incomplete_type_is_rejected,
-    "struct S; struct S *p; void f(void) { --p; }",
-    Diagnostic::IncompleteType(_),
-    vec![lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))), none(),]
-);
-
-reject!(pre_increment_of_a_pointer_to_a_function_is_rejected, "void (*p)(void); void f(void) { ++p; }");
-
-reject!(pre_decrement_of_a_pointer_to_a_function_is_rejected, "void (*p)(void); void f(void) { --p; }");
-
-// ---- 6.3.5 multiplicative operators ---------------------------------------
-
-shaped!(multiplying_two_constants_stays_int, "void f(void) { 2 * 3; }", ints(3));
-
-shaped!(the_remainder_of_two_integers_is_an_integer, "void f(void) { 7 % 2; }", ints(3));
-
-shaped!(
-    multiplication_performs_the_usual_arithmetic_conversions,
-    "int i; double d; void f(void) { i * d; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Double),
-        lv(Ty::Double).then(LValueToRValue, Ty::Double),
-        rv(Ty::Double),
-    ]
-);
-
-// 6.3.5 Each of the operands shall have arithmetic type.
-rejects_shaped!(
-    multiplying_a_structure_is_rejected,
-    "struct S { int x; } s; void f(void) { s * 1; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), none(),]
-);
-
-rejects_shaped!(
-    multiplying_by_a_structure_is_rejected,
-    "struct S { int x; } s; void f(void) { 1 * s; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![rv(Ty::Int), lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none(),]
-);
-
-rejects_shaped!(
-    dividing_a_pointer_is_rejected,
-    "int *p; void f(void) { p / 2; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), none(),]
-);
-
-// 6.3.5 The operands of the % operator shall have integral type.
-rejects_shaped!(
-    a_remainder_with_a_floating_right_operand_is_rejected,
-    "void f(void) { 1 % 1.5; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![rv(Ty::Int), rv(Ty::Double), none()]
-);
-
-rejects_shaped!(
-    a_remainder_with_a_floating_left_operand_is_rejected,
-    "void f(void) { 1.5 % 1; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![rv(Ty::Double), rv(Ty::Int), none()]
-);
-
-// 6.3.5 In both operations, if the value of the second operand is zero, the behavior is
-// undefined: only a constant expression has to be diagnosed (6.4).
-shaped!(
-    a_floating_division_by_zero_is_accepted,
-    "void f(void) { 1 / 0.0; }",
-    vec![rv(Ty::Int).then(IntegerToFloating, Ty::Double), rv(Ty::Double), rv(Ty::Double),]
-);
-
-// ---- 6.3.7 bitwise shift operators ----------------------------------------
-
-shaped!(a_shift_of_two_constants_is_an_int, "void f(void) { 1 << 2; }", ints(3));
-
-// 6.3.7 the behavior is undefined only when the count is negative or greater than or equal to
-// the width in bits of the promoted left operand.
-shaped!(a_shift_count_below_the_width_of_the_promoted_left_operand_is_accepted, "void f(void) { 1 << 5; }", ints(3));
-
-// 6.3.7 The integral promotions are performed on each of the operands.
-shaped!(
-    the_left_operand_of_a_shift_is_promoted,
-    "char c; void f(void) { c << 1; }",
-    vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int), rv(Ty::Int),]
-);
-
-shaped!(
-    an_enumeration_may_be_shifted,
-    "enum E { A }; enum E e; void f(void) { e << 1; }",
-    vec![
-        lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")).then(IntegerPromotion, Ty::Int),
-        rv(Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.7 The type of the result is that of the promoted left operand: the usual arithmetic
-// conversions are not performed.
-shaped!(
-    a_shift_has_the_type_of_its_promoted_left_operand,
-    "int i; long l; void f(void) { i << l; }",
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::Long).then(LValueToRValue, Ty::Long), rv(Ty::Int),]
-);
-
-shaped!(
-    the_operands_of_a_shift_are_promoted_independently,
-    "unsigned u; void f(void) { u >> 1; }",
-    vec![lv(Ty::UInt).then(LValueToRValue, Ty::UInt), rv(Ty::Int), rv(Ty::UInt),]
-);
-
-// 6.3.7 Each of the operands shall have integral type.
-rejects_shaped!(
-    shifting_a_floating_left_operand_is_rejected,
-    "void f(void) { 1.5 << 1; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![rv(Ty::Double), rv(Ty::Int), none()]
-);
-
-rejects_shaped!(
-    shifting_by_a_floating_count_is_rejected,
-    "void f(void) { 1 << 1.5; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![rv(Ty::Int), rv(Ty::Double), none()]
-);
-
-// 6.3.7 the count is compared to the width in bits of the promoted left operand, not to the
-// width of the operand as written.
-shaped!(
-    a_char_left_operand_is_measured_after_its_promotion,
-    "char c; void f(void) { c << 10; }",
-    vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int), rv(Ty::Int),]
-);
-
-shaped!(
-    a_short_left_operand_is_measured_after_its_promotion,
-    "short s; void f(void) { s << 20; }",
-    vec![lv(Ty::Short).then(LValueToRValue, Ty::Short).then(IntegerPromotion, Ty::Int), rv(Ty::Int), rv(Ty::Int),]
-);
-
-// 6.3.7 The right operand shall be nonnegative and less than the width in bits of the promoted
-// left operand: an out-of-range constant count leaves the shift unresolved, so a constant
-// expression built on it is rejected rather than folded.
-// gcc: `enum E { A = 1 << 32 };` and `enum E { A = 1 >> -1 };` are both errors.
-reject!(a_shift_count_at_the_width_of_the_left_operand_is_rejected, "enum E { A = 1 << 32 };");
-
-reject!(a_negative_shift_count_is_rejected, "enum E { A = 1 >> -1 };");
-
-shaped!(
-    a_count_one_below_the_width_of_the_left_operand_is_accepted,
-    "int i; void f(void) { i << 31; }",
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int)]
-);
-
-// 6.3.7 the width that bounds the count is that of the left operand: the type of the count
-// itself does not bound it.
-shaped!(
-    the_type_of_the_count_does_not_bound_the_shift,
-    "int i; void f(void) { i << (short)20; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        rv(Ty::Int).then(IntegerConversion, Ty::Short),
-        rv(Ty::Short).then(IntegerPromotion, Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.7 The integral promotions are performed on each of the operands, whether or not the
-// count is a constant.
-shaped!(
-    a_shift_by_a_variable_count_promotes_its_operands,
-    "char c; int n; void f(void) { c << n; }",
-    vec![
-        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int),
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    an_enumeration_may_be_shifted_by_a_variable_count,
-    "enum E { A }; enum E e; int n; void f(void) { e << n; }",
-    vec![
-        lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")).then(IntegerPromotion, Ty::Int),
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-// A rejected shift converts nothing: the operands keep the types they were written with.
-rejects_shaped!(
-    a_rejected_shift_leaves_its_operands_unpromoted,
-    "enum E { A }; enum E e; void f(void) { e << 1.5; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")), rv(Ty::Double), none(),]
-);
-
-// ---- 6.3.8 relational operators ------------------------------------------
-
-// 6.3.8 both operands are pointers to qualified or unqualified versions of compatible object
-// types.
-shaped!(
-    pointers_to_compatible_object_types_may_be_ordered,
-    "int *p; int *q; void f(void) { p < q; }",
-    vec![
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    ordering_pointers_disregards_the_qualifiers_of_the_pointed_to_type,
-    "const int *p; int *q; void f(void) { p < q; }",
-    vec![
-        lv(Ty::ptr(Ty::konst(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Int))),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.8 both operands are pointers to qualified or unqualified versions of compatible incomplete
-// types.
-shaped!(
-    pointers_to_an_incomplete_structure_may_be_ordered,
-    "struct S; struct S *p; struct S *q; void f(void) { p >= q; }",
-    vec![
-        lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
-        lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.1.2.5 The void type comprises an empty set of values. it is an incomplete type that cannot be
-// completed.
-shaped!(
-    pointers_to_void_may_be_ordered,
-    "void *p; void *q; void f(void) { p > q; }",
-    vec![
-        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
-        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.1.2.5 Types are partitioned into object types, function types, and incomplete types: a
-// function type is neither of the two the constraint admits.
-rejects_shaped!(
-    pointers_to_functions_may_not_be_ordered,
-    "int (*p)(void); int (*q)(void); void f(void) { p < q; }",
-    Diagnostic::OrderedFunctionPointers(_, _),
-    vec![
-        lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))),
-        lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))),
-        none(),
-    ]
-);
-
-rejects_shaped!(
-    pointers_to_incompatible_types_may_not_be_ordered,
-    "int *p; unsigned *q; void f(void) { p < q; }",
-    Diagnostic::InvalidComparison(_, _),
-    vec![
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        lv(Ty::ptr(Ty::UInt)).then(LValueToRValue, Ty::ptr(Ty::UInt)),
-        none(),
-    ]
-);
-
-// 6.3.8 If both of the operands have arithmetic type, the usual arithmetic conversions are
-// performed. The result has type int.
-shaped!(
-    ordering_arithmetic_operands_performs_the_usual_arithmetic_conversions,
-    "int i; double d; void f(void) { i < d; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Double),
-        lv(Ty::Double).then(LValueToRValue, Ty::Double),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.2.2.1 an lvalue that has type "array of type" is converted to an expression that has type
-// "pointer to type" that points to the initial element of the array object.
-shaped!(
-    an_array_operand_of_an_ordering_decays_to_a_pointer,
-    "int a[3]; int *p; void f(void) { a < p; }",
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.5.4.2 For two array types to be compatible, both shall have compatible element types, and if
-// both size specifiers are present, they shall have the same value.
-// 6.1.2.5 An array type of unknown size is an incomplete type.
-shaped!(
-    pointers_to_compatible_incomplete_arrays_may_be_ordered,
-    "int (*p)[]; int (*q)[]; void f(void) { p < q; }",
-    vec![
-        lv(Ty::ptr(Ty::flex(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::flex(Ty::Int))),
-        lv(Ty::ptr(Ty::flex(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::flex(Ty::Int))),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.8 An array of unknown size is compatible with an array of known size, yet the two pointed
-// to types are neither both object types nor both incomplete types.
-rejects_shaped!(
-    a_pointer_to_an_incomplete_array_may_not_be_ordered_with_one_to_a_complete_array,
-    "int (*p)[]; int (*q)[3]; void f(void) { p < q; }",
-    Diagnostic::MixedCompletenessComparison(_, _),
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        lv(Ty::ptr(Ty::flex(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::flex(Ty::Int))),
-        lv(Ty::ptr(Ty::arr(Ty::Int, 3))).then(LValueToRValue, Ty::ptr(Ty::arr(Ty::Int, 3))),
-        none(),
-    ]
-);
-
-// 6.3.8 admits no null pointer constant, unlike 6.3.9 one operand is a pointer and the other is
-// a null pointer constant.
-rejects_shaped!(
-    a_pointer_may_not_be_ordered_with_a_null_pointer_constant,
-    "int *p; void f(void) { p > 0; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), none(),]
-);
-
-// 6.3.8 admits no pointer to void against a pointer to an object type, unlike 6.3.9 one operand
-// is a pointer to an object or incomplete type and the other is a pointer to a qualified or
-// unqualified version of void.
-rejects_shaped!(
-    a_pointer_to_void_may_not_be_ordered_with_a_pointer_to_an_object,
-    "void *v; int *p; void f(void) { v < p; }",
-    Diagnostic::InvalidComparison(_, _),
-    vec![
-        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        none(),
-    ]
-);
-
-// ---- 6.3.9 equality operators --------------------------------------------
-
-// 6.3.9 one operand is a pointer and the other is a null pointer constant.
-shaped!(
-    a_pointer_compared_to_a_null_pointer_constant_converts_the_constant,
-    "int *p; void f(void) { p == 0; }",
-    vec![
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    a_null_pointer_constant_may_be_the_left_operand,
-    "int *p; void f(void) { 0 != p; }",
-    vec![
-        rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.9 puts no restriction on the pointed to type of the pointer compared to a null pointer
-// constant.
-shaped!(
-    a_pointer_to_a_function_may_be_compared_to_a_null_pointer_constant,
-    "int (*p)(void); void f(void) { p == 0; }",
-    vec![
-        lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))),
-        rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::func0(Ty::Int))),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.9 one of the operands is a pointer to an object or incomplete type and the other has type
-// pointer to a qualified or unqualified version of void; the pointer to an object or incomplete
-// type is converted to the type of the other operand.
-shaped!(
-    an_object_pointer_compared_to_a_void_pointer_is_converted_to_void_pointer,
-    "void *v; int *p; void f(void) { v == p; }",
-    vec![
-        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)).then(PointerConversion, Ty::ptr(Ty::Void)),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    an_incomplete_pointer_compared_to_a_void_pointer_is_converted_to_void_pointer,
-    "struct S; struct S *p; void *v; void f(void) { p != v; }",
-    vec![
-        lv(Ty::ptr(Ty::strukt_incomplete("S")))
-            .then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S")))
-            .then(PointerConversion, Ty::ptr(Ty::Void)),
-        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
-        rv(Ty::Int),
-    ]
-);
-
-shaped!(
-    comparing_a_qualified_pointer_to_a_void_pointer_discards_its_qualifiers,
-    "void *v; const int *p; void f(void) { v == p; }",
-    vec![
-        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
-        lv(Ty::ptr(Ty::konst(Ty::Int)))
-            .then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Int)))
-            .then(PointerConversion, Ty::ptr(Ty::Void)),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.9 admits a pointer to an object or incomplete type against a pointer to void, never a
-// pointer to a function type.
-rejects_shaped!(
-    a_pointer_to_a_function_may_not_be_compared_to_a_void_pointer,
-    "void *v; int (*p)(void); void f(void) { v == p; }",
-    Diagnostic::InvalidComparison(_, _),
-    vec![
-        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
-        lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))),
-        none(),
-    ]
-);
-
-// ---- 6.3.10 to 6.3.12 bitwise AND, exclusive OR and inclusive OR ----------
-
-shaped!(a_bitwise_and_of_two_constants_is_an_int, "void f(void) { 6 & 3; }", ints(3));
-
-shaped!(a_bitwise_xor_of_two_constants_is_an_int, "void f(void) { 6 ^ 3; }", ints(3));
-
-shaped!(a_bitwise_or_of_two_constants_is_an_int, "void f(void) { 6 | 3; }", ints(3));
-
-// 6.3.10 The usual arithmetic conversions are performed on the operands.
-shaped!(
-    the_operands_of_a_bitwise_and_are_promoted,
-    "char c; void f(void) { c & c; }",
-    vec![
-        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int),
-        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.11 Unlike a shift, both operands meet at a common type.
-shaped!(
-    a_bitwise_xor_converts_its_operands_to_a_common_type,
-    "int i; unsigned u; void f(void) { i ^ u; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerConversion, Ty::UInt),
-        lv(Ty::UInt).then(LValueToRValue, Ty::UInt),
-        rv(Ty::UInt),
-    ]
-);
-
-shaped!(
-    a_bitwise_or_with_a_long_operand_meets_at_long,
-    "int i; long l; void f(void) { i | l; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerConversion, Ty::Long),
-        lv(Ty::Long).then(LValueToRValue, Ty::Long),
-        rv(Ty::Long),
-    ]
-);
-
-// 6.1.2.5 The type char, the signed and unsigned integer types, and the enumerated types are
-// collectively called integral types.
-shaped!(
-    an_enumeration_may_be_combined_bitwise,
-    "enum E { A }; enum E e; void f(void) { e & 1; }",
-    vec![
-        lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")).then(IntegerPromotion, Ty::Int),
-        rv(Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.10 Each of the operands shall have integral type.
-rejects_shaped!(
-    a_bitwise_and_with_a_floating_left_operand_is_rejected,
-    "void f(void) { 1.5 & 1; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![rv(Ty::Double), rv(Ty::Int), none()]
-);
-
-rejects_shaped!(
-    a_bitwise_xor_with_a_floating_right_operand_is_rejected,
-    "void f(void) { 1 ^ 1.5; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![rv(Ty::Int), rv(Ty::Double), none()]
-);
-
-rejects_shaped!(
-    a_bitwise_or_with_a_pointer_operand_is_rejected,
-    "int *p; void f(void) { p | 1; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), none(),]
-);
-
-rejects_shaped!(
-    combining_two_pointers_bitwise_is_rejected,
-    "int *p; void f(void) { p & p; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        none(),
-    ]
-);
-
-rejects_shaped!(
-    a_bitwise_and_with_a_structure_operand_is_rejected,
-    "struct S { int x; } s; void f(void) { s & 1; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), none(),]
-);
-
-// 6.2.2.1 An array operand is converted to a pointer to its first element before the operand is
-// tested: the pointer it becomes is not an integral type either.
-rejects_shaped!(
-    an_array_operand_of_a_bitwise_or_is_rejected_after_it_decays,
-    "char a[10]; void f(void) { a | 1; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        lv(Ty::arr(Ty::Char, 10)).then(ArrayToPointer, Ty::ptr(Ty::Char)),
-        rv(Ty::Int),
-        none(),
-    ]
-);
-
-// A rejected operation converts nothing: the operands keep the types they were written with.
-rejects_shaped!(
-    a_rejected_bitwise_and_leaves_its_operands_unpromoted,
-    "enum E { A }; enum E e; void f(void) { e & 1.5; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")), rv(Ty::Double), none(),]
-);
-
-// ---- 6.3.15 conditional operator ------------------------------------------
-
-// 6.3.15 If both the operands have pointer type, the result type is a pointer to a type that has
-// the composite type (6.1.2.6) of the two types pointed to.
-shaped!(
-    a_conditional_of_two_pointers_to_the_same_type_keeps_that_type,
-    "int *p, *q; void f(int c) { c ? p : q; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        rv(Ty::ptr(Ty::Int)),
-    ]
-);
-
-// 6.1.2.6 If one type is an array of known size, the composite type is an array of that size.
-shaped!(
-    a_conditional_of_pointers_to_array_takes_the_known_size,
-    "int a[3]; extern int b[]; void f(int c) { c ? &a : &b; }",
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        lv(Ty::arr(Ty::Int, 3)),
-        rv(Ty::ptr(Ty::arr(Ty::Int, 3))),
-        lv(Ty::flex(Ty::Int)),
-        rv(Ty::ptr(Ty::flex(Ty::Int))),
-        rv(Ty::ptr(Ty::arr(Ty::Int, 3))),
-    ]
-);
-
-shaped!(
-    a_conditional_of_pointers_to_unsized_arrays_stays_unsized,
-    "extern int b[]; extern int d[]; void f(int c) { c ? &b : &d; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        lv(Ty::flex(Ty::Int)),
-        rv(Ty::ptr(Ty::flex(Ty::Int))),
-        lv(Ty::flex(Ty::Int)),
-        rv(Ty::ptr(Ty::flex(Ty::Int))),
-        rv(Ty::ptr(Ty::flex(Ty::Int))),
-    ]
-);
-
-// 6.1.2.6 If only one type is a function type with a parameter type list, the composite type is a
-// function prototype with the parameter type list.
-shaped!(
-    a_conditional_of_function_pointers_keeps_the_parameter_type_list,
-    "int g(int); int h(); void f(int c) { c ? g : h; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
-        rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))),
-        rv(Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))),
-    ]
-);
-
-// 6.3.15 the result type is a pointer to a type qualified with all the type qualifiers of the types
-// pointed-to by both operands.
-shaped!(
-    a_conditional_of_pointers_unions_the_qualifiers_of_the_pointed_to_types,
-    "volatile int *vp; const int *cp; void f(int c) { c ? vp : cp; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        lv(Ty::ptr(Ty::vol(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::vol(Ty::Int))),
-        lv(Ty::ptr(Ty::konst(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Int))),
-        rv(Ty::ptr(Ty::konst(Ty::vol(Ty::Int)))),
-    ]
-);
-
-// 6.1.2.6 These rules apply recursively to the types from which the two types are derived.
-shaped!(
-    the_composite_type_is_built_recursively,
-    "int (*x[])(int); int (*y[])(); void f(int c) { c ? &x : &y; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        lv(Ty::flex(Ty::ptr(Ty::func(Ty::Int, [Ty::Int])))),
-        rv(Ty::ptr(Ty::flex(Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))))),
-        lv(Ty::flex(Ty::ptr(Ty::noproto(Ty::Int)))),
-        rv(Ty::ptr(Ty::flex(Ty::ptr(Ty::noproto(Ty::Int))))),
-        rv(Ty::ptr(Ty::flex(Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))))),
-    ]
-);
-
-// 6.3.15 If both the second and third operands have arithmetic type, the usual arithmetic
-// conversions are performed to bring them to a common type, and the result has that type.
-shaped!(
-    a_conditional_of_arithmetic_operands_meets_at_a_common_type,
-    "int i; double d; void f(int c) { c ? i : d; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Double),
-        lv(Ty::Double).then(LValueToRValue, Ty::Double),
-        rv(Ty::Double),
-    ]
-);
-
-// 6.3.15 If both the operands have structure or union type, the result has that type.
-shaped!(
-    a_conditional_of_two_structures_keeps_the_structure_type,
-    "struct S { int x; } s, t; void f(int c) { c ? s : t; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
-        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
-        rv(Ty::strukt("S")),
-    ]
-);
-
-// 6.2.2.1 If the lvalue has qualified type, the value has the unqualified version of the type
-// of the lvalue: a qualified operand still meets an unqualified one under 6.3.15.
-shaped!(
-    a_conditional_of_a_const_and_a_plain_structure_keeps_the_structure_type,
-    "struct S { int x; }; const struct S s; struct S t; void f(int c) { c ? s : t; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        lv(Ty::konst(Ty::strukt("S"))).then(LValueToRValue, Ty::strukt("S")),
-        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
-        rv(Ty::strukt("S")),
-    ]
-);
-
-shaped!(
-    a_conditional_of_a_volatile_and_a_plain_union_keeps_the_union_type,
-    "union U { int x; }; volatile union U u; union U v; void f(int c) { c ? u : v; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        lv(Ty::vol(Ty::union("U"))).then(LValueToRValue, Ty::union("U")),
-        lv(Ty::union("U")).then(LValueToRValue, Ty::union("U")),
-        rv(Ty::union("U")),
-    ]
-);
-
-// 6.3.15 If both the operands have void type, the result has void type.
-shaped!(
-    a_conditional_of_two_void_operands_is_void,
-    "void g(void); void h(void); void f(int c) { c ? g() : h(); }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        rv(Ty::func0(Ty::Void)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Void))),
-        rv(Ty::Void),
-        rv(Ty::func0(Ty::Void)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Void))),
-        rv(Ty::Void),
-        rv(Ty::Void),
-    ]
-);
-
-// 6.3.15 If one operand is a null pointer constant, the result has the type of the other operand.
-shaped!(
-    a_conditional_with_a_null_pointer_constant_takes_the_other_pointer_type,
-    "int *p; void f(int c) { c ? p : 0; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)),
-        rv(Ty::ptr(Ty::Int)),
-    ]
-);
-
-// 6.3.15 If one operand is a pointer to void, the other operand is converted to that type.
-shaped!(
-    a_conditional_of_a_void_pointer_and_an_object_pointer_is_a_void_pointer,
-    "void *vp; int *p; void f(int c) { c ? vp : p; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)).then(PointerConversion, Ty::ptr(Ty::Void)),
-        rv(Ty::ptr(Ty::Void)),
-    ]
-);
-
-// 6.1.2.6 If both types have parameter type lists, the type of each parameter in the composite
-// parameter type list is the composite type of the corresponding parameters.
-shaped!(
-    a_composite_parameter_list_composes_each_parameter,
-    "int g(int (*)[3]); int h(int (*)[]); void f(int c) { c ? g : h; }",
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        rv(Ty::func(Ty::Int, [Ty::ptr(Ty::arr(Ty::Int, 3))]))
-            .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::arr(Ty::Int, 3))]))),
-        rv(Ty::func(Ty::Int, [Ty::ptr(Ty::flex(Ty::Int))]))
-            .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::flex(Ty::Int))]))),
-        rv(Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::arr(Ty::Int, 3))]))),
-    ]
-);
-
-shaped!(
-    a_conditional_of_two_unspecified_functions_stays_unspecified,
-    "int g(); int h(); void f(int c) { c ? g : h; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))),
-        rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))),
-        rv(Ty::ptr(Ty::noproto(Ty::Int))),
-    ]
-);
-
-shaped!(
-    a_composite_prototype_keeps_the_ellipsis,
-    "int g(int, ...); int h(int, ...); void f(int c) { c ? g : h; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        rv(Ty::func_variadic(Ty::Int, [Ty::Int]))
-            .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
-        rv(Ty::func_variadic(Ty::Int, [Ty::Int]))
-            .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
-        rv(Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))),
-    ]
-);
-
-shaped!(
-    the_return_type_of_a_composite_function_is_composite,
-    "int (*g(void))[3]; int (*h(void))[]; void f(int c) { c ? g : h; }",
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        rv(Ty::func0(Ty::ptr(Ty::arr(Ty::Int, 3))))
-            .then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::ptr(Ty::arr(Ty::Int, 3))))),
-        rv(Ty::func0(Ty::ptr(Ty::flex(Ty::Int))))
-            .then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::ptr(Ty::flex(Ty::Int))))),
-        rv(Ty::ptr(Ty::func0(Ty::ptr(Ty::arr(Ty::Int, 3))))),
-    ]
-);
-
-shaped!(
-    a_null_pointer_constant_may_be_the_second_operand,
-    "int *p; void f(int c) { c ? 0 : p; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        rv(Ty::ptr(Ty::Int)),
-    ]
-);
-
-shaped!(
-    a_void_pointer_may_be_the_third_operand,
-    "void *vp; int *p; void f(int c) { c ? p : vp; }",
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)).then(PointerConversion, Ty::ptr(Ty::Void)),
-        lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)),
-        rv(Ty::ptr(Ty::Void)),
-    ]
-);
-
-// ========================================================================
-// coverage — logical operators, comma operator, compound assignment,
-// and error branches of equality / conditional / subscript / sizeof
-// ========================================================================
-
-// ---- 6.3.13 logical AND operator / 6.3.14 logical OR operator -----------
-
-// 6.3.13 The result of && (6.3.14 of ||) has type int.
-shaped!(a_logical_and_of_two_constants_is_an_int, "void f(void) { 1 && 2; }", ints(3));
-
-shaped!(a_logical_or_of_two_constants_is_an_int, "void f(void) { 0 || 1; }", ints(3));
-
-// 6.3.13 the operands are not brought to a common type: each is compared against 0 in place.
-shaped!(
-    the_operands_of_a_logical_and_are_not_converted_to_a_common_type,
-    "double d; int *p; void f(void) { d && p; }",
-    vec![
-        lv(Ty::Double).then(LValueToRValue, Ty::Double),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.2.2.1 an array operand of a logical operator decays to a pointer first.
-shaped!(
-    an_array_operand_of_a_logical_or_decays_to_a_pointer,
-    "int a[3]; void f(void) { a || 0; }",
-    vec![
-        rv(Ty::Int),
-        rv(Ty::Int),
-        lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)),
-        rv(Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.13 Each of the operands shall have scalar type.
-rejects_shaped!(
-    a_logical_and_with_a_structure_left_operand_is_rejected,
-    "struct S { int x; } s; void f(void) { s && 1; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), none(),]
-);
-
-rejects_shaped!(
-    a_logical_or_with_a_structure_right_operand_is_rejected,
-    "struct S { int x; } s; void f(void) { 1 || s; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![rv(Ty::Int), lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none(),]
-);
-
-// ---- 6.3.17 comma operator --------------------------------------------
-
-// 6.3.17 The left operand is evaluated as a void expression; the result has the type and
-// value of the right operand and is not an lvalue.
-shaped!(
-    a_comma_expression_has_the_type_of_its_right_operand,
-    "double d; int i; void f(void) { d, i; }",
-    vec![
-        lv(Ty::Double).then(LValueToRValue, Ty::Double).then(ToVoid, Ty::Void),
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.17 every operand but the last is discarded to void.
-shaped!(
-    every_operand_but_the_last_of_a_comma_is_discarded_to_void,
-    "void f(void) { 1, 2, 3; }",
-    vec![rv(Ty::Int).then(ToVoid, Ty::Void), rv(Ty::Int).then(ToVoid, Ty::Void), rv(Ty::Int), rv(Ty::Int),]
-);
-
-// ---- 6.3.16.2 compound assignment: += and -= -------------------------
-
-// 6.3.16.2 the left operand has arithmetic type and the right has arithmetic type.
-shaped!(
-    an_additive_assignment_of_an_int_yields_an_int,
-    "int i; void f(void) { i += 1; }",
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int)]
-);
-
-// 6.3.16.2 E1 op= E2 is E1 = E1 op (E2): E1 op E2 is computed under the usual arithmetic
-// conversions and the result is converted back to the type of E1.
-shaped!(
-    an_additive_assignment_converts_the_result_back_to_the_left_operand_type,
-    "int i; void f(void) { i += 1.5; }",
-    vec![
-        lv(Ty::Int)
-            .then(LValueToRValue, Ty::Int)
-            .then(IntegerToFloating, Ty::Double)
-            .result(FloatingToInteger, Ty::Int),
-        rv(Ty::Double),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.16.2 the left operand is a pointer to an object type and the right has integral type.
-shaped!(
-    an_additive_assignment_to_a_pointer_stays_a_pointer,
-    "int *p; void f(void) { p += 2; }",
-    vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), rv(Ty::ptr(Ty::Int)),]
-);
-
-// 6.3.16 the assignment expression has the unqualified type of the left operand.
-shaped!(
-    an_additive_assignment_to_a_volatile_operand_has_unqualified_type,
-    "volatile int i; void f(void) { i += 1; }",
-    vec![lv(Ty::vol(Ty::Int)).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int),]
-);
-
+accept!(the_address_of_a_dereferenced_pointer_to_an_incomplete_type_is_accepted, "struct S; struct S *p; struct S *f(void) { return &*p; }");
+accept!(a_dereferenced_pointer_is_assignable, "int *p; void f(void) { *p = 1; }");
+accept!(indirection_on_an_array_designates_its_first_element, "int a[3]; void f(void) { *a = 1; }");
+accept!(indirection_on_a_function_designator_designates_the_function, "int g(void); void f(void) { (*g)(); }");
 accept!(a_subtractive_assignment_to_a_pointer_is_accepted, "int *p; void f(void) { p -= 1; }");
-
-reject!(an_additive_assignment_with_a_pointer_right_operand_is_rejected, "int *p; int i; void f(void) { i += p; }");
-
-reject!(a_subtractive_assignment_of_two_pointers_is_rejected, "int *p; int *q; void f(void) { p -= q; }");
-
-reject!(
-    an_additive_assignment_to_a_pointer_to_an_incomplete_type_is_rejected,
-    "struct S; struct S *p; void f(void) { p += 1; }"
-);
-
-reject!(an_additive_assignment_to_a_void_pointer_is_rejected, "void *p; void f(void) { p += 1; }");
-
-reject!(an_additive_assignment_to_a_const_operand_is_rejected, "void f(void) { const int i; i += 1; }");
-
-reject!(an_additive_assignment_to_an_rvalue_is_rejected, "void f(void) { 1 += 1; }");
-
-// ---- 6.3.16.2 compound assignment: *= /= %= <<= >>= &= |= ^= ---------
-
-shaped!(
-    a_multiplicative_assignment_of_an_int_yields_an_int,
-    "int i; void f(void) { i *= 2; }",
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int)]
-);
-
-shaped!(
-    a_multiplicative_assignment_converts_the_result_back_to_the_left_operand_type,
-    "int i; void f(void) { i *= 1.5; }",
-    vec![
-        lv(Ty::Int)
-            .then(LValueToRValue, Ty::Int)
-            .then(IntegerToFloating, Ty::Double)
-            .result(FloatingToInteger, Ty::Int),
-        rv(Ty::Double),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.16.2 a narrower left operand is promoted for the operation and the result narrows back.
-shaped!(
-    a_bitwise_assignment_promotes_the_left_operand_and_narrows_the_result,
-    "char c; void f(void) { c &= 1; }",
-    vec![
-        lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int).result(IntegerConversion, Ty::Char),
-        rv(Ty::Int),
-        rv(Ty::Char),
-    ]
-);
-
-// 6.3.7 a shift keeps the type of its promoted left operand; the count is independent.
-shaped!(
-    a_shift_assignment_has_the_type_of_its_left_operand,
-    "int i; long n; void f(void) { i <<= n; }",
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::Long).then(LValueToRValue, Ty::Long), rv(Ty::Int),]
-);
-
 accept!(a_division_assignment_is_accepted, "int i; void f(void) { i /= 2; }");
 accept!(a_remainder_assignment_is_accepted, "int i; void f(void) { i %= 2; }");
 accept!(a_right_shift_assignment_is_accepted, "unsigned u; void f(void) { u >>= 1; }");
 accept!(a_bitwise_or_assignment_is_accepted, "int i; void f(void) { i |= 1; }");
 accept!(a_bitwise_xor_assignment_is_accepted, "int i; void f(void) { i ^= 1; }");
-
-reject!(a_remainder_assignment_with_a_floating_left_operand_is_rejected, "double d; void f(void) { d %= 2; }");
-
-reject!(a_remainder_assignment_with_a_floating_right_operand_is_rejected, "int i; void f(void) { i %= 1.5; }");
-
-reject!(a_bitwise_assignment_with_a_floating_operand_is_rejected, "double d; void f(void) { d &= 1; }");
-
-reject!(a_multiplicative_assignment_to_a_pointer_is_rejected, "int *p; void f(void) { p *= 2; }");
-
-reject!(a_shift_assignment_by_a_floating_count_is_rejected, "int i; void f(void) { i <<= 1.5; }");
-
-reject!(a_shift_assignment_by_an_out_of_range_constant_count_is_rejected, "int i; void f(void) { i <<= 40; }");
-
-reject!(a_compound_assignment_to_a_const_operand_is_rejected, "void f(void) { const int i; i *= 2; }");
-
-reject!(a_compound_assignment_to_an_rvalue_is_rejected, "void f(void) { 1 &= 1; }");
-
-// ---- 6.3.9 equality operators: arithmetic operands and error branches ---
-
-shaped!(equality_of_two_arithmetic_operands_is_an_int, "void f(void) { 1 == 2; }", ints(3));
-
-shaped!(
-    comparing_two_compatible_object_pointers_is_an_int,
-    "int *p; int *q; void f(void) { p == q; }",
-    vec![
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        rv(Ty::Int),
-    ]
-);
-
-// 6.3.9 neither operand is arithmetic, a pointer, or a null pointer constant.
-rejects_shaped!(
-    comparing_structures_for_equality_is_rejected,
-    "struct S { int x; } s; void f(void) { s == s; }",
-    Diagnostic::InvalidBinaryOperand(_, _),
-    vec![
-        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
-        lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")),
-        none(),
-    ]
-);
-
-// 6.2.2.3 a null pointer constant may be an integer constant expression cast to void *.
 accept!(a_void_star_cast_of_zero_is_a_null_pointer_constant, "int *p; void f(void) { p == (void *)0; }");
-
-// 6.2.2.3 a zero cast to a type other than void * is not a null pointer constant.
 accept!(an_int_star_cast_of_zero_compares_as_a_plain_pointer, "int *p; void f(void) { p == (int *)0; }");
-
-// 6.2.2.3 a qualified void * cast of zero is not a null pointer constant.
 accept!(a_const_void_star_cast_of_zero_is_not_a_null_pointer_constant, "int *p; void f(void) { p == (void *const)0; }");
-
-// ---- 6.2.2.3 null pointer constants -----------------------------------
-
-// 6.2.2.3 An integral constant expression with the value 0, or such an expression cast to type
-// void *, is called a null pointer constant. If a null pointer constant is assigned to or
-// compared for equality to a pointer, the constant is converted to a pointer of that type.
-//
-// A pointer to function is where the two spellings part company: `(void *)0` is admitted only
-// as a null pointer constant, never as a plain void * operand (6.3.9, 6.3.15, 6.3.16.1 all
-// exclude a pointer to function from the void * rule).
-accept!(
-    a_void_star_cast_of_zero_may_be_assigned_to_a_pointer_to_function,
-    "void (*p)(void); void f(void) { p = (void *)0; }"
-);
-
-accept!(
-    a_void_star_cast_of_zero_may_be_compared_to_a_pointer_to_function,
-    "void (*p)(void); void f(void) { p == (void *)0; }"
-);
-
+accept!(a_void_star_cast_of_zero_may_be_assigned_to_a_pointer_to_function, "void (*p)(void); void f(void) { p = (void *)0; }");
+accept!(a_void_star_cast_of_zero_may_be_compared_to_a_pointer_to_function, "void (*p)(void); void f(void) { p == (void *)0; }");
 accept!(a_void_star_cast_of_zero_may_initialize_a_pointer_to_function, "void (*p)(void) = (void *)0;");
-
-accept!(
-    a_void_star_cast_of_zero_may_be_passed_to_a_pointer_to_function_parameter,
-    "void g(void (*)(void)); void f(void) { g((void *)0); }"
-);
-
-// 6.3.15 if one operand is a null pointer constant, the result has the type of the other operand.
-accept!(
-    a_void_star_cast_of_zero_may_be_a_conditional_operand_beside_a_pointer_to_function,
-    "void (*p)(void); void f(int c) { c ? p : (void *)0; }"
-);
-
-// 6.2.2.3 an integral constant expression with the value 0 is a null pointer constant whatever
-// integral type the cast gives it.
+accept!(a_void_star_cast_of_zero_may_be_passed_to_a_pointer_to_function_parameter, "void g(void (*)(void)); void f(void) { g((void *)0); }");
+accept!(a_void_star_cast_of_zero_may_be_a_conditional_operand_beside_a_pointer_to_function, "void (*p)(void); void f(int c) { c ? p : (void *)0; }");
 accept!(an_int_cast_of_zero_is_a_null_pointer_constant, "int *p; void f(void) { p = (int)0; }");
-
 accept!(a_char_cast_of_zero_is_a_null_pointer_constant, "int *p; void f(void) { p = (char)0; }");
-
 accept!(a_long_cast_of_zero_is_a_null_pointer_constant, "int *p; void f(void) { p = (long)0; }");
+accept!(sizeof_of_a_plain_member_beside_a_bit_field_is_accepted, "struct S { int x : 3; int y; } s; void f(void) { sizeof s.y; }");
 
-// 6.2.2.3 the value has to be 0: a cast of a nonzero constant is an ordinary integer.
-reject!(an_int_cast_of_one_is_not_a_null_pointer_constant, "int *p; void f(void) { p = (int)1; }");
-
-// 6.2.2.3 only one cast to void * is admitted: its operand shall be an integral constant
-// expression, and a pointer is not one.
-reject!(
-    a_void_star_cast_of_a_void_star_cast_of_zero_is_not_a_null_pointer_constant,
-    "void (*p)(void); void f(void) { p = (void *)(void *)0; }"
-);
-
-// ---- 6.3.15 conditional operator: error branches ---------------------
-
-// 6.3.15 The first operand shall have scalar type.
-rejects_shaped!(
-    a_conditional_with_a_non_scalar_controlling_expression_is_rejected,
-    "struct S { int x; } s; void f(void) { s ? 1 : 2; }",
-    Diagnostic::NotScalar(_),
-    vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), rv(Ty::Int), none(),]
-);
-
-// 6.3.15 an arithmetic operand and a non-null pointer operand do not meet.
-rejects_shaped!(
-    a_conditional_mixing_an_arithmetic_and_a_pointer_operand_is_rejected,
-    "int *p; void f(int c) { c ? 1 : p; }",
-    Diagnostic::IncompatibleOperands(_, _),
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        rv(Ty::Int),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        none(),
-    ]
-);
-
-// 6.3.15 two pointers to incompatible object types do not meet.
-rejects_shaped!(
-    a_conditional_between_incompatible_object_pointers_is_rejected,
-    "int *p; char *q; void f(int c) { c ? p : q; }",
-    Diagnostic::PointerMismatch(_, _),
-    vec![
-        lv(Ty::Int).then(LValueToRValue, Ty::Int),
-        lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)),
-        lv(Ty::ptr(Ty::Char)).then(LValueToRValue, Ty::ptr(Ty::Char)),
-        none(),
-    ]
-);
-
-// ---- 6.3.2.1 array subscripting: non-array operand -------------------
-
-// 6.3.2.1 one operand shall have type "pointer to object type".
-rejects_shaped!(
-    subscripting_a_non_pointer_is_rejected,
-    "void f(void) { int i; i[0]; }",
-    Diagnostic::SubscriptNotArray,
-    vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), none()]
-);
-
-// ---- 6.3.3.4 sizeof of a function designator ------------------------
-
-// 6.3.3.4 The sizeof operator shall not be applied to a function type.
-rejects_shaped!(
-    sizeof_of_a_function_designator_is_rejected,
-    "int g(void); void f(void) { sizeof g; }",
-    Diagnostic::SizeofFunction,
-    vec![rv(Ty::func0(Ty::Int)), none()]
-);
-
-// 6.3.3.4 The sizeof operator shall not be applied to an expression that has function type or
-// an incomplete type, to the parenthesized name of such a type, or to an lvalue that designates
-// a bit-field object.
+reject!(the_address_of_a_bit_field_is_rejected, "struct S { int x : 3; } s; void f(void) { &s.x; }");
+reject!(the_address_of_a_bit_field_reached_through_a_pointer_is_rejected, "struct S { int x : 3; } *p; void f(void) { &p->x; }");
+reject!(the_address_of_a_bit_field_of_a_union_is_rejected, "union U { int x : 3; } u; void f(void) { &u.x; }");
+reject!(the_address_of_a_register_object_is_rejected, "void f(void) { register int i; &i; }");
+reject!(indirection_on_an_integer_is_rejected, "void f(void) { int i; *i; }");
+reject!(indirection_on_a_structure_is_rejected, "struct S { int x; } s; void f(void) { *s; }");
+reject!(the_value_of_an_indirection_on_a_pointer_to_void_is_rejected, "void f(void *v) { int i = *v; }");
+reject!(assigning_through_a_pointer_to_void_is_rejected, "void f(void *v) { *v = 0; }");
+reject!(assigning_to_a_member_of_a_const_structure_is_rejected, "struct S { int x; }; void f(void) { const struct S s; s.x = 1; }");
+reject!(assigning_to_a_member_through_a_pointer_to_const_is_rejected, "struct S { int x; }; void f(void) { const struct S *p; p->x = 1; }");
+reject!(a_member_of_an_incomplete_structure_is_rejected, "struct S; struct S *p; void f(void) { p->x; }");
+reject!(post_increment_of_an_rvalue_is_rejected, "void f(void) { 1++; }");
+reject!(post_increment_of_a_const_object_is_rejected, "void f(void) { const int i; i++; }");
+reject!(post_increment_of_an_array_is_rejected, "int a[3]; void f(void) { a++; }");
+reject!(post_increment_of_a_pointer_to_a_function_is_rejected, "void (*p)(void); void f(void) { p++; }");
+reject!(post_decrement_of_a_pointer_to_a_function_is_rejected, "void (*p)(void); void f(void) { p--; }");
+reject!(pre_increment_of_an_rvalue_is_rejected, "void f(void) { ++1; }");
+reject!(pre_increment_of_a_const_object_is_rejected, "void f(void) { const int i; ++i; }");
+reject!(pre_increment_of_an_array_is_rejected, "int a[3]; void f(void) { ++a; }");
+reject!(pre_increment_of_a_pointer_to_a_function_is_rejected, "void (*p)(void); void f(void) { ++p; }");
+reject!(pre_decrement_of_a_pointer_to_a_function_is_rejected, "void (*p)(void); void f(void) { --p; }");
+reject!(a_shift_count_at_the_width_of_the_left_operand_is_rejected, "enum E { A = 1 << 32 };");
+reject!(a_negative_shift_count_is_rejected, "enum E { A = 1 >> -1 };");
+reject!(an_additive_assignment_with_a_pointer_right_operand_is_rejected, "int *p; int i; void f(void) { i += p; }");
+reject!(a_subtractive_assignment_of_two_pointers_is_rejected, "int *p; int *q; void f(void) { p -= q; }");
+reject!(an_additive_assignment_to_a_pointer_to_an_incomplete_type_is_rejected, "struct S; struct S *p; void f(void) { p += 1; }");
+reject!(an_additive_assignment_to_a_void_pointer_is_rejected, "void *p; void f(void) { p += 1; }");
+reject!(an_additive_assignment_to_a_const_operand_is_rejected, "void f(void) { const int i; i += 1; }");
+reject!(an_additive_assignment_to_an_rvalue_is_rejected, "void f(void) { 1 += 1; }");
+reject!(a_remainder_assignment_with_a_floating_left_operand_is_rejected, "double d; void f(void) { d %= 2; }");
+reject!(a_remainder_assignment_with_a_floating_right_operand_is_rejected, "int i; void f(void) { i %= 1.5; }");
+reject!(a_bitwise_assignment_with_a_floating_operand_is_rejected, "double d; void f(void) { d &= 1; }");
+reject!(a_multiplicative_assignment_to_a_pointer_is_rejected, "int *p; void f(void) { p *= 2; }");
+reject!(a_shift_assignment_by_a_floating_count_is_rejected, "int i; void f(void) { i <<= 1.5; }");
+reject!(a_compound_assignment_to_a_const_operand_is_rejected, "void f(void) { const int i; i *= 2; }");
+reject!(a_compound_assignment_to_an_rvalue_is_rejected, "void f(void) { 1 &= 1; }");
+reject!(a_void_star_cast_of_a_void_star_cast_of_zero_is_not_a_null_pointer_constant, "void (*p)(void); void f(void) { p = (void *)(void *)0; }");
 reject!(sizeof_of_a_bit_field_is_rejected, "struct S { int x : 3; } s; void f(void) { sizeof s.x; }");
-
-reject!(
-    sizeof_of_a_bit_field_reached_through_a_pointer_is_rejected,
-    "struct S { int x : 3; } *p; void f(void) { sizeof p->x; }"
-);
-
-// 6.3.3.4 only a bit-field member is excluded: a plain member of the same structure has a size.
-accept!(
-    sizeof_of_a_plain_member_beside_a_bit_field_is_accepted,
-    "struct S { int x : 3; int y; } s; void f(void) { sizeof s.y; }"
-);
-
-// ---- 6.3.2.2 function calls: a poisoned trailing argument -----------
-
+reject!(sizeof_of_a_bit_field_reached_through_a_pointer_is_rejected, "struct S { int x : 3; } *p; void f(void) { sizeof p->x; }");
 reject!(a_poisoned_variadic_argument_is_rejected, "void g(int, ...); void f(void) { g(1, missing); }");
+
+rejects_shaped!(an_array_operand_becomes_a_pointer_to_its_first_element, "char a[10]; void f(void) { -a; }", Diagnostic::InvalidUnary(_), vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Char, 10)).then(ArrayToPointer, Ty::ptr(Ty::Char)), none()]);
+rejects_shaped!(a_function_designator_becomes_a_pointer_to_function, "int g(); void f(void) { g + 1; }", Diagnostic::InvalidOperand, vec![rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))), rv(Ty::Int), none()]);
+rejects_shaped!(calling_a_prototype_with_too_many_arguments_is_rejected, "int g(int); void f(void) { g(1, 2); }", Diagnostic::TooManyArguments(1, 2), vec![rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))), rv(Ty::Int), rv(Ty::Int), none()]);
+rejects_shaped!(calling_a_prototype_with_too_few_arguments_is_rejected, "int g(int, int); void f(void) { g(1); }", Diagnostic::TooFewArguments(2, 1), vec![rv(Ty::func(Ty::Int, [Ty::Int, Ty::Int])) .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int, Ty::Int])),), rv(Ty::Int), none()]);
+rejects_shaped!(a_prototype_with_no_parameters_takes_no_argument, "int g(void); void f(void) { g(1); }", Diagnostic::TooManyArguments(0, 1), vec![rv(Ty::func0(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Int))), rv(Ty::Int), none()]);
+rejects_shaped!(a_variadic_call_still_needs_an_argument_for_each_named_parameter, "int g(int, ...); void f(void) { g(); }", Diagnostic::TooFewArguments(1, 0), vec![rv(Ty::func_variadic(Ty::Int, [Ty::Int])) .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))), none()]);
+rejects_shaped!(an_argument_incompatible_with_its_parameter_is_rejected, "int g(char *); void f(void) { g(1); }", Diagnostic::ArgumentIncompatibleTypes(1, _, _), vec![rv(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)])) .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))), rv(Ty::Int), none()]);
+rejects_shaped!(a_void_argument_is_rejected, "void v(void); int g(int); void f(void) { g(v()); }", Diagnostic::ArgumentIncompatibleTypes(1, _, _), vec![rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))), rv(Ty::func0(Ty::Void)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Void))), rv(Ty::Void), none()]);
+rejects_shaped!(calling_an_object_is_rejected, "double d; void f(void) { d(); }", Diagnostic::CallingNotFunction(_), vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), none()]);
+rejects_shaped!(calling_an_array_is_rejected, "int arr[3]; void f(void) { arr(); }", Diagnostic::CallingNotFunction(_), vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)), none()]);
+rejects_shaped!(calling_the_result_of_a_call_is_rejected, "int g(int); void f(void) { g(1)(2); }", Diagnostic::CallingNotFunction(_), vec![rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))), rv(Ty::Int), rv(Ty::Int), rv(Ty::Int), none()]);
+rejects_shaped!(calling_a_function_with_an_incomplete_return_type_is_rejected, "struct S; struct S g(void); void f(void) { g(); }", Diagnostic::CallingIncompleteReturn(_), vec![rv(Ty::func0(Ty::strukt_incomplete("S"))) .then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt_incomplete("S")))), none()]);
+rejects_shaped!(an_argument_without_a_type_does_not_cascade, "int g(int); void f(void) { g(x); }", Diagnostic::UndeclaredIdentifier(_), vec![rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))), none(), none()]);
+rejects_shaped!(assigning_to_an_address_is_rejected, "int i, *p; void f(void) { &i = p; }", Diagnostic::AssignToRValue, vec![lv(Ty::Int), rv(Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]);
+rejects_shaped!(the_address_of_a_constant_is_rejected, "void f(void) { &1; }", Diagnostic::RValueAddress(_), vec![rv(Ty::Int), none()]);
+rejects_shaped!(the_address_of_an_enumeration_constant_is_rejected, "enum E { A }; void f(void) { &A; }", Diagnostic::RValueAddress(_), vec![rv(Ty::Int), none()]);
+rejects_shaped!(minus_rejects_a_pointer, "int *p; void f(void) { -p; }", Diagnostic::InvalidUnary(_), vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]);
+rejects_shaped!(minus_rejects_a_structure, "struct S { int x; } s; void f(void) { -s; }", Diagnostic::InvalidUnary(_), vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]);
+rejects_shaped!(unary_plus_rejects_a_pointer, "int *p; void f(void) { +p; }", Diagnostic::InvalidUnary(_), vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]);
+rejects_shaped!(unary_plus_rejects_a_structure, "struct S { int x; } s; void f(void) { +s; }", Diagnostic::InvalidUnary(_), vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]);
+rejects_shaped!(a_complement_rejects_a_floating_operand, "void f(void) { double d; ~d; }", Diagnostic::InvalidUnary(_), vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), none()]);
+rejects_shaped!(a_complement_rejects_a_pointer, "int *p; void f(void) { ~p; }", Diagnostic::InvalidUnary(_), vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]);
+rejects_shaped!(a_logical_negation_rejects_a_structure, "struct S { int x; } s; void f(void) { !s; }", Diagnostic::InvalidUnary(_), vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]);
+rejects_shaped!(add_rejects_two_structures, "struct S { int x; } s; void f(void) { s + s; }", Diagnostic::InvalidOperand, vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]);
+rejects_shaped!(add_rejects_a_floating_index, "int *p; void f(void) { p + 1.5; }", Diagnostic::InvalidOperand, vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Double), none()]);
+rejects_shaped!(add_rejects_a_pointer_to_void, "void *p; void f(void) { p + 1; }", Diagnostic::InvalidOperand, vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), rv(Ty::Int), none()]);
+rejects_shaped!(add_rejects_a_pointer_to_an_incomplete_type, "struct S *p; void f(void) { p + 1; }", Diagnostic::InvalidOperand, vec![lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))), rv(Ty::Int), none()]);
+rejects_shaped!(cast_of_a_non_scalar_operand_is_rejected, "struct S { int a; } s; void f(void) { (int)s; }", Diagnostic::CastOfNonScalar, vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]);
+rejects_shaped!(cast_to_a_non_scalar_type_is_rejected, "struct S { int a; }; void f(void) { (struct S)1; }", Diagnostic::CastToNonScalar, vec![rv(Ty::Int), none()]);
+rejects_shaped!(cast_from_a_pointer_to_a_floating_type_is_rejected, "int *p; void f(void) { (double)p; }", Diagnostic::InvalidOperand, vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]);
+rejects_shaped!(cast_from_a_floating_type_to_a_pointer_is_rejected, "double d; void f(void) { (int *)d; }", Diagnostic::InvalidOperand, vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), none()]);
+rejects_shaped!(an_integer_minus_a_pointer_is_rejected, "int i; int *p; void f(void) { i - p; }", Diagnostic::InvalidOperand, vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]);
+rejects_shaped!(subtracting_pointers_to_an_incomplete_type_is_rejected, "struct S *p, *q; void f(void) { p - q; }", Diagnostic::InvalidOperand, vec![lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))), lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))), none()]);
+rejects_shaped!(subtracting_a_floating_index_is_rejected, "int *p; void f(void) { p - 1.5; }", Diagnostic::InvalidOperand, vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Double), none()]);
+rejects_shaped!(assigning_an_incompatible_pointer_is_rejected, "char *p; int *q; void f(void) { q = p; }", |u| Diagnostic::AssignmentIncompatibleTypes(to, from) if *to == u.symbol_ty("q") && *from == u.symbol_ty("p"), vec![lv(Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Char)).then(LValueToRValue, Ty::ptr(Ty::Char)), none()]);
+rejects_shaped!(assigning_away_const_through_a_pointer_is_rejected, "const char *p; char *q; void f(void) { q = p; }", Diagnostic::AssignmentDiscardedQualifiers(_, _), vec![lv(Ty::ptr(Ty::Char)), lv(Ty::ptr(Ty::konst(Ty::Char))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Char))), none()]);
+rejects_shaped!(assigning_to_an_rvalue_is_rejected, "void f(void) { 1 = 1; }", Diagnostic::AssignToRValue, vec![rv(Ty::Int), rv(Ty::Int), none()]);
+rejects_shaped!(assigning_to_a_const_variable_is_rejected, "void f(void) { const int x; x = 1; }", Diagnostic::ConstAssignment(_), vec![lv(Ty::konst(Ty::Int)), rv(Ty::Int), none()]);
+rejects_shaped!(initializing_a_pointer_with_a_double_is_rejected, "void f(void) { int *p = 3.5; }", |u| Diagnostic::InitIncompatibleTypes(to, from) if *to == u.symbol_ty("p") && *from == u.prim("double"), vec![rv(Ty::Double)]);
+rejects_shaped!(initializing_with_an_incompatible_pointer_is_rejected, "void f(void) { char *p; int *q = p; }", |u| Diagnostic::InitIncompatibleTypes(to, from) if *to == u.symbol_ty("q") && *from == u.symbol_ty("p"), vec![lv(Ty::ptr(Ty::Char)).then(LValueToRValue, Ty::ptr(Ty::Char))]);
+rejects_shaped!(initializing_away_const_through_a_pointer_is_rejected, "void f(void) { const char *p; char *q = p; }", Diagnostic::InitDiscardedQualifiers(_, _), vec![lv(Ty::ptr(Ty::konst(Ty::Char))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Char)))]);
+rejects_shaped!(array_initializer_with_too_many_elements_is_rejected, "void f(void) { int a[2] = {1,2,3}; }", Diagnostic::ArrayInitTooLong, ints(4));
+rejects_shaped!(scalar_initializer_with_too_many_elements_is_rejected, "void f(void) { int x = {1,2}; }", Diagnostic::ArrayInitTooLong, ints(1));
+rejects_shaped!(excess_elements_in_a_nested_list_do_not_affect_sibling_lists, "void f(void) { int a[2][2] = {{1,2,3},{4,5}}; }", Diagnostic::ArrayInitTooLong, ints(8));
+rejects_shaped!(an_undeclared_identifier_has_no_type, "void f(void) { x; }", Diagnostic::UndeclaredIdentifier(_), vec![none()]);
+rejects_shaped!(an_operand_without_a_type_is_reported_once, "void f(void) { x + 1; }", Diagnostic::UndeclaredIdentifier(_), vec![none(), rv(Ty::Int), none()]);
+rejects_shaped!(subscripting_a_structure_is_rejected, "struct S { int x; } s; void f(void) { s[0]; }", Diagnostic::InvalidOperand, vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), none()]);
+rejects_shaped!(assigning_to_a_member_of_an_rvalue_structure_is_rejected, "struct S { int x; }; struct S g(void); void f(void) { g().x = 1; }", Diagnostic::AssignToRValue, vec![rv(Ty::func0(Ty::strukt("S"))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt("S")))), rv(Ty::strukt("S")), rv(Ty::Int), rv(Ty::Int), none()]);
+rejects_shaped!(a_dot_applied_to_a_pointer_is_rejected, "struct S { int x; } *p; void f(void) { p.x; }", Diagnostic::AccessNotStuctOrUnion(_), vec![lv(Ty::ptr(Ty::strukt("S"))), none()]);
+rejects_shaped!(a_dot_applied_to_an_enumeration_is_rejected, "enum E { A }; enum E e; void f(void) { e.x; }", Diagnostic::AccessNotStuctOrUnion(_), vec![lv(Ty::enom("E")), none()]);
+rejects_shaped!(a_member_that_the_structure_does_not_have_is_rejected, "struct S { int x; } s; void f(void) { s.y; }", Diagnostic::AccessNotMember(_, _), vec![lv(Ty::strukt("S")), none()]);
+rejects_shaped!(an_arrow_applied_to_a_structure_is_rejected, "struct S { int x; } s; void f(void) { s->x; }", Diagnostic::AccessNotPointer(_), vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]);
+rejects_shaped!(post_increment_of_a_structure_is_rejected, "struct S { int x; } s; void f(void) { s++; }", Diagnostic::BadPostIncDec(_, _), vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]);
+rejects_shaped!(post_increment_of_a_pointer_to_an_incomplete_type_is_rejected, "struct S; struct S *p; void f(void) { p++; }", Diagnostic::IncompleteType(_), vec![lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))), none()]);
+rejects_shaped!(post_increment_of_a_pointer_to_void_is_rejected, "void *p; void f(void) { p++; }", Diagnostic::IncompleteType(_), vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), none()]);
+rejects_shaped!(assigning_to_a_pre_increment_is_rejected, "int i; void f(void) { ++i = 1; }", Diagnostic::AssignToRValue, vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int), none()]);
+rejects_shaped!(pre_increment_of_a_structure_is_rejected, "struct S { int x; } s; void f(void) { ++s; }", Diagnostic::BadPostIncDec(_, _), vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]);
+rejects_shaped!(pre_decrement_of_a_pointer_to_an_incomplete_type_is_rejected, "struct S; struct S *p; void f(void) { --p; }", Diagnostic::IncompleteType(_), vec![lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))), none()]);
+rejects_shaped!(multiplying_a_structure_is_rejected, "struct S { int x; } s; void f(void) { s * 1; }", Diagnostic::InvalidBinaryOperand(_, _), vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), none()]);
+rejects_shaped!(multiplying_by_a_structure_is_rejected, "struct S { int x; } s; void f(void) { 1 * s; }", Diagnostic::InvalidBinaryOperand(_, _), vec![rv(Ty::Int), lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]);
+rejects_shaped!(dividing_a_pointer_is_rejected, "int *p; void f(void) { p / 2; }", Diagnostic::InvalidBinaryOperand(_, _), vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), none()]);
+rejects_shaped!(a_remainder_with_a_floating_right_operand_is_rejected, "void f(void) { 1 % 1.5; }", Diagnostic::InvalidBinaryOperand(_, _), vec![rv(Ty::Int), rv(Ty::Double), none()]);
+rejects_shaped!(a_remainder_with_a_floating_left_operand_is_rejected, "void f(void) { 1.5 % 1; }", Diagnostic::InvalidBinaryOperand(_, _), vec![rv(Ty::Double), rv(Ty::Int), none()]);
+rejects_shaped!(shifting_a_floating_left_operand_is_rejected, "void f(void) { 1.5 << 1; }", Diagnostic::InvalidBinaryOperand(_, _), vec![rv(Ty::Double), rv(Ty::Int), none()]);
+rejects_shaped!(shifting_by_a_floating_count_is_rejected, "void f(void) { 1 << 1.5; }", Diagnostic::InvalidBinaryOperand(_, _), vec![rv(Ty::Int), rv(Ty::Double), none()]);
+rejects_shaped!(a_rejected_shift_leaves_its_operands_unpromoted, "enum E { A }; enum E e; void f(void) { e << 1.5; }", Diagnostic::InvalidBinaryOperand(_, _), vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")), rv(Ty::Double), none()]);
+rejects_shaped!(pointers_to_functions_may_not_be_ordered, "int (*p)(void); int (*q)(void); void f(void) { p < q; }", Diagnostic::OrderedFunctionPointers(_, _), vec![lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))), lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))), none()]);
+rejects_shaped!(pointers_to_incompatible_types_may_not_be_ordered, "int *p; unsigned *q; void f(void) { p < q; }", Diagnostic::InvalidComparison(_, _), vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::UInt)).then(LValueToRValue, Ty::ptr(Ty::UInt)), none()]);
+rejects_shaped!(a_pointer_to_an_incomplete_array_may_not_be_ordered_with_one_to_a_complete_array, "int (*p)[]; int (*q)[3]; void f(void) { p < q; }", Diagnostic::MixedCompletenessComparison(_, _), vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::ptr(Ty::flex(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::flex(Ty::Int))), lv(Ty::ptr(Ty::arr(Ty::Int, 3))).then(LValueToRValue, Ty::ptr(Ty::arr(Ty::Int, 3))), none()]);
+rejects_shaped!(a_pointer_may_not_be_ordered_with_a_null_pointer_constant, "int *p; void f(void) { p > 0; }", Diagnostic::InvalidBinaryOperand(_, _), vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), none()]);
+rejects_shaped!(a_pointer_to_void_may_not_be_ordered_with_a_pointer_to_an_object, "void *v; int *p; void f(void) { v < p; }", Diagnostic::InvalidComparison(_, _), vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]);
+rejects_shaped!(a_pointer_to_a_function_may_not_be_compared_to_a_void_pointer, "void *v; int (*p)(void); void f(void) { v == p; }", Diagnostic::InvalidComparison(_, _), vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))), none()]);
+rejects_shaped!(a_bitwise_and_with_a_floating_left_operand_is_rejected, "void f(void) { 1.5 & 1; }", Diagnostic::InvalidBinaryOperand(_, _), vec![rv(Ty::Double), rv(Ty::Int), none()]);
+rejects_shaped!(a_bitwise_xor_with_a_floating_right_operand_is_rejected, "void f(void) { 1 ^ 1.5; }", Diagnostic::InvalidBinaryOperand(_, _), vec![rv(Ty::Int), rv(Ty::Double), none()]);
+rejects_shaped!(a_bitwise_or_with_a_pointer_operand_is_rejected, "int *p; void f(void) { p | 1; }", Diagnostic::InvalidBinaryOperand(_, _), vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), none()]);
+rejects_shaped!(combining_two_pointers_bitwise_is_rejected, "int *p; void f(void) { p & p; }", Diagnostic::InvalidBinaryOperand(_, _), vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]);
+rejects_shaped!(a_bitwise_and_with_a_structure_operand_is_rejected, "struct S { int x; } s; void f(void) { s & 1; }", Diagnostic::InvalidBinaryOperand(_, _), vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), none()]);
+rejects_shaped!(an_array_operand_of_a_bitwise_or_is_rejected_after_it_decays, "char a[10]; void f(void) { a | 1; }", Diagnostic::InvalidBinaryOperand(_, _), vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Char, 10)).then(ArrayToPointer, Ty::ptr(Ty::Char)), rv(Ty::Int), none()]);
+rejects_shaped!(a_rejected_bitwise_and_leaves_its_operands_unpromoted, "enum E { A }; enum E e; void f(void) { e & 1.5; }", Diagnostic::InvalidBinaryOperand(_, _), vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")), rv(Ty::Double), none()]);
+rejects_shaped!(a_logical_and_with_a_structure_left_operand_is_rejected, "struct S { int x; } s; void f(void) { s && 1; }", Diagnostic::InvalidBinaryOperand(_, _), vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), none()]);
+rejects_shaped!(a_logical_or_with_a_structure_right_operand_is_rejected, "struct S { int x; } s; void f(void) { 1 || s; }", Diagnostic::InvalidBinaryOperand(_, _), vec![rv(Ty::Int), lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]);
+rejects_shaped!(comparing_structures_for_equality_is_rejected, "struct S { int x; } s; void f(void) { s == s; }", Diagnostic::InvalidBinaryOperand(_, _), vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), none()]);
+rejects_shaped!(a_conditional_with_a_non_scalar_controlling_expression_is_rejected, "struct S { int x; } s; void f(void) { s ? 1 : 2; }", Diagnostic::NotScalar(_), vec![lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int), rv(Ty::Int), none()]);
+rejects_shaped!(a_conditional_mixing_an_arithmetic_and_a_pointer_operand_is_rejected, "int *p; void f(int c) { c ? 1 : p; }", Diagnostic::IncompatibleOperands(_, _), vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), none()]);
+rejects_shaped!(a_conditional_between_incompatible_object_pointers_is_rejected, "int *p; char *q; void f(int c) { c ? p : q; }", Diagnostic::PointerMismatch(_, _), vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Char)).then(LValueToRValue, Ty::ptr(Ty::Char)), none()]);
+rejects_shaped!(subscripting_a_non_pointer_is_rejected, "void f(void) { int i; i[0]; }", Diagnostic::SubscriptNotArray, vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), none()]);
+rejects_shaped!(sizeof_of_a_function_designator_is_rejected, "int g(void); void f(void) { sizeof g; }", Diagnostic::SizeofFunction, vec![rv(Ty::func0(Ty::Int)), none()]);
+
+shaped!(a_constant_is_an_rvalue, "void f(void) { 1; }", vec![rv(Ty::Int)]);
+shaped!(an_identifier_is_an_lvalue, "int i; void f(void) { i; }", vec![lv(Ty::Int)]);
+shaped!(an_enumeration_constant_is_an_rvalue, "enum E { A }; void f(void) { A; }", vec![rv(Ty::Int)]);
+shaped!(a_string_literal_is_an_array_lvalue, "void f(void) { \"ab\"; }", vec![lv(Ty::arr(Ty::Char, 3))]);
+shaped!(an_operand_is_converted_to_the_value_it_designates, "int i; void f(void) { -i; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]);
+shaped!(a_char_operand_promotes_to_int, "char c; void f(void) { -c; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int)]);
+shaped!(a_short_operand_promotes_to_int, "short s; void f(void) { -s; }", vec![lv(Ty::Short).then(LValueToRValue, Ty::Short).then(IntegerPromotion, Ty::Int), rv(Ty::Int)]);
+shaped!(a_double_operand_is_left_alone, "double d; void f(void) { -d; }", vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Double)]);
+shaped!(both_operands_of_an_addition_promote, "char c; void f(void) { c + c; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int)]);
+shaped!(a_constant_carries_the_type_of_its_suffix, "void f(void) { 1; 1u; 1l; 1ul; 1.5f; 1.5; 1.5l; }", vec![rv(Ty::Int), rv(Ty::UInt), rv(Ty::Long), rv(Ty::ULong), rv(Ty::Float), rv(Ty::Double), rv(Ty::LDouble)]);
+shaped!(a_character_constant_is_an_int, "void f(void) { 'a'; }", vec![rv(Ty::Int)]);
+shaped!(two_constants_stay_int, "void f(void) { 1 + 2; }", ints(3));
+shaped!(an_integer_and_a_double_meet_at_double, "int i; double d; void f(void) { i + d; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Double), lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Double)]);
+shaped!(an_integer_and_a_float_meet_at_float, "float g; int i; void f(void) { g + i; }", vec![lv(Ty::Float).then(LValueToRValue, Ty::Float), lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Float), rv(Ty::Float)]);
+shaped!(an_int_converts_to_the_unsigned_int_it_meets, "unsigned u; int i; void f(void) { u + i; }", vec![lv(Ty::UInt).then(LValueToRValue, Ty::UInt), lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerConversion, Ty::UInt), rv(Ty::UInt)]);
+shaped!(a_call_has_the_return_type_of_the_function_and_is_an_rvalue, "int g(void); void f(void) { g(); }", vec![rv(Ty::func0(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Int))), rv(Ty::Int)]);
+shaped!(a_call_to_a_function_returning_void_has_type_void, "void g(void); void f(void) { g(); }", vec![rv(Ty::func0(Ty::Void)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Void))), rv(Ty::Void)]);
+shaped!(a_call_returning_a_structure_is_an_rvalue, "struct S { int a; }; struct S g(void); void f(void) { g(); }", vec![rv(Ty::func0(Ty::strukt("S"))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt("S")))), rv(Ty::strukt("S"))]);
+shaped!(an_argument_is_converted_as_if_by_assignment_to_its_parameter, "int g(char, float); void f(void) { g(1, 2); }", vec![rv(Ty::func(Ty::Int, [Ty::Char, Ty::Float])) .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Char, Ty::Float]))), rv(Ty::Int).then(IntegerConversion, Ty::Char), rv(Ty::Int).then(IntegerToFloating, Ty::Float), rv(Ty::Int)]);
+shaped!(an_array_argument_becomes_a_pointer_to_its_first_element, "int g(char *); char a[4]; void f(void) { g(a); }", vec![rv(Ty::Int), rv(Ty::Int), rv(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)])) .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))), lv(Ty::arr(Ty::Char, 4)).then(ArrayToPointer, Ty::ptr(Ty::Char)), rv(Ty::Int)]);
+shaped!(a_structure_argument_is_passed_by_value, "struct S { int a; }; int g(struct S); struct S s; void f(void) { g(s); }", vec![rv(Ty::func(Ty::Int, [Ty::strukt("S")])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::strukt("S")]))), lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::Int)]);
+shaped!(an_argument_pointer_may_gain_the_qualifiers_of_its_parameter, "int g(const char *); char *p; void f(void) { g(p); }", vec![rv(Ty::func(Ty::Int, [Ty::ptr(Ty::konst(Ty::Char))])) .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::konst(Ty::Char))])),), lv(Ty::ptr(Ty::Char)) .then(LValueToRValue, Ty::ptr(Ty::Char)) .then(PointerConversion, Ty::ptr(Ty::konst(Ty::Char))), rv(Ty::Int)]);
+shaped!(a_null_pointer_constant_may_be_passed_to_a_pointer_parameter, "int g(char *); void f(void) { g(0); }", vec![rv(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)])) .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::Char)]))), rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Char)), rv(Ty::Int)]);
+shaped!(a_parameter_qualifier_is_not_part_of_the_function_type, "int g(const int); void f(void) { g(1); }", vec![rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(an_enumeration_parameter_takes_an_integer_argument, "enum E { A }; int g(enum E); void f(void) { g(A); }", vec![rv(Ty::func(Ty::Int, [Ty::enom("E")])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::enom("E")]))), rv(Ty::Int).then(IntegerConversion, Ty::enom("E")), rv(Ty::Int)]);
+shaped!(a_variadic_prototype_accepts_arguments_past_its_named_parameters, "int g(int, ...); void f(void) { g(1, 2, 3); }", vec![rv(Ty::func_variadic(Ty::Int, [Ty::Int])) .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))), rv(Ty::Int), rv(Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(a_call_may_go_through_a_pointer_to_function, "int (*p)(int); void f(void) { p(1); }", vec![lv(Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))).then(LValueToRValue, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(a_call_may_go_through_a_typedefed_function_pointer, "typedef int F(int); F *q; void f(void) { q(1); }", vec![lv(Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))).then(LValueToRValue, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(calling_a_function_returning_a_completed_type_is_accepted, "struct S { int x; }; struct S g(void); void f(void) { g(); }", vec![rv(Ty::func0(Ty::strukt("S"))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt("S")))), rv(Ty::strukt("S"))]);
+shaped!(the_result_of_a_call_is_an_unqualified_rvalue, "const int g(void); void f(void) { g(); }", vec![rv(Ty::func0(Ty::konst(Ty::Int))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::konst(Ty::Int)))), rv(Ty::Int)]);
+shaped!(a_trailing_argument_is_promoted, "int g(int, ...); void f(void) { char c; float x; g(1, c, x); }", vec![rv(Ty::func_variadic(Ty::Int, [Ty::Int])) .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))), rv(Ty::Int), lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), lv(Ty::Float).then(LValueToRValue, Ty::Float).then(FloatingConversion, Ty::Double), rv(Ty::Int)]);
+shaped!(a_trailing_array_argument_becomes_a_pointer, "int g(int, ...); char a[4]; void f(void) { g(1, a); }", vec![rv(Ty::Int), rv(Ty::Int), rv(Ty::func_variadic(Ty::Int, [Ty::Int])) .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))), rv(Ty::Int), lv(Ty::arr(Ty::Char, 4)).then(ArrayToPointer, Ty::ptr(Ty::Char)), rv(Ty::Int)]);
+shaped!(an_argument_of_a_call_without_a_prototype_is_promoted, "int g(); void f(void) { char c; g(c); }", vec![rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))), lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int)]);
+shaped!(the_address_of_an_object_is_a_pointer_to_it, "int i; void f(void) { &i; }", vec![lv(Ty::Int), rv(Ty::ptr(Ty::Int))]);
+shaped!(the_address_of_an_array_is_a_pointer_to_the_array, "int a[3]; void f(void) { &a; }", vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Int, 3)), rv(Ty::ptr(Ty::arr(Ty::Int, 3)))]);
+shaped!(the_address_of_a_function_is_a_pointer_to_function, "int g(void); void f(void) { &g; }", vec![rv(Ty::func0(Ty::Int)), rv(Ty::ptr(Ty::func0(Ty::Int)))]);
+shaped!(the_address_of_a_const_object_points_to_a_const_type, "void f(void) { const int c; &c; }", vec![lv(Ty::konst(Ty::Int)), rv(Ty::ptr(Ty::konst(Ty::Int)))]);
+shaped!(the_address_of_a_volatile_object_points_to_a_volatile_type, "void f(void) { volatile int v; &v; }", vec![lv(Ty::vol(Ty::Int)), rv(Ty::ptr(Ty::vol(Ty::Int)))]);
+shaped!(the_address_of_a_member_is_a_pointer_to_it, "struct S { int x; } s; void f(void) { &s.x; }", vec![lv(Ty::strukt("S")), lv(Ty::Int), rv(Ty::ptr(Ty::Int))]);
+shaped!(the_address_of_an_array_element_is_a_pointer_to_it, "int a[3]; void f(void) { &a[0]; }", vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)), rv(Ty::Int), lv(Ty::Int), rv(Ty::ptr(Ty::Int))]);
+shaped!(the_address_of_a_string_literal_is_a_pointer_to_the_array, "void f(void) { &\"ab\"; }", vec![lv(Ty::arr(Ty::Char, 3)), rv(Ty::ptr(Ty::arr(Ty::Char, 3)))]);
+shaped!(the_address_of_a_dereference_is_the_pointer_itself, "int *p; void f(void) { &*p; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::Int), rv(Ty::ptr(Ty::Int))]);
+shaped!(the_address_of_a_plain_member_beside_a_bit_field_is_accepted, "struct S { int x : 3; int y; } s; void f(void) { &s.y; }", vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::strukt("S")), lv(Ty::Int), rv(Ty::ptr(Ty::Int))]);
+shaped!(indirection_through_a_pointer_designates_an_object, "int *p; void f(void) { *p; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::Int)]);
+shaped!(indirection_through_a_pointer_to_an_incomplete_type_designates_an_object, "struct S; struct S *p; void f(void) { *p; }", vec![lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))), lv(Ty::strukt_incomplete("S"))]);
+shaped!(indirection_on_a_pointer_to_void_is_a_void_expression, "void f(void *v) { *v; }", vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), rv(Ty::Void)]);
+shaped!(unary_plus_yields_the_value_of_its_operand, "int i; void f(void) { +i; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]);
+shaped!(unary_plus_promotes_its_operand, "void f(void) { char c; +c; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int)]);
+shaped!(a_complement_yields_the_promoted_type_of_its_operand, "int i; void f(void) { ~i; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]);
+shaped!(a_complement_promotes_its_operand, "void f(void) { char c; ~c; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int)]);
+shaped!(a_complement_of_an_unsigned_operand_stays_unsigned, "void f(void) { unsigned u; ~u; }", vec![lv(Ty::UInt).then(LValueToRValue, Ty::UInt), rv(Ty::UInt)]);
+shaped!(a_logical_negation_has_type_int, "int i; void f(void) { !i; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]);
+shaped!(a_logical_negation_of_a_floating_operand_has_type_int, "void f(void) { double d; !d; }", vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Int)]);
+shaped!(a_logical_negation_of_a_pointer_has_type_int, "int *p; void f(void) { !p; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int)]);
+shaped!(a_logical_negation_does_not_promote_its_operand, "void f(void) { char c; !c; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char), rv(Ty::Int)]);
+shaped!(a_logical_negation_of_an_array_is_accepted, "int a[3]; void f(void) { !a; }", vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)), rv(Ty::Int)]);
+shaped!(a_logical_negation_of_a_function_designator_is_accepted, "int g(); void f(void) { !g; }", vec![rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))), rv(Ty::Int)]);
+shaped!(a_pointer_plus_an_integer_is_a_pointer, "int *p; void f(void) { p + 1; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), rv(Ty::ptr(Ty::Int))]);
+shaped!(an_integer_plus_a_pointer_is_a_pointer, "int *p; void f(void) { 1 + p; }", vec![rv(Ty::Int), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int))]);
+shaped!(an_array_plus_an_integer_is_a_pointer_to_the_element, "char a[10]; void f(void) { a + 1; }", vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Char, 10)).then(ArrayToPointer, Ty::ptr(Ty::Char)), rv(Ty::Int), rv(Ty::ptr(Ty::Char))]);
+shaped!(a_cast_result_is_always_an_rvalue, "int i; void f(void) { (double)i; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Double), rv(Ty::Double)]);
+shaped!(a_pointer_may_be_cast_to_an_integer, "int *p; void f(void) { (int)p; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)).then(PointerToInteger, Ty::Int), rv(Ty::Int)]);
+shaped!(an_integer_may_be_cast_to_a_pointer, "int i; void f(void) { (int *)i; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToPointer, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int))]);
+shaped!(a_cast_to_void_discards_the_value, "void f(void) { (void)1; }", vec![rv(Ty::Int), rv(Ty::Void)]);
+shaped!(a_constant_expression_mirrors_its_operand, "int a[2 + 3];", ints(4));
+shaped!(a_pointer_minus_an_integer_is_a_pointer, "int *p; void f(void) { p - 1; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), rv(Ty::ptr(Ty::Int))]);
+shaped!(two_compatible_pointers_subtract_to_ptrdiff_t, "int *p, *q; void f(void) { p - q; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int)]);
+shaped!(pointer_subtraction_works_for_any_compatible_object_type, "char *p, *q; void f(void) { p - q; }", vec![lv(Ty::ptr(Ty::Char)).then(LValueToRValue, Ty::ptr(Ty::Char)), lv(Ty::ptr(Ty::Char)).then(LValueToRValue, Ty::ptr(Ty::Char)), rv(Ty::Int)]);
+shaped!(assigning_a_constant_keeps_the_lvalues_type, "int x; void f(void) { x = 1; }", vec![lv(Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(assigning_to_a_volatile_object_has_unqualified_result, "volatile int x; void f(void) { x = 1; }", vec![lv(Ty::vol(Ty::Int)), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(assignment_converts_the_right_operand_to_the_left_operands_type, "int x; void f(void) { x = 3.5; }", vec![lv(Ty::Int), rv(Ty::Double).then(FloatingToInteger, Ty::Int), rv(Ty::Int)]);
+shaped!(zero_is_a_null_pointer_constant, "int *p; void f(void) { p = 0; }", vec![lv(Ty::ptr(Ty::Int)), rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int))]);
+shaped!(assigning_a_pointer_that_gains_const_is_accepted, "char *p; const char *q; void f(void) { q = p; }", vec![lv(Ty::ptr(Ty::konst(Ty::Char))), lv(Ty::ptr(Ty::Char)) .then(LValueToRValue, Ty::ptr(Ty::Char)) .then(PointerConversion, Ty::ptr(Ty::konst(Ty::Char))), rv(Ty::ptr(Ty::konst(Ty::Char)))]);
+shaped!(initializing_with_a_constant_keeps_its_type, "void f(void) { int x = 1; }", vec![rv(Ty::Int)]);
+shaped!(initialization_converts_the_initializer_to_the_declared_type, "void f(void) { int x = 3.5; }", vec![rv(Ty::Double).then(FloatingToInteger, Ty::Int)]);
+shaped!(zero_initializes_a_pointer_as_a_null_pointer_constant, "void f(void) { int *p = 0; }", vec![rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int))]);
+shaped!(initializing_a_pointer_that_gains_const_is_accepted, "void f(void) { char *p; const char *q = p; }", vec![lv(Ty::ptr(Ty::Char)) .then(LValueToRValue, Ty::ptr(Ty::Char)) .then(PointerConversion, Ty::ptr(Ty::konst(Ty::Char)))]);
+shaped!(array_initializer_types_each_element, "void f(void) { int a[3] = {1,2,3}; }", ints(5));
+shaped!(array_initializer_may_have_fewer_elements_than_declared, "void f(void) { int a[3] = {1,2}; }", ints(4));
+shaped!(incomplete_array_size_is_inferred_from_initializer, "void f(void) { int a[] = {1,2,3}; }", ints(3));
+shaped!(scalar_initializer_may_be_wrapped_in_braces, "void f(void) { int x = {1}; }", ints(1));
+shaped!(nested_array_initializer_types_every_element, "void f(void) { int a[2][2] = {{1,2},{3,4}}; }", ints(8));
+shaped!(array_initializer_converts_each_element_to_the_declared_type, "void f(void) { int a[2] = {1, 3.5}; }", vec![rv(Ty::Int), rv(Ty::Int), rv(Ty::Int), rv(Ty::Double).then(FloatingToInteger, Ty::Int)]);
+shaped!(array_of_pointers_initializer_accepts_null_pointer_constants, "void f(void) { int *a[2] = {0, 0}; }", vec![rv(Ty::Int), rv(Ty::Int), rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)), rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int))]);
+shaped!(subscripting_an_array_designates_an_element, "int a[3]; void f(void) { a[0]; }", vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)), rv(Ty::Int), lv(Ty::Int)]);
+shaped!(subscripting_a_pointer_designates_the_object_it_points_to, "int *p; void f(void) { p[1]; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), lv(Ty::Int)]);
+shaped!(a_subscript_may_precede_the_array, "int a[3]; void f(void) { 0[a]; }", vec![rv(Ty::Int), rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)), lv(Ty::Int)]);
+shaped!(a_subscripted_element_is_assignable, "int a[3]; void f(void) { a[0] = 1; }", vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)), rv(Ty::Int), lv(Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(subscripting_an_array_of_arrays_designates_a_row, "int a[2][3]; void f(void) { a[0]; }", vec![rv(Ty::Int), rv(Ty::Int), rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::arr(Ty::Int, 3), 2)).then(ArrayToPointer, Ty::ptr(Ty::arr(Ty::Int, 3))), rv(Ty::Int), lv(Ty::arr(Ty::Int, 3))]);
+shaped!(a_member_of_a_structure_lvalue_is_an_lvalue, "struct S { int x; } s; void f(void) { s.x; }", vec![lv(Ty::strukt("S")), lv(Ty::Int)]);
+shaped!(a_member_reached_through_a_pointer_is_an_lvalue, "struct S { int x; } *p; void f(void) { p->x; }", vec![lv(Ty::ptr(Ty::strukt("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt("S"))), lv(Ty::Int)]);
+shaped!(a_union_member_has_the_type_of_the_named_member, "union U { int x; double y; } u; void f(void) { u.y; }", vec![lv(Ty::union("U")), lv(Ty::Double)]);
+shaped!(a_member_of_an_rvalue_structure_is_an_rvalue, "struct S { int x; }; struct S g(void); void f(void) { g().x; }", vec![rv(Ty::func0(Ty::strukt("S"))).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::strukt("S")))), rv(Ty::strukt("S")), rv(Ty::Int)]);
+shaped!(a_member_of_a_const_structure_is_const, "struct S { int x; }; void f(void) { const struct S s; s.x; }", vec![lv(Ty::konst(Ty::strukt("S"))), lv(Ty::konst(Ty::Int))]);
+shaped!(a_member_reached_through_a_pointer_to_const_is_const, "struct S { int x; }; void f(void) { const struct S *p; p->x; }", vec![lv(Ty::ptr(Ty::konst(Ty::strukt("S")))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::strukt("S")))), lv(Ty::konst(Ty::Int))]);
+shaped!(a_member_of_a_volatile_structure_is_volatile, "volatile struct S { int x; } s; void f(void) { s.x; }", vec![lv(Ty::vol(Ty::strukt("S"))), lv(Ty::vol(Ty::Int))]);
+shaped!(post_increment_yields_the_value_of_its_operand, "int i; void f(void) { i++; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]);
+shaped!(post_decrement_yields_the_value_of_its_operand, "double d; void f(void) { d--; }", vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Double)]);
+shaped!(post_increment_of_a_pointer_is_a_pointer, "int *p; void f(void) { p++; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int))]);
+shaped!(post_increment_keeps_the_type_of_its_operand, "char c; void f(void) { c++; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int).result(IntegerConversion, Ty::Char), rv(Ty::Char)]);
+shaped!(pre_increment_yields_the_value_of_its_operand, "int i; void f(void) { ++i; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]);
+shaped!(pre_decrement_yields_the_value_of_its_operand, "double d; void f(void) { --d; }", vec![lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Double)]);
+shaped!(pre_increment_of_a_pointer_is_a_pointer, "int *p; void f(void) { ++p; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int))]);
+shaped!(pre_increment_keeps_the_type_of_its_operand, "char c; void f(void) { ++c; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int).result(IntegerConversion, Ty::Char), rv(Ty::Char)]);
+shaped!(multiplying_two_constants_stays_int, "void f(void) { 2 * 3; }", ints(3));
+shaped!(the_remainder_of_two_integers_is_an_integer, "void f(void) { 7 % 2; }", ints(3));
+shaped!(multiplication_performs_the_usual_arithmetic_conversions, "int i; double d; void f(void) { i * d; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Double), lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Double)]);
+shaped!(a_floating_division_by_zero_is_accepted, "void f(void) { 1 / 0.0; }", vec![rv(Ty::Int).then(IntegerToFloating, Ty::Double), rv(Ty::Double), rv(Ty::Double)]);
+shaped!(a_shift_of_two_constants_is_an_int, "void f(void) { 1 << 2; }", ints(3));
+shaped!(a_shift_count_below_the_width_of_the_promoted_left_operand_is_accepted, "void f(void) { 1 << 5; }", ints(3));
+shaped!(the_left_operand_of_a_shift_is_promoted, "char c; void f(void) { c << 1; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(an_enumeration_may_be_shifted, "enum E { A }; enum E e; void f(void) { e << 1; }", vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")).then(IntegerPromotion, Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(a_shift_has_the_type_of_its_promoted_left_operand, "int i; long l; void f(void) { i << l; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::Long).then(LValueToRValue, Ty::Long), rv(Ty::Int)]);
+shaped!(the_operands_of_a_shift_are_promoted_independently, "unsigned u; void f(void) { u >> 1; }", vec![lv(Ty::UInt).then(LValueToRValue, Ty::UInt), rv(Ty::Int), rv(Ty::UInt)]);
+shaped!(a_char_left_operand_is_measured_after_its_promotion, "char c; void f(void) { c << 10; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(a_short_left_operand_is_measured_after_its_promotion, "short s; void f(void) { s << 20; }", vec![lv(Ty::Short).then(LValueToRValue, Ty::Short).then(IntegerPromotion, Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(a_count_one_below_the_width_of_the_left_operand_is_accepted, "int i; void f(void) { i << 31; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(the_type_of_the_count_does_not_bound_the_shift, "int i; void f(void) { i << (short)20; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int).then(IntegerConversion, Ty::Short), rv(Ty::Short).then(IntegerPromotion, Ty::Int), rv(Ty::Int)]);
+shaped!(a_shift_by_a_variable_count_promotes_its_operands, "char c; int n; void f(void) { c << n; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]);
+shaped!(an_enumeration_may_be_shifted_by_a_variable_count, "enum E { A }; enum E e; int n; void f(void) { e << n; }", vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")).then(IntegerPromotion, Ty::Int), lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]);
+shaped!(pointers_to_compatible_object_types_may_be_ordered, "int *p; int *q; void f(void) { p < q; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int)]);
+shaped!(ordering_pointers_disregards_the_qualifiers_of_the_pointed_to_type, "const int *p; int *q; void f(void) { p < q; }", vec![lv(Ty::ptr(Ty::konst(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Int))), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int)]);
+shaped!(pointers_to_an_incomplete_structure_may_be_ordered, "struct S; struct S *p; struct S *q; void f(void) { p >= q; }", vec![lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))), lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))), rv(Ty::Int)]);
+shaped!(pointers_to_void_may_be_ordered, "void *p; void *q; void f(void) { p > q; }", vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), rv(Ty::Int)]);
+shaped!(ordering_arithmetic_operands_performs_the_usual_arithmetic_conversions, "int i; double d; void f(void) { i < d; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Double), lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Int)]);
+shaped!(an_array_operand_of_an_ordering_decays_to_a_pointer, "int a[3]; int *p; void f(void) { a < p; }", vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int)]);
+shaped!(pointers_to_compatible_incomplete_arrays_may_be_ordered, "int (*p)[]; int (*q)[]; void f(void) { p < q; }", vec![lv(Ty::ptr(Ty::flex(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::flex(Ty::Int))), lv(Ty::ptr(Ty::flex(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::flex(Ty::Int))), rv(Ty::Int)]);
+shaped!(a_pointer_compared_to_a_null_pointer_constant_converts_the_constant, "int *p; void f(void) { p == 0; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)), rv(Ty::Int)]);
+shaped!(a_null_pointer_constant_may_be_the_left_operand, "int *p; void f(void) { 0 != p; }", vec![rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int)]);
+shaped!(a_pointer_to_a_function_may_be_compared_to_a_null_pointer_constant, "int (*p)(void); void f(void) { p == 0; }", vec![lv(Ty::ptr(Ty::func0(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::func0(Ty::Int))), rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::func0(Ty::Int))), rv(Ty::Int)]);
+shaped!(an_object_pointer_compared_to_a_void_pointer_is_converted_to_void_pointer, "void *v; int *p; void f(void) { v == p; }", vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)).then(PointerConversion, Ty::ptr(Ty::Void)), rv(Ty::Int)]);
+shaped!(an_incomplete_pointer_compared_to_a_void_pointer_is_converted_to_void_pointer, "struct S; struct S *p; void *v; void f(void) { p != v; }", vec![lv(Ty::ptr(Ty::strukt_incomplete("S"))) .then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))) .then(PointerConversion, Ty::ptr(Ty::Void)), lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), rv(Ty::Int)]);
+shaped!(comparing_a_qualified_pointer_to_a_void_pointer_discards_its_qualifiers, "void *v; const int *p; void f(void) { v == p; }", vec![lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), lv(Ty::ptr(Ty::konst(Ty::Int))) .then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Int))) .then(PointerConversion, Ty::ptr(Ty::Void)), rv(Ty::Int)]);
+shaped!(a_bitwise_and_of_two_constants_is_an_int, "void f(void) { 6 & 3; }", ints(3));
+shaped!(a_bitwise_xor_of_two_constants_is_an_int, "void f(void) { 6 ^ 3; }", ints(3));
+shaped!(a_bitwise_or_of_two_constants_is_an_int, "void f(void) { 6 | 3; }", ints(3));
+shaped!(the_operands_of_a_bitwise_and_are_promoted, "char c; void f(void) { c & c; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int)]);
+shaped!(a_bitwise_xor_converts_its_operands_to_a_common_type, "int i; unsigned u; void f(void) { i ^ u; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerConversion, Ty::UInt), lv(Ty::UInt).then(LValueToRValue, Ty::UInt), rv(Ty::UInt)]);
+shaped!(a_bitwise_or_with_a_long_operand_meets_at_long, "int i; long l; void f(void) { i | l; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerConversion, Ty::Long), lv(Ty::Long).then(LValueToRValue, Ty::Long), rv(Ty::Long)]);
+shaped!(an_enumeration_may_be_combined_bitwise, "enum E { A }; enum E e; void f(void) { e & 1; }", vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")).then(IntegerPromotion, Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(a_conditional_of_two_pointers_to_the_same_type_keeps_that_type, "int *p, *q; void f(int c) { c ? p : q; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int))]);
+shaped!(a_conditional_of_pointers_to_array_takes_the_known_size, "int a[3]; extern int b[]; void f(int c) { c ? &a : &b; }", vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::arr(Ty::Int, 3)), rv(Ty::ptr(Ty::arr(Ty::Int, 3))), lv(Ty::flex(Ty::Int)), rv(Ty::ptr(Ty::flex(Ty::Int))), rv(Ty::ptr(Ty::arr(Ty::Int, 3)))]);
+shaped!(a_conditional_of_pointers_to_unsized_arrays_stays_unsized, "extern int b[]; extern int d[]; void f(int c) { c ? &b : &d; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::flex(Ty::Int)), rv(Ty::ptr(Ty::flex(Ty::Int))), lv(Ty::flex(Ty::Int)), rv(Ty::ptr(Ty::flex(Ty::Int))), rv(Ty::ptr(Ty::flex(Ty::Int)))]);
+shaped!(a_conditional_of_function_pointers_keeps_the_parameter_type_list, "int g(int); int h(); void f(int c) { c ? g : h; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::func(Ty::Int, [Ty::Int])).then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))), rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))), rv(Ty::ptr(Ty::func(Ty::Int, [Ty::Int])))]);
+shaped!(a_conditional_of_pointers_unions_the_qualifiers_of_the_pointed_to_types, "volatile int *vp; const int *cp; void f(int c) { c ? vp : cp; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::ptr(Ty::vol(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::vol(Ty::Int))), lv(Ty::ptr(Ty::konst(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Int))), rv(Ty::ptr(Ty::konst(Ty::vol(Ty::Int))))]);
+shaped!(the_composite_type_is_built_recursively, "int (*x[])(int); int (*y[])(); void f(int c) { c ? &x : &y; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::flex(Ty::ptr(Ty::func(Ty::Int, [Ty::Int])))), rv(Ty::ptr(Ty::flex(Ty::ptr(Ty::func(Ty::Int, [Ty::Int]))))), lv(Ty::flex(Ty::ptr(Ty::noproto(Ty::Int)))), rv(Ty::ptr(Ty::flex(Ty::ptr(Ty::noproto(Ty::Int))))), rv(Ty::ptr(Ty::flex(Ty::ptr(Ty::func(Ty::Int, [Ty::Int])))))]);
+shaped!(a_conditional_of_arithmetic_operands_meets_at_a_common_type, "int i; double d; void f(int c) { c ? i : d; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerToFloating, Ty::Double), lv(Ty::Double).then(LValueToRValue, Ty::Double), rv(Ty::Double)]);
+shaped!(a_conditional_of_two_structures_keeps_the_structure_type, "struct S { int x; } s, t; void f(int c) { c ? s : t; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::strukt("S"))]);
+shaped!(a_conditional_of_a_const_and_a_plain_structure_keeps_the_structure_type, "struct S { int x; }; const struct S s; struct S t; void f(int c) { c ? s : t; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::konst(Ty::strukt("S"))).then(LValueToRValue, Ty::strukt("S")), lv(Ty::strukt("S")).then(LValueToRValue, Ty::strukt("S")), rv(Ty::strukt("S"))]);
+shaped!(a_conditional_of_a_volatile_and_a_plain_union_keeps_the_union_type, "union U { int x; }; volatile union U u; union U v; void f(int c) { c ? u : v; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::vol(Ty::union("U"))).then(LValueToRValue, Ty::union("U")), lv(Ty::union("U")).then(LValueToRValue, Ty::union("U")), rv(Ty::union("U"))]);
+shaped!(a_conditional_of_two_void_operands_is_void, "void g(void); void h(void); void f(int c) { c ? g() : h(); }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::func0(Ty::Void)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Void))), rv(Ty::Void), rv(Ty::func0(Ty::Void)).then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::Void))), rv(Ty::Void), rv(Ty::Void)]);
+shaped!(a_conditional_with_a_null_pointer_constant_takes_the_other_pointer_type, "int *p; void f(int c) { c ? p : 0; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int))]);
+shaped!(a_conditional_of_a_void_pointer_and_an_object_pointer_is_a_void_pointer, "void *vp; int *p; void f(int c) { c ? vp : p; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)).then(PointerConversion, Ty::ptr(Ty::Void)), rv(Ty::ptr(Ty::Void))]);
+shaped!(a_composite_parameter_list_composes_each_parameter, "int g(int (*)[3]); int h(int (*)[]); void f(int c) { c ? g : h; }", vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::func(Ty::Int, [Ty::ptr(Ty::arr(Ty::Int, 3))])) .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::arr(Ty::Int, 3))]))), rv(Ty::func(Ty::Int, [Ty::ptr(Ty::flex(Ty::Int))])) .then(FunctionToPointer, Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::flex(Ty::Int))]))), rv(Ty::ptr(Ty::func(Ty::Int, [Ty::ptr(Ty::arr(Ty::Int, 3))])))]);
+shaped!(a_conditional_of_two_unspecified_functions_stays_unspecified, "int g(); int h(); void f(int c) { c ? g : h; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))), rv(Ty::noproto(Ty::Int)).then(FunctionToPointer, Ty::ptr(Ty::noproto(Ty::Int))), rv(Ty::ptr(Ty::noproto(Ty::Int)))]);
+shaped!(a_composite_prototype_keeps_the_ellipsis, "int g(int, ...); int h(int, ...); void f(int c) { c ? g : h; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::func_variadic(Ty::Int, [Ty::Int])) .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))), rv(Ty::func_variadic(Ty::Int, [Ty::Int])) .then(FunctionToPointer, Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int]))), rv(Ty::ptr(Ty::func_variadic(Ty::Int, [Ty::Int])))]);
+shaped!(the_return_type_of_a_composite_function_is_composite, "int (*g(void))[3]; int (*h(void))[]; void f(int c) { c ? g : h; }", vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::func0(Ty::ptr(Ty::arr(Ty::Int, 3)))) .then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::ptr(Ty::arr(Ty::Int, 3))))), rv(Ty::func0(Ty::ptr(Ty::flex(Ty::Int)))) .then(FunctionToPointer, Ty::ptr(Ty::func0(Ty::ptr(Ty::flex(Ty::Int))))), rv(Ty::ptr(Ty::func0(Ty::ptr(Ty::arr(Ty::Int, 3)))))]);
+shaped!(a_null_pointer_constant_may_be_the_second_operand, "int *p; void f(int c) { c ? 0 : p; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int).then(NullPointer, Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int))]);
+shaped!(a_void_pointer_may_be_the_third_operand, "void *vp; int *p; void f(int c) { c ? p : vp; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)).then(PointerConversion, Ty::ptr(Ty::Void)), lv(Ty::ptr(Ty::Void)).then(LValueToRValue, Ty::ptr(Ty::Void)), rv(Ty::ptr(Ty::Void))]);
+shaped!(a_logical_and_of_two_constants_is_an_int, "void f(void) { 1 && 2; }", ints(3));
+shaped!(a_logical_or_of_two_constants_is_an_int, "void f(void) { 0 || 1; }", ints(3));
+shaped!(an_array_operand_of_a_logical_or_decays_to_a_pointer, "int a[3]; void f(void) { a || 0; }", vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::arr(Ty::Int, 3)).then(ArrayToPointer, Ty::ptr(Ty::Int)), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(a_comma_expression_has_the_type_of_its_right_operand, "double d; int i; void f(void) { d, i; }", vec![lv(Ty::Double).then(LValueToRValue, Ty::Double).then(ToVoid, Ty::Void), lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]);
+shaped!(every_operand_but_the_last_of_a_comma_is_discarded_to_void, "void f(void) { 1, 2, 3; }", vec![rv(Ty::Int).then(ToVoid, Ty::Void), rv(Ty::Int).then(ToVoid, Ty::Void), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(an_additive_assignment_of_an_int_yields_an_int, "int i; void f(void) { i += 1; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(an_additive_assignment_converts_the_result_back_to_the_left_operand_type, "int i; void f(void) { i += 1.5; }", vec![lv(Ty::Int) .then(LValueToRValue, Ty::Int) .then(IntegerToFloating, Ty::Double) .result(FloatingToInteger, Ty::Int), rv(Ty::Double), rv(Ty::Int)]);
+shaped!(an_additive_assignment_to_a_pointer_stays_a_pointer, "int *p; void f(void) { p += 2; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int), rv(Ty::ptr(Ty::Int))]);
+shaped!(an_additive_assignment_to_a_volatile_operand_has_unqualified_type, "volatile int i; void f(void) { i += 1; }", vec![lv(Ty::vol(Ty::Int)).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(a_multiplicative_assignment_of_an_int_yields_an_int, "int i; void f(void) { i *= 2; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(a_multiplicative_assignment_converts_the_result_back_to_the_left_operand_type, "int i; void f(void) { i *= 1.5; }", vec![lv(Ty::Int) .then(LValueToRValue, Ty::Int) .then(IntegerToFloating, Ty::Double) .result(FloatingToInteger, Ty::Int), rv(Ty::Double), rv(Ty::Int)]);
+shaped!(a_bitwise_assignment_promotes_the_left_operand_and_narrows_the_result, "char c; void f(void) { c &= 1; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int).result(IntegerConversion, Ty::Char), rv(Ty::Int), rv(Ty::Char)]);
+shaped!(a_shift_assignment_has_the_type_of_its_left_operand, "int i; long n; void f(void) { i <<= n; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::Long).then(LValueToRValue, Ty::Long), rv(Ty::Int)]);
+shaped!(equality_of_two_arithmetic_operands_is_an_int, "void f(void) { 1 == 2; }", ints(3));
+shaped!(comparing_two_compatible_object_pointers_is_an_int, "int *p; int *q; void f(void) { p == q; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int)]);

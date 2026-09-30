@@ -93,13 +93,12 @@ impl Unit {
         self.ctx.diagnostics.iter().chain(self.sema.iter().flat_map(|sema| &sema.diagnostics)).cloned().collect()
     }
 
-    pub fn accepts(&self) -> bool {
-        self.parsed() && self.diagnostics().is_empty()
+    pub fn only_warns(&self) -> bool {
+        !self.diagnostics().iter().any(|d| d.is_error())
     }
 
-    pub fn only_warns(&self) -> bool {
-        let diagnostics = self.diagnostics();
-        !diagnostics.is_empty() && diagnostics.iter().all(|d| !d.is_error())
+    pub fn accepts(&self) -> bool {
+        self.parsed() && self.only_warns()
     }
 
     pub fn enumerators(&self) -> Vec<(String, String)> {

@@ -1,102 +1,4 @@
-exits!(return_constant, "int main(void) { return 42; }", 42);
-exits!(return_zero, "int main(void) { return 0; }", 0);
-exits!(return_negative_wraps, "int main(void) { return -1; }", 255);
-
-exits!(
-    volatile_scalar_execution,
-    "volatile int x = 40; int main(void) { x++; return x + 1; }",
-    42
-);
-emits!(
-    volatile_global_load_is_volatile,
-    "volatile int x; int f(void) { return x; }",
-    "load volatile i32, ptr @x"
-);
-emits!(
-    volatile_global_store_is_volatile,
-    "volatile int x; void f(void) { x = 42; }",
-    "store volatile i32 42, ptr @x"
-);
-emits!(
-    volatile_parameter_initialization_is_volatile,
-    "int f(volatile int x) { return x; }",
-    "store volatile i32 %0"
-);
-emits!(
-    volatile_local_initialization_is_volatile,
-    "int f(void) { volatile int x = 42; return x; }",
-    "store volatile i32 42"
-);
-emits!(
-    volatile_pointer_object_loads_the_pointer_volatile,
-    "int x; int * volatile p = &x; int f(void) { return *p; }",
-    "load volatile ptr, ptr @p"
-);
-emits!(
-    not volatile_pointer_object_does_not_qualify_the_pointee,
-    "int x; int * volatile p = &x; int f(void) { return *p; }",
-    "load volatile i32"
-);
-emits!(
-    pointer_to_volatile_loads_the_pointee_volatile,
-    "volatile int x; volatile int *p = &x; int f(void) { return *p; }",
-    "load volatile i32"
-);
-emits!(
-    volatile_structure_qualifies_member_access,
-    "struct S { int x; }; volatile struct S s; int f(void) { return s.x; }",
-    "load volatile i32"
-);
-emits!(
-    volatile_member_access_is_volatile,
-    "struct S { volatile int x; }; struct S s; int f(void) { return s.x; }",
-    "load volatile i32"
-);
-emits!(
-    const_volatile_global_has_mutable_storage,
-    "const volatile int x = 42; int f(void) { return x; }",
-    "@x = global i32 42"
-);
-emits!(
-    not const_volatile_global_is_not_an_llvm_constant,
-    "const volatile int x = 42; int f(void) { return x; }",
-    "@x = constant"
-);
-emits!(
-    volatile_aggregate_copy_uses_volatile_memcpy,
-    "struct S { int x; }; volatile struct S a; struct S b; void f(void) { a = b; b = a; }",
-    "i32 4, i1 true"
-);
-emits!(
-    volatile_aggregate_argument_uses_volatile_memcpy,
-    "struct S { int x; }; void take(struct S); volatile struct S s; void f(void) { take(s); }",
-    "i32 4, i1 true"
-);
-emits!(
-    volatile_aggregate_parameter_access_is_volatile,
-    "struct S { int x; }; int f(volatile struct S s) { return s.x; }",
-    "load volatile i32"
-);
-emits!(
-    volatile_aggregate_return_uses_volatile_memcpy,
-    "struct S { int x; }; volatile struct S s; struct S f(void) { return s; }",
-    "i32 4, i1 true"
-);
-emits!(
-    not ordinary_aggregate_copy_uses_nonvolatile_memcpy,
-    "struct S { int x; }; struct S a; struct S b; void f(void) { a = b; }",
-    "i32 4, i1 true"
-);
-emits!(
-    volatile_aggregate_list_initialization_uses_volatile_memcpy,
-    "struct S { int x; }; int f(void) { volatile struct S s = { 42 }; return s.x; }",
-    "i32 4, i1 true"
-);
-emits!(
-    volatile_array_typedef_qualifies_element_access,
-    "typedef int A[2]; volatile A a; int f(void) { a[0] = 42; return a[0]; }",
-    "store volatile i32 42"
-);
+#![cfg_attr(rustfmt, rustfmt_skip)]
 
 #[test]
 fn volatile_bitfield_update_reads_and_writes_once() {
@@ -118,6 +20,65 @@ fn volatile_bitfield_compound_assignment_reads_and_writes_once() {
     assert_eq!(ir.matches("store volatile i32").count(), 1, "{ir}");
 }
 
+const BIG_HELPER: &str = "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int gsum(struct big v) { return v.a + v.b + v.c + v.d + v.e; }";
+
+emits!(volatile_global_load_is_volatile, "volatile int x; int f(void) { return x; }", "load volatile i32, ptr @x");
+emits!(volatile_global_store_is_volatile, "volatile int x; void f(void) { x = 42; }", "store volatile i32 42, ptr @x");
+emits!(volatile_parameter_initialization_is_volatile, "int f(volatile int x) { return x; }", "store volatile i32 %0");
+emits!(volatile_local_initialization_is_volatile, "int f(void) { volatile int x = 42; return x; }", "store volatile i32 42");
+emits!(volatile_pointer_object_loads_the_pointer_volatile, "int x; int * volatile p = &x; int f(void) { return *p; }", "load volatile ptr, ptr @p");
+emits!(not volatile_pointer_object_does_not_qualify_the_pointee, "int x; int * volatile p = &x; int f(void) { return *p; }", "load volatile i32");
+emits!(pointer_to_volatile_loads_the_pointee_volatile, "volatile int x; volatile int *p = &x; int f(void) { return *p; }", "load volatile i32");
+emits!(volatile_structure_qualifies_member_access, "struct S { int x; }; volatile struct S s; int f(void) { return s.x; }", "load volatile i32");
+emits!(volatile_member_access_is_volatile, "struct S { volatile int x; }; struct S s; int f(void) { return s.x; }", "load volatile i32");
+emits!(const_volatile_global_has_mutable_storage, "const volatile int x = 42; int f(void) { return x; }", "@x = global i32 42");
+emits!(not const_volatile_global_is_not_an_llvm_constant, "const volatile int x = 42; int f(void) { return x; }", "@x = constant");
+emits!(volatile_aggregate_copy_uses_volatile_memcpy, "struct S { int x; }; volatile struct S a; struct S b; void f(void) { a = b; b = a; }", "i32 4, i1 true");
+emits!(volatile_aggregate_argument_uses_volatile_memcpy, "struct S { int x; }; void take(struct S); volatile struct S s; void f(void) { take(s); }", "i32 4, i1 true");
+emits!(volatile_aggregate_parameter_access_is_volatile, "struct S { int x; }; int f(volatile struct S s) { return s.x; }", "load volatile i32");
+emits!(volatile_aggregate_return_uses_volatile_memcpy, "struct S { int x; }; volatile struct S s; struct S f(void) { return s; }", "i32 4, i1 true");
+emits!(not ordinary_aggregate_copy_uses_nonvolatile_memcpy, "struct S { int x; }; struct S a; struct S b; void f(void) { a = b; }", "i32 4, i1 true");
+emits!(volatile_aggregate_list_initialization_uses_volatile_memcpy, "struct S { int x; }; int f(void) { volatile struct S s = { 42 }; return s.x; }", "i32 4, i1 true");
+emits!(volatile_array_typedef_qualifies_element_access, "typedef int A[2]; volatile A a; int f(void) { a[0] = 42; return a[0]; }", "store volatile i32 42");
+emits!(entry_block_phi_predecessor_follows_params, "int both(int a, int b) { return a && b; } int main(void) { return both(1, 1); }", "phi i1 [ false, %2 ]");
+emits!(warns return_without_value_in_int_function_returns_a_value, "int f(int n) { if (n) return; return 42; }", "ret i32 0");
+emits!(warns not return_without_value_in_int_function_never_returns_void, "int f(int n) { if (n) return; return 42; }", "ret void");
+emits!(union_in_struct_initializer_uses_a_literal_type, "union u { int i; double d; }; struct s { int tag; union u v; } g = { 1, { 41 } }; int main(void) { return g.v.i; }", "@g = global <{ i32, { i32, [4 x i8] } }> <{ i32 1, { i32, [4 x i8] } { i32 41, [4 x i8] zeroinitializer } }>");
+emits!(union_matching_its_widest_member_keeps_its_name, "union u { int i; char c; }; struct s { union u v; } g = { { 42 } }; int main(void) { return g.v.i; }", "@g = global %struct.s <{ %union.u { i32 42 } }>");
+emits!(struct_assign_from_lvalue_uses_memcpy, "struct s { int a; }; int main(void) { struct s v; struct s w; v.a = 42; w = v; return w.a; }", "@llvm.memcpy");
+emits!(struct_init_from_lvalue_uses_memcpy, "struct s { int a; }; int main(void) { struct s v; v.a = 42; { struct s w = v; return w.a; } }", "@llvm.memcpy");
+emits!(union_assign_from_lvalue_uses_memcpy, "union u { int i; char c[8]; }; int main(void) { union u a; union u b; a.i = 42; b = a; return b.i; }", "@llvm.memcpy");
+emits!(struct_assign_through_deref_uses_memcpy, "struct s { int a; }; int main(void) { struct s v; struct s w; struct s *p; v.a = 42; p = &v; w = *p; return w.a; }", "@llvm.memcpy");
+emits!(struct_assign_from_call_spills_then_memcpy, "struct s { int a; }; struct s mk(void) { struct s v; v.a = 42; return v; } int main(void) { struct s w; w = mk(); return w.a; }", "@llvm.memcpy");
+emits!(struct_assign_from_call_writes_temporary_through_sret, "struct s { int a; }; struct s mk(void) { struct s v; v.a = 42; return v; } int main(void) { struct s w; w = mk(); return w.a; }", "call void (ptr) @mk(ptr sret(%struct.s) align 4 %");
+emits!(not struct_lvalue_is_not_loaded, "struct s { int a; }; int main(void) { struct s v; struct s w; v.a = 42; w = v; return w.a; }", "load %struct.s");
+emits!(sret_define, "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int main(void) { return mk(42).a; }", "define void @mk(ptr sret(%struct.big) align 4");
+emits!(not sret_define_returns_void, "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int main(void) { return mk(42).a; }", "ret %struct.big");
+emits!(sret_declare, "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int main(void) { return gmk(42).a; }", "declare void @gmk(ptr sret(%struct.big) align 4, i32)");
+emits!(sret_call, "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int main(void) { return gmk(42).a; }", "call void (ptr, i32) @gmk(ptr sret(%struct.big) align 4 %");
+emits!(sret_align_follows_layout, "struct three { char c[3]; }; struct three mk(void) { struct three r; r.c[0] = 42; return r; } int main(void) { struct three v; v = mk(); return v.c[0]; }", "define void @mk(ptr sret(%struct.three) align 1");
+emits!(sret_union, "union u { int i; char c[8]; }; union u mk(void) { union u r; r.i = 42; return r; } int main(void) { return mk().i; }", "define void @mk(ptr sret(%union.u) align 4");
+emits!(byval_define, "struct big { int a; int b; int c; int d; int e; }; int sum(struct big v) { return v.a + v.e; } int main(void) { struct big v; v.a = 40; v.e = 2; return sum(v); }", "define i32 @sum(ptr byval(%struct.big) align 4");
+emits!(byval_declare, "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; v.a = 42; return gsum(v); }", "declare i32 @gsum(ptr byval(%struct.big) align 4)");
+emits!(byval_call, "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; v.a = 42; return gsum(v); }", "call i32 (ptr) @gsum(ptr byval(%struct.big) align 4 %");
+emits!(not byval_call_does_not_load, "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; v.a = 42; return gsum(v); }", "load %struct.big");
+emits!(byval_union, "union u { int i; char c[8]; }; int f(union u v) { return v.i; } int main(void) { union u v; v.i = 42; return f(v); }", "define i32 @f(ptr byval(%union.u) align 4");
+emits!(byval_keeps_scalar_parameter_order, "struct big { int a; int b; int c; int d; int e; }; int f(int x, struct big v, char y) { return x + v.a + y; } int main(void) { struct big v; v.a = 40; return f(1, v, 1); }", "define i32 @f(i32 %0, ptr byval(%struct.big) align 4 %1, i8 %2)");
+emits!(sret_then_byval_share_temporary, "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n); int sum(struct big v); int main(void) { return sum(mk(42)); }", "call i32 (ptr) @sum(ptr byval(%struct.big) align 4 %");
+emits!(incomplete_extern_object_declared, "struct S; extern struct S s; void *p = &s;", "@s = external global %struct.S\n");
+emits!(incomplete_return_function_declared, "struct S; struct S f(void); struct S (*g(void))(void) { return f; }", "declare void @f()");
+emits!(sret_unprototyped_declare, "struct big { int a; int b; int c; int d; int e; }; struct big gmk(); int main(void) { return gmk(42).a; }", "declare void @gmk(ptr sret(%struct.big) align 4, ...)");
+emits!(sret_unprototyped_call, "struct big { int a; int b; int c; int d; int e; }; struct big gmk(); int main(void) { return gmk(42).a; }", "call void (ptr, ...) @gmk(ptr sret(%struct.big) align 4 %");
+emits!(byval_unprototyped_call, "struct big { int a; int b; int c; int d; int e; }; int gsum(); int main(void) { struct big v; v.a = 42; return gsum(v); }", "call i32 (...) @gsum(ptr byval(%struct.big) align 4 %");
+emits!(sret_variadic_declare, "struct big { int a; int b; int c; int d; int e; }; struct big gfmt(int n, ...); int main(void) { return gfmt(42, 1).a; }", "declare void @gfmt(ptr sret(%struct.big) align 4, i32, ...)");
+emits!(sret_falls_off_end_returns_void, "struct big { int a; int b; int c; int d; int e; }; struct big mk(void) { } int main(void) { struct big v; v = mk(); return 42; }", "  ret void\n}");
+emits!(byval_param_is_not_spilled, "struct big { int a; int b; int c; int d; int e; }; int sum(struct big v) { return v.a; } int main(void) { struct big v; v.a = 42; return sum(v); }", "define i32 @sum(ptr byval(%struct.big) align 4 %0) {\n  %2 = getelementptr inbounds i8, ptr %0, i32 0");
+emits!(sret_return_memcpy_into_hidden_pointer, "struct big { int a; int b; int c; int d; int e; }; struct big mk(void) { struct big r; r.a = 42; return r; } int main(void) { return mk().a; }", "call void @llvm.memcpy.p0.p0.i32(ptr align 4 %0, ptr align 4 %");
+
+exits!(return_constant, "int main(void) { return 42; }", 42);
+exits!(return_zero, "int main(void) { return 0; }", 0);
+exits!(return_negative_wraps, "int main(void) { return -1; }", 255);
+exits!(volatile_scalar_execution, "volatile int x = 40; int main(void) { x++; return x + 1; }", 42);
 exits!(add, "int main(void) { return 40 + 2; }", 42);
 exits!(sub, "int main(void) { return 50 - 8; }", 42);
 exits!(mul, "int main(void) { return 6 * 7; }", 42);
@@ -129,62 +90,24 @@ exits!(precedence, "int main(void) { return 2 + 4 * 10; }", 42);
 exits!(unary_minus, "int main(void) { return -(-42); }", 42);
 exits!(bit_not, "int main(void) { return ~(-43); }", 42);
 exits!(logical_not, "int main(void) { return !0 + !5 + 41; }", 42);
-exits!(
-    comparisons,
-    "int main(void) { return (1 < 2) + (2 <= 2) + (3 > 2) + (3 >= 3) + (4 == 4) + (4 != 5) + 36; }",
-    42
-);
+exits!(comparisons, "int main(void) { return (1 < 2) + (2 <= 2) + (3 > 2) + (3 >= 3) + (4 == 4) + (4 != 5) + 36; }", 42);
 exits!(logical_and_or, "int main(void) { return (1 && 2) + (0 || 3) + 40; }", 42);
-exits!(
-    logical_in_entry_block_with_params,
-    "int both(int a, int b) { return a && b; } int either(int a, int b) { return a || b; } int main(void) { return both(1, 2) * 10 + both(1, 0) * 20 + either(0, 0) * 40 + either(0, 3); }",
-    11
-);
-exits!(
-    logical_in_entry_block_with_sret,
-    "struct s { int v; }; struct s mk(int a, int b) { struct s r; r.v = a && b || !a; return r; } int main(void) { return mk(1, 2).v * 10 + mk(0, 5).v * 20 + mk(1, 0).v * 40 + 12; }",
-    42
-);
-exits!(
-    logical_condition_in_entry_block,
-    "int digit(char c) { if (c >= 48 && c <= 57) return 1; return 0; } int main(void) { return digit(53) * 40 + digit(65) * 20 + 2; }",
-    42
-);
-emits!(
-    entry_block_phi_predecessor_follows_params,
-    "int both(int a, int b) { return a && b; } int main(void) { return both(1, 1); }",
-    "phi i1 [ false, %2 ]"
-);
-exits!(
-    nested_logical_operators,
-    "int main(void) { int a = 5, b = 3, c = 0; return (a && b || c) + (c || a && b) * 2 + (a && b && c) * 4 + (c || c || a) * 8 + ((a || c) && (c || b)) * 16 + 10; }",
-    37
-);
-exits!(
-    nested_logical_short_circuit,
-    "int n = 0; int t(void) { return ++n; } int main(void) { int r = (t() && t() || t()) + (0 && t() || t()) * 2; return r * 10 + n; }",
-    33
-);
-exits!(
-    nested_logical_in_conditions,
-    "int main(void) { int a = 1, b = 0, r = 0; if (a && b || a) r += 1; while (b || a && r < 3) r++; return r * 10 + ((a ? b : a) || a && b); }",
-    30
-);
+exits!(logical_in_entry_block_with_params, "int both(int a, int b) { return a && b; } int either(int a, int b) { return a || b; } int main(void) { return both(1, 2) * 10 + both(1, 0) * 20 + either(0, 0) * 40 + either(0, 3); }", 11);
+exits!(logical_in_entry_block_with_sret, "struct s { int v; }; struct s mk(int a, int b) { struct s r; r.v = a && b || !a; return r; } int main(void) { return mk(1, 2).v * 10 + mk(0, 5).v * 20 + mk(1, 0).v * 40 + 12; }", 42);
+exits!(logical_condition_in_entry_block, "int digit(char c) { if (c >= 48 && c <= 57) return 1; return 0; } int main(void) { return digit(53) * 40 + digit(65) * 20 + 2; }", 42);
+exits!(nested_logical_operators, "int main(void) { int a = 5, b = 3, c = 0; return (a && b || c) + (c || a && b) * 2 + (a && b && c) * 4 + (c || c || a) * 8 + ((a || c) && (c || b)) * 16 + 10; }", 37);
+exits!(nested_logical_short_circuit, "int n = 0; int t(void) { return ++n; } int main(void) { int r = (t() && t() || t()) + (0 && t() || t()) * 2; return r * 10 + n; }", 33);
+exits!(nested_logical_in_conditions, "int main(void) { int a = 1, b = 0, r = 0; if (a && b || a) r += 1; while (b || a && r < 3) r++; return r * 10 + ((a ? b : a) || a && b); }", 30);
 exits!(ternary, "int main(void) { return 1 ? 42 : 7; }", 42);
 exits!(ternary_false, "int main(void) { return 0 ? 7 : 42; }", 42);
 exits!(comma, "int main(void) { return (7, 42); }", 42);
-
 exits!(local_variable, "int main(void) { int x; x = 42; return x; }", 42);
 exits!(local_arithmetic, "int main(void) { int a; int b; a = 6; b = 7; return a * b; }", 42);
 exits!(compound_assign, "int main(void) { int x; x = 40; x += 2; return x; }", 42);
 exits!(enum_assign, "enum e { A = 40, B }; int main(void) { enum e x; x = B; x = x; return x + 1; }", 42);
 exits!(enum_init_from_lvalue, "enum e { A = 40, B }; enum e g = B; int main(void) { enum e x = g; return x + 1; }", 42);
 exits!(compound_assign_promoted_lhs, "int main(void) { unsigned char c; c = 198; c += 100; return c; }", 42);
-exits!(
-    compound_assign_all,
-    "int main(void) { int x; x = 1; x <<= 6; x -= 20; x *= 2; x /= 2; x |= 2; x &= 0xff; x ^= 0; x %= 100; x >>= 0; return x; }",
-    46
-);
+exits!(compound_assign_all, "int main(void) { int x; x = 1; x <<= 6; x -= 20; x *= 2; x /= 2; x |= 2; x &= 0xff; x ^= 0; x %= 100; x >>= 0; return x; }", 46);
 exits!(pre_increment, "int main(void) { int x; x = 41; return ++x; }", 42);
 exits!(post_increment, "int main(void) { int x; x = 42; return x++; }", 42);
 exits!(post_increment_side_effect, "int main(void) { int x; x = 41; x++; return x; }", 42);
@@ -201,116 +124,44 @@ exits!(signed_division_negative, "int main(void) { int a; a = -85; return a / -2
 exits!(signed_remainder_negative, "int main(void) { int a; a = -85; return -(a % 43); }", 42);
 exits!(arithmetic_shift, "int main(void) { int a; a = -168; return -(a >> 2); }", 42);
 exits!(logical_shift, "int main(void) { unsigned a; a = 0xa8000000u; return a >> 26; }", 42);
-
-exits!(
-    call_in_expression,
-    "int f(void) { return 6; } int g(void) { return 7; } int main(void) { return f() * g(); }",
-    42
-);
+exits!(call_in_expression, "int f(void) { return 6; } int g(void) { return 7; } int main(void) { return f() * g(); }", 42);
 exits!(call_prototype_first, "int f(void); int main(void) { return f(); } int f(void) { return 42; }", 42);
 exits!(call_two_arguments, "int f(int a, int b) { return a * b; } int main(void) { return f(6, 7); }", 42);
 exits!(call_char_argument, "int f(char c) { return c; } int main(void) { return f(42); }", 42);
 exits!(call_short_argument, "int f(short s) { return s; } int main(void) { return f(42); }", 42);
 exits!(recursion, "int fact(int n) { return n ? n * fact(n - 1) : 1; } int main(void) { return fact(5) - 78; }", 42);
-exits!(
-    function_pointer_call,
-    "int add(int a, int b) { return a + b; } int main(void) { int (*fp)(int, int); fp = add; return (*fp)(40, 2) - fp(0, 0); }",
-    42
-);
-exits!(
-    variadic_call_double,
-    "int sprintf(char *, const char *, ...); int atoi(const char *); int main(void) { char b[32]; sprintf(b, \"%d %.1f\", 4, 2.0); return atoi(b) * 10 + (b[2] - 0x30); }",
-    42
-);
-
+exits!(function_pointer_call, "int add(int a, int b) { return a + b; } int main(void) { int (*fp)(int, int); fp = add; return (*fp)(40, 2) - fp(0, 0); }", 42);
+exits!(variadic_call_double, "int sprintf(char *, const char *, ...); int atoi(const char *); int main(void) { char b[32]; sprintf(b, \"%d %.1f\", 4, 2.0); return atoi(b) * 10 + (b[2] - 0x30); }", 42);
 exits!(if_true, "int main(void) { if (1) return 42; return 7; }", 42);
 exits!(if_false, "int main(void) { if (0) return 7; return 42; }", 42);
 exits!(if_else, "int main(void) { if (0) return 7; else return 42; }", 42);
-exits!(
-    if_else_if_chain,
-    "int f(int x) { if (x > 0) return 1; else if (x < 0) return -1; return 0; } int main(void) { return f(5) * 40 + f(-3) + f(0) + 3; }",
-    42
-);
+exits!(if_else_if_chain, "int f(int x) { if (x > 0) return 1; else if (x < 0) return -1; return 0; } int main(void) { return f(5) * 40 + f(-3) + f(0) + 3; }", 42);
 exits!(while_loop, "int main(void) { int i; i = 0; while (i < 42) i++; return i; }", 42);
 exits!(do_while, "int main(void) { int i; i = 0; do i++; while (i < 42); return i; }", 42);
 exits!(for_loop, "int main(void) { int i; int s; s = 0; for (i = 0; i < 7; i++) s += 6; return s; }", 42);
 exits!(break_loop, "int main(void) { int i; for (i = 0; ; i++) if (i == 42) break; return i; }", 42);
 exits!(for_no_action, "int main(void) { int i; i = 0; for (; i < 42;) i++; return i; }", 42);
 exits!(for_no_clauses, "int main(void) { int i; i = 0; for (;;) { if (++i == 42) break; } return i; }", 42);
-exits!(
-    continue_loop,
-    "int main(void) { int i; int s; s = 0; for (i = 0; i < 10; i++) { if (i % 2) continue; s += i; } return s + 22; }",
-    42
-);
-exits!(
-    continue_then_break,
-    "int main(void) { int i; int s; s = 0; for (i = 0; i < 100; i++) { if (i % 2) continue; if (i > 12) break; s += i; } return s; }",
-    42
-);
-exits!(
-    while_then_do_while,
-    "int main(void) { int n; int c; n = 27; c = 0; while (n != 1) { n = n % 2 ? 3 * n + 1 : n / 2; c++; } do c--; while (c > 42); return c; }",
-    42
-);
+exits!(continue_loop, "int main(void) { int i; int s; s = 0; for (i = 0; i < 10; i++) { if (i % 2) continue; s += i; } return s + 22; }", 42);
+exits!(continue_then_break, "int main(void) { int i; int s; s = 0; for (i = 0; i < 100; i++) { if (i % 2) continue; if (i > 12) break; s += i; } return s; }", 42);
+exits!(while_then_do_while, "int main(void) { int n; int c; n = 27; c = 0; while (n != 1) { n = n % 2 ? 3 * n + 1 : n / 2; c++; } do c--; while (c > 42); return c; }", 42);
 exits!(goto_label, "int main(void) { int i; i = 0; again: i++; if (i < 42) goto again; return i; }", 42);
-exits!(
-    goto_forward_and_backward,
-    "int main(void) { int i; int s; i = 0; s = 0; loop: if (i == 6) goto done; s += ++i; goto loop; done: return s * 2; }",
-    42
-);
+exits!(goto_forward_and_backward, "int main(void) { int i; int s; i = 0; s = 0; loop: if (i == 6) goto done; s += ++i; goto loop; done: return s * 2; }", 42);
 exits!(goto_skips_statement, "int main(void) { int i; i = 0; goto skip; i = 100; skip: i += 42; return i; }", 42);
-exits!(
-    goto_out_of_nested_loops,
-    "int main(void) { int i; i = 0; for (;;) { while (1) { if (++i == 42) goto out; } } out: return i; }",
-    42
-);
-exits!(
-    goto_label_per_function,
-    "int f(int n) { int r; r = 0; again: if (n > 0) { r += n--; goto again; } return r; } int main(void) { return f(8) + 6; }",
-    42
-);
+exits!(goto_out_of_nested_loops, "int main(void) { int i; i = 0; for (;;) { while (1) { if (++i == 42) goto out; } } out: return i; }", 42);
+exits!(goto_label_per_function, "int f(int n) { int r; r = 0; again: if (n > 0) { r += n--; goto again; } return r; } int main(void) { return f(8) + 6; }", 42);
 exits!(goto_into_block, "int main(void) { int x; x = 0; { goto in; } { int y; y = 42; in: x = 42; } return x; }", 42);
 exits!(goto_chain, "int main(void) { int x; x = 40; goto a; b: x += 2; return x; a: goto b; }", 42);
-
-exits!(
-    break_inner_of_nested_loops,
-    "int main(void) { int i; int j; int s; s = 0; for (i = 0; i < 5; i++) { for (j = 0; ; j++) { if (j == 3) break; s += j; } s += i; } return s + 17; }",
-    42
-);
-exits!(
-    continue_inner_of_nested_loops,
-    "int main(void) { int i; int j; int s; s = 0; for (i = 0; i < 3; i++) { for (j = 0; j < 4; j++) { if (j == 1) continue; s += j; } } return s * 2 + 12; }",
-    42
-);
-exits!(
-    break_inside_do_while,
-    "int main(void) { int i; i = 0; do { if (i == 42) break; i++; } while (1); return i; }",
-    42
-);
-exits!(
-    continue_inside_while,
-    "int main(void) { int i; int s; i = 0; s = 0; while (i < 10) { i++; if (i & 1) continue; s += i; } return s + 12; }",
-    42
-);
-exits!(
-    labeled_loop_body,
-    "int main(void) { int i; i = 0; for (;;) { top: if (i >= 42) break; i++; if (i < 42) goto top; } return i; }",
-    42
-);
+exits!(break_inner_of_nested_loops, "int main(void) { int i; int j; int s; s = 0; for (i = 0; i < 5; i++) { for (j = 0; ; j++) { if (j == 3) break; s += j; } s += i; } return s + 17; }", 42);
+exits!(continue_inner_of_nested_loops, "int main(void) { int i; int j; int s; s = 0; for (i = 0; i < 3; i++) { for (j = 0; j < 4; j++) { if (j == 1) continue; s += j; } } return s * 2 + 12; }", 42);
+exits!(break_inside_do_while, "int main(void) { int i; i = 0; do { if (i == 42) break; i++; } while (1); return i; }", 42);
+exits!(continue_inside_while, "int main(void) { int i; int s; i = 0; s = 0; while (i < 10) { i++; if (i & 1) continue; s += i; } return s + 12; }", 42);
+exits!(labeled_loop_body, "int main(void) { int i; i = 0; for (;;) { top: if (i >= 42) break; i++; if (i < 42) goto top; } return i; }", 42);
 exits!(switch_case, "int main(void) { switch (2) { case 1: return 1; case 2: return 42; default: return 3; } }", 42);
 exits!(switch_default, "int main(void) { switch (9) { case 1: return 1; default: return 42; } }", 42);
-exits!(
-    switch_fallthrough,
-    "int main(void) { int x; x = 40; switch (1) { case 1: x++; case 2: x++; break; case 3: x = 0; } return x; }",
-    42
-);
-exits!(
-    switch_long_control,
-    "int main(void) { long l; unsigned u; l = 3; u = 40; switch (l) { case 3: u += 2; break; default: u = 0; } switch (u) { case 42: return 42; } return 0; }",
-    42
-);
+exits!(switch_fallthrough, "int main(void) { int x; x = 40; switch (1) { case 1: x++; case 2: x++; break; case 3: x = 0; } return x; }", 42);
+exits!(switch_long_control, "int main(void) { long l; unsigned u; l = 3; u = 40; switch (l) { case 3: u += 2; break; default: u = 0; } switch (u) { case 42: return 42; } return 0; }", 42);
 exits!(nested_blocks, "int main(void) { int x; x = 1; { int x; x = 7; } return x + 41; }", 42);
-
 exits!(short_circuit_and, "int f(void) { return 0; } int main(void) { int x; x = 42; (0 && (x = 1)); return x; }", 42);
 exits!(short_circuit_or, "int main(void) { int x; x = 42; (1 || (x = 1)); return x; }", 42);
 exits!(int_wraparound, "int main(void) { unsigned u; u = 0xffffffffu; u += 43; return u; }", 42);
@@ -329,115 +180,37 @@ exits!(global_long, "long g = -100000L; int main(void) { return -(g / 2500) + 2;
 exits!(global_double_from_int, "double g = 2; int main(void) { return g * 21; }", 42);
 exits!(global_float, "float g = 1.5; int main(void) { return g * 28; }", 42);
 exits!(global_long_double, "long double g = 0.5; int main(void) { return g * 84; }", 42);
-exits!(
-    long_double_folds_at_x87_precision,
-    "int main(void) { return (9007199254740992.0L + 1.0L != 9007199254740992.0L) + 41; }",
-    42
-);
+exits!(long_double_folds_at_x87_precision, "int main(void) { return (9007199254740992.0L + 1.0L != 9007199254740992.0L) + 41; }", 42);
 exits!(double_constant_keeps_excess_precision, "double g = 55.1; int main(void) { return g != 55.1; }", 1);
 exits!(float_constant_keeps_excess_precision, "float f = 0.1f; int main(void) { return f == 0.1f; }", 0);
 exits!(float_and_double_constants_share_precision, "int main(void) { return 0.1f == 0.1; }", 1);
 exits!(cast_rounds_excess_precision, "double g = 55.1; int main(void) { return (double)55.1 == g; }", 1);
-exits!(
-    static_initializer_rounds_folded_sum,
-    "double d = 0.1 + 0.2; double e = 0.3; int main(void) { return d == e; }",
-    1
-);
-exits!(
-    static_initializer_rounds_cast_sum,
-    "double d = (double)(0.1 + 0.2); double e = 0.3; int main(void) { return d == e; }",
-    1
-);
-exits!(
-    static_initializer_rounds_integer_to_float,
-    "float f = 16777217; int main(void) { return f == 16777216.0f; }",
-    1
-);
-exits!(
-    division_matches_folded_division,
-    "double x = 1.0, y = 3.0; int main(void) { return x / y == 1.0 / 3.0; }",
-    1
-);
-exits!(
-    negated_division_matches_folded_division,
-    "double x = 1.0, y = 3.0; int main(void) { return -(x / y) == -1.0 / 3.0; }",
-    1
-);
-exits!(
-    stored_quotient_loses_excess_precision,
-    "double x = 1.0, y = 3.0; int main(void) { double t = x / y; return t == x / y; }",
-    0
-);
+exits!(static_initializer_rounds_folded_sum, "double d = 0.1 + 0.2; double e = 0.3; int main(void) { return d == e; }", 1);
+exits!(static_initializer_rounds_cast_sum, "double d = (double)(0.1 + 0.2); double e = 0.3; int main(void) { return d == e; }", 1);
+exits!(static_initializer_rounds_integer_to_float, "float f = 16777217; int main(void) { return f == 16777216.0f; }", 1);
+exits!(division_matches_folded_division, "double x = 1.0, y = 3.0; int main(void) { return x / y == 1.0 / 3.0; }", 1);
+exits!(negated_division_matches_folded_division, "double x = 1.0, y = 3.0; int main(void) { return -(x / y) == -1.0 / 3.0; }", 1);
+exits!(stored_quotient_loses_excess_precision, "double x = 1.0, y = 3.0; int main(void) { double t = x / y; return t == x / y; }", 0);
 exits!(double_chain_keeps_excess_precision, "double x = 1e16, y = 1.0; int main(void) { return x + y - x == y; }", 1);
-exits!(
-    float_chain_keeps_excess_precision,
-    "float a = 16777216.0f, b = 1.0f; int main(void) { return a + b - a == b; }",
-    1
-);
-exits!(
-    compound_assignment_rounds_its_result,
-    "double a = 0.1; int main(void) { double d = 1.0; d += a * 3.0; return d == 1.0 + a * 3.0; }",
-    0
-);
-exits!(
-    long_double_inc_dec,
-    "int main(void) { long double d = 40.5L; d++; ++d; d--; return (int) (d * 2); }",
-    83
-);
-exits!(
-    floating_inc_dec_values,
-    "int main(void) { long double d = 1.5L; float f = 1.5f; double e = 1.5; int r; r = (int) (d++ * 2); r += (int) ++f; r += (int) e--; r += (int) (--d * 4); return r + 30; }",
-    42
-);
+exits!(float_chain_keeps_excess_precision, "float a = 16777216.0f, b = 1.0f; int main(void) { return a + b - a == b; }", 1);
+exits!(compound_assignment_rounds_its_result, "double a = 0.1; int main(void) { double d = 1.0; d += a * 3.0; return d == 1.0 + a * 3.0; }", 0);
+exits!(long_double_inc_dec, "int main(void) { long double d = 40.5L; d++; ++d; d--; return (int) (d * 2); }", 83);
+exits!(floating_inc_dec_values, "int main(void) { long double d = 1.5L; float f = 1.5f; double e = 1.5; int r; r = (int) (d++ * 2); r += (int) ++f; r += (int) e--; r += (int) (--d * 4); return r + 30; }", 42);
 exits!(global_negative, "int g = -42; int main(void) { return -g; }", 42);
 exits!(warns return_without_value_from_int, "int f(int n) { if (n) return; return 42; } int main(void) { return f(0); }", 42);
 exits!(warns return_without_value_from_long, "long f(int n) { if (n) return; return 42; } int main(void) { return f(0); }", 42);
-exits!(
-    warns return_without_value_from_double,
-    "double f(int n) { if (n) return; return 42; } int main(void) { return (int) f(0); }",
-    42
-);
+exits!(warns return_without_value_from_double, "double f(int n) { if (n) return; return 42; } int main(void) { return (int) f(0); }", 42);
 exits!(warns return_without_value_from_char, "char f(int n) { if (n) return; return 42; } int main(void) { return f(0); }", 42);
-exits!(
-    warns return_without_value_from_pointer,
-    "int *f(int n) { if (n) return; return 0; } int main(void) { return f(0) == 0 ? 42 : 0; }",
-    42
-);
-exits!(
-    warns return_without_value_from_struct,
-    "struct s { int a; }; struct s f(int n) { struct s r; r.a = 42; if (n) return; return r; } int main(void) { return f(0).a; }",
-    42
-);
+exits!(warns return_without_value_from_pointer, "int *f(int n) { if (n) return; return 0; } int main(void) { return f(0) == 0 ? 42 : 0; }", 42);
+exits!(warns return_without_value_from_struct, "struct s { int a; }; struct s f(int n) { struct s r; r.a = 42; if (n) return; return r; } int main(void) { return f(0).a; }", 42);
 exits!(return_without_value_from_void, "void f(int n) { if (n) return; } int main(void) { f(1); return 42; }", 42);
-emits!(
-    warns return_without_value_in_int_function_returns_a_value,
-    "int f(int n) { if (n) return; return 42; }",
-    "ret i32 0"
-);
-emits!(warns not return_without_value_in_int_function_never_returns_void, "int f(int n) { if (n) return; return 42; }", "ret void");
 exits!(enum_inc_dec, "enum e { A = 40, B, C }; int main(void) { enum e v = A; v++; ++v; return v; }", 42);
-exits!(
-    enum_dec_through_pointer,
-    "enum e { A = 40, B, C }; int main(void) { enum e v = C; enum e *p = &v; p[0]--; return --v + (v == A); }",
-    41
-);
-exits!(
-    enum_post_inc_value,
-    "enum e { A = 40, B, C }; int main(void) { enum e v = B; int r = v++; return r + (v == C); }",
-    42
-);
-exits!(
-    narrow_inc_dec_wraps,
-    "int main(void) { char c = 127; unsigned char u = 255; short s = -32768; c++; u++; s--; return (c == -128) + (u == 0) + (s == 32767) + 39; }",
-    42
-);
+exits!(enum_dec_through_pointer, "enum e { A = 40, B, C }; int main(void) { enum e v = C; enum e *p = &v; p[0]--; return --v + (v == A); }", 41);
+exits!(enum_post_inc_value, "enum e { A = 40, B, C }; int main(void) { enum e v = B; int r = v++; return r + (v == C); }", 42);
+exits!(narrow_inc_dec_wraps, "int main(void) { char c = 127; unsigned char u = 255; short s = -32768; c++; u++; s--; return (c == -128) + (u == 0) + (s == 32767) + 39; }", 42);
 exits!(narrow_post_inc_value, "int main(void) { char c = 127; int r = c++; return r - 85; }", 42);
 exits!(narrow_pre_inc_value, "int main(void) { unsigned char u = 200; unsigned r = ++u * 2; return r - 360; }", 42);
-exits!(
-    bitfield_inc_wraps,
-    "struct b { unsigned a : 3; int s : 2; }; int main(void) { struct b v; v.a = 7; v.s = 1; v.a++; v.s++; return (v.a == 0) + (v.s == -2) + 40; }",
-    42
-);
+exits!(bitfield_inc_wraps, "struct b { unsigned a : 3; int s : 2; }; int main(void) { struct b v; v.a = 7; v.s = 1; v.a++; v.s++; return (v.a == 0) + (v.s == -2) + 40; }", 42);
 exits!(global_const, "const int g = 42; int main(void) { return g; }", 42);
 exits!(global_enum, "enum e { A = 40, B }; enum e g = B; int main(void) { return g + 1; }", 42);
 exits!(global_tentative, "int g; int g; int main(void) { return g + 42; }", 42);
@@ -447,11 +220,7 @@ exits!(global_null_pointer, "int *p = 0; int main(void) { return p == 0 ? 42 : 7
 exits!(global_pointer_to_global, "int g = 42; int *p = &g; int main(void) { return *p; }", 42);
 exits!(global_pointer_to_element, "int a[3] = {1, 2, 42}; int *p = &a[2]; int main(void) { return *p; }", 42);
 exits!(global_pointer_arithmetic, "int a[3] = {1, 42, 3}; int *p = a + 1; int main(void) { return *p; }", 42);
-exits!(
-    global_function_pointer,
-    "int f(void) { return 42; } int (*fp)(void) = f; int main(void) { return fp == f ? 42 : 7; }",
-    42
-);
+exits!(global_function_pointer, "int f(void) { return 42; } int (*fp)(void) = f; int main(void) { return fp == f ? 42 : 7; }", 42);
 exits!(global_string_array, "char s[] = \"abc\"; int main(void) { return s[1] - 56; }", 42);
 exits!(global_string_array_padded, "char s[8] = \"ab\"; int main(void) { return s[0] - 55 + s[7]; }", 42);
 exits!(global_string_array_exact, "char s[2] = \"ab\"; int main(void) { return s[1] - 56; }", 42);
@@ -463,288 +232,65 @@ exits!(global_array_2d_flat, "int a[2][2] = {1, 2, 3, 40}; int main(void) { retu
 exits!(global_double_array, "double a[2] = {1, 41.0}; int main(void) { return (int) (a[0] + a[1]); }", 42);
 exits!(global_pointer_array, "int x = 42; int *a[2] = {0, &x}; int main(void) { return *a[1]; }", 42);
 exits!(global_struct, "struct s { char c; int a; } v = {'a', 42}; int *p = &v.a; int main(void) { return *p; }", 42);
-exits!(
-    global_struct_partial,
-    "struct s { int a; int b; } v = {42}; int *p = &v.b; int main(void) { return *p + 42; }",
-    42
-);
-exits!(
-    global_struct_nested,
-    "struct i { int a; }; struct o { char c; struct i in; } v = {'x', {42}}; int *p = &v.in.a; int main(void) { return *p; }",
-    42
-);
-exits!(
-    global_struct_array,
-    "struct s { char c; int a; } v[2] = {{'a', 1}, {'b', 42}}; int *p = &v[1].a; int main(void) { return *p; }",
-    42
-);
-exits!(
-    global_struct_with_array,
-    "struct s { int a[3]; } v = {{1, 2, 42}}; int *p = &v.a[2]; int main(void) { return *p; }",
-    42
-);
+exits!(global_struct_partial, "struct s { int a; int b; } v = {42}; int *p = &v.b; int main(void) { return *p + 42; }", 42);
+exits!(global_struct_nested, "struct i { int a; }; struct o { char c; struct i in; } v = {'x', {42}}; int *p = &v.in.a; int main(void) { return *p; }", 42);
+exits!(global_struct_array, "struct s { char c; int a; } v[2] = {{'a', 1}, {'b', 42}}; int *p = &v[1].a; int main(void) { return *p; }", 42);
+exits!(global_struct_with_array, "struct s { int a[3]; } v = {{1, 2, 42}}; int *p = &v.a[2]; int main(void) { return *p; }", 42);
 exits!(global_union_first, "union u { int a; char c; } v = {42}; int *p = &v.a; int main(void) { return *p; }", 42);
 exits!(global_union_narrow, "union u { char c; int a; } v = {'*'}; char *p = &v.c; int main(void) { return *p; }", 42);
-exits!(
-    global_union_pad,
-    "union u { char c; int a; } v = {'*'}; int *p = &v.a; int main(void) { return *p & 0xff; }",
-    42
-);
+exits!(global_union_pad, "union u { char c; int a; } v = {'*'}; int *p = &v.a; int main(void) { return *p & 0xff; }", 42);
 exits!(global_struct_zero, "struct s { char c; int a; } v; int *p = &v.a; int main(void) { return *p + 42; }", 42);
-exits!(
-    global_union_in_struct_keeps_first_member,
-    "union u { int i; double d; }; struct s { int tag; union u v; } g = { 1, { 41 } }; int main(void) { return g.tag + g.v.i; }",
-    42
-);
-exits!(
-    global_union_array_with_zero_tail,
-    "union u { int i; double d; }; union u a[3] = { { 20 }, { 22 } }; int main(void) { return a[0].i + a[1].i + a[2].i; }",
-    42
-);
-exits!(
-    global_union_string_member_in_struct,
-    "union u { char c[3]; int i; }; struct s { union u v; short t; } g = { { \"*\" }, 2 }; int main(void) { return g.v.c[0] + g.v.c[1] + g.t - 2; }",
-    42
-);
-exits!(
-    global_union_nested_in_union_in_struct,
-    "union a { int i; double d; }; union b { union a a; int x; }; struct s { char c; union b b; } g = { 2, { { 40 } } }; int main(void) { return g.c + g.b.a.i; }",
-    42
-);
-exits!(
-    local_struct_with_union_member_init,
-    "union u { int i; double d; }; struct s { char c; union u v; }; int main(void) { static struct s g = { 2, { 40 } }; struct s l = { 1, { 41 } }; return g.c + g.v.i + l.c + l.v.i - 42; }",
-    42
-);
-exits!(
-    global_anonymous_union_member_init,
-    "struct s { union { int i; long double ld; } u; int k; } g = { { 40 }, 2 }; int main(void) { return g.u.i + g.k; }",
-    42
-);
-emits!(
-    union_in_struct_initializer_uses_a_literal_type,
-    "union u { int i; double d; }; struct s { int tag; union u v; } g = { 1, { 41 } }; int main(void) { return g.v.i; }",
-    "@g = global <{ i32, { i32, [4 x i8] } }> <{ i32 1, { i32, [4 x i8] } { i32 41, [4 x i8] zeroinitializer } }>"
-);
-emits!(
-    union_matching_its_widest_member_keeps_its_name,
-    "union u { int i; char c; }; struct s { union u v; } g = { { 42 } }; int main(void) { return g.v.i; }",
-    "@g = global %struct.s <{ %union.u { i32 42 } }>"
-);
-exits!(
-    global_struct_ptr_member,
-    "int x = 42; struct s { int *p; } v = {&x}; int **pp = &v.p; int main(void) { return **pp; }",
-    42
-);
-exits!(
-    global_struct_shadowed,
-    "struct s { int a; } v = {40}; int *p = &v.a; int main(void) { struct s { char c; } w; return *p + sizeof w + 1; }",
-    42
-);
-exits!(
-    static_local_twice,
-    "int f(void) { static int n = 20; return ++n; } int g(void) { static int n = 0; return ++n; } int main(void) { f(); g(); return f() + g() * 10; }",
-    42
-);
-exits!(
-    static_local_pointer,
-    "int f(void) { static int n = 42; static int *p = &n; return *p; } int main(void) { return f(); }",
-    42
-);
+exits!(global_union_in_struct_keeps_first_member, "union u { int i; double d; }; struct s { int tag; union u v; } g = { 1, { 41 } }; int main(void) { return g.tag + g.v.i; }", 42);
+exits!(global_union_array_with_zero_tail, "union u { int i; double d; }; union u a[3] = { { 20 }, { 22 } }; int main(void) { return a[0].i + a[1].i + a[2].i; }", 42);
+exits!(global_union_string_member_in_struct, "union u { char c[3]; int i; }; struct s { union u v; short t; } g = { { \"*\" }, 2 }; int main(void) { return g.v.c[0] + g.v.c[1] + g.t - 2; }", 42);
+exits!(global_union_nested_in_union_in_struct, "union a { int i; double d; }; union b { union a a; int x; }; struct s { char c; union b b; } g = { 2, { { 40 } } }; int main(void) { return g.c + g.b.a.i; }", 42);
+exits!(local_struct_with_union_member_init, "union u { int i; double d; }; struct s { char c; union u v; }; int main(void) { static struct s g = { 2, { 40 } }; struct s l = { 1, { 41 } }; return g.c + g.v.i + l.c + l.v.i - 42; }", 42);
+exits!(global_anonymous_union_member_init, "struct s { union { int i; long double ld; } u; int k; } g = { { 40 }, 2 }; int main(void) { return g.u.i + g.k; }", 42);
+exits!(global_struct_ptr_member, "int x = 42; struct s { int *p; } v = {&x}; int **pp = &v.p; int main(void) { return **pp; }", 42);
+exits!(global_struct_shadowed, "struct s { int a; } v = {40}; int *p = &v.a; int main(void) { struct s { char c; } w; return *p + sizeof w + 1; }", 42);
+exits!(static_local_twice, "int f(void) { static int n = 20; return ++n; } int g(void) { static int n = 0; return ++n; } int main(void) { f(); g(); return f() + g() * 10; }", 42);
+exits!(static_local_pointer, "int f(void) { static int n = 42; static int *p = &n; return *p; } int main(void) { return f(); }", 42);
 exits!(static_local_zero, "int f(void) { static int n; return n + 42; } int main(void) { return f(); }", 42);
-exits!(
-    static_local_array,
-    "int f(void) { static int a[2] = {2, 40}; return a[0] + a[1]; } int main(void) { return f(); }",
-    42
-);
-exits!(
-    struct_member,
-    "struct s { int a; int b; }; int main(void) { struct s v; v.a = 40; v.b = 2; return v.a + v.b; }",
-    42
-);
-exits!(
-    struct_member_nested_arrow,
-    "struct in { int x; int y; }; struct out { char c; struct in i; struct in *p; }; int main(void) { struct out o; struct in n; n.x = 40; o.i.y = 2; o.p = &n; return o.p->x + o.i.y; }",
-    42
-);
-exits!(
-    struct_member_padding_offsets,
-    "struct s { char c; int a; char d; int b; }; int main(void) { struct s v; v.c = 1; v.a = 10; v.d = 1; v.b = 30; return v.c + v.a + v.d + v.b; }",
-    42
-);
-exits!(
-    struct_member_arrow_global,
-    "struct s { int a; int b; } g; int main(void) { struct s *p = &g; p->a = 40; p->b = 2; return g.a + g.b; }",
-    42
-);
-exits!(
-    struct_member_address_of_nested,
-    "struct in { int x; int y; }; struct out { char c; struct in i; }; int main(void) { struct out o; int *p = &o.i.y; *p = 40; o.i.x = 2; return o.i.y + o.i.x; }",
-    42
-);
-exits!(
-    struct_member_of_array_element,
-    "struct s { char c; int a; }; int main(void) { struct s v[3]; v[2].a = 40; v[1].c = 2; return v[2].a + v[1].c; }",
-    42
-);
-exits!(
-    union_member_aliasing,
-    "union u { int i; unsigned char c[4]; }; int main(void) { union u v; v.i = 42; return v.c[0] + v.c[3]; }",
-    42
-);
-exits!(
-    struct_member_arrow_chain,
-    "struct n { int v; struct n *next; }; int main(void) { struct n a; struct n b; a.v = 40; b.v = 2; a.next = &b; b.next = &a; return a.next->v + a.next->next->v; }",
-    42
-);
-exits!(
-    struct_member_inc_dec,
-    "struct s { int a; }; int main(void) { struct s v; struct s *p = &v; p->a = 40; p->a++; ++v.a; return p->a; }",
-    42
-);
-exits!(
-    struct_member_const_pointer_global_init,
-    "struct s { char c; double d; int a; } g = {1, 2.5, 39}; int main(void) { const struct s *p = &g; return p->c + (int) p->d + p->a; }",
-    42
-);
-exits!(
-    bitfield_type_def,
-    "struct s { char c; int : 4; unsigned u : 5; double d; }; union u { char c; struct s s; }; int main(void) { return sizeof(struct s) + sizeof(union u) + 18; }",
-    42
-);
+exits!(static_local_array, "int f(void) { static int a[2] = {2, 40}; return a[0] + a[1]; } int main(void) { return f(); }", 42);
+exits!(struct_member, "struct s { int a; int b; }; int main(void) { struct s v; v.a = 40; v.b = 2; return v.a + v.b; }", 42);
+exits!(struct_member_nested_arrow, "struct in { int x; int y; }; struct out { char c; struct in i; struct in *p; }; int main(void) { struct out o; struct in n; n.x = 40; o.i.y = 2; o.p = &n; return o.p->x + o.i.y; }", 42);
+exits!(struct_member_padding_offsets, "struct s { char c; int a; char d; int b; }; int main(void) { struct s v; v.c = 1; v.a = 10; v.d = 1; v.b = 30; return v.c + v.a + v.d + v.b; }", 42);
+exits!(struct_member_arrow_global, "struct s { int a; int b; } g; int main(void) { struct s *p = &g; p->a = 40; p->b = 2; return g.a + g.b; }", 42);
+exits!(struct_member_address_of_nested, "struct in { int x; int y; }; struct out { char c; struct in i; }; int main(void) { struct out o; int *p = &o.i.y; *p = 40; o.i.x = 2; return o.i.y + o.i.x; }", 42);
+exits!(struct_member_of_array_element, "struct s { char c; int a; }; int main(void) { struct s v[3]; v[2].a = 40; v[1].c = 2; return v[2].a + v[1].c; }", 42);
+exits!(union_member_aliasing, "union u { int i; unsigned char c[4]; }; int main(void) { union u v; v.i = 42; return v.c[0] + v.c[3]; }", 42);
+exits!(struct_member_arrow_chain, "struct n { int v; struct n *next; }; int main(void) { struct n a; struct n b; a.v = 40; b.v = 2; a.next = &b; b.next = &a; return a.next->v + a.next->next->v; }", 42);
+exits!(struct_member_inc_dec, "struct s { int a; }; int main(void) { struct s v; struct s *p = &v; p->a = 40; p->a++; ++v.a; return p->a; }", 42);
+exits!(struct_member_const_pointer_global_init, "struct s { char c; double d; int a; } g = {1, 2.5, 39}; int main(void) { const struct s *p = &g; return p->c + (int) p->d + p->a; }", 42);
+exits!(bitfield_type_def, "struct s { char c; int : 4; unsigned u : 5; double d; }; union u { char c; struct s s; }; int main(void) { return sizeof(struct s) + sizeof(union u) + 18; }", 42);
 exits!(struct_unused_def, "struct b { int a : 3; int b : 5; char c; }; int main(void) { return 42; }", 42);
-exits!(
-    bitfield_init,
-    "struct b { int a : 3; int b : 5; } v = {1, 2}; int main(void) { return *(unsigned char *)&v + 25; }",
-    42
-);
-exits!(
-    bitfield_init_signed_unnamed,
-    "struct b { int a : 3; int s : 4; unsigned : 2; unsigned c : 7; } v = {7, -3, 100}; int main(void) { unsigned char *p = (unsigned char *)&v; return p[1] - p[0] - 47; }",
-    42
-);
-exits!(
-    bitfield_init_unnamed_skips_item,
-    "struct s { char c; int : 4; int x; } v = {1, 41}; int main(void) { return *(int *)((char *)&v + 4) + *(char *)&v; }",
-    42
-);
-exits!(
-    bitfield_init_straddle,
-    "struct t { unsigned a : 3; unsigned b : 6; } v = {5, 37}; int main(void) { unsigned char *p = (unsigned char *)&v; return p[0] - p[1] - 2; }",
-    42
-);
-exits!(
-    bitfield_init_new_unit,
-    "struct u { char c; int a : 4; int b : 30; char d; } v = {3, 9, 12345, 7}; int main(void) { unsigned char *p = (unsigned char *)&v; return p[0] + p[1] + p[4] - p[8] + sizeof(struct u) - 32; }",
-    42
-);
-exits!(
-    bitfield_store_load,
-    "struct b { unsigned a : 3; int s : 4; unsigned : 2; unsigned c : 7; }; int main(void) { struct b v; v.a = 7; v.s = -3; v.c = 100; v.c -= 55; v.a++; return v.a * 10 + v.s + v.c; }",
-    42
-);
-exits!(
-    bitfield_unsigned_wrap,
-    "struct b { unsigned a : 3; }; int main(void) { struct b v; int x; x = 10; v.a = x; return v.a * 21; }",
-    42
-);
-exits!(
-    bitfield_signed_sign_extend,
-    "struct b { unsigned pad : 5; int s : 4; }; int main(void) { struct b v; v.pad = 31; v.s = -3; return v.s + 45; }",
-    42
-);
-exits!(
-    bitfield_store_preserves_neighbors,
-    "struct b { unsigned a : 3; unsigned b : 5; unsigned c : 8; }; int main(void) { struct b v; v.a = 5; v.b = 20; v.c = 200; v.b = 17; return v.a + v.b + v.c - 180; }",
-    42
-);
-exits!(
-    bitfield_straddles_bytes,
-    "struct b { unsigned a : 5; unsigned b : 7; }; int main(void) { struct b v; v.a = 31; v.b = 100; return v.b - v.a - 27; }",
-    42
-);
-exits!(
-    bitfield_arrow_compound_assign,
-    "struct b { unsigned a : 6; }; int main(void) { struct b v; struct b *p = &v; p->a = 6; p->a *= 7; return p->a; }",
-    42
-);
-exits!(
-    bitfield_inc_dec_wrap,
-    "struct b { unsigned a : 4; unsigned b : 4; }; int main(void) { struct b v; v.a = 15; v.b = 0; v.a++; v.b--; return v.a + v.b + 27; }",
-    42
-);
-exits!(
-    bitfield_post_inc_value,
-    "struct b { unsigned a : 3; }; int main(void) { struct b v; int r; v.a = 7; r = v.a++; return r * 6 + v.a; }",
-    42
-);
-exits!(
-    bitfield_pre_dec_value,
-    "struct b { unsigned pad : 9; unsigned a : 3; }; int main(void) { struct b v; v.pad = 511; v.a = 0; return --v.a * 6; }",
-    42
-);
-exits!(
-    bitfield_assign_value_truncated,
-    "struct b { unsigned a : 3; }; int main(void) { struct b v; int x; x = 10; return (v.a = x) + 40; }",
-    42
-);
-exits!(
-    bitfield_second_unit,
-    "struct b { int x; char c; unsigned a : 5; unsigned b : 11; }; int main(void) { struct b v; v.x = 1; v.c = 2; v.a = 31; v.b = 8; return v.x + v.c + v.a + v.b; }",
-    42
-);
-exits!(
-    bitfield_unsigned_promotes_to_int,
-    "struct b { unsigned u : 3; }; int main(void) { struct b v; v.u = 7; return -v.u + 49; }",
-    42
-);
-exits!(
-    bitfield_unsigned_promotion_is_signed_below_int_width,
-    "struct b { unsigned u : 3; unsigned w : 32; }; int main(void) { struct b v; v.u = 7; v.w = 1; return (-v.u < 0) + (-v.w < 0) * 10 + 41; }",
-    42
-);
-exits!(
-    bitfield_signed_arithmetic,
-    "struct b { int s : 4; int t : 4; }; int main(void) { struct b v; v.s = -8; v.t = 7; return v.s * v.t + 98; }",
-    42
-);
-exits!(
-    bitfield_global,
-    "struct b { unsigned a : 3; int s : 5; } g; int main(void) { g.a = 5; g.s = -10; g.s += g.a; return g.s + g.a * 10 - 3; }",
-    42
-);
-exits!(
-    bitfield_condition,
-    "struct b { unsigned a : 1; unsigned b : 1; }; int main(void) { struct b v; v.a = 1; v.b = 0; if (v.b) return 1; return v.a && !v.b ? 42 : 7; }",
-    42
-);
-exits!(
-    bitfield_compare,
-    "struct b { unsigned a : 3; unsigned b : 3; int s : 3; }; int main(void) { struct b v; v.a = 3; v.b = 3; v.s = -1; return (v.a == v.b) + (v.s < v.a) + 40; }",
-    42
-);
-exits!(
-    bitfield_array_element,
-    "struct b { unsigned a : 3; unsigned b : 5; }; int main(void) { struct b v[2]; v[0].a = 1; v[1].a = 2; v[0].b = 31; v[1].b = 6; return v[0].a * v[1].a + v[0].b + v[1].b + 3; }",
-    42
-);
-exits!(
-    bitfield_full_unsigned,
-    "struct b { unsigned a : 32; }; int main(void) { struct b v; v.a = 0xffffffffu; return v.a / 0x06185ea6u; }",
-    42
-);
-exits!(
-    bitfield_full_signed,
-    "struct b { int s : 32; }; int main(void) { struct b v; v.s = -85; return v.s / -2; }",
-    42
-);
-exits!(
-    bitfield_nested_member,
-    "struct in { unsigned a : 3; int s : 5; }; struct out { char c; struct in i; }; int main(void) { struct out o; o.c = 21; o.i.a = 7; o.i.s = -16; o.i.s += 30; return o.c + o.i.a + o.i.s; }",
-    42
-);
+exits!(bitfield_init, "struct b { int a : 3; int b : 5; } v = {1, 2}; int main(void) { return *(unsigned char *)&v + 25; }", 42);
+exits!(bitfield_init_signed_unnamed, "struct b { int a : 3; int s : 4; unsigned : 2; unsigned c : 7; } v = {7, -3, 100}; int main(void) { unsigned char *p = (unsigned char *)&v; return p[1] - p[0] - 47; }", 42);
+exits!(bitfield_init_unnamed_skips_item, "struct s { char c; int : 4; int x; } v = {1, 41}; int main(void) { return *(int *)((char *)&v + 4) + *(char *)&v; }", 42);
+exits!(bitfield_init_straddle, "struct t { unsigned a : 3; unsigned b : 6; } v = {5, 37}; int main(void) { unsigned char *p = (unsigned char *)&v; return p[0] - p[1] - 2; }", 42);
+exits!(bitfield_init_new_unit, "struct u { char c; int a : 4; int b : 30; char d; } v = {3, 9, 12345, 7}; int main(void) { unsigned char *p = (unsigned char *)&v; return p[0] + p[1] + p[4] - p[8] + sizeof(struct u) - 32; }", 42);
+exits!(bitfield_store_load, "struct b { unsigned a : 3; int s : 4; unsigned : 2; unsigned c : 7; }; int main(void) { struct b v; v.a = 7; v.s = -3; v.c = 100; v.c -= 55; v.a++; return v.a * 10 + v.s + v.c; }", 42);
+exits!(bitfield_unsigned_wrap, "struct b { unsigned a : 3; }; int main(void) { struct b v; int x; x = 10; v.a = x; return v.a * 21; }", 42);
+exits!(bitfield_signed_sign_extend, "struct b { unsigned pad : 5; int s : 4; }; int main(void) { struct b v; v.pad = 31; v.s = -3; return v.s + 45; }", 42);
+exits!(bitfield_store_preserves_neighbors, "struct b { unsigned a : 3; unsigned b : 5; unsigned c : 8; }; int main(void) { struct b v; v.a = 5; v.b = 20; v.c = 200; v.b = 17; return v.a + v.b + v.c - 180; }", 42);
+exits!(bitfield_straddles_bytes, "struct b { unsigned a : 5; unsigned b : 7; }; int main(void) { struct b v; v.a = 31; v.b = 100; return v.b - v.a - 27; }", 42);
+exits!(bitfield_arrow_compound_assign, "struct b { unsigned a : 6; }; int main(void) { struct b v; struct b *p = &v; p->a = 6; p->a *= 7; return p->a; }", 42);
+exits!(bitfield_inc_dec_wrap, "struct b { unsigned a : 4; unsigned b : 4; }; int main(void) { struct b v; v.a = 15; v.b = 0; v.a++; v.b--; return v.a + v.b + 27; }", 42);
+exits!(bitfield_post_inc_value, "struct b { unsigned a : 3; }; int main(void) { struct b v; int r; v.a = 7; r = v.a++; return r * 6 + v.a; }", 42);
+exits!(bitfield_pre_dec_value, "struct b { unsigned pad : 9; unsigned a : 3; }; int main(void) { struct b v; v.pad = 511; v.a = 0; return --v.a * 6; }", 42);
+exits!(bitfield_assign_value_truncated, "struct b { unsigned a : 3; }; int main(void) { struct b v; int x; x = 10; return (v.a = x) + 40; }", 42);
+exits!(bitfield_second_unit, "struct b { int x; char c; unsigned a : 5; unsigned b : 11; }; int main(void) { struct b v; v.x = 1; v.c = 2; v.a = 31; v.b = 8; return v.x + v.c + v.a + v.b; }", 42);
+exits!(bitfield_unsigned_promotes_to_int, "struct b { unsigned u : 3; }; int main(void) { struct b v; v.u = 7; return -v.u + 49; }", 42);
+exits!(bitfield_unsigned_promotion_is_signed_below_int_width, "struct b { unsigned u : 3; unsigned w : 32; }; int main(void) { struct b v; v.u = 7; v.w = 1; return (-v.u < 0) + (-v.w < 0) * 10 + 41; }", 42);
+exits!(bitfield_signed_arithmetic, "struct b { int s : 4; int t : 4; }; int main(void) { struct b v; v.s = -8; v.t = 7; return v.s * v.t + 98; }", 42);
+exits!(bitfield_global, "struct b { unsigned a : 3; int s : 5; } g; int main(void) { g.a = 5; g.s = -10; g.s += g.a; return g.s + g.a * 10 - 3; }", 42);
+exits!(bitfield_condition, "struct b { unsigned a : 1; unsigned b : 1; }; int main(void) { struct b v; v.a = 1; v.b = 0; if (v.b) return 1; return v.a && !v.b ? 42 : 7; }", 42);
+exits!(bitfield_compare, "struct b { unsigned a : 3; unsigned b : 3; int s : 3; }; int main(void) { struct b v; v.a = 3; v.b = 3; v.s = -1; return (v.a == v.b) + (v.s < v.a) + 40; }", 42);
+exits!(bitfield_array_element, "struct b { unsigned a : 3; unsigned b : 5; }; int main(void) { struct b v[2]; v[0].a = 1; v[1].a = 2; v[0].b = 31; v[1].b = 6; return v[0].a * v[1].a + v[0].b + v[1].b + 3; }", 42);
+exits!(bitfield_full_unsigned, "struct b { unsigned a : 32; }; int main(void) { struct b v; v.a = 0xffffffffu; return v.a / 0x06185ea6u; }", 42);
+exits!(bitfield_full_signed, "struct b { int s : 32; }; int main(void) { struct b v; v.s = -85; return v.s / -2; }", 42);
+exits!(bitfield_nested_member, "struct in { unsigned a : 3; int s : 5; }; struct out { char c; struct in i; }; int main(void) { struct out o; o.c = 21; o.i.a = 7; o.i.s = -16; o.i.s += 30; return o.c + o.i.a + o.i.s; }", 42);
 exits!(enum_constant, "enum e { A = 40, B }; int main(void) { return B + 1; }", 42);
-
 exits!(short_local, "int main(void) { short s; s = 1000; return s / 24 + 1; }", 42);
 exits!(char_promotion, "int main(void) { char c; c = 100; return (c + c) / 5 + 2; }", 42);
 exits!(unsigned_char_promotion, "int main(void) { unsigned char c; c = 200; return c / 5 + 2; }", 42);
@@ -753,7 +299,6 @@ exits!(compound_assign_char, "int main(void) { char c; c = 40; c += 2; return c;
 exits!(void_cast_local, "int main(void) { int x; x = 42; (void) x; return x; }", 42);
 exits!(pointer_deref, "int main(void) { int x; int *p; x = 42; p = &x; return *p; }", 42);
 exits!(call_return, "int f(void) { return 42; } int main(void) { return f(); }", 42);
-
 exits!(comparison_local, "int main(void) { int a; int b; a = 1; b = 2; return (a < b) + 41; }", 42);
 exits!(logical_not_local, "int main(void) { int x; x = 0; return !x + 41; }", 42);
 exits!(logical_and_or_local, "int main(void) { int a; int b; a = 1; b = 2; return (a && b) + (a || 0) + 40; }", 42);
@@ -761,96 +306,51 @@ exits!(logical_nested_rhs, "int main(void) { int a; int b; a = 1; b = 0; return 
 exits!(ternary_local, "int main(void) { int c; c = 1; return c ? 42 : 7; }", 42);
 exits!(ternary_nested_arm, "int main(void) { int c; c = 1; return c ? (c ? 42 : 1) : 7; }", 42);
 exits!(ternary_common_type, "int main(void) { int c; long l; c = 1; l = 42; return c ? l : 0; }", 42);
-
 exits!(pointer_condition, "int main(void) { int x; int *p; p = &x; return p ? 42 : 7; }", 42);
 exits!(pointer_logical_not, "int main(void) { int x; int *p; p = &x; return !p + 42; }", 42);
 exits!(pointer_logical_and, "int main(void) { int x; int *p; p = &x; return (p && 1) + 41; }", 42);
 exits!(double_condition, "int main(void) { double d; d = 0.5; return d ? 42 : 7; }", 42);
-
 exits!(pointer_store, "int main(void) { int x; int *p; p = &x; *p = 42; return x; }", 42);
 exits!(compound_assign_through_pointer, "int main(void) { int x; int *p; x = 40; p = &x; *p += 2; return x; }", 42);
 exits!(pointer_target_increment, "int main(void) { int x; int *p; x = 41; p = &x; (*p)++; return x; }", 42);
 exits!(compound_assign_int_double, "int main(void) { int i; double d; i = 40; d = 2.5; i += d; return i; }", 42);
-
 exits!(pointer_add, "int main(void) { int a[2]; int *p; a[1] = 42; p = a; return *(p + 1); }", 42);
 exits!(pointer_difference, "int main(void) { int a[3]; int *p; int *q; p = a; q = &a[2]; return (q - p) + 40; }", 42);
-exits!(
-    pointer_comparison,
-    "int main(void) { int a[2]; int *p; int *q; p = a; q = &a[1]; return (p < q) + (p == q) + 41; }",
-    42
-);
+exits!(pointer_comparison, "int main(void) { int a[2]; int *p; int *q; p = a; q = &a[1]; return (p < q) + (p == q) + 41; }", 42);
 exits!(pointer_increment, "int main(void) { int a[2]; int *p; a[0] = 1; a[1] = 42; p = a; p++; return *p; }", 42);
-exits!(
-    inc_dec_floating_pointer,
-    "int main(void) { double d; float f; int a[3]; int *p; d = 40.5; d++; f = 1.0f; f--; p = a; a[1] = 42; p++; return (int) (d + f) + *p - 41; }",
-    42
-);
-
+exits!(inc_dec_floating_pointer, "int main(void) { double d; float f; int a[3]; int *p; d = 40.5; d++; f = 1.0f; f--; p = a; a[1] = 42; p++; return (int) (d + f) + *p - 41; }", 42);
 exits!(array_index, "int main(void) { int a[3]; a[0] = 40; a[1] = 2; a[2] = a[0] + a[1]; return a[2]; }", 42);
 exits!(array_variable_index, "int main(void) { int a[3]; int i; i = 1; a[1] = 42; return a[i]; }", 42);
 exits!(pointer_subscript, "int main(void) { int a[2]; int *p; a[1] = 42; p = a; return p[1]; }", 42);
 exits!(double_array_index, "int main(void) { double a[2]; a[0] = 1.0; a[1] = 41.0; return a[0] + a[1]; }", 42);
 exits!(string_literal_char, "int main(void) { return \"*\"[0]; }", 42);
-
 exits!(null_pointer_initializer, "int main(void) { int *p = 0; int x; x = 42; return x; }", 42);
 exits!(null_pointer_assign, "int main(void) { int *p; int x; p = 0; x = 42; return x; }", 42);
 exits!(null_pointer_cast, "int main(void) { int *p; int x; p = (int *) 0; x = 42; return x; }", 42);
-exits!(
-    member_through_cast_pointer,
-    "struct s { char *key; int val; }; int f(void *p) { return ((struct s *) p)->val; } int g(const void *p) { return ((const struct s *) p)->val; } int main(void) { struct s v = { \"k\", 21 }; return f(&v) + g(&v); }",
-    42
-);
-exits!(
-    member_through_cast_of_member,
-    "struct s { int a; struct s *next; }; int main(void) { struct s v = { 42, 0 }; struct s w; w.next = &v; return ((struct s *) w.next)->a; }",
-    42
-);
-exits!(
-    member_through_qualifier_cast,
-    "struct s { int a; }; struct s g = { 42 }; int main(void) { const struct s *p = &g; return ((struct s *) p)->a; }",
-    42
-);
+exits!(member_through_cast_pointer, "struct s { char *key; int val; }; int f(void *p) { return ((struct s *) p)->val; } int g(const void *p) { return ((const struct s *) p)->val; } int main(void) { struct s v = { \"k\", 21 }; return f(&v) + g(&v); }", 42);
+exits!(member_through_cast_of_member, "struct s { int a; struct s *next; }; int main(void) { struct s v = { 42, 0 }; struct s w; w.next = &v; return ((struct s *) w.next)->a; }", 42);
+exits!(member_through_qualifier_cast, "struct s { int a; }; struct s g = { 42 }; int main(void) { const struct s *p = &g; return ((struct s *) p)->a; }", 42);
 exits!(char_to_pointer_sign_extends, "int main(void) { char c; c = -1; return ((int) (char *) c >> 8) + 43; }", 42);
-
 exits!(float_arithmetic, "int main(void) { double d; d = 21.0; return d * 2; }", 42);
 exits!(float_local, "int main(void) { float f; f = 10.5; return f * 4; }", 42);
 exits!(double_from_integer_literal, "int main(void) { double d; d = 21; return d * 2; }", 42);
 exits!(double_inexact_literal, "int main(void) { double d; d = 0.1; return d * 420; }", 42);
 exits!(double_zero_initializer, "int main(void) { double d = 0; return d + 42; }", 42);
 exits!(negative_zero, "int main(void) { double d; d = 0.0; d = -d; return 1.0 / d < 0 ? 42 : 7; }", 42);
-
 exits!(call_void, "void f(void) { return; } int main(void) { f(); return 42; }", 42);
 exits!(call_argument, "int f(int x) { return x + 1; } int main(void) { return f(41); }", 42);
 exits!(declare_prototype, "int abs(int); int main(void) { return abs(-42); }", 42);
 exits!(declare_void, "void exit(int); int main(void) { exit(42); return 0; }", 42);
 exits!(declare_pointer_param, "int atoi(const char *); int main(void) { return atoi(\"42\"); }", 42);
 exits!(declare_unspecified, "int abs(); int main(void) { return abs(-42); }", 42);
-exits!(
-    declare_variadic,
-    "int sprintf(char *, const char *, ...); int atoi(const char *); int main(void) { char b[8]; sprintf(b, \"%d\", 42); return atoi(b); }",
-    42
-);
+exits!(declare_variadic, "int sprintf(char *, const char *, ...); int atoi(const char *); int main(void) { char b[8]; sprintf(b, \"%d\", 42); return atoi(b); }", 42);
 exits!(declare_after_use, "int main(void) { return abs(-42); } int abs(int);", 42);
-exits!(
-    old_style_definition,
-    "int f(a, b) int a; char b; { return a + b; } int g(); int main(void) { return f(40, 2) + g(); } int g() { return 0; }",
-    42
-);
-exits!(
-    old_style_char_and_float_params_are_promoted,
-    "int f(a, b) char a; float b; { return a + (int) b; } int main(void) { return f(40, 2.9f); }",
-    42
-);
-exits!(
-    old_style_short_and_unsigned_char_params_are_promoted,
-    "int f(s, u) short s; unsigned char u; { return s + u; } int main(void) { return f(-8, 50); }",
-    42
-);
+exits!(old_style_definition, "int f(a, b) int a; char b; { return a + b; } int g(); int main(void) { return f(40, 2) + g(); } int g() { return 0; }", 42);
+exits!(old_style_char_and_float_params_are_promoted, "int f(a, b) char a; float b; { return a + (int) b; } int main(void) { return f(40, 2.9f); }", 42);
+exits!(old_style_short_and_unsigned_char_params_are_promoted, "int f(s, u) short s; unsigned char u; { return s + u; } int main(void) { return f(-8, 50); }", 42);
 exits!(old_style_float_param_narrowed, "double f(x) float x; { return x * 2; } int main(void) { return (int) f(21.25f); }", 42);
 exits!(old_style_char_param_narrowed, "char f(c) char c; { return c + 1; } int main(void) { return f(41); }", 42);
-
 exits!(initializer_evaluated_once, "int main(void) { int x = 40; int y = x++; return x + y; }", 81);
-
 exits!(void_function_body, "void f(void) { } int main(void) { f(); return 42; }", 42);
 exits!(void_function_explicit_return, "void f(void) { return; } int main(void) { f(); return 42; }", 42);
 exits!(nonvoid_fall_off_end_unused, "int f(void) { } int main(void) { f(); return 42; }", 42);
@@ -859,729 +359,118 @@ exits!(dead_code_after_return, "int main(void) { int x; x = 1; return x + 41; x 
 exits!(dead_block_after_return, "int main(void) { return 42; { int y; y = 1; } }", 42);
 exits!(void_call_then_ssa, "void f(void) { } int main(void) { int x; f(); x = 40; return x + 2; }", 42);
 exits!(ternary_void, "void f(void) { } int main(void) { 1 ? f() : f(); return 42; }", 42);
-exits!(
-    ternary_void_false_arm,
-    "int g; void f(void) { g = 1; } void h(void) { g = 42; } int main(void) { 0 ? f() : h(); return g; }",
-    42
-);
-
+exits!(ternary_void_false_arm, "int g; void f(void) { g = 1; } void h(void) { g = 42; } int main(void) { 0 ? f() : h(); return g; }", 42);
 exits!(init_then_assign_before_nested_init, "int main(void) { int a = 1; a = 42; { int b = a; return b; } }", 42);
 exits!(init_from_assigned_variable, "int main(void) { int a; a = 42; { int b = a; return b; } }", 42);
-exits!(
-    init_after_side_effect,
-    "int g; int f(void) { return g; } int main(void) { g = 42; { int x = f(); return x; } }",
-    42
-);
-exits!(
-    init_reads_previous_init,
-    "int main(void) { int a = 20; { int b = a; a = 1; { int c = a + b; return c * 2; } } }",
-    42
-);
-exits!(
-    init_in_loop_body,
-    "int main(void) { int i; int s; s = 0; for (i = 0; i < 3; i++) { int x = 10; x += i; s += x; } return s + 9; }",
-    42
-);
-exits!(
-    static_then_auto,
-    "int f(void) { static int n = 40; int x; x = 2; return n + x; } int main(void) { return f(); }",
-    42
-);
-exits!(
-    static_then_auto_init,
-    "int f(void) { static int n = 40; int x = 2; return n + x; } int main(void) { return f(); }",
-    42
-);
-exits!(
-    auto_then_static,
-    "int f(void) { int x = 2; static int n = 40; return n + x; } int main(void) { return f(); }",
-    42
-);
+exits!(init_after_side_effect, "int g; int f(void) { return g; } int main(void) { g = 42; { int x = f(); return x; } }", 42);
+exits!(init_reads_previous_init, "int main(void) { int a = 20; { int b = a; a = 1; { int c = a + b; return c * 2; } } }", 42);
+exits!(init_in_loop_body, "int main(void) { int i; int s; s = 0; for (i = 0; i < 3; i++) { int x = 10; x += i; s += x; } return s + 9; }", 42);
+exits!(static_then_auto, "int f(void) { static int n = 40; int x; x = 2; return n + x; } int main(void) { return f(); }", 42);
+exits!(static_then_auto_init, "int f(void) { static int n = 40; int x = 2; return n + x; } int main(void) { return f(); }", 42);
+exits!(auto_then_static, "int f(void) { int x = 2; static int n = 40; return n + x; } int main(void) { return f(); }", 42);
 exits!(sibling_blocks_init, "int main(void) { int r; { int a = 40; r = a; } { int b = 2; r += b; } return r; }", 42);
 exits!(init_from_outer_shadowed, "int main(void) { int x = 1; { int x = 42; return x; } }", 42);
-exits!(
-    local_string_and_partial_list,
-    "int main(void) { char s[] = \"ab*\"; int a[4] = {1, 2}; return s[2] + a[1] - a[2] - a[3] - 2; }",
-    42
-);
-exits!(
-    local_struct_list_null_pointer,
-    "struct s { int a; char c; int *p; }; int main(void) { int i = 20; struct s v = {40, 2, 0}; int y = v.a + v.c + i; return y - i - (v.p != 0); }",
-    42
-);
-exits!(
-    local_string_zero_padded,
-    "int main(void) { char s[6] = \"ab\"; return s[0] + s[1] + s[2] + s[5] - 'a' - 'b' + 42; }",
-    42
-);
-exits!(
-    local_string_exact_size_no_nul,
-    "int main(void) { char s[2] = \"ab\"; return s[0] + s[1] - 'a' - 'b' + 42; }",
-    42
-);
+exits!(local_string_and_partial_list, "int main(void) { char s[] = \"ab*\"; int a[4] = {1, 2}; return s[2] + a[1] - a[2] - a[3] - 2; }", 42);
+exits!(local_struct_list_null_pointer, "struct s { int a; char c; int *p; }; int main(void) { int i = 20; struct s v = {40, 2, 0}; int y = v.a + v.c + i; return y - i - (v.p != 0); }", 42);
+exits!(local_string_zero_padded, "int main(void) { char s[6] = \"ab\"; return s[0] + s[1] + s[2] + s[5] - 'a' - 'b' + 42; }", 42);
+exits!(local_string_exact_size_no_nul, "int main(void) { char s[2] = \"ab\"; return s[0] + s[1] - 'a' - 'b' + 42; }", 42);
 exits!(local_array_size_from_list, "int main(void) { int a[] = {1, 2, 3}; return sizeof a / sizeof a[0] * 14; }", 42);
-exits!(
-    local_array_of_structs,
-    "struct p { int x; int y; }; int main(void) { struct p a[2] = {{1, 2}, {3, 40}}; return a[0].x - a[0].y + a[1].x + a[1].y; }",
-    42
-);
-exits!(
-    local_brace_elision,
-    "int main(void) { int a[2][2] = {1, 2, 3, 4}; return a[0][0] * 10 + a[0][1] * 10 + a[1][0] + a[1][1] + 5; }",
-    42
-);
+exits!(local_array_of_structs, "struct p { int x; int y; }; int main(void) { struct p a[2] = {{1, 2}, {3, 40}}; return a[0].x - a[0].y + a[1].x + a[1].y; }", 42);
+exits!(local_brace_elision, "int main(void) { int a[2][2] = {1, 2, 3, 4}; return a[0][0] * 10 + a[0][1] * 10 + a[1][0] + a[1][1] + 5; }", 42);
 exits!(local_union_first_member, "union u { int i; char c; }; int main(void) { union u v = {42}; return v.i; }", 42);
-exits!(
-    local_init_in_loop_recopies,
-    "int main(void) { int i; int s = 0; for (i = 0; i < 3; i++) { int a[2] = {10, 1}; a[0] += i; s += a[0] + a[1]; } return s + 6; }",
-    42
-);
-exits!(
-    local_struct_with_string_member,
-    "struct s { char name[4]; int n; }; int main(void) { struct s v = {\"ab\", 40}; return v.name[0] - 'a' + v.name[1] - 'b' + v.name[2] + v.name[3] + v.n + 2; }",
-    42
-);
-exits!(
-    local_struct_address_constant,
-    "int g; struct s { int *p; int k; }; int main(void) { struct s v = {&g, 2}; *v.p = 40; return g + v.k; }",
-    42
-);
-exits!(
-    local_nested_struct,
-    "struct in { int a; int b; }; struct out { struct in i; int c; }; int main(void) { struct out v = {{1, 2}, 39}; return v.i.a + v.i.b + v.c; }",
-    42
-);
-exits!(
-    local_partial_struct_zero_rest,
-    "struct s { int a; int b; int c; }; int main(void) { struct s v = {42}; return v.a + v.b + v.c; }",
-    42
-);
-exits!(
-    local_init_from_shadowing_block,
-    "int main(void) { int a[2] = {1, 2}; { int a[2] = {40, 2}; return a[0] + a[1]; } }",
-    42
-);
-exits!(
-    local_char_array_with_escapes,
-    "int main(void) { char s[] = \"\\t\\n\\0x\"; return s[0] + s[1] + s[2] + sizeof s + 18; }",
-    42
-);
-exits!(
-    local_long_double_member,
-    "struct s { char c; long double d; int n; }; int main(void) { struct s v = {2, 1.5L, 40}; return v.c + v.n + (int) v.d - 1; }",
-    42
-);
-
-/* 14a. member access on rvalue aggregate */
-exits!(
-    struct_member_of_call_result,
-    "struct s { int a; char c; }; struct s mk(void) { struct s v; v.a = 40; v.c = 2; return v; } int main(void) { return mk().a + mk().c; }",
-    42
-);
-exits!(
-    bitfield_member_of_call_result,
-    "struct s { int a : 3; int b : 5; }; struct s v = {-1, 15}; struct s mk(void) { return v; } int main(void) { return mk().b + mk().a + 28; }",
-    42
-);
-exits!(
-    nested_member_of_call_result,
-    "struct in { int x; int y; }; struct s { char c; struct in i; }; struct s v = {1, {40, 2}}; struct s mk(void) { return v; } int main(void) { return mk().i.x + mk().i.y; }",
-    42
-);
-exits!(
-    member_of_assignment_result,
-    "struct s { int a; int b; }; struct s v = {40, 2}; struct s w; int main(void) { return (w = v).a + (w = v).b; }",
-    42
-);
-exits!(
-    member_of_call_result_in_loop,
-    "struct s { int a; }; struct s mk(int n) { struct s v; v.a = n; return v; } int main(void) { int i; int s; s = 0; for (i = 0; i < 1000; i++) s += mk(i).a; return s % 1000 + 42 - 500; }",
-    42
-);
-exits!(
-    member_of_call_result_in_loop_does_not_grow_stack,
-    "struct s { int a; char pad[4092]; }; struct s mk(int n) { struct s v; v.a = n; return v; } int main(void) { int i; int s; s = 0; for (i = 0; i < 4096; i++) s += mk(i).a; return s % 1000 + 42 - 560; }",
-    42
-);
-
-/* 14. aggregate copies */
-emits!(
-    struct_assign_from_lvalue_uses_memcpy,
-    "struct s { int a; }; int main(void) { struct s v; struct s w; v.a = 42; w = v; return w.a; }",
-    "@llvm.memcpy"
-);
-emits!(
-    struct_init_from_lvalue_uses_memcpy,
-    "struct s { int a; }; int main(void) { struct s v; v.a = 42; { struct s w = v; return w.a; } }",
-    "@llvm.memcpy"
-);
-emits!(
-    union_assign_from_lvalue_uses_memcpy,
-    "union u { int i; char c[8]; }; int main(void) { union u a; union u b; a.i = 42; b = a; return b.i; }",
-    "@llvm.memcpy"
-);
-emits!(
-    struct_assign_through_deref_uses_memcpy,
-    "struct s { int a; }; int main(void) { struct s v; struct s w; struct s *p; v.a = 42; p = &v; w = *p; return w.a; }",
-    "@llvm.memcpy"
-);
-emits!(
-    struct_assign_from_call_spills_then_memcpy,
-    "struct s { int a; }; struct s mk(void) { struct s v; v.a = 42; return v; } int main(void) { struct s w; w = mk(); return w.a; }",
-    "@llvm.memcpy"
-);
-emits!(
-    struct_assign_from_call_writes_temporary_through_sret,
-    "struct s { int a; }; struct s mk(void) { struct s v; v.a = 42; return v; } int main(void) { struct s w; w = mk(); return w.a; }",
-    "call void (ptr) @mk(ptr sret(%struct.s) align 4 %"
-);
-emits!(
-    not struct_lvalue_is_not_loaded,
-    "struct s { int a; }; int main(void) { struct s v; struct s w; v.a = 42; w = v; return w.a; }",
-    "load %struct.s"
-);
-exits!(
-    struct_assign_from_ternary,
-    "struct s { int a; }; int main(void) { struct s u; struct s v; struct s w; u.a = 42; v.a = 7; w = 1 ? u : v; return w.a; }",
-    42
-);
-exits!(
-    struct_param_from_call_result,
-    "struct s { int a; int b; }; struct s mk(void) { struct s v; v.a = 40; v.b = 2; return v; } int sum(struct s v) { return v.a + v.b; } int main(void) { return sum(mk()); }",
-    42
-);
-exits!(
-    struct_return_assignment_result,
-    "struct s { int a; }; struct s g; struct s set(int n) { struct s v; v.a = n; return g = v; } int main(void) { return set(42).a; }",
-    42
-);
-exits!(
-    struct_assign_chain,
-    "struct s { int a; int b; }; int main(void) { struct s u; struct s v; struct s w; u.a = 40; u.b = 2; w = v = u; return w.a + w.b + v.a - u.a; }",
-    42
-);
-exits!(
-    struct_assign_self,
-    "struct s { int a; char c; }; int main(void) { struct s v; v.a = 40; v.c = 2; v = v; return v.a + v.c; }",
-    42
-);
-exits!(
-    struct_assign_copies_all_members,
-    "struct s { char c; int a; }; int main(void) { struct s v; struct s w; v.c = 2; v.a = 40; w = v; v.a = 0; return w.c + w.a; }",
-    42
-);
-exits!(
-    struct_init_from_value_is_a_copy,
-    "struct s { char c; int a; }; int main(void) { struct s v; v.c = 2; v.a = 40; { struct s w = v; v.c = 0; return w.c + w.a; } }",
-    42
-);
-exits!(
-    struct_assign_through_pointer_deref,
-    "struct s { double d; char c; }; struct s *p(struct s *v) { return v; } int main(void) { struct s v; struct s w; v.d = 1.5; v.c = 39; w = *p(&v); return (int) (w.d * 2) + w.c; }",
-    42
-);
-exits!(
-    struct_copy_by_value_param_and_return,
-    "struct s { int a; char c; long l; }; struct s cp(struct s v) { struct s w; w = v; return w; } int main(void) { struct s v; struct s r; v.a = 40; v.c = 2; v.l = 7; r = cp(v); return r.a + r.c; }",
-    42
-);
-exits!(
-    struct_copy_global_to_local,
-    "struct s { char c[3]; }; struct s g; struct s cp(struct s v) { return v; } int main(void) { struct s l; g.c[0] = 40; g.c[2] = 2; l = cp(g); return l.c[0] + l.c[1] + l.c[2]; }",
-    42
-);
-exits!(
-    union_assign_keeps_alternate_member,
-    "union u { int i; char c[8]; }; int main(void) { union u a; union u b; a.i = 1; a.c[5] = 42; b = a; return b.c[5]; }",
-    42
-);
-exits!(
-    union_assign_keeps_bytes_past_first_member,
-    "struct s { int a; char c; long l; }; union u { int i; char c[8]; }; int main(void) { struct s v; struct s w; union u a; union u b; v.a = 40; v.c = 2; v.l = 7; w = v; a.c[5] = 9; a.c[1] = 33; b = a; return w.a + w.c + b.c[5] + b.c[1] - 42; }",
-    42
-);
-exits!(
-    union_return_keeps_alternate_member,
-    "union u { char c[3]; short s; }; union u mk(void) { union u v; v.c[0] = 1; v.c[1] = 2; v.c[2] = 39; return v; } int main(void) { union u w; w = mk(); return w.c[0] + w.c[1] + w.c[2]; }",
-    42
-);
-exits!(
-    struct_and_union_copies_todo_14,
-    "struct s { int a; char c; long l; }; union u { int i; char c[8]; }; struct s cp(struct s v) { struct s w; w = v; return w; } int main(void) { struct s v; union u a; union u b; v.a = 40; v.c = 2; v.l = 7; a.c[5] = 9; b = a; return cp(v).a + cp(v).c + b.c[5] - 9; }",
-    42
-);
-
-/* 15. i386 struct ABI */
-const BIG_HELPER: &str = "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int gsum(struct big v) { return v.a + v.b + v.c + v.d + v.e; }";
-
-emits!(
-    sret_define,
-    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int main(void) { return mk(42).a; }",
-    "define void @mk(ptr sret(%struct.big) align 4"
-);
-emits!(
-    not sret_define_returns_void,
-    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int main(void) { return mk(42).a; }",
-    "ret %struct.big"
-);
-emits!(
-    sret_declare,
-    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int main(void) { return gmk(42).a; }",
-    "declare void @gmk(ptr sret(%struct.big) align 4, i32)"
-);
-emits!(
-    sret_call,
-    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int main(void) { return gmk(42).a; }",
-    "call void (ptr, i32) @gmk(ptr sret(%struct.big) align 4 %"
-);
-emits!(
-    sret_align_follows_layout,
-    "struct three { char c[3]; }; struct three mk(void) { struct three r; r.c[0] = 42; return r; } int main(void) { struct three v; v = mk(); return v.c[0]; }",
-    "define void @mk(ptr sret(%struct.three) align 1"
-);
-emits!(
-    sret_union,
-    "union u { int i; char c[8]; }; union u mk(void) { union u r; r.i = 42; return r; } int main(void) { return mk().i; }",
-    "define void @mk(ptr sret(%union.u) align 4"
-);
-emits!(
-    byval_define,
-    "struct big { int a; int b; int c; int d; int e; }; int sum(struct big v) { return v.a + v.e; } int main(void) { struct big v; v.a = 40; v.e = 2; return sum(v); }",
-    "define i32 @sum(ptr byval(%struct.big) align 4"
-);
-emits!(
-    byval_declare,
-    "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; v.a = 42; return gsum(v); }",
-    "declare i32 @gsum(ptr byval(%struct.big) align 4)"
-);
-emits!(
-    byval_call,
-    "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; v.a = 42; return gsum(v); }",
-    "call i32 (ptr) @gsum(ptr byval(%struct.big) align 4 %"
-);
-emits!(
-    not byval_call_does_not_load,
-    "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; v.a = 42; return gsum(v); }",
-    "load %struct.big"
-);
-emits!(
-    byval_union,
-    "union u { int i; char c[8]; }; int f(union u v) { return v.i; } int main(void) { union u v; v.i = 42; return f(v); }",
-    "define i32 @f(ptr byval(%union.u) align 4"
-);
-emits!(
-    byval_keeps_scalar_parameter_order,
-    "struct big { int a; int b; int c; int d; int e; }; int f(int x, struct big v, char y) { return x + v.a + y; } int main(void) { struct big v; v.a = 40; return f(1, v, 1); }",
-    "define i32 @f(i32 %0, ptr byval(%struct.big) align 4 %1, i8 %2)"
-);
-emits!(
-    sret_then_byval_share_temporary,
-    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n); int sum(struct big v); int main(void) { return sum(mk(42)); }",
-    "call i32 (ptr) @sum(ptr byval(%struct.big) align 4 %"
-);
-
-emits!(
-    incomplete_extern_object_declared,
-    "struct S; extern struct S s; void *p = &s;",
-    "@s = external global %struct.S\n"
-);
-emits!(
-    incomplete_return_function_declared,
-    "struct S; struct S f(void); struct S (*g(void))(void) { return f; }",
-    "declare void @f()"
-);
-exits_linked!(
-    incomplete_extern_object_address,
-    "struct S; extern struct S s; struct S *addr_s(void); void *p = &s; int main(void) { return p == (void *)addr_s() ? 42 : 1; }",
-    "struct S { int a; }; struct S s; struct S *addr_s(void) { return &s; }",
-    42
-);
-exits_linked!(
-    incomplete_return_function_address,
-    "struct S; struct S f(void); struct S (*addr_f(void))(void); int main(void) { return f == addr_f() ? 42 : 1; }",
-    "struct S { int a; }; struct S f(void) { struct S r; r.a = 0; return r; } struct S (*addr_f(void))(void) { return f; }",
-    42
-);
-exits_linked!(
-    incomplete_extern_object_completed_later,
-    "struct S; extern struct S s; struct S { int a; }; int main(void) { return s.a; }",
-    "struct S { int a; }; struct S s = { 42 };",
-    42
-);
-exits_linked!(
-    abi_sret_from_gcc,
-    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int main(void) { struct big v; v = gmk(21); return v.a + v.e; }",
-    BIG_HELPER,
-    42
-);
-exits_linked!(
-    abi_sret_from_gcc_member_of_call,
-    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int main(void) { return gmk(21).a + gmk(21).e; }",
-    BIG_HELPER,
-    42
-);
-exits_linked!(
-    abi_byval_to_gcc,
-    "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; v.a = 10; v.b = 10; v.c = 10; v.d = 10; v.e = 2; return gsum(v); }",
-    BIG_HELPER,
-    42
-);
-exits_linked!(
-    abi_byval_to_gcc_is_a_copy,
-    "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; int r; v.a = 42; v.b = v.c = v.d = v.e = 0; r = gsum(v); return r + v.b; }",
-    "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v) { int r; r = v.a; v.b = 100; return r; }",
-    42
-);
-exits_linked!(
-    abi_nested_call_across_gcc,
-    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int gsum(struct big v); int main(void) { return gsum(gmk(21)); }",
-    BIG_HELPER,
-    42
-);
-exits_linked!(
-    abi_define_called_from_gcc,
-    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int sum(struct big v) { return v.a + v.b + v.c + v.d + v.e; } int gdrive(void); int main(void) { return gdrive(); }",
-    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n); int sum(struct big v); int gdrive(void) { return sum(mk(21)); }",
-    42
-);
-exits_linked!(
-    abi_sret_from_global,
-    "struct big { int a; int b; int c; int d; int e; }; struct big g; struct big mk(void) { return g; } int gdrive2(void); int main(void) { g.a = 40; g.e = 2; return gdrive2(); }",
-    "struct big { int a; int b; int c; int d; int e; }; struct big mk(void); int gdrive2(void) { struct big v; v = mk(); return v.a + v.e; }",
-    42
-);
-exits_linked!(
-    abi_byval_mixed_with_scalars,
-    "struct big { int a; int b; int c; int d; int e; }; int gmix(int x, struct big v, char y); int main(void) { struct big v; v.a = 40; v.b = v.c = v.d = v.e = 0; return gmix(1, v, 1); }",
-    "struct big { int a; int b; int c; int d; int e; }; int gmix(int x, struct big v, char y) { return x + v.a + y; }",
-    42
-);
-exits_linked!(
-    abi_sret_mixed_with_scalars,
-    "struct big { int a; int b; int c; int d; int e; }; struct big gset(int x, int y); int main(void) { struct big v; v = gset(40, 2); return v.a + v.e; }",
-    "struct big { int a; int b; int c; int d; int e; }; struct big gset(int x, int y) { struct big r; r.a = x; r.b = r.c = r.d = 0; r.e = y; return r; }",
-    42
-);
-exits_linked!(
-    abi_union_byval_and_sret,
-    "union u { int i; char c[8]; }; union u gmku(void); int gsu(union u v); int main(void) { union u v; v = gmku(); return gsu(v) + v.c[1]; }",
-    "union u { int i; char c[8]; }; union u gmku(void) { union u r; r.i = 0; r.c[1] = 2; r.c[5] = 40; return r; } int gsu(union u v) { return v.c[5]; }",
-    42
-);
-exits_linked!(
-    abi_small_struct_byval_and_sret,
-    "struct one { int a; }; struct three { char c[3]; }; struct one gm1(void); struct three gm3(void); int gs1(struct one v); int gs3(struct three v); int main(void) { struct one a; struct three b; a = gm1(); b = gm3(); return gs1(a) + gs3(b); }",
-    "struct one { int a; }; struct three { char c[3]; }; struct one gm1(void) { struct one r; r.a = 20; return r; } struct three gm3(void) { struct three r; r.c[0] = 1; r.c[1] = 20; r.c[2] = 1; return r; } int gs1(struct one v) { return v.a; } int gs3(struct three v) { return v.c[0] + v.c[1] + v.c[2]; }",
-    42
-);
-exits_linked!(
-    abi_double_struct_byval_and_sret,
-    "struct q { double d; int i; }; struct q gmq(void); int gsq(struct q v); int main(void) { struct q v; v = gmq(); return gsq(v) + v.i; }",
-    "struct q { double d; int i; }; struct q gmq(void) { struct q r; r.d = 2.5; r.i = 2; return r; } int gsq(struct q v) { return (int) (v.d * 16); }",
-    42
-);
-exits_linked!(
-    abi_long_double_struct_byval_and_sret,
-    "struct x { char c; long double d; }; struct x gmx(void); int gsx(struct x v); int main(void) { struct x v; v = gmx(); return gsx(v) + v.c; }",
-    "struct x { char c; long double d; }; struct x gmx(void) { struct x r; r.c = 2; r.d = 2.5L; return r; } int gsx(struct x v) { return (int) (v.d * 16); }",
-    42
-);
-
-exits!(
-    abi_sret_and_byval_in_module,
-    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int sum(struct big v) { return v.a + v.b + v.c + v.d + v.e; } int main(void) { return sum(mk(21)); }",
-    42
-);
-exits!(
-    abi_sret_scalar_param_reaches_body,
-    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n, int m) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = m; return r; } int main(void) { return mk(40, 2).a + mk(40, 2).e; }",
-    42
-);
-exits!(
-    abi_byval_callee_writes_its_copy,
-    "struct s { int x; int y; }; int poke(struct s a) { a.x = 100; return a.x; } int main(void) { struct s v; v.x = 40; v.y = 2; poke(v); return v.x + v.y; }",
-    42
-);
-exits!(
-    abi_byval_param_returned_through_sret,
-    "struct s { char c[5]; }; struct s id(struct s a) { return a; } int main(void) { struct s v; struct s w; v.c[0] = 1; v.c[4] = 41; w = id(v); return w.c[0] + w.c[4]; }",
-    42
-);
-exits!(
-    abi_byval_param_passed_again,
-    "struct s { int x; int y; }; int inner(struct s a) { return a.x + a.y; } int outer(struct s a) { return inner(a); } int main(void) { struct s v; v.x = 40; v.y = 2; return outer(v); }",
-    42
-);
-exits!(
-    abi_two_byval_params,
-    "struct s { int x; int y; }; int both(struct s a, struct s b) { return a.x + b.y; } int main(void) { struct s v; struct s w; v.x = 40; v.y = 0; w.x = 0; w.y = 2; return both(v, w); }",
-    42
-);
-exits!(
-    abi_sret_assign_to_byval_source,
-    "struct s { int x; int y; }; struct s bump(struct s a) { a.x = a.x + 1; a.y = a.y + 1; return a; } int main(void) { struct s v; v.x = 39; v.y = 1; v = bump(v); return v.x + v.y; }",
-    42
-);
-exits!(
-    abi_return_sret_call_result,
-    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } struct big wrap(int n) { return mk(n); } int main(void) { struct big v; v = wrap(21); return v.a + v.e; }",
-    42
-);
-exits!(
-    abi_return_ternary_place,
-    "struct s { int x; }; struct s pick(int c) { struct s a; struct s b; a.x = 42; b.x = 7; return c ? a : b; } int main(void) { return pick(1).x + pick(0).x - 7; }",
-    42
-);
-exits!(
-    abi_sret_through_function_pointer,
-    "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int sum(struct big v) { return v.a + v.b + v.c + v.d + v.e; } int main(void) { struct big (*fp)(int); int (*sp)(struct big); fp = mk; sp = sum; return sp((*fp)(21)); }",
-    42
-);
-exits!(
-    abi_sret_nested_record,
-    "struct in { char c; int v; }; struct out { char pad; struct in i; }; struct out mk(int n) { struct out r; r.pad = 1; r.i.c = 2; r.i.v = n; return r; } int get(struct out o) { return o.pad + o.i.c + o.i.v; } int main(void) { return get(mk(39)); }",
-    42
-);
-exits!(
-    abi_sret_unprototyped_call,
-    "struct big { int a; int b; int c; int d; int e; }; struct big mk(); int main(void) { struct big v; v = mk(21); return v.a + v.e; } struct big mk(n) int n; { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; }",
-    42
-);
-exits!(
-    abi_byval_unprototyped_call,
-    "struct big { int a; int b; int c; int d; int e; }; int sum(); int main(void) { struct big v; v.a = 40; v.b = v.c = v.d = 0; v.e = 2; return sum(v); } int sum(v) struct big v; { return v.a + v.b + v.c + v.d + v.e; }",
-    42
-);
-emits!(
-    sret_unprototyped_declare,
-    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(); int main(void) { return gmk(42).a; }",
-    "declare void @gmk(ptr sret(%struct.big) align 4, ...)"
-);
-emits!(
-    sret_unprototyped_call,
-    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(); int main(void) { return gmk(42).a; }",
-    "call void (ptr, ...) @gmk(ptr sret(%struct.big) align 4 %"
-);
-emits!(
-    byval_unprototyped_call,
-    "struct big { int a; int b; int c; int d; int e; }; int gsum(); int main(void) { struct big v; v.a = 42; return gsum(v); }",
-    "call i32 (...) @gsum(ptr byval(%struct.big) align 4 %"
-);
-emits!(
-    sret_variadic_declare,
-    "struct big { int a; int b; int c; int d; int e; }; struct big gfmt(int n, ...); int main(void) { return gfmt(42, 1).a; }",
-    "declare void @gfmt(ptr sret(%struct.big) align 4, i32, ...)"
-);
-emits!(
-    sret_falls_off_end_returns_void,
-    "struct big { int a; int b; int c; int d; int e; }; struct big mk(void) { } int main(void) { struct big v; v = mk(); return 42; }",
-    "  ret void\n}"
-);
-emits!(
-    byval_param_is_not_spilled,
-    "struct big { int a; int b; int c; int d; int e; }; int sum(struct big v) { return v.a; } int main(void) { struct big v; v.a = 42; return sum(v); }",
-    "define i32 @sum(ptr byval(%struct.big) align 4 %0) {\n  %2 = getelementptr inbounds i8, ptr %0, i32 0"
-);
-emits!(
-    sret_return_memcpy_into_hidden_pointer,
-    "struct big { int a; int b; int c; int d; int e; }; struct big mk(void) { struct big r; r.a = 42; return r; } int main(void) { return mk().a; }",
-    "call void @llvm.memcpy.p0.p0.i32(ptr align 4 %0, ptr align 4 %"
-);
-exits_linked!(
-    abi_unprototyped_sret_from_gcc,
-    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(); int gsum(); int main(void) { struct big v; v = gmk(21); return gsum(v); }",
-    BIG_HELPER,
-    42
-);
-exits_linked!(
-    abi_byval_param_forwarded_to_gcc,
-    "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int fwd(struct big v) { return gsum(v); } int main(void) { struct big v; v.a = 40; v.b = v.c = v.d = 0; v.e = 2; return fwd(v); }",
-    BIG_HELPER,
-    42
-);
-exits_linked!(
-    abi_sret_forwarded_from_gcc,
-    "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); struct big fwd(int n) { return gmk(n); } int gsum(struct big v); int main(void) { return gsum(fwd(21)); }",
-    BIG_HELPER,
-    42
-);
-
-/* 16. old-style definitions receive promoted arguments (6.7.1) */
-exits_linked!(
-    abi_old_style_params_from_gcc,
-    "int kr(a, f) char a; float f; { return a + (int) f; } int call(void); int main(void) { return call(); }",
-    "int kr(); int call(void) { return kr(40, 2.75f); }",
-    42
-);
-exits_linked!(
-    abi_old_style_params_to_gcc,
-    "int kr(); int main(void) { return kr(40.5f, 2); }",
-    "int kr(f, c) float f; char c; { return (int) f + c; }",
-    42
-);
-
-exits_linked!(
-    abi_variadic_struct_to_gcc,
-    "struct S { int a; char b; double d; }; int take(int n, ...); int main(void) { struct S s; s.a = 1; s.b = 2; s.d = 3.5; return take(1, s, 7); }",
-    "#include <stdarg.h>\nstruct S { int a; char b; double d; }; int take(int n, ...) { va_list ap; struct S s; int x; va_start(ap, n); s = va_arg(ap, struct S); x = va_arg(ap, int); va_end(ap); return s.a + s.b + (int)(s.d * 2) + x; }",
-    17
-);
-exits_linked!(
-    abi_variadic_long_double_to_gcc,
-    "int take(int n, ...); int main(void) { long double ld = 2.5L; return take(1, ld, 9); }",
-    "#include <stdarg.h>\nint take(int n, ...) { va_list ap; long double x; int y; va_start(ap, n); x = va_arg(ap, long double); y = va_arg(ap, int); va_end(ap); return (int)(x * 4) + y; }",
-    19
-);
-exits_linked!(
-    abi_float_returns_from_gcc,
-    "float rf(void); double rd(void); long double rld(void); int main(void) { return (int)((rf() + rd() + (double)rld()) * 4); }",
-    "float rf(void) { return 1.25f; } double rd(void) { return 2.5; } long double rld(void) { return 3.75L; }",
-    30
-);
-exits_linked!(
-    abi_float_returns_to_gcc,
-    "float rf(void) { return 1.25f; } double rd(void) { return 2.5; } long double rld(void) { return 3.75L; } int sum(void); int main(void) { return sum(); }",
-    "float rf(void); double rd(void); long double rld(void); int sum(void) { return (int)((rf() + rd() + (double)rld()) * 4); }",
-    30
-);
-exits_linked!(
-    abi_bitfield_layout_read_from_gcc,
-    "struct B { unsigned a : 3; int b : 5; unsigned c : 7; char d; unsigned e : 20; int f : 12; }; extern struct B g; int size(void); int main(void) { return sizeof(struct B) == size() && g.a == 5 && g.b == -9 && g.c == 100 && g.d == 'x' && g.e == 999999 && g.f == -2000; }",
-    "struct B { unsigned a : 3; int b : 5; unsigned c : 7; char d; unsigned e : 20; int f : 12; }; struct B g = { 5, -9, 100, 'x', 999999, -2000 }; int size(void) { return sizeof(struct B); }",
-    1
-);
-exits_linked!(
-    abi_bitfield_layout_written_for_gcc,
-    "struct B { unsigned a : 30; unsigned b : 4; char c; int x : 4; unsigned d : 31; }; struct B g; int check(void); int main(void) { g.a = 0x3ffffffe; g.b = 9; g.c = 1; g.x = -3; g.d = 0x7ffffff0; return check(); }",
-    "struct B { unsigned a : 30; unsigned b : 4; char c; int x : 4; unsigned d : 31; }; extern struct B g; int check(void) { return g.a == 0x3ffffffe && g.b == 9 && g.c == 1 && g.x == -3 && g.d == 0x7ffffff0; }",
-    1
-);
-
-exits!(
-    double_to_unsigned_above_int_max,
-    "int main(void) { volatile double d = 3000000000.0; volatile long double ld = 4000000000.0L; unsigned u = (unsigned)d; unsigned long ul = (unsigned long)ld; return u == 3000000000u && ul == 4000000000UL; }",
-    1
-);
-exits!(
-    unsigned_max_to_floating,
-    "int main(void) { volatile unsigned u = 4294967295u; volatile double d = u; volatile float f = u; return d == 4294967295.0 && f == 4294967296.0f; }",
-    1
-);
-exits!(
-    nan_comparisons,
-    "int main(void) { volatile double z = 0.0; double n = z / z; return (n == n) + 2 * (n != n) + 4 * (n < 1) + 8 * !(n >= 1); }",
-    10
-);
-exits!(
-    infinity_and_negative_zero,
-    "int main(void) { volatile double z = 0.0; double i = 1.0 / z, m = -z; return (i > 1e308) + 2 * (1.0 / m < 0) + 4 * (m == 0.0); }",
-    7
-);
-exits!(
-    pointer_difference_large_elements,
-    "struct B { char c[12]; }; int main(void) { struct B a[10]; return &a[7] - &a[2]; }",
-    5
-);
+exits!(local_init_in_loop_recopies, "int main(void) { int i; int s = 0; for (i = 0; i < 3; i++) { int a[2] = {10, 1}; a[0] += i; s += a[0] + a[1]; } return s + 6; }", 42);
+exits!(local_struct_with_string_member, "struct s { char name[4]; int n; }; int main(void) { struct s v = {\"ab\", 40}; return v.name[0] - 'a' + v.name[1] - 'b' + v.name[2] + v.name[3] + v.n + 2; }", 42);
+exits!(local_struct_address_constant, "int g; struct s { int *p; int k; }; int main(void) { struct s v = {&g, 2}; *v.p = 40; return g + v.k; }", 42);
+exits!(local_nested_struct, "struct in { int a; int b; }; struct out { struct in i; int c; }; int main(void) { struct out v = {{1, 2}, 39}; return v.i.a + v.i.b + v.c; }", 42);
+exits!(local_partial_struct_zero_rest, "struct s { int a; int b; int c; }; int main(void) { struct s v = {42}; return v.a + v.b + v.c; }", 42);
+exits!(local_init_from_shadowing_block, "int main(void) { int a[2] = {1, 2}; { int a[2] = {40, 2}; return a[0] + a[1]; } }", 42);
+exits!(local_char_array_with_escapes, "int main(void) { char s[] = \"\\t\\n\\0x\"; return s[0] + s[1] + s[2] + sizeof s + 18; }", 42);
+exits!(local_long_double_member, "struct s { char c; long double d; int n; }; int main(void) { struct s v = {2, 1.5L, 40}; return v.c + v.n + (int) v.d - 1; }", 42);
+exits!(struct_member_of_call_result, "struct s { int a; char c; }; struct s mk(void) { struct s v; v.a = 40; v.c = 2; return v; } int main(void) { return mk().a + mk().c; }", 42);
+exits!(bitfield_member_of_call_result, "struct s { int a : 3; int b : 5; }; struct s v = {-1, 15}; struct s mk(void) { return v; } int main(void) { return mk().b + mk().a + 28; }", 42);
+exits!(nested_member_of_call_result, "struct in { int x; int y; }; struct s { char c; struct in i; }; struct s v = {1, {40, 2}}; struct s mk(void) { return v; } int main(void) { return mk().i.x + mk().i.y; }", 42);
+exits!(member_of_assignment_result, "struct s { int a; int b; }; struct s v = {40, 2}; struct s w; int main(void) { return (w = v).a + (w = v).b; }", 42);
+exits!(member_of_call_result_in_loop, "struct s { int a; }; struct s mk(int n) { struct s v; v.a = n; return v; } int main(void) { int i; int s; s = 0; for (i = 0; i < 1000; i++) s += mk(i).a; return s % 1000 + 42 - 500; }", 42);
+exits!(member_of_call_result_in_loop_does_not_grow_stack, "struct s { int a; char pad[4092]; }; struct s mk(int n) { struct s v; v.a = n; return v; } int main(void) { int i; int s; s = 0; for (i = 0; i < 4096; i++) s += mk(i).a; return s % 1000 + 42 - 560; }", 42);
+exits!(struct_assign_from_ternary, "struct s { int a; }; int main(void) { struct s u; struct s v; struct s w; u.a = 42; v.a = 7; w = 1 ? u : v; return w.a; }", 42);
+exits!(struct_param_from_call_result, "struct s { int a; int b; }; struct s mk(void) { struct s v; v.a = 40; v.b = 2; return v; } int sum(struct s v) { return v.a + v.b; } int main(void) { return sum(mk()); }", 42);
+exits!(struct_return_assignment_result, "struct s { int a; }; struct s g; struct s set(int n) { struct s v; v.a = n; return g = v; } int main(void) { return set(42).a; }", 42);
+exits!(struct_assign_chain, "struct s { int a; int b; }; int main(void) { struct s u; struct s v; struct s w; u.a = 40; u.b = 2; w = v = u; return w.a + w.b + v.a - u.a; }", 42);
+exits!(struct_assign_self, "struct s { int a; char c; }; int main(void) { struct s v; v.a = 40; v.c = 2; v = v; return v.a + v.c; }", 42);
+exits!(struct_assign_copies_all_members, "struct s { char c; int a; }; int main(void) { struct s v; struct s w; v.c = 2; v.a = 40; w = v; v.a = 0; return w.c + w.a; }", 42);
+exits!(struct_init_from_value_is_a_copy, "struct s { char c; int a; }; int main(void) { struct s v; v.c = 2; v.a = 40; { struct s w = v; v.c = 0; return w.c + w.a; } }", 42);
+exits!(struct_assign_through_pointer_deref, "struct s { double d; char c; }; struct s *p(struct s *v) { return v; } int main(void) { struct s v; struct s w; v.d = 1.5; v.c = 39; w = *p(&v); return (int) (w.d * 2) + w.c; }", 42);
+exits!(struct_copy_by_value_param_and_return, "struct s { int a; char c; long l; }; struct s cp(struct s v) { struct s w; w = v; return w; } int main(void) { struct s v; struct s r; v.a = 40; v.c = 2; v.l = 7; r = cp(v); return r.a + r.c; }", 42);
+exits!(struct_copy_global_to_local, "struct s { char c[3]; }; struct s g; struct s cp(struct s v) { return v; } int main(void) { struct s l; g.c[0] = 40; g.c[2] = 2; l = cp(g); return l.c[0] + l.c[1] + l.c[2]; }", 42);
+exits!(union_assign_keeps_alternate_member, "union u { int i; char c[8]; }; int main(void) { union u a; union u b; a.i = 1; a.c[5] = 42; b = a; return b.c[5]; }", 42);
+exits!(union_assign_keeps_bytes_past_first_member, "struct s { int a; char c; long l; }; union u { int i; char c[8]; }; int main(void) { struct s v; struct s w; union u a; union u b; v.a = 40; v.c = 2; v.l = 7; w = v; a.c[5] = 9; a.c[1] = 33; b = a; return w.a + w.c + b.c[5] + b.c[1] - 42; }", 42);
+exits!(union_return_keeps_alternate_member, "union u { char c[3]; short s; }; union u mk(void) { union u v; v.c[0] = 1; v.c[1] = 2; v.c[2] = 39; return v; } int main(void) { union u w; w = mk(); return w.c[0] + w.c[1] + w.c[2]; }", 42);
+exits!(struct_and_union_copies_todo_14, "struct s { int a; char c; long l; }; union u { int i; char c[8]; }; struct s cp(struct s v) { struct s w; w = v; return w; } int main(void) { struct s v; union u a; union u b; v.a = 40; v.c = 2; v.l = 7; a.c[5] = 9; b = a; return cp(v).a + cp(v).c + b.c[5] - 9; }", 42);
+exits!(abi_sret_and_byval_in_module, "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int sum(struct big v) { return v.a + v.b + v.c + v.d + v.e; } int main(void) { return sum(mk(21)); }", 42);
+exits!(abi_sret_scalar_param_reaches_body, "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n, int m) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = m; return r; } int main(void) { return mk(40, 2).a + mk(40, 2).e; }", 42);
+exits!(abi_byval_callee_writes_its_copy, "struct s { int x; int y; }; int poke(struct s a) { a.x = 100; return a.x; } int main(void) { struct s v; v.x = 40; v.y = 2; poke(v); return v.x + v.y; }", 42);
+exits!(abi_byval_param_returned_through_sret, "struct s { char c[5]; }; struct s id(struct s a) { return a; } int main(void) { struct s v; struct s w; v.c[0] = 1; v.c[4] = 41; w = id(v); return w.c[0] + w.c[4]; }", 42);
+exits!(abi_byval_param_passed_again, "struct s { int x; int y; }; int inner(struct s a) { return a.x + a.y; } int outer(struct s a) { return inner(a); } int main(void) { struct s v; v.x = 40; v.y = 2; return outer(v); }", 42);
+exits!(abi_two_byval_params, "struct s { int x; int y; }; int both(struct s a, struct s b) { return a.x + b.y; } int main(void) { struct s v; struct s w; v.x = 40; v.y = 0; w.x = 0; w.y = 2; return both(v, w); }", 42);
+exits!(abi_sret_assign_to_byval_source, "struct s { int x; int y; }; struct s bump(struct s a) { a.x = a.x + 1; a.y = a.y + 1; return a; } int main(void) { struct s v; v.x = 39; v.y = 1; v = bump(v); return v.x + v.y; }", 42);
+exits!(abi_return_sret_call_result, "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } struct big wrap(int n) { return mk(n); } int main(void) { struct big v; v = wrap(21); return v.a + v.e; }", 42);
+exits!(abi_return_ternary_place, "struct s { int x; }; struct s pick(int c) { struct s a; struct s b; a.x = 42; b.x = 7; return c ? a : b; } int main(void) { return pick(1).x + pick(0).x - 7; }", 42);
+exits!(abi_sret_through_function_pointer, "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int sum(struct big v) { return v.a + v.b + v.c + v.d + v.e; } int main(void) { struct big (*fp)(int); int (*sp)(struct big); fp = mk; sp = sum; return sp((*fp)(21)); }", 42);
+exits!(abi_sret_nested_record, "struct in { char c; int v; }; struct out { char pad; struct in i; }; struct out mk(int n) { struct out r; r.pad = 1; r.i.c = 2; r.i.v = n; return r; } int get(struct out o) { return o.pad + o.i.c + o.i.v; } int main(void) { return get(mk(39)); }", 42);
+exits!(abi_sret_unprototyped_call, "struct big { int a; int b; int c; int d; int e; }; struct big mk(); int main(void) { struct big v; v = mk(21); return v.a + v.e; } struct big mk(n) int n; { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; }", 42);
+exits!(abi_byval_unprototyped_call, "struct big { int a; int b; int c; int d; int e; }; int sum(); int main(void) { struct big v; v.a = 40; v.b = v.c = v.d = 0; v.e = 2; return sum(v); } int sum(v) struct big v; { return v.a + v.b + v.c + v.d + v.e; }", 42);
+exits!(double_to_unsigned_above_int_max, "int main(void) { volatile double d = 3000000000.0; volatile long double ld = 4000000000.0L; unsigned u = (unsigned)d; unsigned long ul = (unsigned long)ld; return u == 3000000000u && ul == 4000000000UL; }", 1);
+exits!(unsigned_max_to_floating, "int main(void) { volatile unsigned u = 4294967295u; volatile double d = u; volatile float f = u; return d == 4294967295.0 && f == 4294967296.0f; }", 1);
+exits!(nan_comparisons, "int main(void) { volatile double z = 0.0; double n = z / z; return (n == n) + 2 * (n != n) + 4 * (n < 1) + 8 * !(n >= 1); }", 10);
+exits!(infinity_and_negative_zero, "int main(void) { volatile double z = 0.0; double i = 1.0 / z, m = -z; return (i > 1e308) + 2 * (1.0 / m < 0) + 4 * (m == 0.0); }", 7);
+exits!(pointer_difference_large_elements, "struct B { char c[12]; }; int main(void) { struct B a[10]; return &a[7] - &a[2]; }", 5);
 exits!(sizeof_does_not_evaluate_operand, "int main(void) { int i = 0; int s = sizeof(i++); return i * 10 + s; }", 4);
 exits!(sizeof_comma_decays_array, "int main(void) { char a[10]; return sizeof(0, a); }", 4);
-exits!(
-    duffs_device,
-    "int main(void) { int n = 13, count = 0; int i = (n + 3) / 4; switch (n % 4) { case 0: do { count++; case 3: count++; case 2: count++; case 1: count++; } while (--i > 0); } return count; }",
-    13
-);
-exits!(
-    switch_default_in_middle,
-    "int main(void) { int x = 9, r = 0; switch (x) { case 1: r += 1; default: r += 10; case 2: r += 100; break; case 3: r += 1000; } return r; }",
-    110
-);
-exits!(
-    switch_case_inside_dead_if,
-    "int main(void) { int x = 2, r = 0; switch (x) { case 1: if (0) { case 2: r = 3; } else { r = 4; } } return r; }",
-    3
-);
-exits!(
-    switch_extreme_int_cases,
-    "int f(int x) { switch (x) { case -2147483647 - 1: return 1; case 2147483647: return 2; case 0: return 3; case -1: return 4; default: return 5; } } int main(void) { return f(-2147483647 - 1) == 1 && f(2147483647) == 2 && f(0) == 3 && f(-1) == 4 && f(9) == 5; }",
-    1
-);
-exits!(
-    switch_extreme_unsigned_cases,
-    "int f(unsigned x) { switch (x) { case 4294967295u: return 1; case 2147483648u: return 2; case 0: return 3; default: return 5; } } int main(void) { return f(4294967295u) == 1 && f(2147483648u) == 2 && f(0) == 3 && f(9) == 5; }",
-    1
-);
-exits!(
-    switch_negative_case_on_char,
-    "int f(char c) { switch (c) { case -1: return 1; case 127: return 2; default: return 3; } } int main(void) { return f((char)255) * 100 + f(127) * 10 + f(0); }",
-    123
-);
-exits!(
-    struct_self_assignment,
-    "struct S { int a[4]; }; int main(void) { struct S s; s.a[0] = 1; s.a[3] = 4; s = s; return s.a[0] * 10 + s.a[3]; }",
-    14
-);
-exits!(
-    struct_return_chained,
-    "struct S { int a, b, c; }; struct S f(int x) { struct S s; s.a = x; s.b = x + 1; s.c = x + 2; return s; } struct S g(struct S s) { s.a *= 10; return s; } int main(void) { struct S r = g(g(f(1))); return r.a + r.b + f(5).c; }",
-    109
-);
-exits!(
-    struct_return_ignored,
-    "struct S { int a[4]; }; int n; struct S f(void) { struct S s; n++; s.a[0] = n; return s; } int main(void) { f(); f(); return n; }",
-    2
-);
-exits!(
-    struct_conditional,
-    "struct S { int a; double d; }; int main(void) { struct S x, y, z; int c = 0; x.a = 1; x.d = 1.5; y.a = 2; y.d = 2.5; z = c ? x : y; return z.a * 10 + (int)(z.d * 2); }",
-    25
-);
-exits!(
-    struct_assignment_rvalue_member,
-    "struct S { int x; char c[4]; } a, b; int main(void) { b.x = 7; return (a = b).x * 10 + a.x; }",
-    77
-);
-exits!(
-    typedef_name_as_member,
-    "typedef int T; struct S { int T; } s; int main(void) { struct S *p = &s; s.T = 3; p->T += 1; return s.T; }",
-    4
-);
-exits!(
-    typedef_cast_versus_multiplication,
-    "typedef int T; int main(void) { int x = 3, *p = &x, r; { int T = 2; r = (T)*x; } r += (T)*p; return r; }",
-    9
-);
-exits!(
-    enum_tag_in_sizeof_stays_visible,
-    "int x = sizeof(enum { Q = 5 }); int y = Q; int main(void) { return x + y; }",
-    9
-);
-exits!(
-    struct_tag_in_sizeof_stays_visible,
-    "int main(void) { int n = sizeof(struct S { int a; char b; }); struct S s; return n + sizeof s; }",
-    16
-);
-exits!(
-    enum_constant_in_struct_is_file_scope,
-    "struct S { enum { A = 3, B } e; int x; }; int y = B; int main(void) { return y; }",
-    4
-);
-exits!(
-    strings_in_nested_aggregates,
-    "char a[2][4] = { \"ab\", \"cd\" }; char b[][3] = { \"ab\", \"cd\", \"e\" }; int main(void) { return a[1][1] + sizeof b + b[2][0]; }",
-    210
-);
-exits!(
-    function_pointer_table,
-    "int a1(int x) { return x + 1; } int a2(int x) { return x * 2; } int a3(int x) { return x - 3; } int (*tab[3])(int) = { a1, a2, a3 }; int main(void) { int i, v = 10; for (i = 0; i < 3; i++) v = tab[i](v); return v; }",
-    19
-);
-exits!(
-    old_style_main,
-    "int main(argc, argv) int argc; char **argv; { return argc + (argv[argc] == 0); }",
-    2
-);
+exits!(duffs_device, "int main(void) { int n = 13, count = 0; int i = (n + 3) / 4; switch (n % 4) { case 0: do { count++; case 3: count++; case 2: count++; case 1: count++; } while (--i > 0); } return count; }", 13);
+exits!(switch_default_in_middle, "int main(void) { int x = 9, r = 0; switch (x) { case 1: r += 1; default: r += 10; case 2: r += 100; break; case 3: r += 1000; } return r; }", 110);
+exits!(switch_case_inside_dead_if, "int main(void) { int x = 2, r = 0; switch (x) { case 1: if (0) { case 2: r = 3; } else { r = 4; } } return r; }", 3);
+exits!(switch_extreme_int_cases, "int f(int x) { switch (x) { case -2147483647 - 1: return 1; case 2147483647: return 2; case 0: return 3; case -1: return 4; default: return 5; } } int main(void) { return f(-2147483647 - 1) == 1 && f(2147483647) == 2 && f(0) == 3 && f(-1) == 4 && f(9) == 5; }", 1);
+exits!(switch_extreme_unsigned_cases, "int f(unsigned x) { switch (x) { case 4294967295u: return 1; case 2147483648u: return 2; case 0: return 3; default: return 5; } } int main(void) { return f(4294967295u) == 1 && f(2147483648u) == 2 && f(0) == 3 && f(9) == 5; }", 1);
+exits!(switch_negative_case_on_char, "int f(char c) { switch (c) { case -1: return 1; case 127: return 2; default: return 3; } } int main(void) { return f((char)255) * 100 + f(127) * 10 + f(0); }", 123);
+exits!(struct_self_assignment, "struct S { int a[4]; }; int main(void) { struct S s; s.a[0] = 1; s.a[3] = 4; s = s; return s.a[0] * 10 + s.a[3]; }", 14);
+exits!(struct_return_chained, "struct S { int a, b, c; }; struct S f(int x) { struct S s; s.a = x; s.b = x + 1; s.c = x + 2; return s; } struct S g(struct S s) { s.a *= 10; return s; } int main(void) { struct S r = g(g(f(1))); return r.a + r.b + f(5).c; }", 109);
+exits!(struct_return_ignored, "struct S { int a[4]; }; int n; struct S f(void) { struct S s; n++; s.a[0] = n; return s; } int main(void) { f(); f(); return n; }", 2);
+exits!(struct_conditional, "struct S { int a; double d; }; int main(void) { struct S x, y, z; int c = 0; x.a = 1; x.d = 1.5; y.a = 2; y.d = 2.5; z = c ? x : y; return z.a * 10 + (int)(z.d * 2); }", 25);
+exits!(struct_assignment_rvalue_member, "struct S { int x; char c[4]; } a, b; int main(void) { b.x = 7; return (a = b).x * 10 + a.x; }", 77);
+exits!(typedef_name_as_member, "typedef int T; struct S { int T; } s; int main(void) { struct S *p = &s; s.T = 3; p->T += 1; return s.T; }", 4);
+exits!(typedef_cast_versus_multiplication, "typedef int T; int main(void) { int x = 3, *p = &x, r; { int T = 2; r = (T)*x; } r += (T)*p; return r; }", 9);
+exits!(enum_tag_in_sizeof_stays_visible, "int x = sizeof(enum { Q = 5 }); int y = Q; int main(void) { return x + y; }", 9);
+exits!(struct_tag_in_sizeof_stays_visible, "int main(void) { int n = sizeof(struct S { int a; char b; }); struct S s; return n + sizeof s; }", 16);
+exits!(enum_constant_in_struct_is_file_scope, "struct S { enum { A = 3, B } e; int x; }; int y = B; int main(void) { return y; }", 4);
+exits!(strings_in_nested_aggregates, "char a[2][4] = { \"ab\", \"cd\" }; char b[][3] = { \"ab\", \"cd\", \"e\" }; int main(void) { return a[1][1] + sizeof b + b[2][0]; }", 210);
+exits!(function_pointer_table, "int a1(int x) { return x + 1; } int a2(int x) { return x * 2; } int a3(int x) { return x - 3; } int (*tab[3])(int) = { a1, a2, a3 }; int main(void) { int i, v = 10; for (i = 0; i < 3; i++) v = tab[i](v); return v; }", 19);
+exits!(old_style_main, "int main(argc, argv) int argc; char **argv; { return argc + (argv[argc] == 0); }", 2);
+exits!(preprocess_targets_i386_limits, "#include <limits.h>\nint main(void) { return (CHAR_MIN < 0) + (LONG_MAX == 2147483647L) * 2; }", 3);
 
-exits!(
-    preprocess_targets_i386_limits,
-    "#include <limits.h>\nint main(void) { return (CHAR_MIN < 0) + (LONG_MAX == 2147483647L) * 2; }",
-    3
-);
+exits_linked!(incomplete_extern_object_address, "struct S; extern struct S s; struct S *addr_s(void); void *p = &s; int main(void) { return p == (void *)addr_s() ? 42 : 1; }", "struct S { int a; }; struct S s; struct S *addr_s(void) { return &s; }", 42);
+exits_linked!(incomplete_return_function_address, "struct S; struct S f(void); struct S (*addr_f(void))(void); int main(void) { return f == addr_f() ? 42 : 1; }", "struct S { int a; }; struct S f(void) { struct S r; r.a = 0; return r; } struct S (*addr_f(void))(void) { return f; }", 42);
+exits_linked!(incomplete_extern_object_completed_later, "struct S; extern struct S s; struct S { int a; }; int main(void) { return s.a; }", "struct S { int a; }; struct S s = { 42 };", 42);
+exits_linked!(abi_sret_from_gcc, "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int main(void) { struct big v; v = gmk(21); return v.a + v.e; }", BIG_HELPER, 42);
+exits_linked!(abi_sret_from_gcc_member_of_call, "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int main(void) { return gmk(21).a + gmk(21).e; }", BIG_HELPER, 42);
+exits_linked!(abi_byval_to_gcc, "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; v.a = 10; v.b = 10; v.c = 10; v.d = 10; v.e = 2; return gsum(v); }", BIG_HELPER, 42);
+exits_linked!(abi_byval_to_gcc_is_a_copy, "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int main(void) { struct big v; int r; v.a = 42; v.b = v.c = v.d = v.e = 0; r = gsum(v); return r + v.b; }", "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v) { int r; r = v.a; v.b = 100; return r; }", 42);
+exits_linked!(abi_nested_call_across_gcc, "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); int gsum(struct big v); int main(void) { return gsum(gmk(21)); }", BIG_HELPER, 42);
+exits_linked!(abi_define_called_from_gcc, "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n) { struct big r; r.a = n; r.b = r.c = r.d = 0; r.e = n; return r; } int sum(struct big v) { return v.a + v.b + v.c + v.d + v.e; } int gdrive(void); int main(void) { return gdrive(); }", "struct big { int a; int b; int c; int d; int e; }; struct big mk(int n); int sum(struct big v); int gdrive(void) { return sum(mk(21)); }", 42);
+exits_linked!(abi_sret_from_global, "struct big { int a; int b; int c; int d; int e; }; struct big g; struct big mk(void) { return g; } int gdrive2(void); int main(void) { g.a = 40; g.e = 2; return gdrive2(); }", "struct big { int a; int b; int c; int d; int e; }; struct big mk(void); int gdrive2(void) { struct big v; v = mk(); return v.a + v.e; }", 42);
+exits_linked!(abi_byval_mixed_with_scalars, "struct big { int a; int b; int c; int d; int e; }; int gmix(int x, struct big v, char y); int main(void) { struct big v; v.a = 40; v.b = v.c = v.d = v.e = 0; return gmix(1, v, 1); }", "struct big { int a; int b; int c; int d; int e; }; int gmix(int x, struct big v, char y) { return x + v.a + y; }", 42);
+exits_linked!(abi_sret_mixed_with_scalars, "struct big { int a; int b; int c; int d; int e; }; struct big gset(int x, int y); int main(void) { struct big v; v = gset(40, 2); return v.a + v.e; }", "struct big { int a; int b; int c; int d; int e; }; struct big gset(int x, int y) { struct big r; r.a = x; r.b = r.c = r.d = 0; r.e = y; return r; }", 42);
+exits_linked!(abi_union_byval_and_sret, "union u { int i; char c[8]; }; union u gmku(void); int gsu(union u v); int main(void) { union u v; v = gmku(); return gsu(v) + v.c[1]; }", "union u { int i; char c[8]; }; union u gmku(void) { union u r; r.i = 0; r.c[1] = 2; r.c[5] = 40; return r; } int gsu(union u v) { return v.c[5]; }", 42);
+exits_linked!(abi_small_struct_byval_and_sret, "struct one { int a; }; struct three { char c[3]; }; struct one gm1(void); struct three gm3(void); int gs1(struct one v); int gs3(struct three v); int main(void) { struct one a; struct three b; a = gm1(); b = gm3(); return gs1(a) + gs3(b); }", "struct one { int a; }; struct three { char c[3]; }; struct one gm1(void) { struct one r; r.a = 20; return r; } struct three gm3(void) { struct three r; r.c[0] = 1; r.c[1] = 20; r.c[2] = 1; return r; } int gs1(struct one v) { return v.a; } int gs3(struct three v) { return v.c[0] + v.c[1] + v.c[2]; }", 42);
+exits_linked!(abi_double_struct_byval_and_sret, "struct q { double d; int i; }; struct q gmq(void); int gsq(struct q v); int main(void) { struct q v; v = gmq(); return gsq(v) + v.i; }", "struct q { double d; int i; }; struct q gmq(void) { struct q r; r.d = 2.5; r.i = 2; return r; } int gsq(struct q v) { return (int) (v.d * 16); }", 42);
+exits_linked!(abi_long_double_struct_byval_and_sret, "struct x { char c; long double d; }; struct x gmx(void); int gsx(struct x v); int main(void) { struct x v; v = gmx(); return gsx(v) + v.c; }", "struct x { char c; long double d; }; struct x gmx(void) { struct x r; r.c = 2; r.d = 2.5L; return r; } int gsx(struct x v) { return (int) (v.d * 16); }", 42);
+exits_linked!(abi_unprototyped_sret_from_gcc, "struct big { int a; int b; int c; int d; int e; }; struct big gmk(); int gsum(); int main(void) { struct big v; v = gmk(21); return gsum(v); }", BIG_HELPER, 42);
+exits_linked!(abi_byval_param_forwarded_to_gcc, "struct big { int a; int b; int c; int d; int e; }; int gsum(struct big v); int fwd(struct big v) { return gsum(v); } int main(void) { struct big v; v.a = 40; v.b = v.c = v.d = 0; v.e = 2; return fwd(v); }", BIG_HELPER, 42);
+exits_linked!(abi_sret_forwarded_from_gcc, "struct big { int a; int b; int c; int d; int e; }; struct big gmk(int n); struct big fwd(int n) { return gmk(n); } int gsum(struct big v); int main(void) { return gsum(fwd(21)); }", BIG_HELPER, 42);
+exits_linked!(abi_old_style_params_from_gcc, "int kr(a, f) char a; float f; { return a + (int) f; } int call(void); int main(void) { return call(); }", "int kr(); int call(void) { return kr(40, 2.75f); }", 42);
+exits_linked!(abi_old_style_params_to_gcc, "int kr(); int main(void) { return kr(40.5f, 2); }", "int kr(f, c) float f; char c; { return (int) f + c; }", 42);
+exits_linked!(abi_variadic_struct_to_gcc, "struct S { int a; char b; double d; }; int take(int n, ...); int main(void) { struct S s; s.a = 1; s.b = 2; s.d = 3.5; return take(1, s, 7); }", "#include <stdarg.h>\nstruct S { int a; char b; double d; }; int take(int n, ...) { va_list ap; struct S s; int x; va_start(ap, n); s = va_arg(ap, struct S); x = va_arg(ap, int); va_end(ap); return s.a + s.b + (int)(s.d * 2) + x; }", 17);
+exits_linked!(abi_variadic_long_double_to_gcc, "int take(int n, ...); int main(void) { long double ld = 2.5L; return take(1, ld, 9); }", "#include <stdarg.h>\nint take(int n, ...) { va_list ap; long double x; int y; va_start(ap, n); x = va_arg(ap, long double); y = va_arg(ap, int); va_end(ap); return (int)(x * 4) + y; }", 19);
+exits_linked!(abi_float_returns_from_gcc, "float rf(void); double rd(void); long double rld(void); int main(void) { return (int)((rf() + rd() + (double)rld()) * 4); }", "float rf(void) { return 1.25f; } double rd(void) { return 2.5; } long double rld(void) { return 3.75L; }", 30);
+exits_linked!(abi_float_returns_to_gcc, "float rf(void) { return 1.25f; } double rd(void) { return 2.5; } long double rld(void) { return 3.75L; } int sum(void); int main(void) { return sum(); }", "float rf(void); double rd(void); long double rld(void); int sum(void) { return (int)((rf() + rd() + (double)rld()) * 4); }", 30);
+exits_linked!(abi_bitfield_layout_read_from_gcc, "struct B { unsigned a : 3; int b : 5; unsigned c : 7; char d; unsigned e : 20; int f : 12; }; extern struct B g; int size(void); int main(void) { return sizeof(struct B) == size() && g.a == 5 && g.b == -9 && g.c == 100 && g.d == 'x' && g.e == 999999 && g.f == -2000; }", "struct B { unsigned a : 3; int b : 5; unsigned c : 7; char d; unsigned e : 20; int f : 12; }; struct B g = { 5, -9, 100, 'x', 999999, -2000 }; int size(void) { return sizeof(struct B); }", 1);
+exits_linked!(abi_bitfield_layout_written_for_gcc, "struct B { unsigned a : 30; unsigned b : 4; char c; int x : 4; unsigned d : 31; }; struct B g; int check(void); int main(void) { g.a = 0x3ffffffe; g.b = 9; g.c = 1; g.x = -3; g.d = 0x7ffffff0; return check(); }", "struct B { unsigned a : 30; unsigned b : 4; char c; int x : 4; unsigned d : 31; }; extern struct B g; int check(void) { return g.a == 0x3ffffffe && g.b == 9 && g.c == 1 && g.x == -3 && g.d == 0x7ffffff0; }", 1);

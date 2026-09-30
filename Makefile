@@ -49,8 +49,7 @@ c:
 
 cc:
 	$(I386_CC) $(CFF) rscs/hello.c
-	$(I386_RUN) ./a.out || echo $$?
-	rm ./a.out
+	$(I386_RUN) ./a.out ; echo $$?
 
 llvm:
 	clang --target=i686-linux-gnu $(CFF) -O0 -S -emit-llvm rscs/hello.c -o /dev/stdout

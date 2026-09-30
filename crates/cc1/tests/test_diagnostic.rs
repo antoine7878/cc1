@@ -1,3 +1,4 @@
+#![cfg_attr(rustfmt, rustfmt_skip)]
 use libft::SourceMap;
 use libft::TmpDir;
 use std::fs;
@@ -8,182 +9,6 @@ use cc1::parser::parse_reader;
 use cc1::semantic::Analyzer;
 
 use crate::common::{Unit, strip_ansi};
-
-reports!(
-    report_undeclared_identifier,
-    "void f(void) { x = 1; }",
-    ["<test>:1:16: error: Use of undeclared identifier 'x'"]
-);
-
-reports!(
-    report_points_at_the_offending_line,
-    "int f(void)\n{\n  return y;\n}",
-    ["<test>:3:10: error: Use of undeclared identifier 'y'"]
-);
-
-reports!(report_duplicate_declaration, "int x; char x;", ["<test>:1:13: error: duplicate declaration of variable `x'"]);
-
-reports!(
-    report_duplicate_declaration_across_lines,
-    "int x;\nchar x;",
-    ["<test>:2:6: error: duplicate declaration of variable `x'"]
-);
-
-reports!(
-    report_conflicting_types_across_scopes,
-    "int x; void f(void){ extern long x; }",
-    ["<test>:1:34: error: conflicting types for 'x'"]
-);
-
-reports!(report_non_constant_expression, "int x; enum E { A = x };", ["<test>:1:21: error: Non constant expression"]);
-
-reports!(
-    report_non_integer_constant_expression,
-    "enum E { A = 1.5 };",
-    ["<test>:1:14: error: Non integer constant expression"]
-);
-
-reports!(
-    report_non_integral_bit_field,
-    "struct S { double a : 3; };",
-    ["<test>:1:23: error: Bit-field has non-integral type"]
-);
-
-reports!(
-    report_bit_field_width_exceeding_its_type,
-    "struct S { int a : 33; };",
-    ["<test>:1:20: error: width of bit-field 'a' (33 bits) exceeds the width of its type (32 bits)"]
-);
-
-reports!(
-    report_anonymous_bit_field_width_exceeding_its_type,
-    "struct S { int a; int : 33; };",
-    ["<test>:1:25: error: width of anonymous bit-field (33 bits) exceeds the width of its type (32 bits)"]
-);
-
-reports!(
-    report_negative_bit_field_width,
-    "struct S { int a : -1; };",
-    ["<test>:1:20: error: bit-field 'a' has negative width (-1)"]
-);
-
-reports!(
-    report_negative_anonymous_bit_field_width,
-    "struct S { int a; int : -1; };",
-    ["<test>:1:25: error: anonymous bit-field has negative width (-1)"]
-);
-
-reports!(
-    report_zero_width_named_bit_field,
-    "struct S { int a : 0; };",
-    ["<test>:1:20: error: named bit-field 'a' has zero width"]
-);
-
-reports!(
-    report_old_style_parameter_declared_twice,
-    "int f(a, b) int a; int a; { return a; }",
-    ["<test>:1:24: error: duplicate declaration of parameter `a'"]
-);
-
-reports!(
-    report_void_is_not_the_only_parameter,
-    "void f(void, int) { }",
-    [
-        "<test>:1:8: error: Parameter shall not have void type",
-        "<test>:1:6: error: Parameter shall include an identifier",
-    ]
-);
-
-reports!(report_named_void_parameter, "void f(void x) { }", ["<test>:1:8: error: Parameter shall not have void type"]);
-
-reports!(
-    report_named_void_parameter_in_prototype,
-    "int f(void x);",
-    ["<test>:1:7: error: Parameter shall not have void type"]
-);
-
-reports!(
-    report_named_typedef_void_parameter_in_prototype,
-    "typedef void V; int f(V x);",
-    ["<test>:1:23: error: Parameter shall not have void type"]
-);
-
-reports!(
-    report_named_void_parameter_in_nested_prototype,
-    "void g(void) { int f(void x); }",
-    ["<test>:1:22: error: Parameter shall not have void type"]
-);
-
-reports!(
-    report_old_style_void_parameter,
-    "void f(a, b) int b; void a; { }",
-    ["<test>:1:26: error: Parameter shall not have void type"]
-);
-
-reports!(
-    report_old_style_initialized_parameter,
-    "int f(a) int a = 1; { return a; }",
-    ["<test>:1:18: error: parameter cannot have an initializer"]
-);
-
-reports!(
-    report_old_style_declaration_without_parameter,
-    "int f(a) int; int a; { return a; }",
-    ["<test>:1:10: error: declaration does not declare a parameter"]
-);
-
-reports!(
-    report_parameter_storage_class,
-    "void f(static int a) { }",
-    ["<test>:1:8: error: Parameter shall only by declared with register storage"]
-);
-
-reports!(
-    report_prototype_with_declaration_list,
-    "int f(int a) int b; { return a; }",
-    ["<test>:1:5: error: Parameter style function declration shall not be followed by a declaration list"]
-);
-
-reports!(
-    report_duplicate_parameter,
-    "int f(int a, int a) { return a; }",
-    ["<test>:1:18: error: duplicate declaration of parameter `a'"]
-);
-
-reports!(
-    report_duplicate_parameter_in_prototype,
-    "void f(int a, int a, int b, int b);",
-    [
-        "<test>:1:19: error: duplicate declaration of parameter `a'",
-        "<test>:1:33: error: duplicate declaration of parameter `b'"
-    ]
-);
-
-reports!(
-    report_duplicate_parameter_in_nested_prototype,
-    "void g(int (*h)(int x, int x));",
-    ["<test>:1:28: error: duplicate declaration of parameter `x'"]
-);
-
-reports!(
-    report_duplicate_parameter_in_definition_nested_prototype,
-    "void g(int (*h)(int x, int x)) { }",
-    ["<test>:1:28: error: duplicate declaration of parameter `x'"]
-);
-
-reports!(accept_distinct_prototype_parameters, "void f(int a, int b); void g(int, int);", [] as [&str; 0]);
-
-reports!(
-    accept_same_parameter_name_in_distinct_prototypes,
-    "void f(int a, int (*h)(int a)); void g(int a) { }",
-    [] as [&str; 0]
-);
-
-reports!(
-    report_declarator_is_not_a_function,
-    "int (*f)(void) { return 0; }",
-    ["<test>:1:5: error: Declarator shall be function type"]
-);
 
 #[test]
 fn an_accepted_unit_reports_nothing() {
@@ -215,112 +40,6 @@ fn a_report_names_the_file_and_position() {
     assert!(message.starts_with("<test>:1:16: "), "{message}");
 }
 
-reports!(report_empty_declaration, "int ;", ["<test>:1:1: error: Declaration declares nothing"]);
-
-reports!(
-    report_syntax_error_lists_expected_tokens,
-    "struct s { int a }",
-    ["<test>:1:18: error: syntax error, unexpected '}', expecting ',' or ';'"]
-);
-
-reports!(
-    report_struct_error_recovers_at_the_next_member,
-    "struct s { int a; : 0; int b; };",
-    ["<test>:1:19: error: syntax error, unexpected ':'"]
-);
-
-reports!(
-    report_struct_error_recovers_on_a_leading_member,
-    "struct s { : 0; int a; };",
-    ["<test>:1:12: error: syntax error, unexpected ':'"]
-);
-
-reports!(
-    report_syntax_error_at_end_of_file,
-    "int f(void) { return 0; } }",
-    ["<test>:1:27: error: syntax error, unexpected '}', expecting end of file"]
-);
-
-reports!(
-    report_unterminated_block_expects_a_closing_brace,
-    "int f(void) { return 0;",
-    ["<test>:1:24: error: syntax error, unexpected end of file, expecting ';' or '}'"]
-);
-
-reports!(report_syntax_error_without_expected_tokens, "int x = ;", ["<test>:1:9: error: syntax error, unexpected ';'"]);
-
-reports!(
-    report_struct_without_member,
-    "struct s { int; };",
-    ["<test>:1:12: error: Declaration declares nothing", "<test>:1:1: error: struct has no named member"]
-);
-
-reports!(
-    report_union_without_member,
-    "union u { int; };",
-    ["<test>:1:11: error: Declaration declares nothing", "<test>:1:1: error: union has no named member"]
-);
-
-reports!(
-    report_struct_with_only_unnamed_bit_fields,
-    "struct t { int : 3; };",
-    ["<test>:1:1: error: struct has no named member"]
-);
-
-reports!(
-    report_empty_struct_declaration,
-    "struct s { int a; int; };",
-    ["<test>:1:19: error: Declaration declares nothing"]
-);
-
-reports!(
-    report_integer_constant_too_large,
-    "int x = 0x100000000;",
-    ["<test>:1:9: error: integer constant is too large for any integer type"]
-);
-
-reports!(
-    report_concat_narrow_then_wide_literal,
-    "int f(void) { return (\"a\" L\"b\")[0]; }",
-    ["<test>:1:23: warning: concatenation of a wide and a narrow string literal is undefined"]
-);
-
-reports!(
-    report_concat_wide_then_narrow_literal,
-    "int f(void) { return (L\"a\" \"b\")[0]; }",
-    ["<test>:1:23: warning: concatenation of a wide and a narrow string literal is undefined"]
-);
-
-reports!(
-    report_concat_wide_literal_in_subscript,
-    "int f(void) { return L\"ab\" \"cd\"[0]; }",
-    ["<test>:1:22: warning: concatenation of a wide and a narrow string literal is undefined"]
-);
-
-reports!(
-    report_arithmetic_overflow_in_addition,
-    "enum E { A = 2147483647 + 1 };",
-    ["<test>:1:14: error: integer overflow in constant expression"]
-);
-
-reports!(
-    report_arithmetic_overflow_in_negation,
-    "enum E { A = -(-2147483647 - 1) };",
-    ["<test>:1:14: error: integer overflow in constant expression"]
-);
-
-reports!(
-    report_shift_count_out_of_range,
-    "enum E { A = 1 << 32 };",
-    ["<test>:1:19: warning: shift count >= width of type"]
-);
-
-reports!(
-    report_invalid_shift_operands_in_source_order,
-    "void f(void) { 1.5 << 1; }",
-    ["<test>:1:16: error: invalid operands to binary expression ('double' and 'int')"]
-);
-
 #[test]
 fn complex_types_use_c_declarator_syntax_in_diagnostics() {
     let cases = [
@@ -336,92 +55,6 @@ fn complex_types_use_c_declarator_syntax_in_diagnostics() {
         assert!(messages[0].contains(expected), "{src}: {messages:?}");
     }
 }
-
-reports!(report_remainder_by_zero, "enum E { A = 1 % 0 };", ["<test>:1:14: error: remainder by zero is undefined"]);
-
-reports!(report_division_by_zero, "enum E { A = 1 / 0 };", ["<test>:1:14: error: division by zero is undefined"]);
-
-reports!(report_shift_count_negative, "enum E { A = 1 << -1 };", ["<test>:1:19: warning: shift count is negative"]);
-
-reports!(
-    report_member_of_an_incomplete_structure,
-    "struct S; void f(void) { struct S *p; p->x; }",
-    ["<test>:1:39: error: incomplete definition of type 'struct S'"]
-);
-
-reports!(
-    report_increment_of_a_pointer_to_an_incomplete_type,
-    "struct S; void f(void) { struct S *p; p++; }",
-    ["<test>:1:39: error: incomplete definition of type 'struct S'"]
-);
-
-reports!(
-    report_pre_increment_of_a_structure,
-    "struct S { int x; } s; void f(void) { ++s; }",
-    ["<test>:1:39: error: cannot increment value of type 'struct S'"]
-);
-
-reports!(
-    report_pre_decrement_of_a_structure,
-    "struct S { int x; } s; void f(void) { --s; }",
-    ["<test>:1:39: error: cannot decrement value of type 'struct S'"]
-);
-
-reports!(
-    report_constant_overflow,
-    "enum E { A = (-2147483647 - 1) / -1 };",
-    ["<test>:1:14: error: overflow in constant expression"]
-);
-
-reports!(report_external_register, "register int x;", ["<test>:1:1: error: External declaration auto of register"]);
-
-reports!(
-    report_block_function_not_extern,
-    "void f(void) { auto int g(void); }",
-    ["<test>:1:25: error: Function in block not declared as extern"]
-);
-
-reports!(
-    poisoned_operand_does_not_leak_internal_error,
-    "void f(void) { x + 1; }",
-    ["<test>:1:16: error: Use of undeclared identifier 'x'"]
-);
-
-reports!(
-    poisoned_return_operand_does_not_leak_internal_error,
-    "int f(void) { return x + 1; }",
-    ["<test>:1:22: error: Use of undeclared identifier 'x'"]
-);
-
-reports!(
-    poisoned_initializer_operand_does_not_leak_internal_error,
-    "void f(void) { int y = x + 1; }",
-    ["<test>:1:24: error: Use of undeclared identifier 'x'"]
-);
-
-reports!(
-    report_too_many_arguments,
-    "int g(int); void f(void) { g(1, 2); }",
-    ["<test>:1:28: error: too many arguments to function call, expected 1, have 2"]
-);
-
-reports!(
-    report_too_few_arguments,
-    "int g(int, int); void f(void) { g(1); }",
-    ["<test>:1:33: error: too few arguments to function call, expected 2, have 1"]
-);
-
-reports!(
-    report_a_prototype_with_no_parameters_takes_no_argument,
-    "int g(void); void f(void) { g(1); }",
-    ["<test>:1:29: error: too many arguments to function call, expected 0, have 1"]
-);
-
-reports!(
-    poisoned_argument_does_not_leak_internal_error,
-    "int g(int); void f(void) { g(x); }",
-    ["<test>:1:30: error: Use of undeclared identifier 'x'"]
-);
 
 fn scratch_file(dir: &TmpDir, contents: &str) -> std::path::PathBuf {
     let path = dir.join("src.c");
@@ -459,134 +92,6 @@ fn source_line_of_a_missing_file_is_none() {
     let ctx = Context::default();
     assert_eq!(ctx.source_line("/cc1/no/such/source/file.c", 1), None);
 }
-
-reports!(
-    report_forward_enum_reference,
-    "enum E *p;",
-    ["<test>:1:1: error: ISO C forbids forward references to enum 'E'"]
-);
-
-reports!(
-    report_indirection_on_a_pointer_to_void,
-    "void *v; void f(void) { *v; }",
-    ["<test>:1:25: warning: dereferencing 'void *' pointer"]
-);
-
-reports!(
-    report_cast_of_a_non_scalar_operand,
-    "struct S { int a; } s; void f(void) { (int)s; }",
-    ["<test>:1:39: error: Conversion of non scalar type"]
-);
-
-reports!(report_stray_at_sign, "int x = 1; @", ["<test>:1:12: error: stray '@' in program"]);
-reports!(report_stray_backtick, "int x = 1; `", ["<test>:1:12: error: stray '`' in program"]);
-reports!(report_stray_dollar, "int x = 1; $", ["<test>:1:12: error: stray '$' in program"]);
-reports!(
-    report_newline_in_string_literal,
-    "char *s = \"ab\ncd\";",
-    [
-        "<test>:1:11: error: missing terminating \" character",
-        "<test>:2:3: error: missing terminating \" character",
-        "<test>:2:5: error: syntax error, unexpected end of file, expecting ',' or ';'"
-    ]
-);
-reports!(
-    report_newline_in_wide_string_literal,
-    "char *s = L\"ab\ncd\";",
-    [
-        "<test>:1:11: error: missing terminating \" character",
-        "<test>:2:3: error: missing terminating \" character",
-        "<test>:2:5: error: syntax error, unexpected end of file, expecting ',' or ';'"
-    ]
-);
-reports!(
-    report_newline_in_char_constant,
-    "int c = 'a\n';",
-    [
-        "<test>:1:9: error: missing terminating ' character",
-        "<test>:2:1: error: missing terminating ' character",
-        "<test>:2:3: error: syntax error, unexpected end of file"
-    ]
-);
-reports!(
-    report_empty_char_constant,
-    "int c = '';",
-    ["<test>:1:9: error: empty character constant", "<test>:1:11: error: syntax error, unexpected ';'"]
-);
-reports!(
-    report_char_constant_escape_out_of_range,
-    "int c = '\\777';",
-    ["<test>:1:9: error: escape sequence is out of range for the character type"]
-);
-reports!(
-    report_char_constant_escape_no_hex_digits,
-    "int c = '\\x';",
-    ["<test>:1:9: error: \\x used with no following hex digits"]
-);
-reports!(report_char_constant_unknown_escape, "int c = '\\q';", ["<test>:1:9: error: unknown escape sequence: '\\q'"]);
-reports!(
-    report_wide_char_constant_hex_escape_wrap,
-    "int c = L'\\x100000041';",
-    ["<test>:1:9: error: escape sequence is out of range for the character type"]
-);
-reports!(
-    report_string_hex_escape_wrap,
-    "char a[] = \"\\x100000041\";",
-    ["<test>:1:12: error: escape sequence is out of range for the character type"]
-);
-reports!(
-    report_wide_string_hex_escape_wrap,
-    "long c[] = L\"\\x100000041\";",
-    ["<test>:1:12: error: escape sequence is out of range for the character type"]
-);
-reports!(report_stray_non_ascii, "int x = 1; é", ["<test>:1:12: error: stray '\\u{e9}' in program"]);
-reports!(
-    report_stray_backslash,
-    "int x = 1; \\ ;",
-    [
-        "<test>:1:12: error: stray '\\\\' in program",
-        "<test>:1:14: error: syntax error, unexpected ';', expecting end of file"
-    ]
-);
-
-// ----- error position ------------------------------------------------------
-
-reports!(
-    report_unknown_type_name_as_a_struct_member,
-    "struct S { foo x; };",
-    ["<test>:1:12: error: syntax error, unexpected IDENTIFIER"]
-);
-
-reports!(
-    report_unknown_type_name_in_an_old_style_parameter_declaration,
-    "int f(a) foo a; { return 0; }",
-    [
-        "<test>:1:10: error: syntax error, unexpected IDENTIFIER, expecting ',' or ';'",
-        "<test>:1:17: error: syntax error, unexpected '{', expecting end of file",
-        "<test>:1:29: error: syntax error, unexpected '}', expecting end of file"
-    ]
-);
-
-reports!(
-    report_trailing_identifier_on_the_declaration_line,
-    "int f(void) __attribute__((noreturn));\nint main(void) { return 0; }",
-    ["<test>:1:13: error: syntax error, unexpected IDENTIFIER, expecting ',' or ';'"]
-);
-
-reports!(
-    report_untyped_declarator_after_a_typedef_is_not_a_type,
-    "typedef int T; foo() { return 0; } int main(void) { foo x = 1; return x; }",
-    [
-        "<test>:1:57: error: syntax error, unexpected IDENTIFIER, expecting ',' or ';'",
-        "<test>:1:71: error: Use of undeclared identifier 'x'"
-    ]
-);
-
-reports!(
-    report_tab_counts_as_one_column,
-    "int f(void)\n{\n\t\tint y = ;\n}",
-    ["<test>:3:11: error: syntax error, unexpected ';'"]
-);
 
 fn compile_file(dir: &TmpDir, contents: &str) -> Unit {
     let path = scratch_file(dir, contents);
@@ -671,13 +176,99 @@ fn source_line_maps_a_marked_line_to_the_parsed_file() {
     assert_eq!(ctx.source_line(name, 1).as_deref(), Some("# 10 \"other.c\""));
 }
 
+reports!(report_undeclared_identifier, "void f(void) { x = 1; }", ["<test>:1:16: error: Use of undeclared identifier 'x'"]);
+reports!(report_points_at_the_offending_line, "int f(void)\n{\n  return y;\n}", ["<test>:3:10: error: Use of undeclared identifier 'y'"]);
+reports!(report_duplicate_declaration, "int x; char x;", ["<test>:1:13: error: duplicate declaration of variable `x'"]);
+reports!(report_duplicate_declaration_across_lines, "int x;\nchar x;", ["<test>:2:6: error: duplicate declaration of variable `x'"]);
+reports!(report_conflicting_types_across_scopes, "int x; void f(void){ extern long x; }", ["<test>:1:34: error: conflicting types for 'x'"]);
+reports!(report_non_constant_expression, "int x; enum E { A = x };", ["<test>:1:21: error: Non constant expression"]);
+reports!(report_non_integer_constant_expression, "enum E { A = 1.5 };", ["<test>:1:14: error: Non integer constant expression"]);
+reports!(report_non_integral_bit_field, "struct S { double a : 3; };", ["<test>:1:23: error: Bit-field has non-integral type"]);
+reports!(report_bit_field_width_exceeding_its_type, "struct S { int a : 33; };", ["<test>:1:20: error: width of bit-field 'a' (33 bits) exceeds the width of its type (32 bits)"]);
+reports!(report_anonymous_bit_field_width_exceeding_its_type, "struct S { int a; int : 33; };", ["<test>:1:25: error: width of anonymous bit-field (33 bits) exceeds the width of its type (32 bits)"]);
+reports!(report_negative_bit_field_width, "struct S { int a : -1; };", ["<test>:1:20: error: bit-field 'a' has negative width (-1)"]);
+reports!(report_negative_anonymous_bit_field_width, "struct S { int a; int : -1; };", ["<test>:1:25: error: anonymous bit-field has negative width (-1)"]);
+reports!(report_zero_width_named_bit_field, "struct S { int a : 0; };", ["<test>:1:20: error: named bit-field 'a' has zero width"]);
+reports!(report_old_style_parameter_declared_twice, "int f(a, b) int a; int a; { return a; }", ["<test>:1:24: error: duplicate declaration of parameter `a'"]);
+reports!(report_void_is_not_the_only_parameter, "void f(void, int) { }", ["<test>:1:8: error: Parameter shall not have void type", "<test>:1:6: error: Parameter shall include an identifier"]);
+reports!(report_named_void_parameter, "void f(void x) { }", ["<test>:1:8: error: Parameter shall not have void type"]);
+reports!(report_named_void_parameter_in_prototype, "int f(void x);", ["<test>:1:7: error: Parameter shall not have void type"]);
+reports!(report_named_typedef_void_parameter_in_prototype, "typedef void V; int f(V x);", ["<test>:1:23: error: Parameter shall not have void type"]);
+reports!(report_named_void_parameter_in_nested_prototype, "void g(void) { int f(void x); }", ["<test>:1:22: error: Parameter shall not have void type"]);
+reports!(report_old_style_void_parameter, "void f(a, b) int b; void a; { }", ["<test>:1:26: error: Parameter shall not have void type"]);
+reports!(report_old_style_initialized_parameter, "int f(a) int a = 1; { return a; }", ["<test>:1:18: error: parameter cannot have an initializer"]);
+reports!(report_old_style_declaration_without_parameter, "int f(a) int; int a; { return a; }", ["<test>:1:10: error: declaration does not declare a parameter"]);
+reports!(report_parameter_storage_class, "void f(static int a) { }", ["<test>:1:8: error: Parameter shall only by declared with register storage"]);
+reports!(report_prototype_with_declaration_list, "int f(int a) int b; { return a; }", ["<test>:1:5: error: Parameter style function declration shall not be followed by a declaration list"]);
+reports!(report_duplicate_parameter, "int f(int a, int a) { return a; }", ["<test>:1:18: error: duplicate declaration of parameter `a'"]);
+reports!(report_duplicate_parameter_in_prototype, "void f(int a, int a, int b, int b);", ["<test>:1:19: error: duplicate declaration of parameter `a'", "<test>:1:33: error: duplicate declaration of parameter `b'"]);
+reports!(report_duplicate_parameter_in_nested_prototype, "void g(int (*h)(int x, int x));", ["<test>:1:28: error: duplicate declaration of parameter `x'"]);
+reports!(report_duplicate_parameter_in_definition_nested_prototype, "void g(int (*h)(int x, int x)) { }", ["<test>:1:28: error: duplicate declaration of parameter `x'"]);
+reports!(accept_distinct_prototype_parameters, "void f(int a, int b); void g(int, int);", [] as [&str; 0]);
+reports!(accept_same_parameter_name_in_distinct_prototypes, "void f(int a, int (*h)(int a)); void g(int a) { }", [] as [&str; 0]);
+reports!(report_declarator_is_not_a_function, "int (*f)(void) { return 0; }", ["<test>:1:5: error: Declarator shall be function type"]);
+reports!(report_empty_declaration, "int ;", ["<test>:1:1: error: Declaration declares nothing"]);
+reports!(report_syntax_error_lists_expected_tokens, "struct s { int a }", ["<test>:1:18: error: syntax error, unexpected '}', expecting ',' or ';'"]);
+reports!(report_struct_error_recovers_at_the_next_member, "struct s { int a; : 0; int b; };", ["<test>:1:19: error: syntax error, unexpected ':'"]);
+reports!(report_struct_error_recovers_on_a_leading_member, "struct s { : 0; int a; };", ["<test>:1:12: error: syntax error, unexpected ':'"]);
+reports!(report_syntax_error_at_end_of_file, "int f(void) { return 0; } }", ["<test>:1:27: error: syntax error, unexpected '}', expecting end of file"]);
+reports!(report_unterminated_block_expects_a_closing_brace, "int f(void) { return 0;", ["<test>:1:24: error: syntax error, unexpected end of file, expecting ';' or '}'"]);
+reports!(report_syntax_error_without_expected_tokens, "int x = ;", ["<test>:1:9: error: syntax error, unexpected ';'"]);
+reports!(report_struct_without_member, "struct s { int; };", ["<test>:1:12: error: Declaration declares nothing", "<test>:1:1: error: struct has no named member"]);
+reports!(report_union_without_member, "union u { int; };", ["<test>:1:11: error: Declaration declares nothing", "<test>:1:1: error: union has no named member"]);
+reports!(report_struct_with_only_unnamed_bit_fields, "struct t { int : 3; };", ["<test>:1:1: error: struct has no named member"]);
+reports!(report_empty_struct_declaration, "struct s { int a; int; };", ["<test>:1:19: error: Declaration declares nothing"]);
+reports!(report_integer_constant_too_large, "int x = 0x100000000;", ["<test>:1:9: error: integer constant is too large for any integer type"]);
+reports!(report_concat_narrow_then_wide_literal, "int f(void) { return (\"a\" L\"b\")[0]; }", ["<test>:1:23: warning: concatenation of a wide and a narrow string literal is undefined"]);
+reports!(report_concat_wide_then_narrow_literal, "int f(void) { return (L\"a\" \"b\")[0]; }", ["<test>:1:23: warning: concatenation of a wide and a narrow string literal is undefined"]);
+reports!(report_concat_wide_literal_in_subscript, "int f(void) { return L\"ab\" \"cd\"[0]; }", ["<test>:1:22: warning: concatenation of a wide and a narrow string literal is undefined"]);
+reports!(report_arithmetic_overflow_in_addition, "enum E { A = 2147483647 + 1 };", ["<test>:1:14: error: integer overflow in constant expression"]);
+reports!(report_arithmetic_overflow_in_negation, "enum E { A = -(-2147483647 - 1) };", ["<test>:1:14: error: integer overflow in constant expression"]);
+reports!(report_shift_count_out_of_range, "enum E { A = 1 << 32 };", ["<test>:1:19: warning: shift count >= width of type"]);
+reports!(report_invalid_shift_operands_in_source_order, "void f(void) { 1.5 << 1; }", ["<test>:1:16: error: invalid operands to binary expression ('double' and 'int')"]);
+reports!(report_remainder_by_zero, "enum E { A = 1 % 0 };", ["<test>:1:14: error: remainder by zero is undefined"]);
+reports!(report_division_by_zero, "enum E { A = 1 / 0 };", ["<test>:1:14: error: division by zero is undefined"]);
+reports!(report_shift_count_negative, "enum E { A = 1 << -1 };", ["<test>:1:19: warning: shift count is negative"]);
+reports!(report_member_of_an_incomplete_structure, "struct S; void f(void) { struct S *p; p->x; }", ["<test>:1:39: error: incomplete definition of type 'struct S'"]);
+reports!(report_increment_of_a_pointer_to_an_incomplete_type, "struct S; void f(void) { struct S *p; p++; }", ["<test>:1:39: error: incomplete definition of type 'struct S'"]);
+reports!(report_pre_increment_of_a_structure, "struct S { int x; } s; void f(void) { ++s; }", ["<test>:1:39: error: cannot increment value of type 'struct S'"]);
+reports!(report_pre_decrement_of_a_structure, "struct S { int x; } s; void f(void) { --s; }", ["<test>:1:39: error: cannot decrement value of type 'struct S'"]);
+reports!(report_constant_overflow, "enum E { A = (-2147483647 - 1) / -1 };", ["<test>:1:14: error: overflow in constant expression"]);
+reports!(report_external_register, "register int x;", ["<test>:1:1: error: External declaration auto of register"]);
+reports!(report_block_function_not_extern, "void f(void) { auto int g(void); }", ["<test>:1:25: error: Function in block not declared as extern"]);
+reports!(poisoned_operand_does_not_leak_internal_error, "void f(void) { x + 1; }", ["<test>:1:16: error: Use of undeclared identifier 'x'"]);
+reports!(poisoned_return_operand_does_not_leak_internal_error, "int f(void) { return x + 1; }", ["<test>:1:22: error: Use of undeclared identifier 'x'"]);
+reports!(poisoned_initializer_operand_does_not_leak_internal_error, "void f(void) { int y = x + 1; }", ["<test>:1:24: error: Use of undeclared identifier 'x'"]);
+reports!(report_too_many_arguments, "int g(int); void f(void) { g(1, 2); }", ["<test>:1:28: error: too many arguments to function call, expected 1, have 2"]);
+reports!(report_too_few_arguments, "int g(int, int); void f(void) { g(1); }", ["<test>:1:33: error: too few arguments to function call, expected 2, have 1"]);
+reports!(report_a_prototype_with_no_parameters_takes_no_argument, "int g(void); void f(void) { g(1); }", ["<test>:1:29: error: too many arguments to function call, expected 0, have 1"]);
+reports!(poisoned_argument_does_not_leak_internal_error, "int g(int); void f(void) { g(x); }", ["<test>:1:30: error: Use of undeclared identifier 'x'"]);
+reports!(report_forward_enum_reference, "enum E *p;", ["<test>:1:1: error: ISO C forbids forward references to enum 'E'"]);
+reports!(report_indirection_on_a_pointer_to_void, "void *v; void f(void) { *v; }", ["<test>:1:25: warning: dereferencing 'void *' pointer"]);
+reports!(report_cast_of_a_non_scalar_operand, "struct S { int a; } s; void f(void) { (int)s; }", ["<test>:1:39: error: Conversion of non scalar type"]);
+reports!(report_stray_at_sign, "int x = 1; @", ["<test>:1:12: error: stray '@' in program"]);
+reports!(report_stray_backtick, "int x = 1; `", ["<test>:1:12: error: stray '`' in program"]);
+reports!(report_stray_dollar, "int x = 1; $", ["<test>:1:12: error: stray '$' in program"]);
+reports!(report_newline_in_string_literal, "char *s = \"ab\ncd\";", ["<test>:1:11: error: missing terminating \" character", "<test>:2:3: error: missing terminating \" character", "<test>:2:5: error: syntax error, unexpected end of file, expecting ',' or ';'"]);
+reports!(report_newline_in_wide_string_literal, "char *s = L\"ab\ncd\";", ["<test>:1:11: error: missing terminating \" character", "<test>:2:3: error: missing terminating \" character", "<test>:2:5: error: syntax error, unexpected end of file, expecting ',' or ';'"]);
+reports!(report_newline_in_char_constant, "int c = 'a\n';", ["<test>:1:9: error: missing terminating ' character", "<test>:2:1: error: missing terminating ' character", "<test>:2:3: error: syntax error, unexpected end of file"]);
+reports!(report_empty_char_constant, "int c = '';", ["<test>:1:9: error: empty character constant", "<test>:1:11: error: syntax error, unexpected ';'"]);
+reports!(report_char_constant_escape_out_of_range, "int c = '\\777';", ["<test>:1:9: error: escape sequence is out of range for the character type"]);
+reports!(report_char_constant_escape_no_hex_digits, "int c = '\\x';", ["<test>:1:9: error: \\x used with no following hex digits"]);
+reports!(report_char_constant_unknown_escape, "int c = '\\q';", ["<test>:1:9: error: unknown escape sequence: '\\q'"]);
+reports!(report_wide_char_constant_hex_escape_wrap, "int c = L'\\x100000041';", ["<test>:1:9: error: escape sequence is out of range for the character type"]);
+reports!(report_string_hex_escape_wrap, "char a[] = \"\\x100000041\";", ["<test>:1:12: error: escape sequence is out of range for the character type"]);
+reports!(report_wide_string_hex_escape_wrap, "long c[] = L\"\\x100000041\";", ["<test>:1:12: error: escape sequence is out of range for the character type"]);
+reports!(report_stray_non_ascii, "int x = 1; é", ["<test>:1:12: error: stray '\\u{e9}' in program"]);
+reports!(report_stray_backslash, "int x = 1; \\ ;", ["<test>:1:12: error: stray '\\\\' in program", "<test>:1:14: error: syntax error, unexpected ';', expecting end of file"]);
+reports!(report_unknown_type_name_as_a_struct_member, "struct S { foo x; };", ["<test>:1:12: error: syntax error, unexpected IDENTIFIER"]);
+reports!(report_unknown_type_name_in_an_old_style_parameter_declaration, "int f(a) foo a; { return 0; }", ["<test>:1:10: error: syntax error, unexpected IDENTIFIER, expecting ',' or ';'", "<test>:1:17: error: syntax error, unexpected '{', expecting end of file", "<test>:1:29: error: syntax error, unexpected '}', expecting end of file"]);
+reports!(report_trailing_identifier_on_the_declaration_line, "int f(void) __attribute__((noreturn));\nint main(void) { return 0; }", ["<test>:1:13: error: syntax error, unexpected IDENTIFIER, expecting ',' or ';'"]);
+reports!(report_untyped_declarator_after_a_typedef_is_not_a_type, "typedef int T; foo() { return 0; } int main(void) { foo x = 1; return x; }", ["<test>:1:57: error: syntax error, unexpected IDENTIFIER, expecting ',' or ';'", "<test>:1:71: error: Use of undeclared identifier 'x'"]);
+reports!(report_tab_counts_as_one_column, "int f(void)\n{\n\t\tint y = ;\n}", ["<test>:3:11: error: syntax error, unexpected ';'"]);
 reports!(report_pp_number_hex_minus, "int x = 0x1E-1;", ["<test>:1:9: error: invalid numeric constant '0x1E-1'"]);
 reports!(report_pp_number_hex_plus, "int x = 0x1e+1;", ["<test>:1:9: error: invalid numeric constant '0x1e+1'"]);
 reports!(report_pp_number_two_dots, "double x = 1.2.3;", ["<test>:1:12: error: invalid numeric constant '1.2.3'"]);
 reports!(report_pp_number_letter_suffix, "int x = 123abc;", ["<test>:1:9: error: invalid numeric constant '123abc'"]);
 reports!(report_pp_number_hex_without_digits, "int x = 0x;", ["<test>:1:9: error: invalid numeric constant '0x'"]);
-reports!(
-    report_pp_number_exponent_without_digits,
-    "double x = 1e;",
-    ["<test>:1:12: error: invalid numeric constant '1e'"]
-);
+reports!(report_pp_number_exponent_without_digits, "double x = 1e;", ["<test>:1:12: error: invalid numeric constant '1e'"]);

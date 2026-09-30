@@ -1,3 +1,5 @@
+#![cfg_attr(rustfmt, rustfmt_skip)]
+
 use crate::common::Unit;
 
 macro_rules! op {
@@ -29,7 +31,6 @@ op!(unary_plus, "void f(int a) { int b; b = +a; }", "Plus");
 op!(unary_minus, "void f(int a) { int b; b = -a; }", "Minus");
 op!(bit_not, "void f(int a) { int b; b = ~a; }", "BitNot");
 op!(logical_not, "void f(int a) { int b; b = !a; }", "LogicalNot");
-
 op!(add, "void f(int a, int b) { int c; c = a + b; }", "Add");
 op!(sub, "void f(int a, int b) { int c; c = a - b; }", "Sub");
 op!(mul, "void f(int a, int b) { int c; c = a * b; }", "Mul");
@@ -48,7 +49,6 @@ op!(bit_or, "void f(int a, int b) { int c; c = a | b; }", "BitOr");
 op!(bit_xor, "void f(int a, int b) { int c; c = a ^ b; }", "BitXor");
 op!(logical_and, "void f(int a, int b) { int c; c = a && b; }", "LogicalAnd");
 op!(logical_or, "void f(int a, int b) { int c; c = a || b; }", "LogicalOr");
-
 op!(assign, "void f(int a) { int b; b = a; }", "Assign");
 op!(mul_assign, "void f(int a, int b) { a *= b; }", "MulAssign");
 op!(div_assign, "void f(int a, int b) { a /= b; }", "DivAssign");
@@ -60,10 +60,8 @@ op!(right_assign, "void f(int a, int b) { a >>= b; }", "RightAssign");
 op!(bit_and_assign, "void f(int a, int b) { a &= b; }", "BitAndAssign");
 op!(bit_xor_assign, "void f(int a, int b) { a ^= b; }", "BitXorAssign");
 op!(bit_or_assign, "void f(int a, int b) { a |= b; }", "BitOrAssign");
-
 op!(dot, "struct S { int x; }; void f(struct S s) { int a; a = s.x; }", "Dot access");
 op!(arrow, "struct S { int x; }; void f(struct S *s) { int a; a = s->x; }", "Ptr access");
-
 op!(array_access, "void f(int a[]) { int b; b = a[0]; }", "Array access");
 op!(ternary, "void f(int a, int b, int c) { int d; d = a ? b : c; }", "Ternary");
 op!(function_call, "int g(int x); void f(void) { int a; a = g(1); }", "Fn call");
