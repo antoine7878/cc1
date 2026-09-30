@@ -66,6 +66,18 @@ impl fmt::Debug for ConstValue {
 }
 
 impl ConstValue {
+    fn bit_size(&self) -> u32 {
+        match self {
+            ConstValue::UnsignedInt(_)
+            | ConstValue::Int(_)
+            | ConstValue::Long(_)
+            | ConstValue::UnsignedLong(_)
+            | ConstValue::Float(_) => 32,
+            ConstValue::Double(_) => 64,
+            ConstValue::LongDouble(_) => 80,
+        }
+    }
+
     pub fn get_integer_value(&self) -> Option<u64> {
         match *self {
             ConstValue::Int(c) => Some(c as u64),
@@ -341,6 +353,9 @@ impl ConstFolder {
 
     pub fn binary(&self, ty: &ResolvedType, op: BinaryOp, lhs: ConstValue, rhs: ConstValue) -> Diag<ConstValue> {
         if matches!(op, BinaryOp::Left | BinaryOp::Right) {
+            if rhs.is_negative() || rhs.is_greater_or_eq(lhs.bit_size()) {
+                return Diag::err(lhs, Diagnostic::NonConstantExpression);
+            }
             return Diag::ok(self.shift(ty, op, lhs, rhs));
         }
         if ty.is_floating() {
