@@ -93,6 +93,7 @@ pub fn enum_tag(resolver: &mut Resolver, id: EnumId) -> Option<TagDefId> {
 
     let mut members = Vec::new();
     let mut value: i64 = 0;
+    let mut has_negative = false;
 
     for enumerator_id in &enum_node.enumerators {
         let enumerator = enumerator_id.resolve();
@@ -105,6 +106,7 @@ pub fn enum_tag(resolver: &mut Resolver, id: EnumId) -> Option<TagDefId> {
             resolver.add_diag(Diag::err((), Diagnostic::EnumeratorBadValue), &enumerator.span);
             value = 0
         }
+        has_negative |= value < 0;
         let ty = QualifiedType::plain(resolver.sema.builtins.int);
         members.push(Member::symbol(
             resolver.declare(Symbol::enumerator(enumerator.name, ty, value as i32), &enumerator.span),
@@ -113,6 +115,7 @@ pub fn enum_tag(resolver: &mut Resolver, id: EnumId) -> Option<TagDefId> {
         value += 1;
     }
     resolver.sema.tags.complete(tag, members);
+    resolver.sema.tags.set_unsigned(tag, !has_negative);
     Some(tag)
 }
 

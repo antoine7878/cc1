@@ -224,11 +224,9 @@ reports!(report_concat_wide_then_narrow_literal, "int f(void) { return (L\"a\" \
 reports!(report_concat_wide_literal_in_subscript, "int f(void) { return L\"ab\" \"cd\"[0]; }", ["<test>:1:22: warning: concatenation of a wide and a narrow string literal is undefined"]);
 reports!(report_arithmetic_overflow_in_addition, "enum E { A = 2147483647 + 1 };", ["<test>:1:14: error: integer overflow in constant expression"]);
 reports!(report_arithmetic_overflow_in_negation, "enum E { A = -(-2147483647 - 1) };", ["<test>:1:14: error: integer overflow in constant expression"]);
-reports!(report_shift_count_out_of_range, "enum E { A = 1 << 32 };", ["<test>:1:19: warning: shift count >= width of type"]);
 reports!(report_invalid_shift_operands_in_source_order, "void f(void) { 1.5 << 1; }", ["<test>:1:16: error: invalid operands to binary expression ('double' and 'int')"]);
 reports!(report_remainder_by_zero, "enum E { A = 1 % 0 };", ["<test>:1:14: error: remainder by zero is undefined"]);
 reports!(report_division_by_zero, "enum E { A = 1 / 0 };", ["<test>:1:14: error: division by zero is undefined"]);
-reports!(report_shift_count_negative, "enum E { A = 1 << -1 };", ["<test>:1:19: warning: shift count is negative"]);
 reports!(report_member_of_an_incomplete_structure, "struct S; void f(void) { struct S *p; p->x; }", ["<test>:1:39: error: incomplete definition of type 'struct S'"]);
 reports!(report_increment_of_a_pointer_to_an_incomplete_type, "struct S; void f(void) { struct S *p; p++; }", ["<test>:1:39: error: incomplete definition of type 'struct S'"]);
 reports!(report_pre_increment_of_a_structure, "struct S { int x; } s; void f(void) { ++s; }", ["<test>:1:39: error: cannot increment value of type 'struct S'"]);

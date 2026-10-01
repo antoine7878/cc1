@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use crate::ast::{BinaryOp, ConstFolder, ConstValue, Expression, ExpressionNode, Tag, UnaryOp};
+use crate::ast::{BinaryOp, ConstFolder, ConstValue, Expression, ExpressionNode, UnaryOp};
 use crate::semantic::{
     Diag, Diagnostic, DiagnosticNode, DiagnosticSink, QualifiedType, ResolvedType, Sema, SymbolKind,
 };
@@ -59,13 +59,7 @@ fn fits(ty: &ResolvedType, value: ConstValue) -> bool {
 }
 
 fn scalar_ty(sema: &Sema, qty: QualifiedType) -> ResolvedType {
-    let ty = qty.id.resolve_with(sema);
-    if let ResolvedType::Tag(id) = ty
-        && (*id).resolve_with(sema).kind == Tag::Enum
-    {
-        return ResolvedType::Int;
-    }
-    ty.clone()
+    qty.id.resolve_with(sema).underlying(sema).clone()
 }
 
 fn node_ty(sema: &Sema, expr: &ExpressionNode) -> Result<QualifiedType, Diagnostic> {

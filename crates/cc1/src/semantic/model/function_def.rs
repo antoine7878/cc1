@@ -116,4 +116,20 @@ impl DeclaredParams {
             },
         }
     }
+
+    pub fn len(&self) -> usize {
+        match self {
+            DeclaredParams::Unspecified => 0,
+            DeclaredParams::Names(names) => names.len(),
+            DeclaredParams::Prototype { params, .. } => params.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            DeclaredParams::Unspecified => true,
+            DeclaredParams::Names(names) => names.is_empty(),
+            DeclaredParams::Prototype { params, .. } => params.is_empty(),
+        }
+    }
 }

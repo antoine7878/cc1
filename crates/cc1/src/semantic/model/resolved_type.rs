@@ -121,6 +121,15 @@ impl ResolvedType {
         matches!(self, ResolvedType::Float | ResolvedType::Double | ResolvedType::LongDouble)
     }
 
+    pub fn underlying<'a>(&'a self, sema: &'a Sema) -> &'a ResolvedType {
+        match self {
+            ResolvedType::Tag(id) if (*id).resolve_with(sema).kind == Tag::Enum => {
+                if (*id).resolve_with(sema).is_unsigned { &ResolvedType::UnsignedInt } else { &ResolvedType::Int }
+            }
+            _ => self,
+        }
+    }
+
     pub fn is_signed(&self) -> bool {
         matches!(
             self,
@@ -375,8 +384,10 @@ impl QualifiedType {
                 e1.is_compatible(sema, e2) && (l1.is_none() || l2.is_none() || l1 == l2)
             }
             (ResolvedType::Pointer(l), ResolvedType::Pointer(r)) => l.is_compatible(sema, r),
-            (ResolvedType::Tag(id), ResolvedType::Int) | (ResolvedType::Int, ResolvedType::Tag(id)) => {
-                (*id).resolve_with(sema).kind == Tag::Enum
+            (ResolvedType::Tag(id), other) | (other, ResolvedType::Tag(id))
+                if (*id).resolve_with(sema).kind == Tag::Enum =>
+            {
+                other.is_integer() && other == ResolvedType::Tag(*id).underlying(sema)
             }
             _ => false,
         }
@@ -448,15 +459,15 @@ impl QualifiedType {
     }
 
     pub fn is_signed(&self, sema: &Sema) -> bool {
-        self.id.resolve_with(sema).is_signed()
+        self.id.resolve_with(sema).underlying(sema).is_signed()
     }
 
     pub fn is_unsigned(&self, sema: &Sema) -> bool {
-        self.id.resolve_with(sema).is_unsigned()
+        self.id.resolve_with(sema).underlying(sema).is_unsigned()
     }
 
     pub fn class(&self, sema: &Sema) -> Option<NumericClass> {
-        self.id.resolve_with(sema).class()
+        self.id.resolve_with(sema).underlying(sema).class()
     }
 }
 

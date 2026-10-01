@@ -1,6 +1,5 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-accept!(gap_enum_without_negative_points_as_unsigned, "enum E { A, B } e; unsigned int *p = &e;");
 accept!(gap_extern_void_object, "extern void v;");
 
 emits!(not gap_string_concat_emits_no_intermediate_literals, "char *p = \"ab\" \"cd\" \"ef\";", "@.str.1");
@@ -14,7 +13,6 @@ exits!(gap_paren_comma_single_argument_unprototyped, "int g(); int main(void) { 
 exits!(gap_long_divided_by_unsigned_bit_field, "struct B { unsigned x : 4; } b; int main(void) { long l = -6; b.x = 2; return l / b.x == -3; }", 1);
 exits!(gap_long_compared_to_unsigned_bit_field, "struct B { unsigned x : 21; } b; int main(void) { long l = -5; b.x = 3; return l <= b.x; }", 1);
 exits!(gap_conditional_long_and_unsigned_bit_field, "struct B { unsigned x : 4; } b; int main(void) { long l = -1; b.x = 1; return (0 ? b.x : l) < 0; }", 1);
-exits!(gap_enum_without_negative_is_unsigned, "enum E { A, B }; int main(void) { enum E x = A; return x - 1 < 0; }", 0);
 exits!(gap_pragma_pack, "#pragma pack(1)\nstruct S { char c; int i; };\n#pragma pack()\nint main(void) { return sizeof(struct S); }", 5);
 exits!(gap_enum_constant_in_parameter_list, "int f(enum E { A, B } x) { return x + B; } int main(void) { return f(0); }", 1);
 exits!(warns gap_deref_void_pointer_discarded, "int main(void) { int x = 1; void *p = &x; *p; (void)*p; return 0; }", 0);
@@ -22,7 +20,6 @@ exits!(gap_typedef_void_parameter_list, "typedef void V; int f(V); int f(V) { re
 
 reject!(gap_nested_tag_redefinition, "struct S { struct S { int a; } x; };");
 reject!(gap_paren_comma_whole_argument_list, "int printf(const char *, ...); int main(void) { printf((\"%d\", 1)); return 0; }");
-reject!(gap_enum_without_negative_is_not_int, "enum E { A, B } e; int *p = &e;");
 reject!(gap_hex_pp_number_with_sign, "int x = 0x1E-1;");
 
 reject!(gap_cpp_comment, "int x = 4 // 2\n;");

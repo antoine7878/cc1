@@ -280,7 +280,7 @@ shaped!(a_floating_division_by_zero_is_accepted, "void f(void) { 1 / 0.0; }", ve
 shaped!(a_shift_of_two_constants_is_an_int, "void f(void) { 1 << 2; }", ints(3));
 shaped!(a_shift_count_below_the_width_of_the_promoted_left_operand_is_accepted, "void f(void) { 1 << 5; }", ints(3));
 shaped!(the_left_operand_of_a_shift_is_promoted, "char c; void f(void) { c << 1; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
-shaped!(an_enumeration_may_be_shifted, "enum E { A }; enum E e; void f(void) { e << 1; }", vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")).then(IntegerPromotion, Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(an_enumeration_may_be_shifted, "enum E { A }; enum E e; void f(void) { e << 1; }", vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")).then(IntegerPromotion, Ty::UInt), rv(Ty::Int), rv(Ty::UInt)]);
 shaped!(a_shift_has_the_type_of_its_promoted_left_operand, "int i; long l; void f(void) { i << l; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::Long).then(LValueToRValue, Ty::Long), rv(Ty::Int)]);
 shaped!(the_operands_of_a_shift_are_promoted_independently, "unsigned u; void f(void) { u >> 1; }", vec![lv(Ty::UInt).then(LValueToRValue, Ty::UInt), rv(Ty::Int), rv(Ty::UInt)]);
 shaped!(a_char_left_operand_is_measured_after_its_promotion, "char c; void f(void) { c << 10; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
@@ -288,7 +288,7 @@ shaped!(a_short_left_operand_is_measured_after_its_promotion, "short s; void f(v
 shaped!(a_count_one_below_the_width_of_the_left_operand_is_accepted, "int i; void f(void) { i << 31; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
 shaped!(the_type_of_the_count_does_not_bound_the_shift, "int i; void f(void) { i << (short)20; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int).then(IntegerConversion, Ty::Short), rv(Ty::Short).then(IntegerPromotion, Ty::Int), rv(Ty::Int)]);
 shaped!(a_shift_by_a_variable_count_promotes_its_operands, "char c; int n; void f(void) { c << n; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]);
-shaped!(an_enumeration_may_be_shifted_by_a_variable_count, "enum E { A }; enum E e; int n; void f(void) { e << n; }", vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")).then(IntegerPromotion, Ty::Int), lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::Int)]);
+shaped!(an_enumeration_may_be_shifted_by_a_variable_count, "enum E { A }; enum E e; int n; void f(void) { e << n; }", vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")).then(IntegerPromotion, Ty::UInt), lv(Ty::Int).then(LValueToRValue, Ty::Int), rv(Ty::UInt)]);
 shaped!(pointers_to_compatible_object_types_may_be_ordered, "int *p; int *q; void f(void) { p < q; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int)]);
 shaped!(ordering_pointers_disregards_the_qualifiers_of_the_pointed_to_type, "const int *p; int *q; void f(void) { p < q; }", vec![lv(Ty::ptr(Ty::konst(Ty::Int))).then(LValueToRValue, Ty::ptr(Ty::konst(Ty::Int))), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int)]);
 shaped!(pointers_to_an_incomplete_structure_may_be_ordered, "struct S; struct S *p; struct S *q; void f(void) { p >= q; }", vec![lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))), lv(Ty::ptr(Ty::strukt_incomplete("S"))).then(LValueToRValue, Ty::ptr(Ty::strukt_incomplete("S"))), rv(Ty::Int)]);
@@ -308,7 +308,7 @@ shaped!(a_bitwise_or_of_two_constants_is_an_int, "void f(void) { 6 | 3; }", ints
 shaped!(the_operands_of_a_bitwise_and_are_promoted, "char c; void f(void) { c & c; }", vec![lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), lv(Ty::Char).then(LValueToRValue, Ty::Char).then(IntegerPromotion, Ty::Int), rv(Ty::Int)]);
 shaped!(a_bitwise_xor_converts_its_operands_to_a_common_type, "int i; unsigned u; void f(void) { i ^ u; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerConversion, Ty::UInt), lv(Ty::UInt).then(LValueToRValue, Ty::UInt), rv(Ty::UInt)]);
 shaped!(a_bitwise_or_with_a_long_operand_meets_at_long, "int i; long l; void f(void) { i | l; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int).then(IntegerConversion, Ty::Long), lv(Ty::Long).then(LValueToRValue, Ty::Long), rv(Ty::Long)]);
-shaped!(an_enumeration_may_be_combined_bitwise, "enum E { A }; enum E e; void f(void) { e & 1; }", vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")).then(IntegerPromotion, Ty::Int), rv(Ty::Int), rv(Ty::Int)]);
+shaped!(an_enumeration_may_be_combined_bitwise, "enum E { A }; enum E e; void f(void) { e & 1; }", vec![lv(Ty::enom("E")).then(LValueToRValue, Ty::enom("E")).then(IntegerPromotion, Ty::UInt), rv(Ty::Int).then(IntegerConversion, Ty::UInt), rv(Ty::UInt)]);
 shaped!(a_conditional_of_two_pointers_to_the_same_type_keeps_that_type, "int *p, *q; void f(int c) { c ? p : q; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::ptr(Ty::Int))]);
 shaped!(a_conditional_of_pointers_to_array_takes_the_known_size, "int a[3]; extern int b[]; void f(int c) { c ? &a : &b; }", vec![rv(Ty::Int), rv(Ty::Int), lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::arr(Ty::Int, 3)), rv(Ty::ptr(Ty::arr(Ty::Int, 3))), lv(Ty::flex(Ty::Int)), rv(Ty::ptr(Ty::flex(Ty::Int))), rv(Ty::ptr(Ty::arr(Ty::Int, 3)))]);
 shaped!(a_conditional_of_pointers_to_unsized_arrays_stays_unsized, "extern int b[]; extern int d[]; void f(int c) { c ? &b : &d; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::flex(Ty::Int)), rv(Ty::ptr(Ty::flex(Ty::Int))), lv(Ty::flex(Ty::Int)), rv(Ty::ptr(Ty::flex(Ty::Int))), rv(Ty::ptr(Ty::flex(Ty::Int)))]);
@@ -343,3 +343,11 @@ shaped!(a_bitwise_assignment_promotes_the_left_operand_and_narrows_the_result, "
 shaped!(a_shift_assignment_has_the_type_of_its_left_operand, "int i; long n; void f(void) { i <<= n; }", vec![lv(Ty::Int).then(LValueToRValue, Ty::Int), lv(Ty::Long).then(LValueToRValue, Ty::Long), rv(Ty::Int)]);
 shaped!(equality_of_two_arithmetic_operands_is_an_int, "void f(void) { 1 == 2; }", ints(3));
 shaped!(comparing_two_compatible_object_pointers_is_an_int, "int *p; int *q; void f(void) { p == q; }", vec![lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), lv(Ty::ptr(Ty::Int)).then(LValueToRValue, Ty::ptr(Ty::Int)), rv(Ty::Int)]);
+accept!(enum_without_negative_points_as_unsigned, "enum E { A, B } e; unsigned int *p = &e;");
+reject!(enum_without_negative_is_not_int, "enum E { A, B } e; int *p = &e;");
+exits!(enum_without_negative_is_unsigned, "enum E { A, B }; int main(void) { enum E x = A; return x - 1 < 0; }", 0);
+accept!(enum_with_negative_points_as_int, "enum E { A = -1, B } e; int *p = &e;");
+reject!(enum_with_negative_is_not_unsigned, "enum E { A = -1, B } e; unsigned int *p = &e;");
+exits!(enum_with_negative_is_signed, "enum E { A = -1, B }; int main(void) { enum E x = B; return x - 1 < 0; }", 1);
+exits!(enum_without_negative_converts_to_floating_as_unsigned, "enum E { A }; int main(void) { enum E x = (enum E)0x80000000u; return (double)x > 0; }", 1);
+exits!(enum_without_negative_shifts_right_logically, "enum E { A }; int main(void) { enum E x = (enum E)0x80000000u; return (x >> 31) == 1; }", 1);

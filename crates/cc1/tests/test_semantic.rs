@@ -246,3 +246,32 @@ value!(cast_value_unsigned_int_wraps, "enum e { A = (unsigned int)-1 % 1000 };",
 value!(cast_value_long_is_32_bits_on_i386, "enum e { A = (unsigned long)-1 % 1000 };", &[("A", "295")]);
 value!(cast_value_enum_sequence, "enum e { A = (int)(1 + 2), B, C = (char)-1, D };", &[("A", "3"), ("B", "4"), ("C", "-1"), ("D", "0")]);
 value!(pp_number_valid_constants_unchanged, "enum e { A = (int)1.e+1, B = 0x1E, C = 0x1E - 1, D = (int)(.5e+1f), E = 0x1eUL, F = (int)1E-1 };", &[("A", "10"), ("B", "30"), ("C", "29"), ("D", "5"), ("E", "30"), ("F", "0")]);
+
+// ---- 5.1.2.2.1 program startup: gcc -Wmain under -pedantic-errors ----------
+accept!(main_without_parameters, "int main(void) { return 0; }");
+accept!(main_with_empty_parameter_list, "int main() { return 0; }");
+accept!(main_with_argc_argv, "int main(int argc, char **argv) { return 0; }");
+accept!(main_with_array_argv, "int main(int argc, char *argv[]) { return 0; }");
+accept!(main_with_envp, "int main(int argc, char **argv, char **envp) { return 0; }");
+accept!(main_ignores_qualifiers, "const int main(int a, const char **b, char *const *c) { return 0; }");
+accept!(main_old_style_is_not_checked, "int main(a, b) int a; int b; { return 0; }");
+accept!(main_static_declaration_before_definition, "static int main(void);\nint main(void) { return 0; }");
+recover!(main_is_static, "static int main(void) { return 0; }", [Diagnostic::StaticMain], &[]);
+recover!(main_returns_long, "long main(void) { return 0; }", [Diagnostic::IntMain], &[]);
+recover!(main_returns_void, "void main(a) { }", [Diagnostic::IntMain], &[]);
+recover!(main_returns_enum, "enum e { A }; enum e main(void) { return 0; }", [Diagnostic::IntMain], &[]);
+recover!(main_with_one_parameter, "int main(int a) { return 0; }", [Diagnostic::ArgCountMain], &[]);
+recover!(main_with_four_parameters, "int main(int a, char **b, char **c, int d) { return 0; }", [Diagnostic::ArgCountMain], &[]);
+recover!(main_second_parameter_int, "int main(int a, int b) { return 0; }", [Diagnostic::SecondArgMain], &[]);
+recover!(main_second_parameter_unsigned_char, "int main(int a, unsigned char **b) { return 0; }", [Diagnostic::SecondArgMain], &[]);
+recover!(main_second_parameter_array_of_arrays, "int main(int a, char b[][2]) { return 0; }", [Diagnostic::SecondArgMain], &[]);
+recover!(main_third_parameter_int, "int main(int a, char **b, int c) { return 0; }", [Diagnostic::ThirdArgMain], &[]);
+recover!(main_third_parameter_triple_pointer, "int main(int a, char **b, char ***c) { return 0; }", [Diagnostic::ThirdArgMain], &[]);
+accept!(main_first_parameter_const_int, "int main(const int a, char **b) { return 0; }");
+accept!(main_first_parameter_signed, "int main(signed a, char **b) { return 0; }");
+recover!(main_first_parameter_long, "int main(long a, char **b) { return 0; }", [Diagnostic::FirstArgMain], &[]);
+recover!(main_first_parameter_unsigned, "int main(unsigned a, char *b[]) { return 0; }", [Diagnostic::FirstArgMain], &[]);
+recover!(main_first_parameter_enum, "enum e { A }; int main(enum e a, char **b) { return 0; }", [Diagnostic::FirstArgMain], &[]);
+recover!(main_is_variadic, "int main(int a, char **b, ...) { return 0; }", [Diagnostic::VariadicMain], &[]);
+recover!(main_variadic_with_one_parameter, "int main(int a, ...) { return 0; }", [Diagnostic::ArgCountMain, Diagnostic::VariadicMain], &[]);
+recover!(main_reports_every_violation, "static long main(long a, int b, int c, ...) { return 0; }", [Diagnostic::IntMain, Diagnostic::FirstArgMain, Diagnostic::SecondArgMain, Diagnostic::ThirdArgMain, Diagnostic::VariadicMain, Diagnostic::StaticMain], &[]);

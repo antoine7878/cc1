@@ -9,6 +9,14 @@ use crate::semantic::{QualifiedType, Sema, SymbolKind, sema};
 
 #[derive(Clone, Debug)]
 pub enum Diagnostic {
+    StaticMain,
+    IntMain,
+    ArgCountMain,
+    FirstArgMain,
+    SecondArgMain,
+    ThirdArgMain,
+    VariadicMain,
+
     CPPStyleComment,
     NestedRedefinition(Name),
     OutsideSwitch(&'static str),
@@ -255,6 +263,13 @@ impl DiagnosticNode {
     #[rustfmt::skip]
     pub fn message(&self, sema: &Sema) -> String {
         match &self.inner {
+            Diagnostic::StaticMain => "‘main’ is normally a non-static function".to_string(),
+            Diagnostic::IntMain => "return type of ‘main’ is not ‘int’".to_string(),
+            Diagnostic::ArgCountMain => "‘main’ takes only zero or two arguments".to_string(),
+            Diagnostic::FirstArgMain => "first argument of ‘main’ should be ‘int’".to_string(),
+            Diagnostic::SecondArgMain => "second argument of ‘main’ should be ‘char **’".to_string(),
+            Diagnostic::ThirdArgMain => "third argument of ‘main’ should probably be ‘char **’".to_string(),
+            Diagnostic::VariadicMain => "‘main’ declared as variadic function".to_string(),
             Diagnostic::CPPStyleComment => "C++ style comments are not allowed in ISO C90".to_string(),
             Diagnostic::NestedRedefinition(name) =>  format!("nested redefinition of '{}'", name.id.resolve()),
             Diagnostic::OutsideSwitch(s) => format!("'{}' statement not in switch statement", s),

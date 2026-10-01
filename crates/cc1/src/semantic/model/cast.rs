@@ -90,7 +90,11 @@ pub fn promote(sema: &Sema, re: &mut ResolvedExpression) {
     }
 
     let kind = CastKind::IntegerPromotion;
-    let to = QualifiedType::plain(sema.builtins.int);
+    let is_unsigned_enum = matches!(re.casted_ty().id.resolve_with(sema), &ResolvedType::Tag(id) if id.resolve_with(sema).is_unsigned);
+    let to = match is_unsigned_enum {
+        true => QualifiedType::plain(sema.builtins.unsigned_int),
+        false => QualifiedType::plain(sema.builtins.int),
+    };
     re.casts.push(ImplicitCast::new(kind, to));
 }
 

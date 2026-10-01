@@ -81,7 +81,51 @@ pub fn define_function(resolver: &mut Resolver, node: &FunctionDefinitionNode) -
     sym.definition = DefinitionState::Defined;
     let sym = resolver.declare(sym, decl_span);
     let declared = (previous == Some(sym)).then_some(declared).flatten();
-    Some(FunctionHeader { id: resolver.sema.functions.declare(sym, return_ty), params, declared })
+    let header = FunctionHeader { id: resolver.sema.functions.declare(sym, return_ty), params, declared };
+    if name.id.resolve() == "main" {
+        check_main(resolver, &header, storage, &name.span);
+    }
+    Some(header)
+}
+
+fn check_main(resolver: &mut Resolver, header: &FunctionHeader, storage: Storage, span: &Span) {
+    let sema = &*resolver.sema;
+    let mut diags = Vec::new();
+    if header.id.resolve_with(sema).return_ty.id != sema.builtins.int {
+        diags.push(Diagnostic::IntMain);
+    }
+    if let DeclaredParams::Prototype { params, is_variadic, .. } = &header.params {
+        let params: Vec<_> = params.iter().filter(|param| !param.ty.is_void(sema)).collect();
+        if params.first().is_some_and(|param| param.ty.id != sema.builtins.int) {
+            diags.push(Diagnostic::FirstArgMain);
+        }
+        if params.get(1).is_some_and(|param| !is_char_ptr_ptr(sema, param.ty)) {
+            diags.push(Diagnostic::SecondArgMain);
+        }
+        if params.get(2).is_some_and(|param| !is_char_ptr_ptr(sema, param.ty)) {
+            diags.push(Diagnostic::ThirdArgMain);
+        }
+        if params.len() == 1 || params.len() > 3 {
+            diags.push(Diagnostic::ArgCountMain);
+        }
+        if *is_variadic {
+            diags.push(Diagnostic::VariadicMain);
+        }
+    }
+    if storage == Storage::Static {
+        diags.push(Diagnostic::StaticMain);
+    }
+    for diag in diags {
+        resolver.add_diag(Diag::err((), diag), span);
+    }
+}
+
+fn is_char_ptr_ptr(sema: &Sema, ty: QualifiedType) -> bool {
+    ty.id
+        .resolve_with(sema)
+        .pointee()
+        .and_then(|ptr| ptr.id.resolve_with(sema).pointee())
+        .is_some_and(|ch| ch.id == sema.builtins.char)
 }
 
 fn param_types(sema: &Sema, sym: SymbolId) -> Option<ParamTypes> {

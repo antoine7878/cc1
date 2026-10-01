@@ -28,8 +28,7 @@ impl<'a> LlvmInit<'a> {
             };
         }
         let rty = match rty {
-            ResolvedType::Tag(id) if id.resolve().is_enum() => &ResolvedType::Int,
-            rty => rty,
+            rty => rty.underlying(sema()),
         };
         let value = ConstFolder.convert(rty, value).unwrap_or(value);
         write!(f, "{}", LlvmSymbol::cst(self.ty.llvm(), value))
