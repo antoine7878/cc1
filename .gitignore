@@ -40,6 +40,5 @@ _d/
 *.fdb_latexmk
 *.fls
 *.log
-.claude/worktrees
 
 en.subject.*
