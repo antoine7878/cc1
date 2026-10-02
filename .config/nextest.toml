@@ -1,5 +1,6 @@
 [profile.default]
 status-level = "fail"
+test-threads = 24
 final-status-level = "none"
 failure-output = "immediate"
 fail-fast = false
@@ -7,3 +8,7 @@ fail-fast = false
 [[profile.default.overrides]]
 filter = 'test(test_run)'
 priority = -10
+
+[[profile.default.overrides]]
+filter = 'test(/^test_limits::/)'
+priority = 100

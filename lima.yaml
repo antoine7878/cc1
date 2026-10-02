@@ -5,7 +5,7 @@ base:
 
 vmType: vz
 arch: aarch64
-cpus: 8
+cpus: 12
 memory: 8GiB
 disk: 30GiB
 
