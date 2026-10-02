@@ -500,3 +500,15 @@ accept!(bitfield_assign_result_sizeof_accepted, "struct B { unsigned a : 4, b : 
 reject!(bitfield_comma_result_address_rejected, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { unsigned *q = &(0, s.b); return 0; }");
 reject!(bitfield_assign_result_address_rejected, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { unsigned *q = &(s.b = 2); return 0; }");
 exits!(signed_shift_left_wraps, "int main(void) { volatile int x = 200; return ((x << 24) >> 24) == -56; }", 1);
+
+reject!(typedef_name_in_sizeof_addition, "typedef long T; int main(void) { long q = 1; return sizeof(q + T); }");
+reject!(typedef_name_as_subscript, "typedef int T; int main(void) { int a[4]; return sizeof a[T]; }");
+reject!(typedef_name_in_conditional_operand, "typedef int T; enum { A = sizeof(0 ? 1 : T) }; int main(void) { return A; }");
+reject!(typedef_name_as_addition_operand, "typedef int T; int main(void) { return 1 + T; }");
+reject!(typedef_name_as_assigned_value, "typedef int T; int main(void) { int x = 0; x = T; return x; }");
+reject!(typedef_name_as_callee, "typedef int T; int main(void) { return T(1); }");
+reports!(report_typedef_name_as_operand, "typedef int T; int main(void) { return 1 + T; }", ["<test>:1:44: error: unexpected type name 'T': expected expression"]);
+reports!(report_typedef_name_as_callee, "typedef int T; int main(void) { return T(1); }", ["<test>:1:40: error: unexpected type name 'T': expected expression"]);
+exits!(variable_shadows_typedef_name, "typedef int T; int main(void) { int T = 3; return T; }", 3);
+exits!(label_named_like_typedef, "typedef int T; int main(void) { goto T; return 1; T: return 4; }", 4);
+exits!(member_named_like_typedef, "typedef int T; struct S { int T; }; int main(void) { struct S s; s.T = 5; return s.T; }", 5);

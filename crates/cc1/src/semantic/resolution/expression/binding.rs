@@ -1,7 +1,7 @@
 use crate::ast::{Expression, ExpressionNode};
 use crate::semantic::resolution::declaration;
 use crate::semantic::resolution::expression::*;
-use crate::semantic::{Diag, Diagnostic, DiagnosticSink, Resolver};
+use crate::semantic::{Diag, Diagnostic, DiagnosticSink, Resolver, SymbolKind};
 
 pub fn bind_callee(resolver: &mut Resolver, node: &ExpressionNode) {
     if let Expression::FunctionCall(f, _) = node.id.resolve()
@@ -17,9 +17,12 @@ pub fn bind(resolver: &mut Resolver, node: &ExpressionNode) {
         return;
     }
     if let Expression::Identifier(name) = node.id.resolve() {
-        let sym = resolver.lookup_ordinary(name.id);
+        let mut sym = resolver.lookup_ordinary(name.id);
         if sym.is_none() {
             resolver.add_diag(Diag::err((), Diagnostic::UndeclaredIdentifier(*name)), &node.span);
+        } else if sym.is_some_and(|s| s.resolve_with(resolver.sema).kind == SymbolKind::Typedef) {
+            resolver.add_diag(Diag::err((), Diagnostic::TypeNameAsExpression(*name)), &node.span);
+            sym = None;
         }
         resolver.sema.expr_bindings.set(node.id, sym);
     }

@@ -76,6 +76,7 @@ pub enum Diagnostic {
 
     // 6.3.1
     UndeclaredIdentifier(Name),
+    TypeNameAsExpression(Name),
 
     // 6.3.2.1
     SubscriptNotArray,
@@ -345,6 +346,7 @@ impl DiagnosticNode {
 
             // 6.3.1
             Diagnostic::UndeclaredIdentifier(name) => format!("Use of undeclared identifier '{}'", name.id.resolve()),
+            Diagnostic::TypeNameAsExpression(name) => format!("unexpected type name '{}': expected expression", name.id.resolve()),
 
             // 6.3.2.1
             Diagnostic::SubscriptNotArray => "subscripted value is not an array, pointer, or vector".to_string(),
