@@ -260,8 +260,8 @@ pub fn pointer_integer_arithmetic(
         return Err(Diagnostic::Poisoned);
     };
     match inner.id.resolve_with(sema) {
-        t if !t.is_complete(sema) => Err(Diagnostic::InvalidOperand),
-        ResolvedType::Function { .. } => Err(Diagnostic::InvalidOperand),
+        t if !t.is_complete(sema) => Err(Diagnostic::PointerArithmeticIncomplete(*inner)),
+        ResolvedType::Function { .. } => Err(Diagnostic::PointerArithmeticFunction(*inner)),
         _ => {
             promote(sema, integral);
             Ok((pointer.casted_ty(), RValue))
@@ -282,11 +282,16 @@ pub fn pointer_minus_pointer(
     };
     let l = lp.id.resolve_with(sema);
     let r = rp.id.resolve_with(sema);
-    if !l.is_object(sema) || !r.is_object(sema) {
-        return Err(Diagnostic::InvalidOperand);
+    for (ty, pointee) in [(&l, lp), (&r, rp)] {
+        if !ty.is_object(sema) {
+            return Err(match ty {
+                ResolvedType::Function { .. } => Diagnostic::PointerArithmeticFunction(*pointee),
+                _ => Diagnostic::PointerArithmeticIncomplete(*pointee),
+            });
+        }
     }
     if !lp.is_compatible_ignoring_qualifiers(sema, rp) {
-        return Err(Diagnostic::InvalidOperand);
+        return Err(Diagnostic::InvalidBinaryOperand(lhs.casted_ty(), rhs.casted_ty()));
     }
     Ok((QualifiedType::plain(sema.builtins.ptrdiff_t), RValue))
 }

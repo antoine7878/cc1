@@ -355,6 +355,8 @@ constant!(literal_char_escape_double_quote, "'\\\"'", "Int(34)");
 
 escape_invalid!(literal_char_hex_escape_no_digits, "'\\x'", "Int(0)", cc1::semantic::Diagnostic::EscapeNoHexDigits);
 escape_invalid!(literal_char_hex_escape_bad_digit, "'\\xg'", "Int(103)", cc1::semantic::Diagnostic::EscapeNoHexDigits);
+escape_invalid!(literal_octal_with_digit_eight, "08", "Int(0)", cc1::semantic::Diagnostic::InvalidOctalDigit('8'));
+escape_invalid!(literal_octal_with_digit_nine_after_valid_ones, "0129u", "Int(0)", cc1::semantic::Diagnostic::InvalidOctalDigit('9'));
 escape_invalid!(literal_wide_char_hex_escape_no_digits, "L'\\x'", "Int(0)", cc1::semantic::Diagnostic::EscapeNoHexDigits);
 escape_invalid!(literal_char_unknown_escape, "'\\q'", "Int(113)", cc1::semantic::Diagnostic::UnknownEscape('q'));
 escape_invalid!(literal_char_escape_e_is_unknown, "'\\e'", "Int(101)", cc1::semantic::Diagnostic::UnknownEscape('e'));

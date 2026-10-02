@@ -32,7 +32,6 @@ pub enum Diagnostic {
     OutputError(String),
     Poisoned,
     Invariant(&'static str),
-    InvalidOperand,
     SyntaxError { found: &'static str, expected: ExpectedTokens },
 
     // 5.2.4.1
@@ -57,6 +56,7 @@ pub enum Diagnostic {
 
     // 6.1.3.2
     IntegerConstantTooLarge,
+    InvalidOctalDigit(char),
 
     // 6.1.3.4
     EscapeOutOfRange,
@@ -122,6 +122,9 @@ pub enum Diagnostic {
     DivisionByZero,
     ModuloByZero,
     InvalidBinaryOperand(QualifiedType, QualifiedType),
+    PointerArithmeticIncomplete(QualifiedType),
+    PointerArithmeticFunction(QualifiedType),
+    InvalidCast(QualifiedType, QualifiedType),
 
     // 6.3.7
     ShiftCountNegative,
@@ -297,7 +300,6 @@ impl DiagnosticNode {
 
             Diagnostic::Poisoned => "Internal error".to_string(),
             Diagnostic::Invariant(what) => format!("internal error: {what}: violated semantic constraint"),
-            Diagnostic::InvalidOperand => "invalid operand".to_string(),
             Diagnostic::SyntaxError { found, expected } if expected.is_empty() => format!("syntax error, unexpected {}", token_label(found)),
             Diagnostic::SyntaxError { found, expected } => format!("syntax error, unexpected {}, expecting {expected}", token_label(found)),
 
@@ -322,6 +324,7 @@ impl DiagnosticNode {
             Diagnostic::FloatConstantTruncatedToZero => "floating constant truncated to zero".to_string(),
 
             // 6.1.3.2
+            Diagnostic::InvalidOctalDigit(c) => format!("invalid digit \"{c}\" in octal constant"),
             Diagnostic::IntegerConstantTooLarge => "integer constant is too large for any integer type".to_string(),
 
             // 6.1.3.4
@@ -393,6 +396,9 @@ impl DiagnosticNode {
             Diagnostic::DivisionByZero => "division by zero is undefined".to_string(),
             Diagnostic::ModuloByZero =>  "remainder by zero is undefined".to_string(),
             Diagnostic::InvalidBinaryOperand(lhs, rhs) => format!("invalid operands to binary expression ('{}' and '{}')", lhs.display(sema), rhs.display(sema)),
+            Diagnostic::PointerArithmeticIncomplete(ty) => format!("arithmetic on a pointer to an incomplete type '{}'", ty.display(sema)),
+            Diagnostic::PointerArithmeticFunction(ty) => format!("arithmetic on a pointer to the function type '{}'", ty.display(sema)),
+            Diagnostic::InvalidCast(from, to) => format!("invalid cast from '{}' to '{}'", from.display(sema), to.display(sema)),
 
             // 6.3.7
             Diagnostic::ShiftCountNegative => "shift count is negative".to_string(),
@@ -464,8 +470,8 @@ impl DiagnosticNode {
             Diagnostic::FunctionReturningFunction(ty) => format!("function cannot return function type '{}'", ty.display(sema)),
             Diagnostic::VoidParameter => "Parameter shall not have void type".to_string(),
             Diagnostic::NamedVoidParameter => "parameter has void type".to_string(),
-            Diagnostic::ParameterNotRegister => "Parameter shall only by declared with register storage".to_string(),
-            Diagnostic::DuplicateParameterName => "Duplicate paramter identifier".to_string(),
+            Diagnostic::ParameterNotRegister => "parameter shall only be declared with the register storage class".to_string(),
+            Diagnostic::DuplicateParameterName => "duplicate parameter identifier".to_string(),
             Diagnostic::IdentifierListInDeclaration => "parameter names (without types) in function declaration".to_string(),
 
             // 6.5.6
@@ -492,7 +498,7 @@ impl DiagnosticNode {
             Diagnostic::ReturnIncompatibleTypes(to, from) => format!("returning '{}' from a function with incompatible result type '{}'", from.display(sema), to.display(sema)),
 
             // 6.7
-            Diagnostic::AutoRegisterExternal => "External declaration auto of register".to_string(),
+            Diagnostic::AutoRegisterExternal => "file-scope declaration specifies 'auto' or 'register'".to_string(),
             Diagnostic::InternalNeverDefined(name) => format!("'{}' used but never defined", name.id.resolve()),
             Diagnostic::TentativeNeverCompleted(ty) => format!("tentative definition has type '{}' that is never completed", ty.display(sema)),
 
@@ -500,7 +506,7 @@ impl DiagnosticNode {
             Diagnostic::NotFunctionTypeDeclarator => "Declarator shall be function type".to_string(),
             Diagnostic::FunctionAutoExtern => "Function storage shall be auto or extern".to_string(),
             Diagnostic::UnnamedPrototypeParameter => "Parameter shall include an identifier".to_string(),
-            Diagnostic::ParameterTypeListWithList => "Parameter style function declration shall not be followed by a declaration list".to_string(),
+            Diagnostic::ParameterTypeListWithList => "prototype-style function declaration shall not be followed by a declaration list".to_string(),
             Diagnostic::MissingParameterInOldStyle => "Missing parameter".to_string(),
             Diagnostic::InitializedParameter => "parameter cannot have an initializer".to_string(),
             Diagnostic::DeclarationWithoutParameter => "declaration does not declare a parameter".to_string(),

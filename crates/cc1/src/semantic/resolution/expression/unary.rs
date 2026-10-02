@@ -120,7 +120,7 @@ pub fn cast(
                 return Err(Diagnostic::CastOfNonScalar);
             }
             if ty.is_pointer() != from.is_pointer() && (ty.is_floating() || from.is_floating()) {
-                return Err(Diagnostic::InvalidOperand);
+                return Err(Diagnostic::InvalidCast(re.casted_ty(), qualif));
             }
             cast::convert(sema, re, qualif.id, is_null);
         }

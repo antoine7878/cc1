@@ -172,6 +172,11 @@ impl ConstValue {
         let (prefix, radix) = Self::get_radix(s.as_str());
         let suffix = Self::get_integer_suffix(s.as_str());
         let digits = &s[prefix.len()..(s.len() - suffix.len())];
+        if radix == 8 {
+            if let Some(c) = digits.chars().find(|c| matches!(c, '8' | '9')) {
+                return Diag::new(ConstValue::Int(0), Some(Diagnostic::InvalidOctalDigit(c)));
+            }
+        }
         let value = Self::digits_value(digits, radix);
         Self::integer_type(value, Self::integer_candidates(suffix, radix))
     }

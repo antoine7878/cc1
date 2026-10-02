@@ -198,8 +198,8 @@ reports!(report_named_void_parameter_in_nested_prototype, "void g(void) { int f(
 reports!(report_old_style_void_parameter, "void f(a, b) int b; void a; { }", ["<test>:1:26: error: Parameter shall not have void type"]);
 reports!(report_old_style_initialized_parameter, "int f(a) int a = 1; { return a; }", ["<test>:1:18: error: parameter cannot have an initializer"]);
 reports!(report_old_style_declaration_without_parameter, "int f(a) int; int a; { return a; }", ["<test>:1:10: error: declaration does not declare a parameter"]);
-reports!(report_parameter_storage_class, "void f(static int a) { }", ["<test>:1:8: error: Parameter shall only by declared with register storage"]);
-reports!(report_prototype_with_declaration_list, "int f(int a) int b; { return a; }", ["<test>:1:5: error: Parameter style function declration shall not be followed by a declaration list"]);
+reports!(report_parameter_storage_class, "void f(static int a) { }", ["<test>:1:8: error: parameter shall only be declared with the register storage class"]);
+reports!(report_prototype_with_declaration_list, "int f(int a) int b; { return a; }", ["<test>:1:5: error: prototype-style function declaration shall not be followed by a declaration list"]);
 reports!(report_duplicate_parameter, "int f(int a, int a) { return a; }", ["<test>:1:18: error: duplicate declaration of parameter `a'"]);
 reports!(report_duplicate_parameter_in_prototype, "void f(int a, int a, int b, int b);", ["<test>:1:19: error: duplicate declaration of parameter `a'", "<test>:1:33: error: duplicate declaration of parameter `b'"]);
 reports!(report_duplicate_parameter_in_nested_prototype, "void g(int (*h)(int x, int x));", ["<test>:1:28: error: duplicate declaration of parameter `x'"]);
@@ -232,7 +232,7 @@ reports!(report_increment_of_a_pointer_to_an_incomplete_type, "struct S; void f(
 reports!(report_pre_increment_of_a_structure, "struct S { int x; } s; void f(void) { ++s; }", ["<test>:1:39: error: cannot increment value of type 'struct S'"]);
 reports!(report_pre_decrement_of_a_structure, "struct S { int x; } s; void f(void) { --s; }", ["<test>:1:39: error: cannot decrement value of type 'struct S'"]);
 reports!(report_constant_overflow, "enum E { A = (-2147483647 - 1) / -1 };", ["<test>:1:14: error: overflow in constant expression"]);
-reports!(report_external_register, "register int x;", ["<test>:1:1: error: External declaration auto of register"]);
+reports!(report_external_register, "register int x;", ["<test>:1:1: error: file-scope declaration specifies 'auto' or 'register'"]);
 reports!(report_block_function_not_extern, "void f(void) { auto int g(void); }", ["<test>:1:25: error: Function in block not declared as extern"]);
 reports!(poisoned_operand_does_not_leak_internal_error, "void f(void) { x + 1; }", ["<test>:1:16: error: Use of undeclared identifier 'x'"]);
 reports!(poisoned_return_operand_does_not_leak_internal_error, "int f(void) { return x + 1; }", ["<test>:1:22: error: Use of undeclared identifier 'x'"]);
@@ -270,3 +270,14 @@ reports!(report_pp_number_two_dots, "double x = 1.2.3;", ["<test>:1:12: error: i
 reports!(report_pp_number_letter_suffix, "int x = 123abc;", ["<test>:1:9: error: invalid numeric constant '123abc'"]);
 reports!(report_pp_number_hex_without_digits, "int x = 0x;", ["<test>:1:9: error: invalid numeric constant '0x'"]);
 reports!(report_pp_number_exponent_without_digits, "double x = 1e;", ["<test>:1:12: error: invalid numeric constant '1e'"]);
+reports!(report_duplicate_old_style_parameter, "void f(a, a) { }", ["<test>:1:6: error: duplicate parameter identifier"]);
+reports!(report_invalid_octal_digit, "int x = 08;", ["<test>:1:9: error: invalid digit \"8\" in octal constant"]);
+reports!(report_invalid_octal_digit_after_valid_ones, "int y = 0129;", ["<test>:1:9: error: invalid digit \"9\" in octal constant"]);
+reports!(report_pointer_arithmetic_on_void, "void *p; void f(void) { p + 1; }", ["<test>:1:25: error: arithmetic on a pointer to an incomplete type 'void'"]);
+reports!(report_pointer_arithmetic_on_incomplete_struct, "struct S *p; void f(void) { p - 1; }", ["<test>:1:29: error: arithmetic on a pointer to an incomplete type 'struct S'"]);
+reports!(report_pointer_difference_of_incomplete_struct, "struct S *p, *q; void f(void) { p - q; }", ["<test>:1:33: error: arithmetic on a pointer to an incomplete type 'struct S'"]);
+reports!(report_pointer_arithmetic_on_function, "int g(void); void f(void) { (&g) + 1; }", ["<test>:1:29: error: arithmetic on a pointer to the function type 'int(void)'"]);
+reports!(report_invalid_additive_operands, "struct S { int x; } s; void f(void) { s + s; }", ["<test>:1:39: error: invalid operands to binary expression ('struct S' and 'struct S')"]);
+reports!(report_pointer_difference_of_distinct_types, "int *p; char *q; void f(void) { p - q; }", ["<test>:1:33: error: invalid operands to binary expression ('int *' and 'char *')"]);
+reports!(report_cast_from_pointer_to_floating, "int *p; void f(void) { (double)p; }", ["<test>:1:24: error: invalid cast from 'int *' to 'double'"]);
+reports!(report_cast_from_floating_to_pointer, "double d; void f(void) { (int *)d; }", ["<test>:1:26: error: invalid cast from 'double' to 'int *'"]);

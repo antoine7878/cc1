@@ -91,3 +91,4 @@ reject!(address_of_void_object, "extern void v; void *p = &v;");
 reject!(assign_to_void_object, "extern void v; int main(void){ v = 0; return 0; }");
 accept!(void_object_as_expression_statement, "extern void v; int main(void){ v; return 0; }");
 accept!(const_void_object_declaration, "extern const void cv; int main(void){ return 0; }");
+accept!(leading_zero_floating_constants_are_not_octal, "double d = 09.5; double e = 09e1;");

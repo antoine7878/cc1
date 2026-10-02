@@ -38,7 +38,7 @@ pub fn additive(sema: &mut Sema, op: &BinaryOp, e1: &ExpressionNode, e2: &Expres
             (BinaryOp::Sub, ResolvedType::Pointer(_), ResolvedType::Pointer(_)) => {
                 cast::pointer_minus_pointer(sema, lhs, rhs)
             }
-            _ => Err(Diagnostic::InvalidOperand),
+            _ => Err(Diagnostic::InvalidBinaryOperand(lhs.casted_ty(), rhs.casted_ty())),
         }
     })
 }
