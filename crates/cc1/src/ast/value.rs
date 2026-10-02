@@ -131,15 +131,26 @@ impl ConstValue {
         }
     }
 
-    fn parse_float(s: &str) -> Self {
+    fn parse_float(s: &str) -> Diag<Self> {
         let s = s.to_lowercase();
         let suffix = Self::get_float_suffix(s.as_str());
         let s = &s[0..(s.len() - suffix.len())];
-        match suffix {
-            "f" => ConstValue::Float(F80::from(s)),
-            "l" => ConstValue::LongDouble(F80::from(s)),
-            _ => ConstValue::Double(F80::from(s)),
-        }
+        let exact = F80::from(s);
+        let (value, rounded, name) = match suffix {
+            "f" => (ConstValue::Float(exact), exact.round_float(), "float"),
+            "l" => (ConstValue::LongDouble(exact), exact, "long double"),
+            _ => (ConstValue::Double(exact), exact.round_double(), "double"),
+        };
+        let mantissa = s.split('e').next().unwrap_or("");
+        let nonzero = mantissa.bytes().any(|c| c.is_ascii_digit() && c != b'0');
+        let diagnostic = if !rounded.is_finite() {
+            Some(Diagnostic::FloatConstantOutOfRange(name))
+        } else if nonzero && rounded.is_zero() {
+            Some(Diagnostic::FloatConstantTruncatedToZero)
+        } else {
+            None
+        };
+        Diag::new(value, diagnostic)
     }
 
     fn parse_char(s: &str) -> Diag<Self> {
@@ -185,7 +196,7 @@ impl ConstValue {
         if s.contains('\'') {
             Self::parse_char(s)
         } else if !lower.starts_with("0x") && (lower.contains('.') || lower.contains('e')) {
-            Diag::ok(Self::parse_float(s))
+            Self::parse_float(s)
         } else {
             Self::parse_integer(s)
         }

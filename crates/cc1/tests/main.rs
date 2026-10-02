@@ -3,6 +3,7 @@ mod common;
 
 mod test_arena;
 mod test_cast;
+mod test_constant_diagnostics;
 mod test_constraints;
 mod test_diagnostic;
 mod test_driver;

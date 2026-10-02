@@ -50,9 +50,16 @@ pub fn try_fold(sema: &mut Sema, expr: &ExpressionNode) -> Option<ConstValue> {
 
 pub fn fold_initializer(sema: &mut Sema, ty: QualifiedType, expr: &ExpressionNode) -> Option<ConstValue> {
     let mut collected = Vec::new();
-    let value = evaluate(sema, expr, &mut VecSink::collecting(&mut collected)).ok()?;
-    sema.diagnostics.append(&mut collected);
     let ty = scalar_ty(sema, ty);
+    let value = match evaluate(sema, expr, &mut VecSink::collecting(&mut collected)) {
+        Ok(value) => value,
+        Err(Diagnostic::ConstantOverflow) => {
+            sema.add_diag(Diag::err((), Diagnostic::ConstantOverflow), &expr.span);
+            return ConstFolder.convert(&ty, ConstValue::Int(0));
+        }
+        Err(_) => return None,
+    };
+    sema.diagnostics.append(&mut collected);
     if !fits(&ty, value) {
         sema.add_diag(Diag::err((), Diagnostic::ConstantOverflow), &expr.span);
     }
@@ -83,6 +90,9 @@ fn operand(sema: &mut Sema, e: &ExpressionNode, sink: &mut VecSink) -> Result<Co
     let value = evaluate(sema, e, sink)?;
     let casted = sema.expressions.get(e.id).map(|re| re.casted_ty()).ok_or(Diagnostic::Poisoned)?;
     let ty = scalar_ty(sema, casted);
+    if !fits(&ty, value) {
+        return Err(Diagnostic::ConstantOverflow);
+    }
     ConstFolder.convert(&ty, value).ok_or(Diagnostic::NonIntegerConstantExpression)
 }
 
@@ -149,14 +159,20 @@ fn evaluate_node(sema: &mut Sema, expr: &ExpressionNode, sink: &mut VecSink) -> 
 
 fn integral_operands(sema: &Sema, expr: &ExpressionNode) -> Result<(), Diagnostic> {
     let operands: Vec<&ExpressionNode> = match expr.id.resolve() {
-        Expression::SizeofExpr(_) | Expression::SizeofType(_) => return Ok(()),
+        Expression::SizeofExpr(_) | Expression::SizeofType(_) | Expression::Constant(_) => return Ok(()),
+        Expression::Identifier(_) => return identifier(sema, expr).map(|_| ()),
+        Expression::StringLiteral(_)
+        | Expression::List(_)
+        | Expression::Assign(_, _, _)
+        | Expression::ArraySubscripting(_, _)
+        | Expression::FunctionCall(_, _)
+        | Expression::Member(_, _, _) => return Err(Diagnostic::NonConstantExpression),
         Expression::Cast(_, e) if is_constant(e) => return Ok(()),
         Expression::ConstantExpression(e) | Expression::Unary(_, e) | Expression::Cast(_, e) | Expression::Block(e) => {
             vec![e]
         }
         Expression::Binary(_, e1, e2) => vec![e1, e2],
         Expression::Ternary(condition, e1, e2) => vec![condition, e1, e2],
-        _ => Vec::new(),
     };
     for operand in operands {
         if node_ty(sema, operand)?.is_floating(sema) {

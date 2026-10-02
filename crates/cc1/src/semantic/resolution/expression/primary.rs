@@ -11,7 +11,11 @@ use crate::semantic::{
 pub fn identifier(sema: &mut Sema, node: &ExpressionNode) -> ExprResult {
     let id = sema.expr_bindings.get(node.id).copied().ok_poisoned()?;
     let sym = id.resolve_with(sema);
-    Ok((sym.ty, sym.value_category()))
+    let category = match sym.ty.id.resolve_with(sema).is_void() {
+        true => RValue,
+        false => sym.value_category(),
+    };
+    Ok((sym.ty, category))
 }
 
 pub fn constant(sema: &mut Sema, e: &ExpressionNode) -> ExprResult {

@@ -14,8 +14,9 @@ use crate::ast::{
 use crate::context::ctx;
 use crate::semantic::resolution::{expression, statement};
 use crate::semantic::{
-    Diag, Diagnostic, DiagnosticNode, DiagnosticSink, FunctionDefId, Linkage, QualifiedType, ScopeKind, Sema,
-    StatementScopes, Symbol, SymbolId, SymbolKind, SymbolScope, SymbolScopes, TagDefId, constraints, declaration, fold,
+    Diag, Diagnostic, DiagnosticNode, DiagnosticSink, FunctionDefId, Linkage, QualifiedType, ResolvedType, ScopeKind,
+    Sema, StatementScopes, Symbol, SymbolId, SymbolKind, SymbolScope, SymbolScopes, TagDefId, constraints, declaration,
+    fold,
 };
 
 #[derive(Debug)]
@@ -154,7 +155,11 @@ impl Resolver<'_> {
             return self.add_diag(Diag::err(None, Diagnostic::UnknownTypeName(name)), span);
         }
         let base = sym.ty;
-        if (is_const && base.is_const) || (is_volatile && base.is_volatile) {
+        let mut inner = base;
+        while let ResolvedType::Array { elem, .. } = inner.id.resolve_with(self.sema) {
+            inner = *elem;
+        }
+        if (is_const && (base.is_const || inner.is_const)) || (is_volatile && (base.is_volatile || inner.is_volatile)) {
             self.add_diag(Diag::err((), Diagnostic::DuplicateTypeQualifiers), span)
         }
         Some(QualifiedType::new(base.id, base.is_const || is_const, base.is_volatile || is_volatile))

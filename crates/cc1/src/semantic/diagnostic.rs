@@ -51,6 +51,10 @@ pub enum Diagnostic {
     ConflictingLinkage(Name),
     ConflictingTypes(Name),
 
+    // 6.1.3.1
+    FloatConstantOutOfRange(&'static str),
+    FloatConstantTruncatedToZero,
+
     // 6.1.3.2
     IntegerConstantTooLarge,
 
@@ -240,6 +244,8 @@ impl Diagnostic {
             | Diagnostic::ShiftCountNegative
             | Diagnostic::IndirectionToVoid
             | Diagnostic::NamedVoidParameter
+            | Diagnostic::FloatConstantOutOfRange(_)
+            | Diagnostic::FloatConstantTruncatedToZero
             | Diagnostic::ShiftCountOutOfRange => Severity::Warning,
             _ => Severity::Error
         }
@@ -310,6 +316,10 @@ impl DiagnosticNode {
             // 6.1.2.2
             Diagnostic::ConflictingLinkage(name) => format!("declaration of '{}' conflicts with the linkage of a previous declaration", name.id.resolve()),
             Diagnostic::ConflictingTypes(name) => format!("conflicting types for '{}'", name.id.resolve()),
+
+            // 6.1.3.1
+            Diagnostic::FloatConstantOutOfRange(ty) => format!("floating constant exceeds range of '{}'", ty),
+            Diagnostic::FloatConstantTruncatedToZero => "floating constant truncated to zero".to_string(),
 
             // 6.1.3.2
             Diagnostic::IntegerConstantTooLarge => "integer constant is too large for any integer type".to_string(),

@@ -22,7 +22,7 @@ PP			"."?{D}({D}|{L}|[eE][+-]|".")*
 
 ^#[ \t]*[0-9]+.*\n          { line_marker(self); }
 "//".*                      { self.ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::CPPStyleComment, self.span)); }
-#.*                         {}
+^[ \t]*#.*                  {}
 "auto"			            { return YYToken::AUTO; }
 "break"			            { return YYToken::BREAK; }
 "case"			            { return YYToken::CASE; }
