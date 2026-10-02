@@ -1,5 +1,5 @@
 use std::fmt::{self, Display};
-use std::io::{self, Write, stderr};
+use std::io::{self, IsTerminal, Write, stderr};
 
 use libft::{Severity, Span, render};
 
@@ -253,11 +253,13 @@ impl DiagnosticNode {
     }
 
     pub fn print(&self) -> io::Result<()> {
-        self.write(&mut stderr())
+        let mut err = stderr();
+        let color = err.is_terminal();
+        self.write(&mut err, color)
     }
 
-    pub fn write<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        render(w, ctx(), "cc1", self.span, self.severity(), self.message(sema()))
+    pub fn write<W: Write>(&self, w: &mut W, color: bool) -> io::Result<()> {
+        render(w, ctx(), "cc1", self.span, self.severity(), self.message(sema()), color)
     }
 
     #[rustfmt::skip]

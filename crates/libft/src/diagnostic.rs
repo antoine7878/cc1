@@ -40,19 +40,23 @@ pub fn render<W: Write, S: SourceMap, D: Display>(
     span: Span,
     severity: Severity,
     msg: D,
+    color: bool,
 ) -> io::Result<()> {
     let line_no = span.start.line;
     let padding = line_no.to_string().len();
     let mid_pad = 9usize.saturating_sub(padding);
 
-    let color = severity.color();
+    let (color, reset) = match color {
+        true => (severity.color(), RESET),
+        false => ("", ""),
+    };
 
     let Some(path) = src.path_of(span.start.file) else {
-        return writeln!(w, "{prog}: {color}{severity}:{RESET} {msg}");
+        return writeln!(w, "{prog}: {color}{severity}:{reset} {msg}");
     };
     let path = path.to_string();
 
-    writeln!(w, "{path}:{line_no}:{}: {color}{severity}:{RESET} {msg}", span.start.col,)?;
+    writeln!(w, "{path}:{line_no}:{}: {color}{severity}:{reset} {msg}", span.start.col,)?;
 
     let Some(line) = src.source_line(&path, line_no) else { return Ok(()) };
     let line = line.replace('\t', " ");
@@ -61,7 +65,7 @@ pub fn render<W: Write, S: SourceMap, D: Display>(
     writeln!(w, "     {:>padding$}|{:>mid_pad$}{line}", line_no, "")?;
     writeln!(
         w,
-        "     {:>padding$}|{:>mid_pad$}{color}{:>col_no$}{RESET} ",
+        "     {:>padding$}|{:>mid_pad$}{color}{:>col_no$}{reset} ",
         "",
         "",
         "^".repeat(col_no + 1 - span.start.col)

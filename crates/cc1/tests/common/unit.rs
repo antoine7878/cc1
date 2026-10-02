@@ -425,7 +425,7 @@ impl Unit {
             .iter()
             .map(|diag| {
                 let mut buf = Vec::new();
-                let _ = diag.write(&mut buf);
+                let _ = diag.write(&mut buf, false);
                 strip_ansi(&String::from_utf8_lossy(&buf)).trim_end().to_string()
             })
             .collect()
@@ -442,7 +442,7 @@ impl Unit {
         let mut out = String::new();
         for diag in self.diagnostics() {
             let mut buf = Vec::new();
-            let _ = diag.write(&mut buf);
+            let _ = diag.write(&mut buf, true);
             out.push_str(&String::from_utf8_lossy(&buf));
         }
         out
