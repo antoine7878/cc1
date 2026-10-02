@@ -47,6 +47,7 @@ pub struct Sema {
     pub expr_bindings: SideTable<ExpressionId, SymbolId>,
     pub expr_consts: SideTable<ExpressionId, ConstValue>,
     pub try_consts: SideTable<ExpressionId, ConstValue>,
+    pub integral_checks: SideTable<ExpressionId, Option<Diagnostic>>,
     pub member_refs: SideTable<ExpressionId, MemberRef>,
     pub declarations: HashMap<DeclaratorId, SymbolId>,
     pub externals: HashMap<NameId, External>,
@@ -74,6 +75,7 @@ impl Default for Sema {
             expr_bindings: SideTable::default(),
             expr_consts: SideTable::default(),
             try_consts: SideTable::default(),
+            integral_checks: SideTable::default(),
             member_refs: SideTable::default(),
             statements: SideTable::default(),
 
@@ -167,6 +169,7 @@ impl Sema {
         self.expr_bindings.resize(len);
         self.expr_consts.resize(len);
         self.try_consts.resize(len);
+        self.integral_checks.resize(len);
         self.member_refs.resize(len);
         self.statements.resize(arenas.statements.len());
     }

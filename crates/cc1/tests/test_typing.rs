@@ -351,3 +351,21 @@ reject!(enum_with_negative_is_not_unsigned, "enum E { A = -1, B } e; unsigned in
 exits!(enum_with_negative_is_signed, "enum E { A = -1, B }; int main(void) { enum E x = B; return x - 1 < 0; }", 1);
 exits!(enum_without_negative_converts_to_floating_as_unsigned, "enum E { A }; int main(void) { enum E x = (enum E)0x80000000u; return (double)x > 0; }", 1);
 exits!(enum_without_negative_shifts_right_logically, "enum E { A }; int main(void) { enum E x = (enum E)0x80000000u; return (x >> 31) == 1; }", 1);
+
+accept!(a_parenthesized_zero_is_a_null_pointer_constant, "int *p = (0);");
+accept!(a_parenthesized_void_star_cast_of_zero_is_a_null_pointer_constant, "int *p = ((void *)0);");
+accept!(a_character_zero_is_a_null_pointer_constant, "int *p = '\\0';");
+accept!(a_folded_difference_is_a_null_pointer_constant, "int *p = 1 - 1;");
+accept!(a_void_star_cast_of_a_folded_difference_is_a_null_pointer_constant, "int *p = (void *)(1 - 1);");
+accept!(an_enumerator_of_value_zero_is_a_null_pointer_constant, "enum { E }; int *p = E;");
+accept!(a_conditional_of_constants_is_a_null_pointer_constant, "int *p = 1 ? 0 : 0;");
+accept!(a_sizeof_difference_is_a_null_pointer_constant, "int *p = sizeof(int) - sizeof(int);");
+accept!(a_constant_conditional_may_be_assigned_to_a_pointer_to_function, "void (*p)(void); void f(void) { p = 1 ? 0 : 0; }");
+accept!(a_constant_conditional_may_be_compared_to_a_pointer, "int *p; void f(void) { p == (1 ? 0 : 0); }");
+accept!(a_null_pointer_constant_may_be_a_conditional_operand_beside_a_pointer, "int *p; void f(int c) { c ? p : 0; }");
+accept!(a_null_pointer_constant_may_be_returned_as_a_pointer, "int *f(void) { return (void *)(1 - 1); }");
+accept!(a_null_pointer_constant_may_be_passed_to_a_pointer_to_function_parameter, "void g(void (*)(void)); void f(void) { g(1 - 1); }");
+reject!(a_conditional_with_a_variable_arm_is_not_a_null_pointer_constant, "int main(void) { int x = 1; int *p = 1 ? 0 : x; return p != 0; }");
+reject!(a_logical_and_with_a_variable_operand_is_not_a_null_pointer_constant, "int main(void) { int x = 1; int *p = 0 && x; return p != 0; }");
+reject!(a_conditional_with_a_variable_arm_may_not_be_compared_to_a_pointer, "int *p; void f(void) { int x = 1; p == (1 ? 0 : x); }");
+reject!(a_logical_and_with_a_variable_operand_may_not_be_assigned_to_a_pointer, "int *p; void f(void) { int x = 1; p = 0 && x; }");

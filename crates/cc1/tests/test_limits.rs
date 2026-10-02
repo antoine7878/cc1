@@ -129,6 +129,13 @@ test_case!(cast_chain_compiles_in_linear_time, {
     assert!(run.elapsed < Duration::from_secs(20), "{:?}", run.elapsed);
 });
 
+test_case!(null_pointer_constant_cast_chain_compiles_in_linear_time, {
+    let src = format!("int main(void) {{ int *p = {}0; return p != 0; }}", "(int)".repeat(20000));
+    let run = compile("nullcasts", &src);
+    assert_eq!(run.status, 0, "{}", run.stderr);
+    assert!(run.elapsed < Duration::from_secs(20), "{:?}", run.elapsed);
+});
+
 test_case!(constant_cast_chain_compiles_in_linear_time, {
     let src = format!("enum {{ A = {}1 }};\nint main(void) {{ return A; }}", "(int)".repeat(20000));
     let run = compile("constcasts", &src);

@@ -54,7 +54,9 @@ pub fn is_null_pointer_constant(sema: &mut Sema, node: &ExpressionNode) -> bool 
         node = op.unparenthesized();
     }
     let Some(re) = sema.expressions.get(node.id) else { return false };
-    re.ty.is_integral(sema) && fold::try_fold(sema, node).is_some_and(|v| v.is_zero())
+    re.ty.is_integral(sema)
+        && fold::try_fold(sema, node).is_some_and(|v| v.is_zero())
+        && fold::integral_operands(sema, node).is_ok()
 }
 
 fn is_void_pointer(sema: &Sema, qty: QualifiedType) -> bool {

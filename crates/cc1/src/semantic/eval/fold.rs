@@ -157,7 +157,16 @@ fn evaluate_node(sema: &mut Sema, expr: &ExpressionNode, sink: &mut VecSink) -> 
     }
 }
 
-fn integral_operands(sema: &Sema, expr: &ExpressionNode) -> Result<(), Diagnostic> {
+pub fn integral_operands(sema: &mut Sema, expr: &ExpressionNode) -> Result<(), Diagnostic> {
+    if let Some(cached) = sema.integral_checks.get(expr.id) {
+        return cached.clone().map_or(Ok(()), Err);
+    }
+    let result = check_integral_operands(sema, expr);
+    sema.integral_checks.set(expr.id, Some(result.clone().err()));
+    result
+}
+
+fn check_integral_operands(sema: &mut Sema, expr: &ExpressionNode) -> Result<(), Diagnostic> {
     let operands: Vec<&ExpressionNode> = match expr.id.resolve() {
         Expression::SizeofExpr(_) | Expression::SizeofType(_) | Expression::Constant(_) => return Ok(()),
         Expression::Identifier(_) => return identifier(sema, expr).map(|_| ()),
