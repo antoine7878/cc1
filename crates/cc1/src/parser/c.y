@@ -14,11 +14,12 @@ use crate::parser::YYLex;
 use crate::parser::yyerror;
 use crate::semantic::{Diagnostic, DiagnosticNode};
 
-fn concat_string_literals(ctx: &mut Context, lhs: StringLiteralNode, rhs: StringLiteralNode, span: Span) -> StringLiteralNode {
-    if lhs.id.resolve_with(&ctx.arenas).is_wide != rhs.id.resolve_with(&ctx.arenas).is_wide {
+fn concat_string_literals(ctx: &mut Context, pieces: Vec<StringLiteralNode>, span: Span) -> StringLiteralNode {
+    let wide = pieces.iter().filter(|piece| piece.id.resolve_with(&ctx.arenas).is_wide).count();
+    if wide != 0 && wide != pieces.len() {
         ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::MixedWideStringConcat, span));
     }
-    ctx.arenas.strings.concat(lhs, rhs, span)
+    ctx.arenas.strings.concat(&pieces, span)
 }
 
 fn sizeof_expr(ctx: &mut Context, operand: ExpressionNode, span: Span) -> ExpressionNode {
@@ -91,7 +92,7 @@ macro_rules! spec {
 %nonassoc PREC_THEN
 %nonassoc ELSE
 
-%type<StringLiteralNode> string_literal
+%type<Vec<StringLiteralNode>> string_literal
 %type<Vec<Name>> identifier_list
 
 %type<ExpressionNode> expression constant_expression
@@ -181,16 +182,16 @@ constant_expression /* ExpressionNode */
     : expression %prec PREC_NO_COMMA                                                        { node_span!(self, expressions, constant_expression, $1) }
     ;
 
-string_literal /* StringLiteralNode */
-      : STRING_LITERAL                                                                      { $1 }
-      | string_literal STRING_LITERAL                                                       { with_span!(self, concat_string_literals, &mut self.lexer.ctx, $1, $2) }
+string_literal /* Vec<StringLiteralNode> */
+      : STRING_LITERAL                                                                      { vec![$1] }
+      | string_literal STRING_LITERAL                                                       { push!($<mut>1, $2) }
       ;
 
 expression /* ExpressionNode */
     : '(' expression ')'                                                                    { node_span!(self, expressions, block, $2) }
     | IDENTIFIER                                                                            { node_span!(self, expressions, identifier, $1) }
     | CONSTANT                                                                              { node_span!(self, expressions, constant, $1)}
-    | string_literal                                                                        { node_span!(self, expressions, string_literal, $1) }
+    | string_literal                                                                        { let span = self.span; let literal = concat_string_literals(&mut self.lexer.ctx, $1, span); node_span!(self, expressions, string_literal, literal) }
     | expression '[' expression ']'                                                         { node_span!(self, expressions, array_access, $1, $3) }
     | expression '(' ')'                                                                    { node_span!(self, expressions, function_call, $1, None) }
     | expression '(' expression ')'                                                         { node_span!(self, expressions, function_call, $1, Some($3)) }

@@ -68,12 +68,15 @@ impl StringConstInterner {
         Diag::new(StringLiteralNode::new(id, span), diagnostic)
     }
 
-    pub fn concat(&mut self, lhs: StringLiteralNode, rhs: StringLiteralNode, span: Span) -> StringLiteralNode {
-        let head = self.get(lhs.id).clone();
-        let tail = self.get(rhs.id).clone();
-        let mut units = head.units;
-        units.extend(tail.units);
-        let id = self.intern(StringConstant { units, is_wide: head.is_wide || tail.is_wide });
+    pub fn concat(&mut self, pieces: &[StringLiteralNode], span: Span) -> StringLiteralNode {
+        let mut units = Vec::new();
+        let mut is_wide = false;
+        for piece in pieces {
+            let constant = self.get(piece.id);
+            units.extend_from_slice(&constant.units);
+            is_wide |= constant.is_wide;
+        }
+        let id = self.intern(StringConstant { units, is_wide });
         StringLiteralNode::new(id, span)
     }
 }

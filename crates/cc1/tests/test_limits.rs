@@ -140,3 +140,23 @@ reject!(limit_fold_probe_cache_keeps_variable_array_size_error, "int x; int a[x]
 reject!(limit_fold_probe_cache_keeps_variable_array_size_after_cast, "int main(void) { int x = 1; int a[(int)(int)x]; return 0; }");
 reject!(limit_fold_probe_cache_keeps_nonconstant_enumerator, "int x; enum { A = (int)(int)x };");
 reject!(limit_fold_probe_cache_keeps_nonconstant_case, "int main(void) { int x = 1; switch (x) { case (int)(int)x: return 0; } return 1; }");
+
+#[test]
+fn limit_string_concat_many_pieces_emits_one_literal() {
+    let src = format!("char *p = {};", vec!["\"ab\""; 20000].join(" "));
+    let run = compile("string_concat_many", &src);
+    assert_eq!(run.status, 0, "{}", run.stderr);
+    assert_eq!(run.stdout.lines().filter(|line| line.starts_with("@.str")).count(), 1, "{}", &run.stdout[..run.stdout.len().min(400)]);
+    assert!(run.stdout.contains("[40001 x i8]"), "{}", &run.stdout[..run.stdout.len().min(400)]);
+    assert!(run.stdout.len() < 400_000, "IR size {}", run.stdout.len());
+}
+
+#[test]
+fn limit_string_concat_many_distinct_pieces_emits_one_literal() {
+    let pieces: Vec<String> = (0..5000).map(|i| format!("\"{}\"", i % 10)).collect();
+    let src = format!("char *p = {};", pieces.join("\n"));
+    let run = compile("string_concat_distinct", &src);
+    assert_eq!(run.status, 0, "{}", run.stderr);
+    assert_eq!(run.stdout.lines().filter(|line| line.starts_with("@.str")).count(), 1);
+    assert!(run.stdout.len() < 100_000, "IR size {}", run.stdout.len());
+}

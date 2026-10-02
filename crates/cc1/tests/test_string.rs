@@ -34,3 +34,16 @@ reject!(string_escape_octal_out_of_range, "char *s = \"\\777\";");
 reject!(string_escape_hex_no_digits, "char *s = \"\\x\";");
 reject!(string_escape_unknown, "char *s = \"a\\qb\";");
 reject!(string_init_too_long, "char s[1] = \"ab\";");
+
+literal!(string_concat_three_keeps_escapes_apart, "char *s = \"\\x1\" \"2\" \"\\x3\";", "\\x012\\x03");
+literal!(string_concat_four_octal_escapes, "char *s = \"\\1\" \"2\" \"\\0\" \"3\";", "\\x012\\x003");
+literal!(string_concat_three_wide, "int f(void) { return (L\"a\" L\"b\" L\"c\")[0]; }", "Labc");
+literal!(string_concat_three_mixed_wide_first, "int f(void) { return (L\"a\" \"b\" \"c\")[0]; }", "Labc");
+
+exits!(string_concat_three_escapes_value, "int main(void) { return (\"\\x1\" \"2\" \"\\x3\")[1]; }", 50);
+exits!(string_concat_three_escapes_size, "int main(void) { return sizeof(\"\\x1\" \"2\" \"\\x3\"); }", 4);
+exits!(string_concat_three_wide_value, "int main(void) { return (L\"a\" L\"b\" L\"c\")[2]; }", 99);
+exits!(string_concat_four_pieces_last_byte, "int main(void) { char *s = \"a\" \"b\" \"c\" \"d\"; return s[3]; }", 100);
+
+emits!(not string_concat_emits_no_intermediate_two_pieces, "char *p = \"ab\" \"cd\";", "@.str.1");
+emits!(not string_concat_emits_no_unused_piece, "char *p = \"ab\" \"cd\" \"ef\";", "c\"ab\\00\"");

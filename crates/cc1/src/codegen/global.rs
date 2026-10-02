@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ast::visit::walk_init_declarator;
-use crate::ast::{InitDeclaratorNode, StringConstId, TranslationUnitNode, Visitor};
+use crate::ast::{Expression, ExpressionId, InitDeclaratorNode, StringConstId, TranslationUnitNode, Visitor};
 use crate::codegen::{Frozen, LlvmName, LlvmSymbol};
 use crate::context::ctx;
 use crate::semantic::{Duration, Initializer, SymbolId, sema};
@@ -55,8 +55,11 @@ impl Globals {
     }
 
     fn collect_literals(&mut self) {
-        for i in 0..ctx().arenas.strings.len() {
-            self.literals.insert(i.into(), LlvmSymbol::ptr(LlvmName::StringLiteral(i.into())));
+        let arena = &ctx().arenas.expressions;
+        for i in 0..arena.len() {
+            if let Expression::StringLiteral(literal) = arena.get(ExpressionId::from(i)) {
+                self.literals.insert(literal.id, LlvmSymbol::ptr(LlvmName::StringLiteral(literal.id)));
+            }
         }
     }
 
