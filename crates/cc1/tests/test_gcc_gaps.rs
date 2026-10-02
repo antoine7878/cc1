@@ -34,7 +34,6 @@ valid!(gap_paren_comma_single_argument_unprototyped, "int g(); int main(void) { 
 valid!(gap_long_divided_by_unsigned_bit_field, "struct B { unsigned x : 4; } b; int main(void) { long l = -6; b.x = 2; return l / b.x == -3; }", 1, "");
 valid!(gap_long_compared_to_unsigned_bit_field, "struct B { unsigned x : 21; } b; int main(void) { long l = -5; b.x = 3; return l <= b.x; }", 1, "");
 valid!(gap_conditional_long_and_unsigned_bit_field, "struct B { unsigned x : 4; } b; int main(void) { long l = -1; b.x = 1; return (0 ? b.x : l) < 0; }", 1, "");
-valid!(gap_pragma_pack, "#pragma pack(1)\nstruct S { char c; int i; };\n#pragma pack()\nint main(void) { return sizeof(struct S); }", 5, "");
 valid!(gap_enum_constant_in_parameter_list, "int f(enum E { A, B } x) { return x + B; } int main(void) { return f(0); }", 1, "");
 valid!(gap_deref_void_pointer_discarded, "int main(void) { int x = 1; void *p = &x; *p; (void)*p; return 0; }", 0, "", warnings = &["warning: dereferencing 'void *' pointer", "warning: dereferencing 'void *' pointer"]);
 valid!(gap_typedef_void_parameter_list, "typedef void V; int f(V); int f(V) { return 3; } int main(void) { return f(); }", 3, "");
@@ -46,20 +45,13 @@ invalid!(gap_digraphs, "int a<:2:>;", &["error: syntax error, unexpected '<', ex
 invalid!(gap_newline_in_string_literal, "char *s = \"a\nb\";", &["warning: missing terminating '\"' character [-Winvalid-pp-token]", "warning: missing terminating '\"' character [-Winvalid-pp-token]", "error: missing terminating \" character", "error: missing terminating \" character", "error: syntax error, unexpected end of file, expecting ',' or ';'"]);
 invalid!(gap_sizeof_type_name_then_operand, "int f(void) { return sizeof (int) 1; }", &["error: cast expression is not a valid operand of 'sizeof'"]);
 invalid!(gap_identifier_list_in_declaration, "int f(a, b);", &["error: parameter names (without types) in function declaration"]);
-invalid!(gap_qualified_function_type, "typedef int F(void); const F f;", &["error: ISO C forbids qualified function types"]);
-invalid!(gap_static_incomplete_array, "static int a[];", &["error: array size missing in 'a'"]);
 invalid!(gap_main_returning_void, "void main(void) { }", &["error: return type of ‘main’ is not ‘int’"]);
 invalid!(gap_main_char_parameter, "int main(char c) { return 0; }", &["error: first argument of ‘main’ should be ‘int’", "error: ‘main’ takes only zero or two arguments"]);
 invalid!(gap_main_static, "static int main(void) { return 0; }", &["error: ‘main’ is normally a non-static function"]);
 invalid!(gap_subscript_non_lvalue_array, "struct S { int a[3]; }; struct S f(void); int g(void) { return f().a[1]; }", &["error: invalid use of non-lvalue array"]);
 invalid!(gap_decay_non_lvalue_array, "struct S { int a[3]; } x, y; int g(void) { int *p = (x = y).a; return p != 0; }", &["error: invalid use of non-lvalue array"]);
-invalid!(gap_register_array_subscript, "int f(void) { register int a[3]; a[0] = 1; return a[0]; }", &["error: address of register variable requested", "error: address of register variable requested"]);
-invalid!(gap_register_array_decay, "int f(void) { register int a[3]; int *p = a; return p != 0; }", &["error: address of register variable requested"]);
 invalid!(gap_register_struct_member_address, "struct S { int x; }; int f(void) { register struct S s; int *p = &s.x; return p != 0; }", &["error: address of register variable requested"]);
-invalid!(gap_function_to_object_pointer_cast, "int f(void); void g(void) { void *v = (void *)f; }", &["error: invalid cast from 'int (*)(void)' to 'void *'"]);
-invalid!(gap_object_to_function_pointer_cast, "void g(void) { int x; int (*p)(void) = (int (*)(void))&x; }", &["error: invalid cast from 'int *' to 'int (*)(void)'"]);
 invalid!(gap_conditional_merges_qualifiers_into_void_pointer, "void g(int c) { int x = 1; const int *p = &x; void *q = &x; void *r = c ? p : q; }", &["error: initializing 'void *' with an expression of type 'const void *' discards qualifiers"]);
-invalid!(gap_deref_incomplete_struct, "struct S; struct S *p; void f(void) { *p; }", &["error: incomplete definition of type 'struct S'"]);
 invalid!(gap_call_qualified_void_function, "void volatile f(); void g(void) { f(); }", &["error: calling a function with qualified void return type 'volatile void'"]);
 invalid!(gap_static_init_pointer_to_char, "int g; char c = (char)&g;", &["error: initializer element is not a compile-time constant"]);
 invalid!(gap_constant_shift_too_wide, "enum { A = 1 << 32 };", &["warning: shift count >= width of type", "error: Non constant expression"]);

@@ -253,14 +253,14 @@ declaration_specifiers /* Vec<DeclarationSpecifier> */
 	| declaration_specifiers_typed                                                          { $1 }
 	;
 
-declaration_specifiers_untyped /* Vec<DeclarationSpecifier> — no type yet */
+declaration_specifiers_untyped /* Vec<DeclarationSpecifier> */
 	: storage_class_specifier                                                               { spec!(self, vec![DeclarationSpecifier::Storage($1)]) }
 	| type_qualifier                                                                        { spec!(self, vec![DeclarationSpecifier::Qualifier($1)]) }
 	| declaration_specifiers_untyped storage_class_specifier                                { spec!(self, push!($<mut>1, DeclarationSpecifier::Storage($2))) }
 	| declaration_specifiers_untyped type_qualifier                                         { spec!(self, push!($<mut>1, DeclarationSpecifier::Qualifier($2))) }
 	;
 
-declaration_specifiers_typed /* Vec<DeclarationSpecifier> — a type has been seen */
+declaration_specifiers_typed /* Vec<DeclarationSpecifier> */
 	: type_specifier                                                                        { spec!(self, vec![DeclarationSpecifier::Type($1)]) }
 	| declaration_specifiers_untyped type_specifier                                         { spec!(self, push!($<mut>1, DeclarationSpecifier::Type($2))) }
 	| declaration_specifiers_typed type_specifier_kw                                        { spec!(self, push!($<mut>1, DeclarationSpecifier::Type($2))) }
@@ -379,12 +379,12 @@ specifier_qualifier_list /* Vec<DeclarationSpecifier> */
 	| specifier_qualifier_list_typed                                                        { $1 }
 	;
 
-specifier_qualifier_list_untyped /* Vec<DeclarationSpecifier> — no type specifier yet */
+specifier_qualifier_list_untyped /* Vec<DeclarationSpecifier> */
 	: type_qualifier                                                                        { spec!(self, vec![DeclarationSpecifier::Qualifier($1)]) }
 	| specifier_qualifier_list_untyped type_qualifier                                       { spec!(self, push!($<mut>1, DeclarationSpecifier::Qualifier($2))) }
 	;
 
-specifier_qualifier_list_typed /* Vec<DeclarationSpecifier> — a type specifier has been seen */
+specifier_qualifier_list_typed /* Vec<DeclarationSpecifier> */
 	: type_specifier                                                                        { spec!(self, vec![DeclarationSpecifier::Type($1)]) }
 	| specifier_qualifier_list_untyped type_specifier                                       { spec!(self, push!($<mut>1, DeclarationSpecifier::Type($2))) }
 	| specifier_qualifier_list_typed type_specifier_kw                                      { spec!(self, push!($<mut>1, DeclarationSpecifier::Type($2))) }

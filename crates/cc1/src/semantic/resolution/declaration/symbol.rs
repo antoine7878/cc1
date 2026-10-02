@@ -114,6 +114,14 @@ pub fn declare_init_declarator(
     {
         constraints::types::check_complete_object(ty.is_complete(resolver.sema), ty).collect(resolver, &core.span);
     }
+    if kind == SymbolKind::Variable
+        && storage == Storage::Static
+        && !has_initializer
+        && resolver.scope_kind() == ScopeKind::File
+    {
+        let is_unsized_array = matches!(ty.id.resolve_with(resolver.sema), ResolvedType::Array { len: None, .. });
+        constraints::types::check_internal_array_size(is_unsized_array, name).collect(resolver, &core.span);
+    }
     let sym = Symbol::new(name, ty, Some(storage), kind, has_initializer);
     let sym_id = declare_symbol(resolver, sym, declared_storage, &core.span);
     resolver.sema.declarations.insert(init_declarator.declarator.id, sym_id);

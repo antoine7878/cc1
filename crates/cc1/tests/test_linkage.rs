@@ -37,3 +37,7 @@ invalid!(tentative_never_completed_external, "struct S; struct S x;", &["error: 
 invalid!(tentative_never_completed_internal, "struct S; static struct S x;", &["error: tentative definition has type 'struct S' that is never completed"]);
 invalid!(tentative_never_completed_used, "struct S; static struct S x; struct S *p(void) { return &x; }", &["error: tentative definition has type 'struct S' that is never completed"]);
 invalid!(tentative_array_sizeof_before_completion, "int a[]; enum e { P = sizeof(a) };", &["error: invalid application of 'sizeof' to an incomplete type 'int[]'"]);
+invalid!(static_incomplete_array, "static int a[];", &["error: array size missing in 'a'"]);
+valid!(tentative_incomplete_array_external_is_completed, "int a[];\nint main(void) { return 0; }", 0, "");
+valid!(internal_array_with_size_is_accepted, "static int a[3]; int main(void) { return sizeof(a) == 3 * sizeof(int) ? 0 : 1; }", 0, "");
+valid!(internal_array_sized_by_initializer_is_accepted, "static int a[] = { 1, 2 }; int main(void) { return sizeof(a) == 2 * sizeof(int) ? 0 : 1; }", 0, "");

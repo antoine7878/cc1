@@ -160,6 +160,8 @@ pub enum Diagnostic {
     EmptyDeclaration,
     InvalidTypeSpecifier,
     IncompleteVariable(QualifiedType),
+    ArraySizeMissing(Name),
+    QualifiedFunctionType,
 
     // 6.5.1
     MultipleStorageSpecifiers,
@@ -437,6 +439,8 @@ impl DiagnosticNode {
             Diagnostic::EmptyDeclaration => "Declaration declares nothing".to_string(),
             Diagnostic::InvalidTypeSpecifier => "Invalid type specifier or combination thereof".to_string(),
             Diagnostic::IncompleteVariable(ty) => format!("variable has incomplete type '{}'", ty.display(sema)),
+            Diagnostic::QualifiedFunctionType => "ISO C forbids qualified function types".to_string(),
+            Diagnostic::ArraySizeMissing(name) => format!("array size missing in '{}'", name.id.resolve()),
 
             // 6.5.1
             Diagnostic::MultipleStorageSpecifiers => "Multiple storage class declaration".to_string(),

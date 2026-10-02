@@ -56,12 +56,15 @@ pub fn array_to_pointer(sema: &mut Sema, re: &mut ResolvedExpression, span: &Spa
     if re.kind == ValueCategory::RValue {
         sema.add_diag(Diag::err((), Diagnostic::NonLValueArray), span);
     }
+    if re.is_register_object {
+        sema.add_diag(Diag::err((), Diagnostic::RegisterAddress), span);
+    }
     let elem = QualifiedType::new(elem.id, elem.is_const || re.ty.is_const, elem.is_volatile || re.ty.is_volatile);
     let to = QualifiedType::plain(sema.types.pointer(elem));
     re.casts.push(ImplicitCast::new(CastKind::ArrayToPointer, to))
 }
 
-pub fn lvalue_to_rvalue(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
+pub fn check_complete_lvalue(sema: &mut Sema, re: &ResolvedExpression, span: &Span) {
     if !matches!(re.kind, ValueCategory::LValue) {
         return;
     }
@@ -72,6 +75,17 @@ pub fn lvalue_to_rvalue(sema: &mut Sema, re: &mut ResolvedExpression, span: &Spa
     if !ty.is_complete(sema) {
         sema.add_diag(Diag::err((), Diagnostic::IncompleteType(re.ty)), span);
     }
+}
+
+pub fn lvalue_to_rvalue(sema: &mut Sema, re: &mut ResolvedExpression, span: &Span) {
+    if !matches!(re.kind, ValueCategory::LValue) {
+        return;
+    }
+    let ty = re.ty.id.resolve_with(sema);
+    if matches!(ty, ResolvedType::Array { .. } | ResolvedType::Function { .. }) {
+        return;
+    }
+    check_complete_lvalue(sema, re, span);
     let to = QualifiedType::plain(re.ty.id);
     re.casts.push(ImplicitCast::new(CastKind::LValueToRValue, to));
 }

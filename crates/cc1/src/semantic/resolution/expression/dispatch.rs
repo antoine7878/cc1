@@ -11,6 +11,7 @@ pub fn resolve_expression(resolver: &mut Resolver, node: &ExpressionNode) {
         Ok((ty, kind)) => {
             let mut re = ResolvedExpression::new(ty, kind);
             re.bit_width = bit_width(resolver.sema, node);
+            re.is_register_object = is_register_object(resolver.sema, node);
             Some(re)
         }
         Err(diag) => {

@@ -1,5 +1,5 @@
 use crate::ast::statement::StatementId;
-use crate::ast::visit::{Visitor, walk_jump_statement, walk_labeled_statement};
+use crate::ast::visit::{Visitor, walk_expression_statement, walk_jump_statement, walk_labeled_statement};
 use crate::ast::{
     ConstFolder, ExpressionNode, ExpressionStatementNode, IterationStatement, IterationStatementNode, JumpStatement,
     JumpStatementNode, LabeledStatement, LabeledStatementNode, SelectionStatement, SelectionStatementNode,
@@ -88,9 +88,24 @@ fn check_selection_statement(sema: &mut Sema, node: &SelectionStatementNode) -> 
     }
 }
 
+pub fn resolve_expression_statement(resolver: &mut Resolver, node: &ExpressionStatementNode) {
+    walk_expression_statement(resolver, node);
+    if let Some(e) = &node.expr
+        && let Ok(mut ops) = operands(resolver.sema, [e])
+    {
+        let (sema, [re]) = ops.parts();
+        if !re.ty.is_void(sema) {
+            cast::check_complete_lvalue(sema, re, &e.span);
+        }
+    }
+}
+
 fn expr_to_void(sema: &mut Sema, e: &ExpressionNode) -> Option<()> {
     let mut ops = operands(sema, [e]).ok()?;
     let (sema, [re]) = ops.parts();
+    if !re.ty.is_void(sema) {
+        cast::check_complete_lvalue(sema, re, &e.span);
+    }
     cast::convert(sema, re, sema.builtins.void, false);
     Some(())
 }

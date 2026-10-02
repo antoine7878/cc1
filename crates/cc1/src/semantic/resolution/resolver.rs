@@ -8,8 +8,8 @@ use crate::ast::visit::{
     walk_translation_unit,
 };
 use crate::ast::{
-    CompoundStatementNode, ConstValue, DeclarationNode, ExpressionNode, FunctionDefinitionNode, InitDeclaratorNode,
-    Name, NameId, Statement, StatementNode, Tag,
+    CompoundStatementNode, ConstValue, DeclarationNode, ExpressionNode, ExpressionStatementNode,
+    FunctionDefinitionNode, InitDeclaratorNode, Name, NameId, Statement, StatementNode, Tag,
 };
 use crate::context::ctx;
 use crate::semantic::resolution::{expression, statement};
@@ -162,6 +162,8 @@ impl Resolver<'_> {
         if (is_const && (base.is_const || inner.is_const)) || (is_volatile && (base.is_volatile || inner.is_volatile)) {
             self.add_diag(Diag::err((), Diagnostic::DuplicateTypeQualifiers), span)
         }
+        let is_function = matches!(base.id.resolve_with(self.sema), ResolvedType::Function { .. });
+        constraints::types::check_function_qualifiers(is_function, is_const || is_volatile).collect(self, span);
         Some(QualifiedType::new(base.id, base.is_const || is_const, base.is_volatile || is_volatile))
     }
 
@@ -325,6 +327,10 @@ impl Visitor for Resolver<'_> {
             Statement::Jump(inner) => statement::resolve_jump_statement(self, node.id, inner),
             _ => walk_statement(self, node),
         }
+    }
+
+    fn visit_expression_statement(&mut self, node: &ExpressionStatementNode) {
+        statement::resolve_expression_statement(self, node);
     }
 
     fn visit_expression(&mut self, node: &ExpressionNode) {

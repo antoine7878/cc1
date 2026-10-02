@@ -33,6 +33,20 @@ pub fn check_complete_object(is_complete: bool, ty: QualifiedType) -> Diag<()> {
     }
 }
 
+pub fn check_internal_array_size(is_unsized_array: bool, name: Name) -> Diag<()> {
+    match is_unsized_array {
+        true => Diag::err((), Diagnostic::ArraySizeMissing(name)),
+        false => Diag::ok(()),
+    }
+}
+
+pub fn check_function_qualifiers(is_function: bool, is_qualified: bool) -> Diag<()> {
+    match is_function && is_qualified {
+        true => Diag::err((), Diagnostic::QualifiedFunctionType),
+        false => Diag::ok(()),
+    }
+}
+
 pub fn check_member_type(is_object: bool, ty: QualifiedType) -> Diag<()> {
     match is_object {
         true => Diag::ok(()),

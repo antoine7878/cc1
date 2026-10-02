@@ -95,7 +95,8 @@ impl<W: Write> Builder<W> {
         let Some(ret_attr) = ReturnAttr::classify_return(*ret) else { return };
         self.blank();
         self.reset(params.len());
-        self.write_fmt(format_args!("define {} {}", ret_attr.ret_llvm(), LlvmName::Global(sym_id)));
+        let linkage = linkage_prefix(sym_id.resolve().linkage);
+        self.write_fmt(format_args!("define {linkage}{} {}", ret_attr.ret_llvm(), LlvmName::Global(sym_id)));
         self.params(params, is_variadic);
         self.write_line(format_args!(" {{"));
     }
@@ -351,10 +352,7 @@ impl<W: Write> Builder<W> {
         }
         let Some(layout) = layout else { return };
         let align = layout.align;
-        let linkage = match sym.linkage {
-            Linkage::External => "",
-            Linkage::Internal | Linkage::None => "internal ",
-        };
+        let linkage = linkage_prefix(sym.linkage);
         let init = LlvmInit::top(sym.ty, sym.initializer.map(|i| i.resolve()));
         self.write_line(format_args!("{name} = {linkage}{kind} {init}, align {align}"));
     }
@@ -366,5 +364,12 @@ impl<W: Write> Builder<W> {
         }
         self.write_line(format_args!("  ]"));
         self.has_block_ret = true;
+    }
+}
+
+fn linkage_prefix(linkage: Linkage) -> &'static str {
+    match linkage {
+        Linkage::External => "",
+        Linkage::Internal | Linkage::None => "internal ",
     }
 }

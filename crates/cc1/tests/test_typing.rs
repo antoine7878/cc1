@@ -348,3 +348,6 @@ invalid!(a_logical_and_with_a_variable_operand_is_not_a_null_pointer_constant, "
 invalid!(a_conditional_with_a_variable_arm_may_not_be_compared_to_a_pointer, "int *p; void f(void) { int x = 1; p == (1 ? 0 : x); }", &["error: invalid operands to binary expression ('int *' and 'int')"]);
 invalid!(a_logical_and_with_a_variable_operand_may_not_be_assigned_to_a_pointer, "int *p; void f(void) { int x = 1; p = 0 && x; }", &["error: assignment to 'int *' from incompatible pointer type 'int'"]);
 invalid!(cast_to_a_non_scalar_type_is_reported_once, "struct S { int a; }; enum E { A = (struct S)1 };", &["error: Conversion to non scalar type"]);
+invalid!(deref_incomplete_struct, "struct S; struct S *p; void f(void) { *p; }", &["error: incomplete definition of type 'struct S'"]);
+valid!(dereferenced_pointer_to_a_complete_struct_is_accepted, "struct S { int x; } s = { 4 }; struct S *p = &s; int main(void) { *p; return (*p).x; }", 4, "");
+invalid!(deref_incomplete_struct_in_for_clause, "struct S; struct S *p; void f(void) { for (*p; ; ) { } }", &["error: incomplete definition of type 'struct S'"]);

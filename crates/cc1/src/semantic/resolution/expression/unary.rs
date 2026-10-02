@@ -47,13 +47,21 @@ fn object_symbol(sema: &Sema, e: &ExpressionNode) -> Option<SymbolId> {
     }
 }
 
+pub fn is_register_object(sema: &Sema, e: &ExpressionNode) -> bool {
+    is_register_symbol(sema, object_symbol(sema, e))
+}
+
+fn is_register_symbol(sema: &Sema, object: Option<SymbolId>) -> bool {
+    object.is_some_and(|id| id.resolve_with(sema).storage == Some(Storage::Register))
+}
+
 fn address_type(
     sema: &mut Sema,
     re: &mut ResolvedExpression,
     sym: Option<SymbolId>,
     object: Option<SymbolId>,
 ) -> ExprResult {
-    let is_register = object.is_some_and(|id| id.resolve_with(sema).storage == Some(Storage::Register));
+    let is_register = is_register_symbol(sema, object);
     constraints::expression::check_address_of(
         re.kind,
         re.casted_ty().is_function(sema),
@@ -122,8 +130,19 @@ pub fn cast(
             if ty.is_pointer() != from.is_pointer() && (ty.is_floating() || from.is_floating()) {
                 return Err(Diagnostic::InvalidCast(re.casted_ty(), qualif));
             }
+            if !is_null
+                && ty.is_pointer()
+                && from.is_pointer()
+                && is_pointer_to_function(sema, re.casted_ty()) != is_pointer_to_function(sema, qualif)
+            {
+                return Err(Diagnostic::InvalidCast(re.casted_ty(), qualif));
+            }
             cast::convert(sema, re, qualif.id, is_null);
         }
         Ok((qualif, RValue))
     })
+}
+
+fn is_pointer_to_function(sema: &Sema, qty: QualifiedType) -> bool {
+    matches!(qty.id.resolve_with(sema), ResolvedType::Pointer(inner) if inner.is_function(sema))
 }
