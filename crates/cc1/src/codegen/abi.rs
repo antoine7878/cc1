@@ -18,9 +18,10 @@ pub enum ReturnAttr {
 
 pub fn classify_param(qty: QualifiedType) -> (LlvmType, ParamAttr) {
     match qty.id.resolve() {
-        ResolvedType::Tag(t) if t.resolve().kind != Tag::Enum => {
-            (LlvmType::Ptr, ParamAttr::ByVal { ty: qty.llvm(), align: 4 })
-        }
+        ResolvedType::Tag(t) if t.resolve().kind != Tag::Enum => match sema().layout(&qty.id) {
+            Some(_) => (LlvmType::Ptr, ParamAttr::ByVal { ty: qty.llvm(), align: 4 }),
+            None => (LlvmType::Ptr, ParamAttr::Direct),
+        },
         _ => (qty.llvm(), ParamAttr::Direct),
     }
 }

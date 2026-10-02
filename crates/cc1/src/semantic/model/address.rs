@@ -89,7 +89,9 @@ fn additive(sema: &mut Sema, ptr: &ExpressionNode, index: &ExpressionNode, sign:
 
 fn cast(sema: &mut Sema, node: &ExpressionNode, inner: &ExpressionNode) -> Option<AddressOffset> {
     if let Some(at) = address_constant(sema, inner) {
-        return Some(at);
+        let ty = sema.expressions.get(node.id)?.ty;
+        let narrowed = ty.is_integral(sema) && layout::of(sema, ty.id)?.size != layout::POINTER.size;
+        return (!narrowed).then_some(at);
     }
     let ty = sema.expressions.get(node.id)?.casted_ty();
     if !ty.is_pointer(sema) {

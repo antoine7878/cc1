@@ -4,6 +4,30 @@ accept!(gap_extern_void_object, "extern void v;");
 
 emits!(not gap_string_concat_emits_no_intermediate_literals, "char *p = \"ab\" \"cd\" \"ef\";", "@.str.1");
 
+exits!(gap_extern_void_object_emits_valid_ir, "extern void v; int main(void) { return 0; }", 0);
+exits!(gap_extern_const_void_object_emits_valid_ir, "extern const void cv; int main(void) { return 0; }", 0);
+exits!(gap_extern_void_object_expression_statement, "extern void v; int main(void) { v; return 0; }", 0);
+exits!(gap_incomplete_struct_parameter_declaration, "struct S; void f(struct S); int main(void) { return 0; }", 0);
+exits!(gap_incomplete_union_parameter_declaration, "union U; void f(union U); int main(void) { return 0; }", 0);
+exits!(gap_incomplete_struct_parameter_function_pointer, "struct S; void f(struct S); void (*fp)(struct S) = f; int main(void) { return fp != 0; }", 1);
+exits!(gap_incomplete_struct_parameter_after_complete_param, "struct S; int f(int, struct S); int main(void) { return 0; }", 0);
+emits!(not gap_incomplete_struct_parameter_no_byval, "struct S; void f(struct S); int main(void) { return 0; }", "byval");
+exits!(gap_static_init_address_to_int, "int g; int i = (int)&g; int main(void) { return i != 0 ? 0 : 1; }", 0);
+exits!(gap_static_init_address_to_unsigned, "int g; unsigned u = (unsigned)&g; int main(void) { return u != 0 ? 0 : 1; }", 0);
+exits!(gap_static_init_address_to_long, "int g; long l = (long)&g; int main(void) { return l != 0 ? 0 : 1; }", 0);
+reject!(gap_static_init_address_to_short, "int g; short s = (short)&g;");
+reject!(gap_static_init_address_to_char_in_struct, "int g; struct { char c; } x = { (char)&g };");
+reject!(gap_static_init_address_to_char_in_array, "int g; int a[2] = { (int)&g, (char)&g };");
+reject!(gap_static_init_address_via_int_to_char, "int g; char c = (char)(int)&g;");
+reject!(gap_static_init_address_via_char_to_int, "int g; int i = (int)(char)&g;");
+reject!(gap_auto_init_address_to_char_in_struct, "int g; int main(void) { struct { char c; } x = { (char)&g }; return 0; }");
+reject!(gap_auto_init_address_to_short_in_struct, "int g; int main(void) { struct { short c; } x = { (short)&g }; return 0; }");
+accept!(gap_auto_init_address_to_int_in_array, "int g; int main(void) { int a[2] = { (int)&g, 1 }; return 0; }");
+reject!(gap_static_init_int_cast_address_to_short, "int g; short s = (int)&g;");
+reject!(gap_static_init_int_cast_address_to_char_in_struct, "int g; struct { char c; } x = { (int)&g };");
+reject!(gap_static_init_long_cast_address_to_unsigned_char, "int g; unsigned char uc = (unsigned long)&g;");
+accept!(gap_static_init_address_to_int_in_struct, "int g; struct { int c; } x = { (int)&g };");
+
 exits!(gap_arrow_on_array, "struct S { int a; } arr[2]; int main(void) { arr->a = 42; return arr[0].a; }", 42);
 exits!(gap_incomplete_extern_object, "struct S; extern struct S s; int main(void) { return 0; }", 0);
 exits!(gap_incomplete_union_extern_object, "union U; extern union U u; int main(void) { return 0; }", 0);

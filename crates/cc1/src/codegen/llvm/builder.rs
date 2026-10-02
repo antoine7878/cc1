@@ -340,7 +340,10 @@ impl<W: Write> Builder<W> {
         let layout = sema().layout(&sym.ty.id);
         let kind = if sym.ty.is_const && !sym.ty.is_volatile { "constant" } else { "global" };
         if sym.definition == DefinitionState::Declared {
-            let ty = sym.ty.llvm();
+            let ty = match sym.ty.id.resolve() {
+                ResolvedType::Void => LlvmType::char(),
+                _ => sym.ty.llvm(),
+            };
             return match layout {
                 Some(layout) => self.write_line(format_args!("{name} = external {kind} {ty}, align {}", layout.align)),
                 None => self.write_line(format_args!("{name} = external {kind} {ty}")),
