@@ -22,7 +22,7 @@ PP			"."?{D}({D}|{L}|[eE][+-]|".")*
 
 ^#[ \t]*[0-9]+.*\n          { line_marker(self); }
 "//".*                      { self.ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::CPPStyleComment, self.span)); }
-^[ \t]*#.*                  {}
+^[ \t]*#.*                  { directive(self); }
 "auto"			            { return YYToken::AUTO; }
 "break"			            { return YYToken::BREAK; }
 "case"			            { return YYToken::CASE; }
@@ -136,6 +136,7 @@ fn line_marker<R: Read>(lex: &mut YYLex<R>) {
     let rest = text.trim_start().trim_start_matches('#').trim_start();
     let end = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
     let Ok(line) = rest[..end].parse::<usize>() else { return };
+    lex.ctx.preprocessed = true;
 
     if let Some(file) = rest[end..].trim_start().strip_prefix('"').and_then(|s| s.split('"').next()) {
         lex.pos.file = lex.ctx.arenas.names.intern(file.to_string()).into();
@@ -143,6 +144,16 @@ fn line_marker<R: Read>(lex: &mut YYLex<R>) {
     lex.ctx.mark_line(lex.pos.file, line, lex.pos.line);
     lex.pos.line = line;
     lex.pos.col = 1;
+}
+
+fn directive<R: Read>(lex: &mut YYLex<R>) {
+    let indent = lex.yytext.len() - lex.yytext.trim_start_matches([' ', '\t']).len();
+    if indent > 0 && lex.ctx.preprocessed {
+        let pushed = lex.yytext.len() - indent;
+        lex.yyless(indent);
+        lex.uncounted -= pushed;
+        lex.pos.col -= pushed;
+    }
 }
 
 fn alloc_ident<R: Read>(lex: &mut YYLex<R>) -> Name {

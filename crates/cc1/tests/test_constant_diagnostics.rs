@@ -14,6 +14,20 @@ test_case!(stray_hash_in_raw_input_is_rejected, {
     assert_eq!(status, 1, "{stderr}");
     assert!(stderr.contains("stray '#' in program"), "{stderr}");
 });
+test_case!(indented_hash_after_line_marker_is_stray, {
+    let (status, stderr) = run_raw("marker_stray", "# 1 \"a.c\"\nint x = 1;\n # x = 2;\nint main(void) { return x; }\n");
+    assert_eq!(status, 1, "{stderr}");
+    assert!(stderr.contains("a.c:2:2: error: stray '#' in program"), "{stderr}");
+});
+test_case!(column_one_pragma_after_line_marker_is_skipped, {
+    let (status, stderr) = run_raw("marker_pragma", "# 1 \"a.c\"\n#pragma foo\nint main(void) { return 0; }\n");
+    assert_eq!(status, 0, "{stderr}");
+});
+test_case!(indented_directive_text_after_line_marker_is_rejected, {
+    let (status, stderr) = run_raw("marker_pragma_indented", "# 1 \"a.c\"\nint x;\n #pragma foo\nint main(void) { return 0; }\n");
+    assert_eq!(status, 1, "{stderr}");
+    assert!(stderr.contains("stray '#' in program"), "{stderr}");
+});
 test_case!(directive_line_in_raw_input_is_skipped, {
     let (status, stderr) = run_raw("hello", "#include <stdio.h>\nint main()\n{\nprintf(\"hello, world\\n\");\n}\n");
     assert_eq!(status, 0, "{stderr}");

@@ -39,6 +39,7 @@ pub struct Context {
     pub arenas: AstArenas,
     pub ast: TranslationUnitNode,
     pub line_markers: Vec<LineMarker>,
+    pub preprocessed: bool,
     source_cache: RefCell<HashMap<String, Option<Vec<String>>>>,
     const_one: ExpressionNode,
 }
@@ -55,6 +56,7 @@ impl Default for Context {
             arenas,
             ast: TranslationUnitNode::default(),
             line_markers: Vec::default(),
+            preprocessed: false,
             source_cache: RefCell::default(),
         }
     }
