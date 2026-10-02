@@ -1,5 +1,5 @@
 use crate::ast::{BinaryOp, Expression, ExpressionNode, MemberOp, StringConstId, UnaryOp};
-use crate::semantic::{Duration, ResolvedType, Sema, SymbolId, SymbolKind, fold, layout};
+use crate::semantic::{Duration, QualifiedType, ResolvedType, Sema, SymbolId, SymbolKind, fold, layout};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AddressBase {
@@ -87,11 +87,14 @@ fn additive(sema: &mut Sema, ptr: &ExpressionNode, index: &ExpressionNode, sign:
     at.shift(count.checked_mul(size)?.checked_mul(sign)?)
 }
 
+pub fn holds_address(sema: &mut Sema, ty: QualifiedType) -> bool {
+    ty.is_pointer(sema) || ty.is_integral(sema) && layout::of(sema, ty.id).is_some_and(|l| l.size == layout::POINTER.size)
+}
+
 fn cast(sema: &mut Sema, node: &ExpressionNode, inner: &ExpressionNode) -> Option<AddressOffset> {
     if let Some(at) = address_constant(sema, inner) {
         let ty = sema.expressions.get(node.id)?.ty;
-        let narrowed = ty.is_integral(sema) && layout::of(sema, ty.id)?.size != layout::POINTER.size;
-        return (!narrowed).then_some(at);
+        return holds_address(sema, ty).then_some(at);
     }
     let ty = sema.expressions.get(node.id)?.casted_ty();
     if !ty.is_pointer(sema) {

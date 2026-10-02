@@ -6,7 +6,7 @@ use crate::ast::{ConstValue, Expression, ExpressionNode, InitializerNode, String
 use crate::semantic::resolution::expression;
 use crate::semantic::{
     AddressOffset, AssignmentContext, Diag, Diagnostic, DiagnosticSink, Duration, QualifiedType, ResolvedType,
-    Resolver, Sema, TagDefId, address, fold, layout,
+    Resolver, Sema, TagDefId, address, fold,
 };
 use crate::{ast, define_arena};
 
@@ -61,9 +61,7 @@ fn single(resolver: &mut Resolver, ty: QualifiedType, e: &ExpressionNode, consta
         return Initializer::Value(value);
     }
     if let Some(at) = address::address_constant(resolver.sema, e) {
-        let narrowed = ty.is_integral(resolver.sema)
-            && layout::of(resolver.sema, ty.id).is_none_or(|l| l.size != layout::POINTER.size);
-        if !narrowed {
+        if address::holds_address(resolver.sema, ty) {
             return Initializer::Address(at);
         }
     }

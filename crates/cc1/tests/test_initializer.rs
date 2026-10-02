@@ -74,3 +74,10 @@ reject!(init_static_struct_from_a_variable, "struct S { int a; } x; struct S y =
 size!(init_char_array_sized_from_string, "char a[] = \"abc\";", "a", 4);
 size!(init_array_sized_from_list, "int a[] = { 1, 2, 3 };", "a", 12);
 size!(init_array_of_struct_sized_from_list, "struct S { int a; int b; }; struct S a[] = { { 1, 2 }, { 3, 4 } };", "a", 16);
+
+reject!(init_address_int_to_float, "int g; float f = (float)(int)&g;");
+reject!(init_address_int_to_double, "int g; double d = (int)&g;");
+reject!(init_address_long_to_float, "int g; float f = (long)&g;");
+reject!(init_address_int_to_long_double, "int g; long double ld = (int)&g;");
+accept!(init_address_int_pointer_sized_kept, "int g; int i = (int)&g; long l = (long)&g; unsigned u = (unsigned)&g; char *p = (char *)(int)&g;");
+exits!(init_automatic_address_int_to_double, "int main(void) { int g; double d = (int)&g; return d == 0; }", 0);
