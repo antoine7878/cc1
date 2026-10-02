@@ -45,6 +45,15 @@ reject!(enumerator_logical_and_with_non_constant_operand, "int x; enum { A = 0 &
 accept!(static_initializer_logical_or_non_constant, "int x; int y = 1 || x; int main(void){ return 0; }");
 accept!(static_initializer_logical_and_non_constant, "int x; int y = 0 && x; int main(void){ return 0; }");
 accept!(static_initializer_conditional_non_constant, "int x; int y = 1 ? 2 : x; int main(void){ return 0; }");
+reject!(static_initializer_conditional_function_call_arm, "int f(void); static int x = 1 ? 2 : f();");
+reject!(static_initializer_logical_and_assignment, "int y; static int x = 0 && (y = 2);");
+reject!(static_initializer_logical_or_increment, "int y; static int x = 1 || y++;");
+reject!(static_initializer_conditional_comma_arm, "static int x = 1 ? 2 : (3, 4);");
+reject!(aggregate_initializer_conditional_function_call_arm, "int f(void); int main(void) { int a[2] = { 1 ? 2 : f(), 3 }; return a[0]; }");
+reports!(static_initializer_conditional_function_call_arm_message, "int f(void); static int x = 1 ? 2 : f();", ["<test>:1:29: error: initializer element is not a compile-time constant"]);
+accept!(static_initializer_sizeof_function_call, "int f(void); static int s = sizeof(f()); int main(void){ return 0; }");
+accept!(static_initializer_sizeof_assignment, "int y; static int t = sizeof(y = 2); int main(void){ return 0; }");
+exits!(automatic_initializer_conditional_function_call_arm, "int f(void) { return 1; } int main(void) { int v = 1 ? 2 : f(); return v - 2; }", 0);
 accept!(case_unevaluated_division_by_zero, "int main(void){ int x = 1; switch (x) { case 0 && (1 / 0): break; case 1 ? 3 : 1 / 0: break; } return 0; }");
 accept!(case_unevaluated_sizeof_operand, "int main(void){ int x = 1; switch (x) { case 0 || sizeof(x): break; } return 0; }");
 exits!(runtime_logical_and_still_folds, "int f(void) { return 1; } int main(void) { return 0 && f() ? 1 : 42; }", 42);

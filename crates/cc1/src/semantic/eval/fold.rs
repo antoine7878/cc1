@@ -328,6 +328,29 @@ fn cast(
     Ok(operand(sema, e, sink)?.rounded())
 }
 
+pub fn has_side_effect_operator(expr: &ExpressionNode) -> bool {
+    match expr.id.resolve() {
+        Expression::Assign(_, _, _) | Expression::FunctionCall(_, _) | Expression::List(_) => true,
+        Expression::Unary(UnaryOp::PreInc | UnaryOp::PreDec | UnaryOp::PostInc | UnaryOp::PostDec, _) => true,
+        Expression::Unary(_, e)
+        | Expression::Cast(_, e)
+        | Expression::Block(e)
+        | Expression::ConstantExpression(e)
+        | Expression::Member(_, e, _) => has_side_effect_operator(e),
+        Expression::Binary(_, e1, e2) | Expression::ArraySubscripting(e1, e2) => {
+            has_side_effect_operator(e1) || has_side_effect_operator(e2)
+        }
+        Expression::Ternary(c, e1, e2) => {
+            has_side_effect_operator(c) || has_side_effect_operator(e1) || has_side_effect_operator(e2)
+        }
+        Expression::Identifier(_)
+        | Expression::Constant(_)
+        | Expression::StringLiteral(_)
+        | Expression::SizeofExpr(_)
+        | Expression::SizeofType(_) => false,
+    }
+}
+
 fn is_constant(e: &ExpressionNode) -> bool {
     match e.id.resolve() {
         Expression::Constant(_) => true,

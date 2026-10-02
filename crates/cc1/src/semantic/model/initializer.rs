@@ -57,6 +57,10 @@ fn single(resolver: &mut Resolver, ty: QualifiedType, e: &ExpressionNode, consta
     if !constant {
         return Initializer::Expr(e.clone());
     }
+    if fold::has_side_effect_operator(e) {
+        resolver.add_diag(Diag::err((), Diagnostic::NonConstantInitializer), &e.span);
+        return Initializer::Zero;
+    }
     if let Some(value) = fold::fold_initializer(resolver.sema, ty, e) {
         return Initializer::Value(value);
     }
