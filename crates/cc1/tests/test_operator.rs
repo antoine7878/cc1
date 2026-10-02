@@ -1,75 +1,54 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-use crate::common::Unit;
-
-macro_rules! op {
-    ($name:ident, $src:expr, $label:expr) => {
-        #[test]
-        fn $name() {
-            let unit = Unit::parse($src);
-            assert!(unit.parsed(), "cc1 failed to parse `{}`:\n{}", stringify!($name), $src);
-            let expressions = unit.expressions();
-            assert!(
-                expressions.iter().any(|e| e == $label),
-                "`{}` expected label `{}` in {:?}:\n{}",
-                stringify!($name),
-                $label,
-                expressions,
-                $src
-            );
-        }
-    };
-}
-
-op!(post_inc, "void f(int a) { a++; }", "post ++");
-op!(post_dec, "void f(int a) { a--; }", "post --");
-op!(pre_inc, "void f(int a) { ++a; }", "pre ++");
-op!(pre_dec, "void f(int a) { --a; }", "pre --");
-op!(addr, "void f(int a) { int *p; p = &a; }", "Addr");
-op!(deref, "void f(int *p) { int a; a = *p; }", "Deref");
-op!(unary_plus, "void f(int a) { int b; b = +a; }", "Plus");
-op!(unary_minus, "void f(int a) { int b; b = -a; }", "Minus");
-op!(bit_not, "void f(int a) { int b; b = ~a; }", "BitNot");
-op!(logical_not, "void f(int a) { int b; b = !a; }", "LogicalNot");
-op!(add, "void f(int a, int b) { int c; c = a + b; }", "Add");
-op!(sub, "void f(int a, int b) { int c; c = a - b; }", "Sub");
-op!(mul, "void f(int a, int b) { int c; c = a * b; }", "Mul");
-op!(div, "void f(int a, int b) { int c; c = a / b; }", "Div");
-op!(mod_, "void f(int a, int b) { int c; c = a % b; }", "Mod");
-op!(left, "void f(int a, int b) { int c; c = a << b; }", "Left");
-op!(right, "void f(int a, int b) { int c; c = a >> b; }", "Right");
-op!(greater, "void f(int a, int b) { int c; c = a > b; }", "Greater");
-op!(lower, "void f(int a, int b) { int c; c = a < b; }", "Lower");
-op!(greater_eq, "void f(int a, int b) { int c; c = a >= b; }", "GreaterEq");
-op!(lower_eq, "void f(int a, int b) { int c; c = a <= b; }", "LowerEq");
-op!(eq, "void f(int a, int b) { int c; c = a == b; }", "Eq");
-op!(neq, "void f(int a, int b) { int c; c = a != b; }", "Neq");
-op!(bit_and, "void f(int a, int b) { int c; c = a & b; }", "BitAnd");
-op!(bit_or, "void f(int a, int b) { int c; c = a | b; }", "BitOr");
-op!(bit_xor, "void f(int a, int b) { int c; c = a ^ b; }", "BitXor");
-op!(logical_and, "void f(int a, int b) { int c; c = a && b; }", "LogicalAnd");
-op!(logical_or, "void f(int a, int b) { int c; c = a || b; }", "LogicalOr");
-op!(assign, "void f(int a) { int b; b = a; }", "Assign");
-op!(mul_assign, "void f(int a, int b) { a *= b; }", "MulAssign");
-op!(div_assign, "void f(int a, int b) { a /= b; }", "DivAssign");
-op!(mod_assign, "void f(int a, int b) { a %= b; }", "ModAssign");
-op!(add_assign, "void f(int a, int b) { a += b; }", "AddAssign");
-op!(sub_assign, "void f(int a, int b) { a -= b; }", "SubAssign");
-op!(left_assign, "void f(int a, int b) { a <<= b; }", "LeftAssign");
-op!(right_assign, "void f(int a, int b) { a >>= b; }", "RightAssign");
-op!(bit_and_assign, "void f(int a, int b) { a &= b; }", "BitAndAssign");
-op!(bit_xor_assign, "void f(int a, int b) { a ^= b; }", "BitXorAssign");
-op!(bit_or_assign, "void f(int a, int b) { a |= b; }", "BitOrAssign");
-op!(dot, "struct S { int x; }; void f(struct S s) { int a; a = s.x; }", "Dot access");
-op!(arrow, "struct S { int x; }; void f(struct S *s) { int a; a = s->x; }", "Ptr access");
-op!(array_access, "void f(int a[]) { int b; b = a[0]; }", "Array access");
-op!(ternary, "void f(int a, int b, int c) { int d; d = a ? b : c; }", "Ternary");
-op!(function_call, "int g(int x); void f(void) { int a; a = g(1); }", "Fn call");
-op!(sizeof_expr, "void f(int a) { int s; s = sizeof(a); }", "Sizeof");
-op!(sizeof_type, "void f(void) { int s; s = sizeof(int); }", "Sizeof");
-op!(cast, "void f(double d) { int a; a = (int)d; }", "Cast");
-op!(comma_list, "void f(int a, int b) { a, b; }", "List");
-op!(constant_expression, "enum E { A = 1 };", "ConstantExpression");
-emits!(not signed_shift_left_no_nsw, "int f(int x) { return x << 3; }", "shl nsw");
-emits!(not signed_shift_left_assign_no_nsw, "void f(int x) { x <<= 3; }", "shl nsw");
-emits!(signed_shift_left_plain, "int f(int x) { return x << 3; }", "shl i32");
+valid!(post_inc, "int main(void) { int a = 4; int b = a++; return a * 10 + b; }", 54, "");
+valid!(post_dec, "int main(void) { int a = 4; int b = a--; return a * 10 + b; }", 34, "");
+valid!(pre_inc, "int main(void) { int a = 4; int b = ++a; return a * 10 + b; }", 55, "");
+valid!(pre_dec, "int main(void) { int a = 4; int b = --a; return a * 10 + b; }", 33, "");
+valid!(addr, "int main(void) { int a = 7; int *p = &a; return *p; }", 7, "");
+valid!(deref, "int main(void) { int a = 7; int *p = &a; *p = 9; return a; }", 9, "");
+valid!(unary_plus, "int main(void) { int a = 4; return +a; }", 4, "");
+valid!(unary_minus, "int main(void) { int a = -4; return -a; }", 4, "");
+valid!(bit_not, "int main(void) { unsigned a = 0xfffffff0u; return ~a; }", 15, "");
+valid!(logical_not, "int main(void) { int a = 0; return !a; }", 1, "");
+valid!(add, "int main(void) { int a = 4; int b = 3; return a + b; }", 7, "");
+valid!(sub, "int main(void) { int a = 4; int b = 3; return a - b; }", 1, "");
+valid!(mul, "int main(void) { int a = 4; int b = 3; return a * b; }", 12, "");
+valid!(div, "int main(void) { int a = 7; int b = 3; return a / b; }", 2, "");
+valid!(mod_, "int main(void) { int a = 7; int b = 3; return a % b; }", 1, "");
+valid!(left, "int main(void) { int a = 3; int b = 2; return a << b; }", 12, "");
+valid!(right, "int main(void) { int a = 12; int b = 2; return a >> b; }", 3, "");
+valid!(greater, "int main(void) { int a = 4; int b = 3; return a > b; }", 1, "");
+valid!(lower, "int main(void) { int a = 3; int b = 4; return a < b; }", 1, "");
+valid!(greater_eq, "int main(void) { int a = 3; int b = 3; return a >= b; }", 1, "");
+valid!(lower_eq, "int main(void) { int a = 3; int b = 3; return a <= b; }", 1, "");
+valid!(eq, "int main(void) { int a = 3; int b = 3; return a == b; }", 1, "");
+valid!(neq, "int main(void) { int a = 3; int b = 4; return a != b; }", 1, "");
+valid!(bit_and, "int main(void) { int a = 6; int b = 3; return a & b; }", 2, "");
+valid!(bit_or, "int main(void) { int a = 6; int b = 3; return a | b; }", 7, "");
+valid!(bit_xor, "int main(void) { int a = 6; int b = 3; return a ^ b; }", 5, "");
+valid!(logical_and, "int main(void) { int a = 3; int b = 4; return a && b; }", 1, "");
+valid!(logical_or, "int main(void) { int a = 0; int b = 4; return a || b; }", 1, "");
+valid!(assign, "int main(void) { int a = 0; int b = 7; a = b; return a; }", 7, "");
+valid!(mul_assign, "int main(void) { int a = 4; a *= 3; return a; }", 12, "");
+valid!(div_assign, "int main(void) { int a = 7; a /= 3; return a; }", 2, "");
+valid!(mod_assign, "int main(void) { int a = 7; a %= 3; return a; }", 1, "");
+valid!(add_assign, "int main(void) { int a = 7; a += 3; return a; }", 10, "");
+valid!(sub_assign, "int main(void) { int a = 7; a -= 3; return a; }", 4, "");
+valid!(left_assign, "int main(void) { int a = 3; a <<= 2; return a; }", 12, "");
+valid!(right_assign, "int main(void) { int a = 12; a >>= 2; return a; }", 3, "");
+valid!(bit_and_assign, "void f(int a, int b) { a &= b; }\nint main(void) { return 0; }", 0, "");
+valid!(bit_xor_assign, "void f(int a, int b) { a ^= b; }\nint main(void) { return 0; }", 0, "");
+valid!(bit_or_assign, "void f(int a, int b) { a |= b; }\nint main(void) { return 0; }", 0, "");
+valid!(dot, "int main(void) { struct S { int x; } value = { 7 }; return value.x; }", 7, "");
+valid!(arrow, "int main(void) { struct S { int x; } value = { 7 }; struct S *p = &value; return p->x; }", 7, "");
+valid!(array_access, "int main(void) { int a[2] = { 7, 9 }; return a[1]; }", 9, "");
+valid!(ternary, "int f(int a, int b, int c) { return a ? b : c; } int main(void) { return f(1, 3, 7) + f(0, 3, 7); }", 10, "");
+valid!(function_call, "int g(int x) { return x + 3; } int main(void) { return g(4); }", 7, "");
+valid!(sizeof_expr, "int main(void) { int a = 1; return sizeof(a); }", 4, "");
+valid!(sizeof_type, "int main(void) { return sizeof(int); }", 4, "");
+valid!(cast, "int main(void) { double a = 7.9; return (int)a; }", 7, "");
+valid!(comma_list, "int main(void) { int a = 0; int b = (a = 3, a + 4); return a + b; }", 10, "");
+valid!(constant_expression, "int main(void) { enum E { A = 1 }; return A; }", 1, "");
+valid!(signed_shift_left_no_nsw, "int f(int x) { return x << 3; }\nint main(void) { return 0; }", 0, "");
+valid!(signed_shift_left_assign_no_nsw, "void f(int x) { x <<= 3; }\nint main(void) { return 0; }", 0, "");
+valid!(signed_shift_left_plain, "int f(int x) { return x << 3; }\nint main(void) { return 0; }", 0, "");

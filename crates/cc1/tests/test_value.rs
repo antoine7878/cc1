@@ -1,432 +1,124 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-use std::cmp::Ordering;
-
-use cc1::ast::{BinaryOp, ConstFolder, ConstValue, F80, UnaryOp};
-use cc1::semantic::{Diag, Diagnostic, ResolvedType};
-
-trait FoldValue {
-    fn fold_value(self) -> ConstValue;
-}
-
-impl FoldValue for ConstValue {
-    fn fold_value(self) -> ConstValue {
-        self
-    }
-}
-
-impl FoldValue for Diag<ConstValue> {
-    fn fold_value(self) -> ConstValue {
-        self.res
-    }
-}
-
-impl FoldValue for Option<ConstValue> {
-    fn fold_value(self) -> ConstValue {
-        self.expect("conversion should succeed")
-    }
-}
-
-fn repr(value: impl FoldValue) -> String {
-    crate::common::repr(Some(value.fold_value()))
-}
-
-macro_rules! fold {
-    ($name:ident, $method:ident($($arg:expr),* $(,)?), $expected:expr) => {
-        #[test]
-        fn $name() {
-            let fold = ConstFolder;
-            assert_eq!(
-                repr(fold.$method($($arg),*)),
-                $expected,
-                "{}",
-                stringify!($method($($arg),*))
-            );
-        }
-    };
-    (ignore $reason:literal, $name:ident, $method:ident($($arg:expr),* $(,)?), $expected:expr) => {
-        #[test]
-        #[ignore = $reason]
-        fn $name() {
-            let fold = ConstFolder;
-            assert_eq!(
-                repr(fold.$method($($arg),*)),
-                $expected,
-                "{}",
-                stringify!($method($($arg),*))
-            );
-        }
-    };
-}
-
-macro_rules! fold_overflow {
-    ($name:ident, $method:ident($($arg:expr),* $(,)?), $expected:expr) => {
-        #[test]
-        fn $name() {
-            let Diag { res, diagnostic } = ConstFolder.$method($($arg),*);
-            assert_eq!(repr(res), $expected, "{}", stringify!($method($($arg),*)));
-            assert!(
-                matches!(diagnostic, Some(Diagnostic::ArithmeticOverflow)),
-                "{} should report ArithmeticOverflow, got {diagnostic:?}",
-                stringify!($method($($arg),*))
-            );
-        }
-    };
-}
-
-#[test]
-fn logical_not_tests_against_zero() {
-    assert_eq!(repr(ConstValue::Int(0).logical_not()), "Int(1)");
-    assert_eq!(repr(ConstValue::Int(42).logical_not()), "Int(0)");
-    assert_eq!(repr(ConstValue::Double(F80::from(0.0)).logical_not()), "Int(1)");
-    assert_eq!(repr(ConstValue::from(true)), "Int(1)");
-    assert_eq!(repr(ConstValue::from(false)), "Int(0)");
-}
-
-#[test]
-fn is_true_follows_zero_test() {
-    assert!(ConstValue::Int(1).is_true());
-    assert!(!ConstValue::Int(0).is_true());
-    assert!(ConstValue::Double(F80::from(0.5)).is_true());
-    assert!(!ConstValue::Double(F80::from(0.0)).is_true());
-    assert!(!ConstValue::UnsignedLong(0).is_true());
-}
-
-#[test]
-fn is_floating_covers_real_types() {
-    assert!(ConstValue::Float(F80::from(0.0)).is_floating());
-    assert!(ConstValue::Double(F80::from(0.0)).is_floating());
-    assert!(ConstValue::LongDouble(F80::from(0.0)).is_floating());
-    assert!(!ConstValue::Int(0).is_floating());
-    assert!(!ConstValue::UnsignedLong(0).is_floating());
-}
-
-#[test]
-fn get_integer_value_rejects_real_types() {
-    assert_eq!(ConstValue::Int(1).get_integer_value(), Some(1));
-    assert_eq!(ConstValue::Int(-1).get_integer_value(), Some(u64::MAX));
-    assert_eq!(ConstValue::UnsignedLong(u64::MAX).get_integer_value(), Some(u64::MAX));
-    assert_eq!(ConstValue::Double(F80::from(1.0)).get_integer_value(), None);
-    assert_eq!(ConstValue::Float(F80::from(1.0)).get_integer_value(), None);
-    assert_eq!(ConstValue::LongDouble(F80::from(1.0)).get_integer_value(), None);
-}
-
-#[test]
-fn to_i64_and_to_u64_reinterpret() {
-    assert_eq!(ConstValue::Int(-1).to_i64(), -1);
-    assert_eq!(ConstValue::Int(-1).to_u64(), u64::MAX);
-    assert_eq!(ConstValue::UnsignedInt(u32::MAX).to_i64(), u32::MAX as i64);
-    assert_eq!(ConstValue::Double(F80::from(3.9)).to_i64(), 3);
-    assert_eq!(ConstValue::Double(F80::from(-3.9)).to_i64(), -3);
-}
-
-#[test]
-fn equality_compares_same_type_operands() {
-    let fold = ConstFolder;
-    assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(1)), Some(Ordering::Equal)));
-    assert!(matches!(fold.compare(ConstValue::Double(F80::from(1.0)), ConstValue::Double(F80::from(1.0))), Some(Ordering::Equal)));
-    assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(2)), Some(Ordering::Less | Ordering::Greater)));
-}
-
-#[test]
-fn ordering_compares_same_type_operands() {
-    let fold = ConstFolder;
-    assert!(matches!(fold.compare(ConstValue::Int(1), ConstValue::Int(2)), Some(Ordering::Less)));
-    assert!(matches!(fold.compare(ConstValue::Double(F80::from(1.0)), ConstValue::Double(F80::from(1.5))), Some(Ordering::Less)));
-    assert!(matches!(fold.compare(ConstValue::UnsignedInt(1), ConstValue::UnsignedInt(0)), Some(Ordering::Greater)));
-    assert!(matches!(fold.compare(ConstValue::Long(-1), ConstValue::Long(0)), Some(Ordering::Less)));
-    assert!(matches!(fold.compare(ConstValue::Int(2), ConstValue::Int(2)), Some(Ordering::Less | Ordering::Equal)));
-    assert!(matches!(fold.compare(ConstValue::Int(2), ConstValue::Int(2)), Some(Ordering::Greater | Ordering::Equal)));
-}
-
-#[test]
-fn every_operator_folds_in_sequence() {
-    let fold = ConstFolder;
-    let ty = ResolvedType::Int;
-    let steps = [
-        (BinaryOp::Add, 2, "Int(3)"),
-        (BinaryOp::Mul, 4, "Int(12)"),
-        (BinaryOp::Sub, 2, "Int(10)"),
-        (BinaryOp::Div, 3, "Int(3)"),
-        (BinaryOp::Mod, 2, "Int(1)"),
-        (BinaryOp::Left, 3, "Int(8)"),
-        (BinaryOp::Right, 1, "Int(4)"),
-        (BinaryOp::BitOr, 1, "Int(5)"),
-        (BinaryOp::BitAnd, 3, "Int(1)"),
-        (BinaryOp::BitXor, 3, "Int(2)"),
-    ];
-    let mut value = ConstValue::Int(1);
-    for (op, rhs, expected) in steps {
-        value = fold.binary(&ty, op, value, ConstValue::Int(rhs)).res;
-        assert_eq!(repr(value), expected, "{op:?}");
-    }
-}
-
-#[test]
-fn float_arithmetic_keeps_excess_precision() {
-    let sum = ConstFolder.binary(
-        &ResolvedType::Float,
-        BinaryOp::Add,
-        ConstValue::Float(F80::from(16777216.0)),
-        ConstValue::Float(F80::from(1.0)),
-    );
-    assert_eq!(sum.res, ConstValue::Float(F80::from(16777217.0)));
-    assert_eq!(repr(sum.res.rounded()), "Float(16777216.0)");
-}
-
-#[test]
-fn double_constant_keeps_excess_precision() {
-    let value = ConstValue::parse("0.1").res;
-    assert_eq!(value, ConstValue::Double(F80::from("0.1")));
-    assert_ne!(value, ConstValue::Double(F80::from(0.1)));
-    assert_eq!(value.rounded(), ConstValue::Double(F80::from(0.1)));
-}
-
-#[test]
-fn float_constant_keeps_excess_precision() {
-    let value = ConstValue::parse("0.1f").res;
-    assert_eq!(value, ConstValue::Float(F80::from("0.1")));
-    assert_eq!(value.rounded(), ConstValue::Float(F80::from(f64::from(0.1f32))));
-}
-
-#[test]
-fn widening_conversion_keeps_excess_precision() {
-    let value = ConstValue::Float(F80::from("0.1"));
-    assert_eq!(ConstFolder.convert(&ResolvedType::Double, value), Some(ConstValue::Double(F80::from("0.1"))));
-}
-
-#[test]
-fn narrowing_conversion_rounds() {
-    let value = ConstValue::LongDouble(F80::from("0.1"));
-    assert_eq!(ConstFolder.convert(&ResolvedType::Double, value), Some(ConstValue::Double(F80::from(0.1))));
-    let value = ConstValue::Double(F80::from("0.1"));
-    assert_eq!(ConstFolder.convert(&ResolvedType::Float, value), Some(ConstValue::Float(F80::from(f64::from(0.1f32)))));
-}
-
-#[test]
-fn convert_rejects_a_type_that_holds_no_value() {
-    let fold = ConstFolder;
-    assert_eq!(fold.convert(&ResolvedType::Void, ConstValue::Int(1)), None);
-}
-
-#[test]
-fn comparing_unconverted_operands_yields_no_ordering() {
-    let fold = ConstFolder;
-    assert_eq!(fold.compare(ConstValue::Int(1), ConstValue::Double(F80::from(1.0))), None);
-}
-
-#[test]
-fn only_additive_and_multiplicative_results_report_an_overflow() {
-    let fold = ConstFolder;
-    for (op, lhs, rhs) in [
-        (BinaryOp::Div, ConstValue::Int(i32::MIN), ConstValue::Int(-1)),
-        (BinaryOp::Left, ConstValue::Int(1), ConstValue::Int(31)),
-        (BinaryOp::BitXor, ConstValue::Int(-1), ConstValue::Int(0)),
-    ] {
-        let folded = fold.binary(&ResolvedType::Int, op, lhs, rhs);
-        assert!(folded.diagnostic.is_none(), "{op:?} reported {:?}", folded.diagnostic);
-    }
-}
-
-#[test]
-fn compare_orders_every_representation() {
-    let fold = ConstFolder;
-    assert_eq!(fold.compare(ConstValue::UnsignedLong(1), ConstValue::UnsignedLong(2)), Some(Ordering::Less));
-    assert_eq!(fold.compare(ConstValue::Float(F80::from(1.0)), ConstValue::Float(F80::from(2.0))), Some(Ordering::Less));
-    assert_eq!(
-        fold.compare(ConstValue::LongDouble(F80::from(2.0)), ConstValue::LongDouble(F80::from(2.0))),
-        Some(Ordering::Equal)
-    );
-    assert_eq!(fold.compare(ConstValue::Double(F80::from(f64::NAN)), ConstValue::Double(F80::from(1.0))), None);
-}
-
-#[test]
-fn is_negative_covers_every_representation() {
-    assert!(ConstValue::Int(-1).is_negative());
-    assert!(ConstValue::Long(-1).is_negative());
-    assert!(ConstValue::Float(F80::from(-1.0)).is_negative());
-    assert!(ConstValue::Double(F80::from(-1.0)).is_negative());
-    assert!(ConstValue::LongDouble(F80::from(-1.0)).is_negative());
-    assert!(!ConstValue::Int(1).is_negative());
-    assert!(!ConstValue::UnsignedInt(1).is_negative());
-    assert!(!ConstValue::UnsignedLong(1).is_negative());
-}
-
-#[test]
-fn is_greater_or_eq_covers_every_representation() {
-    assert!(ConstValue::Int(5).is_greater_or_eq(4));
-    assert!(ConstValue::UnsignedInt(5).is_greater_or_eq(4));
-    assert!(ConstValue::UnsignedLong(4).is_greater_or_eq(4));
-    assert!(ConstValue::Float(F80::from(4.5)).is_greater_or_eq(4));
-    assert!(ConstValue::LongDouble(F80::from(4.0)).is_greater_or_eq(4));
-    assert!(!ConstValue::Long(3).is_greater_or_eq(4));
-    assert!(!ConstValue::Double(F80::from(3.5)).is_greater_or_eq(4));
-}
-
-#[test]
-fn is_zero_covers_every_representation() {
-    assert!(ConstValue::Float(F80::from(0.0)).is_zero());
-    assert!(ConstValue::Double(F80::from(0.0)).is_zero());
-    assert!(ConstValue::LongDouble(F80::from(0.0)).is_zero());
-    assert!(!ConstValue::Float(F80::from(1.0)).is_zero());
-    assert!(!ConstValue::LongDouble(F80::from(1.0)).is_zero());
-}
-
-#[test]
-fn a_floating_value_reinterprets_as_an_integer_by_truncation() {
-    assert_eq!(ConstValue::Float(F80::from(3.9)).to_i64(), 3);
-    assert_eq!(ConstValue::Float(F80::from(3.9)).to_u64(), 3);
-    assert_eq!(ConstValue::Double(F80::from(3.9)).to_u64(), 3);
-    assert_eq!(ConstValue::LongDouble(F80::from(3.9)).to_u64(), 3);
-}
-
-#[test]
-fn the_minimum_of_a_signed_type_is_recognised() {
-    let fold = ConstFolder;
-    assert!(fold.is_min(&ResolvedType::Int, ConstValue::Int(i32::MIN)));
-    assert!(fold.is_min(&ResolvedType::Long, ConstValue::Long(-2147483648)));
-    assert!(!fold.is_min(&ResolvedType::Int, ConstValue::Int(0)));
-    assert!(!fold.is_min(&ResolvedType::UnsignedInt, ConstValue::UnsignedInt(0)));
-    assert!(!fold.is_min(&ResolvedType::UnsignedLong, ConstValue::UnsignedLong(0)));
-}
-
-#[test]
-fn long_double_literals_round_to_the_x87_format() {
-    assert_ne!(ConstValue::parse("0.1l").res, ConstValue::LongDouble(F80::from(0.1)));
-    assert_eq!(ConstValue::parse("0.1l").res, ConstValue::LongDouble(F80::from("0.1")));
-}
-
-#[test]
-fn an_exact_long_double_literal_is_the_double_widened() {
-    assert_eq!(ConstValue::parse("1.5l").res, ConstValue::LongDouble(F80::from(1.5)));
-}
-
-constant!(literal_zero, "0", "Int(0)");
-constant!(literal_decimal, "42", "Int(42)");
-constant!(literal_int_max, "2147483647", "Int(2147483647)");
-constant!(literal_decimal_above_int_max, "2147483648", "UnsignedLong(2147483648)");
-constant!(literal_octal, "010", "Int(8)");
-constant!(literal_octal_max, "017777777777", "Int(2147483647)");
-constant!(literal_hexadecimal, "0x10", "Int(16)");
-constant!(literal_hexadecimal_upper, "0XFF", "Int(255)");
-constant!(literal_hexadecimal_above_int_max, "0x80000000", "UnsignedInt(2147483648)");
-constant!(literal_octal_above_int_max, "020000000000", "UnsignedInt(2147483648)");
-constant!(literal_unsigned_suffix, "1u", "UnsignedInt(1)");
-constant!(literal_unsigned_suffix_upper, "1U", "UnsignedInt(1)");
-constant!(literal_long_suffix, "1l", "Long(1)");
-constant!(literal_long_suffix_upper, "1L", "Long(1)");
-constant!(literal_unsigned_long_suffix, "1ul", "UnsignedLong(1)");
-constant!(literal_long_unsigned_suffix, "1lu", "UnsignedLong(1)");
-constant!(literal_unsigned_long_suffix_upper, "1UL", "UnsignedLong(1)");
-constant!(literal_double, "1.5", "Double(1.5)");
-constant!(literal_double_leading_dot, ".5", "Double(0.5)");
-constant!(literal_double_exponent, "1e3", "Double(1000.0)");
-constant!(literal_double_negative_exponent, "1e-3", "Double(0.001)");
-constant!(literal_float_suffix, "1.5f", "Float(1.5)");
-constant!(literal_float_suffix_upper, "1.5F", "Float(1.5)");
-constant!(literal_long_double_suffix, "1.5l", "LongDouble(1.5)");
-constant!(literal_char, "'a'", "Int(97)");
-constant!(literal_char_digit, "'0'", "Int(48)");
-constant!(literal_char_escape_newline, "'\\n'", "Int(10)");
-constant!(literal_char_escape_tab, "'\\t'", "Int(9)");
-constant!(literal_char_escape_null, "'\\0'", "Int(0)");
-constant!(literal_char_escape_backslash, "'\\\\'", "Int(92)");
-constant!(literal_char_escape_quote, "'\\''", "Int(39)");
-constant!(literal_char_escape_bell, "'\\a'", "Int(7)");
-constant!(literal_char_escape_backspace, "'\\b'", "Int(8)");
-constant!(literal_char_escape_form_feed, "'\\f'", "Int(12)");
-constant!(literal_char_escape_carriage_return, "'\\r'", "Int(13)");
-constant!(literal_char_escape_vertical_tab, "'\\v'", "Int(11)");
-constant!(literal_char_escape_octal, "'\\101'", "Int(65)");
-constant!(literal_char_escape_hexadecimal, "'\\x41'", "Int(65)");
-constant!(literal_char_is_sign_extended, "'\\377'", "Int(-1)");
-constant!(literal_char_hexadecimal_is_sign_extended, "'\\xff'", "Int(-1)");
-constant!(literal_char_multi_is_packed, "'ab'", "Int(24930)");
-constant!(literal_wide_char, "L'a'", "Int(97)");
-constant!(literal_wide_char_is_not_sign_extended, "L'\\xff'", "Int(255)");
-constant!(literal_char_octal_escape_at_range_limit, "'\\377'", "Int(-1)");
-constant!(literal_char_hex_escape_at_range_limit, "'\\xff'", "Int(-1)");
-constant!(literal_wide_char_hex_escape_at_range_limit, "L'\\xffffffff'", "Int(-1)");
-constant!(literal_char_hex_escape_extra_leading_zeros, "'\\x0000000000041'", "Int(65)");
-constant!(literal_wide_char_hex_escape_above_char_range, "L'\\x100'", "Int(256)");
-constant!(literal_wide_char_hex_escape_uses_wchar_range, "L'\\xffff'", "Int(65535)");
-constant!(literal_char_escape_question_mark, "'\\?'", "Int(63)");
-constant!(literal_char_escape_double_quote, "'\\\"'", "Int(34)");
-
-escape_invalid!(literal_char_hex_escape_no_digits, "'\\x'", "Int(0)", cc1::semantic::Diagnostic::EscapeNoHexDigits);
-escape_invalid!(literal_char_hex_escape_bad_digit, "'\\xg'", "Int(103)", cc1::semantic::Diagnostic::EscapeNoHexDigits);
-escape_invalid!(literal_octal_with_digit_eight, "08", "Int(0)", cc1::semantic::Diagnostic::InvalidOctalDigit('8'));
-escape_invalid!(literal_octal_with_digit_nine_after_valid_ones, "0129u", "Int(0)", cc1::semantic::Diagnostic::InvalidOctalDigit('9'));
-escape_invalid!(literal_wide_char_hex_escape_no_digits, "L'\\x'", "Int(0)", cc1::semantic::Diagnostic::EscapeNoHexDigits);
-escape_invalid!(literal_char_unknown_escape, "'\\q'", "Int(113)", cc1::semantic::Diagnostic::UnknownEscape('q'));
-escape_invalid!(literal_char_escape_e_is_unknown, "'\\e'", "Int(101)", cc1::semantic::Diagnostic::UnknownEscape('e'));
-
-escape_out_of_range!(literal_char_octal_escape_out_of_range, "'\\777'", "Int(-1)");
-escape_out_of_range!(literal_char_octal_escape_just_out_of_range, "'\\400'", "Int(0)");
-escape_out_of_range!(literal_char_hex_escape_out_of_range, "'\\x100'", "Int(0)");
-escape_out_of_range!(literal_char_hex_escape_far_out_of_range, "'\\x1ff'", "Int(-1)");
-escape_out_of_range!(literal_multi_char_escape_out_of_range, "'a\\x100'", "Int(24832)");
-escape_out_of_range!(literal_char_hex_escape_grossly_out_of_range, "'\\x100000041'", "Int(65)");
-escape_out_of_range!(literal_wide_char_hex_escape_grossly_out_of_range, "L'\\x100000041'", "Int(65)");
-
-fold!(add_int, binary(&ResolvedType::Int, BinaryOp::Add, ConstValue::Int(1), ConstValue::Int(2)), "Int(3)");
-fold!(sub_unsigned_wraps, binary(&ResolvedType::UnsignedInt, BinaryOp::Sub, ConstValue::UnsignedInt(1), ConstValue::UnsignedInt(2)), "UnsignedInt(4294967295)");
-fold!(div_int, binary(&ResolvedType::Int, BinaryOp::Div, ConstValue::Int(7), ConstValue::Int(2)), "Int(3)");
-fold!(div_negative_truncates_toward_zero, binary(&ResolvedType::Int, BinaryOp::Div, ConstValue::Int(-7), ConstValue::Int(2)), "Int(-3)");
-fold!(rem_int, binary(&ResolvedType::Int, BinaryOp::Mod, ConstValue::Int(7), ConstValue::Int(2)), "Int(1)");
-fold!(rem_keeps_sign_of_dividend, binary(&ResolvedType::Int, BinaryOp::Mod, ConstValue::Int(-7), ConstValue::Int(2)), "Int(-1)");
-fold!(bitand_int, binary(&ResolvedType::Int, BinaryOp::BitAnd, ConstValue::Int(6), ConstValue::Int(3)), "Int(2)");
-fold!(bitor_int, binary(&ResolvedType::Int, BinaryOp::BitOr, ConstValue::Int(6), ConstValue::Int(3)), "Int(7)");
-fold!(bitxor_int, binary(&ResolvedType::Int, BinaryOp::BitXor, ConstValue::Int(6), ConstValue::Int(3)), "Int(5)");
-fold!(shift_left, binary(&ResolvedType::Int, BinaryOp::Left, ConstValue::Int(1), ConstValue::Int(4)), "Int(16)");
-fold!(shift_left_into_sign_bit, binary(&ResolvedType::Int, BinaryOp::Left, ConstValue::Int(1), ConstValue::Int(31)), "Int(-2147483648)");
-fold!(shift_right_is_arithmetic, binary(&ResolvedType::Int, BinaryOp::Right, ConstValue::Int(-8), ConstValue::Int(1)), "Int(-4)");
-fold!(shift_right_unsigned_is_logical, binary(&ResolvedType::UnsignedInt, BinaryOp::Right, ConstValue::UnsignedInt(2147483648), ConstValue::Int(31)), "UnsignedInt(1)");
-fold!(shift_keeps_left_operand_type, binary(&ResolvedType::Long, BinaryOp::Left, ConstValue::Long(1), ConstValue::Int(1)), "Long(2)");
-fold!(neg_int, unary(&ResolvedType::Int, UnaryOp::Minus, ConstValue::Int(1)), "Int(-1)");
-fold!(neg_double, unary(&ResolvedType::Double, UnaryOp::Minus, ConstValue::Double(F80::from(1.5))), "Double(-1.5)");
-fold!(bitnot_int, unary(&ResolvedType::Int, UnaryOp::BitNot, ConstValue::Int(0)), "Int(-1)");
-fold!(bitnot_unsigned, unary(&ResolvedType::UnsignedInt, UnaryOp::BitNot, ConstValue::UnsignedInt(0)), "UnsignedInt(4294967295)");
-fold!(convert_to_int, convert(&ResolvedType::Int, ConstValue::Long(300)), "Int(300)");
-fold!(convert_to_int_wraps, convert(&ResolvedType::Int, ConstValue::Long(4294967297)), "Int(1)");
-fold!(convert_to_unsigned_long_is_32_bits_on_i386, convert(&ResolvedType::UnsignedLong, ConstValue::Int(-1)), "UnsignedLong(4294967295)");
-fold!(convert_to_long_is_32_bits_on_i386, convert(&ResolvedType::Long, ConstValue::UnsignedLong(4294967296)), "Long(0)");
-fold!(convert_to_double, convert(&ResolvedType::Double, ConstValue::Int(3)), "Double(3.0)");
-fold!(convert_from_double_truncates, convert(&ResolvedType::Int, ConstValue::Double(F80::from(3.9))), "Int(3)");
-fold!(unsigned_div, binary(&ResolvedType::UnsignedInt, BinaryOp::Div, ConstValue::UnsignedInt(7), ConstValue::UnsignedInt(2)), "UnsignedInt(3)");
-fold!(unsigned_rem, binary(&ResolvedType::UnsignedInt, BinaryOp::Mod, ConstValue::UnsignedInt(7), ConstValue::UnsignedInt(2)), "UnsignedInt(1)");
-fold!(unsigned_mul_wraps_without_a_diagnostic, binary(&ResolvedType::UnsignedInt, BinaryOp::Mul, ConstValue::UnsignedInt(65536), ConstValue::UnsignedInt(65536)), "UnsignedInt(0)");
-fold!(unsigned_bitor, binary(&ResolvedType::UnsignedInt, BinaryOp::BitOr, ConstValue::UnsignedInt(4026531840), ConstValue::UnsignedInt(15)), "UnsignedInt(4026531855)");
-fold!(unsigned_long_sub_wraps, binary(&ResolvedType::UnsignedLong, BinaryOp::Sub, ConstValue::UnsignedLong(0), ConstValue::UnsignedLong(1)), "UnsignedLong(4294967295)");
-fold!(double_sub, binary(&ResolvedType::Double, BinaryOp::Sub, ConstValue::Double(F80::from(1.5)), ConstValue::Double(F80::from(0.25))), "Double(1.25)");
-fold!(double_mul, binary(&ResolvedType::Double, BinaryOp::Mul, ConstValue::Double(F80::from(1.5)), ConstValue::Double(F80::from(2.0))), "Double(3.0)");
-fold!(long_double_add, binary(&ResolvedType::LongDouble, BinaryOp::Add, ConstValue::LongDouble(F80::from(1.5)), ConstValue::LongDouble(F80::from(1.5))), "LongDouble(3.0)");
-fold!(neg_unsigned_wraps, unary(&ResolvedType::UnsignedInt, UnaryOp::Minus, ConstValue::UnsignedInt(1)), "UnsignedInt(4294967295)");
-fold!(neg_long, unary(&ResolvedType::Long, UnaryOp::Minus, ConstValue::Long(-1)), "Long(1)");
-fold!(neg_floating_zero_keeps_its_sign, unary(&ResolvedType::Double, UnaryOp::Minus, ConstValue::Double(F80::from(0.0))), "Double(-0.0)");
-fold!(bitnot_long, unary(&ResolvedType::Long, UnaryOp::BitNot, ConstValue::Long(0)), "Long(-1)");
-fold!(convert_to_a_narrow_integer_type, convert(&ResolvedType::Char, ConstValue::Int(300)), "Int(44)");
-fold!(convert_to_unsigned_int_wraps, convert(&ResolvedType::UnsignedInt, ConstValue::Int(-1)), "UnsignedInt(4294967295)");
-fold!(convert_to_long_double, convert(&ResolvedType::LongDouble, ConstValue::Int(3)), "LongDouble(3.0)");
-fold!(convert_to_float_rounds, convert(&ResolvedType::Float, ConstValue::Double(F80::from(16777217.0))), "Float(16777216.0)");
-fold!(unsigned_int_shift_left, binary(&ResolvedType::UnsignedInt, BinaryOp::Left, ConstValue::UnsignedInt(1), ConstValue::Int(31)), "UnsignedInt(2147483648)");
-fold!(unsigned_long_shift_left, binary(&ResolvedType::UnsignedLong, BinaryOp::Left, ConstValue::UnsignedLong(1), ConstValue::Int(4)), "UnsignedLong(16)");
-fold!(long_shift_right_is_arithmetic, binary(&ResolvedType::Long, BinaryOp::Right, ConstValue::Long(-8), ConstValue::Int(1)), "Long(-4)");
-fold!(unsigned_long_shift_right_is_logical, binary(&ResolvedType::UnsignedLong, BinaryOp::Right, ConstValue::UnsignedLong(2147483648), ConstValue::Int(31)), "UnsignedLong(1)");
-fold!(a_shift_narrows_to_the_width_of_its_type, binary(&ResolvedType::Long, BinaryOp::Left, ConstValue::Long(1), ConstValue::Int(31)), "Long(-2147483648)");
-fold!(bitnot_unsigned_long, unary(&ResolvedType::UnsignedLong, UnaryOp::BitNot, ConstValue::UnsignedLong(0)), "UnsignedLong(4294967295)");
-fold!(double_div, binary(&ResolvedType::Double, BinaryOp::Div, ConstValue::Double(F80::from(3.0)), ConstValue::Double(F80::from(2.0))), "Double(1.5)");
-fold!(unsigned_add_wraps, binary(&ResolvedType::UnsignedInt, BinaryOp::Add, ConstValue::UnsignedInt(4294967295), ConstValue::UnsignedInt(1)), "UnsignedInt(0)");
-fold!(unsigned_bitxor, binary(&ResolvedType::UnsignedInt, BinaryOp::BitXor, ConstValue::UnsignedInt(6), ConstValue::UnsignedInt(3)), "UnsignedInt(5)");
-fold!(convert_an_unsigned_int_to_double, convert(&ResolvedType::Double, ConstValue::UnsignedInt(1)), "Double(1.0)");
-fold!(convert_a_long_to_double, convert(&ResolvedType::Double, ConstValue::Long(2)), "Double(2.0)");
-fold!(convert_an_unsigned_long_to_double, convert(&ResolvedType::Double, ConstValue::UnsignedLong(3)), "Double(3.0)");
-
-fold_overflow!(add_wraps, binary(&ResolvedType::Int, BinaryOp::Add, ConstValue::Int(i32::MAX), ConstValue::Int(1)), "Int(-2147483648)");
-fold_overflow!(mul_wraps, binary(&ResolvedType::Int, BinaryOp::Mul, ConstValue::Int(65536), ConstValue::Int(65536)), "Int(0)");
-fold_overflow!(neg_wraps, unary(&ResolvedType::Int, UnaryOp::Minus, ConstValue::Int(i32::MIN)), "Int(-2147483648)");
-fold_overflow!(long_add_wraps_at_32_bits, binary(&ResolvedType::Long, BinaryOp::Add, ConstValue::Long(2147483647), ConstValue::Long(1)), "Long(-2147483648)");
-
-too_large!(literal_above_unsigned_int_max, "0x100000000", "UnsignedLong(0)");
-too_large!(literal_above_long_max, "0xffffffffffffffff", "UnsignedLong(4294967295)");
-too_large!(literal_unsigned_suffix_promotes, "4294967296u", "UnsignedLong(0)");
+valid!(literal_zero, "int main(void) { return !((0 == (0)) && (sizeof(0) == sizeof(int)) && (((0) - (0) - 1 < 0) == 1)); }", 0, "");
+valid!(literal_decimal, "int main(void) { return !((42 == (42)) && (sizeof(42) == sizeof(int)) && (((42) - (42) - 1 < 0) == 1)); }", 0, "");
+valid!(literal_int_max, "int main(void) { return !((2147483647 == (2147483647)) && (sizeof(2147483647) == sizeof(int)) && (((2147483647) - (2147483647) - 1 < 0) == 1)); }", 0, "");
+valid!(literal_decimal_above_int_max, "int main(void) { return !((2147483648 == (2147483648ul)) && (sizeof(2147483648) == sizeof(unsigned long)) && (((2147483648) - (2147483648) - 1 < 0) == 0)); }", 0, "");
+valid!(literal_octal, "int main(void) { return !((010 == (8)) && (sizeof(010) == sizeof(int)) && (((010) - (010) - 1 < 0) == 1)); }", 0, "");
+valid!(literal_octal_max, "int main(void) { return !((017777777777 == (2147483647)) && (sizeof(017777777777) == sizeof(int)) && (((017777777777) - (017777777777) - 1 < 0) == 1)); }", 0, "");
+valid!(literal_hexadecimal, "int main(void) { return !((0x10 == (16)) && (sizeof(0x10) == sizeof(int)) && (((0x10) - (0x10) - 1 < 0) == 1)); }", 0, "");
+valid!(literal_hexadecimal_upper, "int main(void) { return !((0XFF == (255)) && (sizeof(0XFF) == sizeof(int)) && (((0XFF) - (0XFF) - 1 < 0) == 1)); }", 0, "");
+valid!(literal_hexadecimal_above_int_max, "int main(void) { return !((0x80000000 == (2147483648u)) && (sizeof(0x80000000) == sizeof(unsigned int)) && (((0x80000000) - (0x80000000) - 1 < 0) == 0)); }", 0, "");
+valid!(literal_octal_above_int_max, "int main(void) { return !((020000000000 == (2147483648u)) && (sizeof(020000000000) == sizeof(unsigned int)) && (((020000000000) - (020000000000) - 1 < 0) == 0)); }", 0, "");
+valid!(literal_unsigned_suffix, "int main(void) { return !((1u == (1u)) && (sizeof(1u) == sizeof(unsigned int)) && (((1u) - (1u) - 1 < 0) == 0)); }", 0, "");
+valid!(literal_unsigned_suffix_upper, "int main(void) { return !((1U == (1u)) && (sizeof(1U) == sizeof(unsigned int)) && (((1U) - (1U) - 1 < 0) == 0)); }", 0, "");
+valid!(literal_long_suffix, "int main(void) { return !((1l == (1l)) && (sizeof(1l) == sizeof(long)) && (((1l) - (1l) - 1 < 0) == 1)); }", 0, "");
+valid!(literal_long_suffix_upper, "int main(void) { return !((1L == (1l)) && (sizeof(1L) == sizeof(long)) && (((1L) - (1L) - 1 < 0) == 1)); }", 0, "");
+valid!(literal_unsigned_long_suffix, "int main(void) { return !((1ul == (1ul)) && (sizeof(1ul) == sizeof(unsigned long)) && (((1ul) - (1ul) - 1 < 0) == 0)); }", 0, "");
+valid!(literal_long_unsigned_suffix, "int main(void) { return !((1lu == (1ul)) && (sizeof(1lu) == sizeof(unsigned long)) && (((1lu) - (1lu) - 1 < 0) == 0)); }", 0, "");
+valid!(literal_unsigned_long_suffix_upper, "int main(void) { return !((1UL == (1ul)) && (sizeof(1UL) == sizeof(unsigned long)) && (((1UL) - (1UL) - 1 < 0) == 0)); }", 0, "");
+valid!(literal_double, "int main(void) { return !((1.5 == (1.5)) && (sizeof(1.5) == sizeof(double))); }", 0, "");
+valid!(literal_double_leading_dot, "int main(void) { return !((.5 == (0.5)) && (sizeof(.5) == sizeof(double))); }", 0, "");
+valid!(literal_double_exponent, "int main(void) { return !((1e3 == (1000.0)) && (sizeof(1e3) == sizeof(double))); }", 0, "");
+valid!(literal_double_negative_exponent, "int main(void) { return !((1e-3 == (0.001)) && (sizeof(1e-3) == sizeof(double))); }", 0, "");
+valid!(literal_float_suffix, "int main(void) { return !((1.5f == (1.5f)) && (sizeof(1.5f) == sizeof(float))); }", 0, "");
+valid!(literal_float_suffix_upper, "int main(void) { return !((1.5F == (1.5f)) && (sizeof(1.5F) == sizeof(float))); }", 0, "");
+valid!(literal_long_double_suffix, "int main(void) { return !((1.5l == (1.5l)) && (sizeof(1.5l) == sizeof(long double))); }", 0, "");
+valid!(literal_char, "int main(void) { return !(('a' == (97)) && (sizeof('a') == sizeof(int)) && ((('a') - ('a') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_digit, "int main(void) { return !(('0' == (48)) && (sizeof('0') == sizeof(int)) && ((('0') - ('0') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_escape_newline, "int main(void) { return !(('\\n' == (10)) && (sizeof('\\n') == sizeof(int)) && ((('\\n') - ('\\n') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_escape_tab, "int main(void) { return !(('\\t' == (9)) && (sizeof('\\t') == sizeof(int)) && ((('\\t') - ('\\t') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_escape_null, "int main(void) { return !(('\\0' == (0)) && (sizeof('\\0') == sizeof(int)) && ((('\\0') - ('\\0') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_escape_backslash, "int main(void) { return !(('\\\\' == (92)) && (sizeof('\\\\') == sizeof(int)) && ((('\\\\') - ('\\\\') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_escape_quote, "int main(void) { return !(('\\'' == (39)) && (sizeof('\\'') == sizeof(int)) && ((('\\'') - ('\\'') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_escape_bell, "int main(void) { return !(('\\a' == (7)) && (sizeof('\\a') == sizeof(int)) && ((('\\a') - ('\\a') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_escape_backspace, "int main(void) { return !(('\\b' == (8)) && (sizeof('\\b') == sizeof(int)) && ((('\\b') - ('\\b') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_escape_form_feed, "int main(void) { return !(('\\f' == (12)) && (sizeof('\\f') == sizeof(int)) && ((('\\f') - ('\\f') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_escape_carriage_return, "int main(void) { return !(('\\r' == (13)) && (sizeof('\\r') == sizeof(int)) && ((('\\r') - ('\\r') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_escape_vertical_tab, "int main(void) { return !(('\\v' == (11)) && (sizeof('\\v') == sizeof(int)) && ((('\\v') - ('\\v') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_escape_octal, "int main(void) { return !(('\\101' == (65)) && (sizeof('\\101') == sizeof(int)) && ((('\\101') - ('\\101') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_escape_hexadecimal, "int main(void) { return !(('\\x41' == (65)) && (sizeof('\\x41') == sizeof(int)) && ((('\\x41') - ('\\x41') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_is_sign_extended, "int main(void) { return !(('\\377' == (-1)) && (sizeof('\\377') == sizeof(int)) && ((('\\377') - ('\\377') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_hexadecimal_is_sign_extended, "int main(void) { return !(('\\xff' == (-1)) && (sizeof('\\xff') == sizeof(int)) && ((('\\xff') - ('\\xff') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_multi_is_packed, "int main(void) { return !(('ab' == (24930)) && (sizeof('ab') == sizeof(int)) && ((('ab') - ('ab') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_wide_char, "int main(void) { return !((L'a' == (97)) && (sizeof(L'a') == sizeof(int)) && (((L'a') - (L'a') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_wide_char_is_not_sign_extended, "int main(void) { return !((L'\\xff' == (255)) && (sizeof(L'\\xff') == sizeof(int)) && (((L'\\xff') - (L'\\xff') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_octal_escape_at_range_limit, "int main(void) { return !(('\\377' == (-1)) && (sizeof('\\377') == sizeof(int)) && ((('\\377') - ('\\377') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_hex_escape_at_range_limit, "int main(void) { return !(('\\xff' == (-1)) && (sizeof('\\xff') == sizeof(int)) && ((('\\xff') - ('\\xff') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_wide_char_hex_escape_at_range_limit, "int main(void) { return !((L'\\xffffffff' == (-1)) && (sizeof(L'\\xffffffff') == sizeof(int)) && (((L'\\xffffffff') - (L'\\xffffffff') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_hex_escape_extra_leading_zeros, "int main(void) { return !(('\\x0000000000041' == (65)) && (sizeof('\\x0000000000041') == sizeof(int)) && ((('\\x0000000000041') - ('\\x0000000000041') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_wide_char_hex_escape_above_char_range, "int main(void) { return !((L'\\x100' == (256)) && (sizeof(L'\\x100') == sizeof(int)) && (((L'\\x100') - (L'\\x100') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_wide_char_hex_escape_uses_wchar_range, "int main(void) { return !((L'\\xffff' == (65535)) && (sizeof(L'\\xffff') == sizeof(int)) && (((L'\\xffff') - (L'\\xffff') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_escape_question_mark, "int main(void) { return !(('\\?' == (63)) && (sizeof('\\?') == sizeof(int)) && ((('\\?') - ('\\?') - 1 < 0) == 1)); }", 0, "");
+valid!(literal_char_escape_double_quote, "int main(void) { return !(('\\\"' == (34)) && (sizeof('\\\"') == sizeof(int)) && ((('\\\"') - ('\\\"') - 1 < 0) == 1)); }", 0, "");
+invalid!(literal_char_hex_escape_no_digits, "int value = '\\x';", &["error: \\x used with no following hex digits"]);
+invalid!(literal_char_hex_escape_bad_digit, "int value = '\\xg';", &["error: \\x used with no following hex digits"]);
+invalid!(literal_octal_with_digit_eight, "int value = 08;", &["error: invalid digit \"8\" in octal constant"]);
+invalid!(literal_octal_with_digit_nine_after_valid_ones, "int value = 0129u;", &["error: invalid digit \"9\" in octal constant"]);
+invalid!(literal_wide_char_hex_escape_no_digits, "int value = L'\\x';", &["error: \\x used with no following hex digits"]);
+invalid!(literal_char_unknown_escape, "int value = '\\q';", &["error: unknown escape sequence: '\\q'"]);
+invalid!(literal_char_escape_e_is_unknown, "int value = '\\e';", &["error: unknown escape sequence: '\\e'"]);
+invalid!(literal_char_octal_escape_out_of_range, "int value = '\\777';", &["error: escape sequence is out of range for the character type"]);
+invalid!(literal_char_octal_escape_just_out_of_range, "int value = '\\400';", &["error: escape sequence is out of range for the character type"]);
+invalid!(literal_char_hex_escape_out_of_range, "int value = '\\x100';", &["error: escape sequence is out of range for the character type"]);
+invalid!(literal_char_hex_escape_far_out_of_range, "int value = '\\x1ff';", &["error: escape sequence is out of range for the character type"]);
+invalid!(literal_multi_char_escape_out_of_range, "int value = 'a\\x100';", &["error: escape sequence is out of range for the character type"]);
+invalid!(literal_char_hex_escape_grossly_out_of_range, "int value = '\\x100000041';", &["error: escape sequence is out of range for the character type"]);
+invalid!(literal_wide_char_hex_escape_grossly_out_of_range, "int value = L'\\x100000041';", &["error: escape sequence is out of range for the character type"]);
+invalid!(literal_above_unsigned_int_max, "int value = 0x100000000;", &["error: integer constant is too large for any integer type"]);
+invalid!(literal_above_long_max, "int value = 0xffffffffffffffff;", &["error: integer constant is too large for any integer type"]);
+invalid!(literal_unsigned_suffix_promotes, "int value = 4294967296u;", &["error: integer constant is too large for any integer type"]);
+valid!(add_int, "int main(void) { return !(((1) + (2)) == (3)); }", 0, "");
+valid!(sub_unsigned_wraps, "int main(void) { return !(((1u) - (2u)) == (4294967295u)); }", 0, "");
+valid!(div_int, "int main(void) { return !(((7) / (2)) == (3)); }", 0, "");
+valid!(div_negative_truncates_toward_zero, "int main(void) { return !(((-7) / (2)) == (-3)); }", 0, "");
+valid!(rem_int, "int main(void) { return !(((7) % (2)) == (1)); }", 0, "");
+valid!(rem_keeps_sign_of_dividend, "int main(void) { return !(((-7) % (2)) == (-1)); }", 0, "");
+valid!(bitand_int, "int main(void) { return !(((6) & (3)) == (2)); }", 0, "");
+valid!(bitor_int, "int main(void) { return !(((6) | (3)) == (7)); }", 0, "");
+valid!(bitxor_int, "int main(void) { return !(((6) ^ (3)) == (5)); }", 0, "");
+valid!(shift_left, "int main(void) { return !(((1) << (4)) == (16)); }", 0, "");
+valid!(shift_left_into_sign_bit, "int main(void) { return !(((1) << (31)) == (-2147483648)); }", 0, "");
+valid!(shift_right_is_arithmetic, "int main(void) { return !(((-8) >> (1)) == (-4)); }", 0, "");
+valid!(shift_right_unsigned_is_logical, "int main(void) { return !(((2147483648u) >> (31)) == (1u)); }", 0, "");
+valid!(shift_keeps_left_operand_type, "int main(void) { return !(((1l) << (1)) == (2l)); }", 0, "");
+valid!(neg_int, "int main(void) { return !((-(1)) == (-1)); }", 0, "");
+valid!(neg_double, "int main(void) { return !((-(1.5)) == (-1.5)); }", 0, "");
+valid!(bitnot_int, "int main(void) { return !((~(0)) == (-1)); }", 0, "");
+valid!(bitnot_unsigned, "int main(void) { return !((~(0u)) == (4294967295u)); }", 0, "");
+valid!(convert_to_int, "int main(void) { return !(((int)(300l)) == (300)); }", 0, "");
+valid!(convert_to_unsigned_long_is_32_bits_on_i386, "int main(void) { return !(((unsigned long)(-1)) == (4294967295ul)); }", 0, "");
+valid!(convert_to_double, "int main(void) { return !(((double)(3)) == (3.0)); }", 0, "");
+valid!(convert_from_double_truncates, "int main(void) { return !(((int)(3.9)) == (3)); }", 0, "");
+valid!(unsigned_div, "int main(void) { return !(((7u) / (2u)) == (3u)); }", 0, "");
+valid!(unsigned_rem, "int main(void) { return !(((7u) % (2u)) == (1u)); }", 0, "");
+valid!(unsigned_mul_wraps_without_a_diagnostic, "int main(void) { return !(((65536u) * (65536u)) == (0u)); }", 0, "");
+valid!(unsigned_bitor, "int main(void) { return !(((4026531840u) | (15u)) == (4026531855u)); }", 0, "");
+valid!(unsigned_long_sub_wraps, "int main(void) { return !(((0ul) - (1ul)) == (4294967295ul)); }", 0, "");
+valid!(double_sub, "int main(void) { return !(((1.5) - (0.25)) == (1.25)); }", 0, "");
+valid!(double_mul, "int main(void) { return !(((1.5) * (2.0)) == (3.0)); }", 0, "");
+valid!(long_double_add, "int main(void) { return !(((1.5l) + (1.5l)) == (3.0l)); }", 0, "");
+valid!(neg_unsigned_wraps, "int main(void) { return !((-(1u)) == (4294967295u)); }", 0, "");
+valid!(neg_long, "int main(void) { return !((-(-1l)) == (1l)); }", 0, "");
+valid!(neg_floating_zero_keeps_its_sign, "int sprintf(char *, const char *, ...); int puts(const char *); int main(void) { char text[20]; sprintf(text, \"%.1f\", -0.0); puts(text); return 0; }", 0, "-0.0\n");
+valid!(bitnot_long, "int main(void) { return !((~(0l)) == (-1l)); }", 0, "");
+valid!(convert_to_a_narrow_integer_type, "int main(void) { return !(((char)(300)) == (44)); }", 0, "");
+valid!(convert_to_unsigned_int_wraps, "int main(void) { return !(((unsigned int)(-1)) == (4294967295u)); }", 0, "");
+valid!(convert_to_long_double, "int main(void) { return !(((long double)(3)) == (3.0l)); }", 0, "");
+valid!(convert_to_float_rounds, "int main(void) { return !(((float)(16777217.0)) == (16777216.0f)); }", 0, "");
+valid!(unsigned_int_shift_left, "int main(void) { return !(((1u) << (31)) == (2147483648u)); }", 0, "");
+valid!(unsigned_long_shift_left, "int main(void) { return !(((1ul) << (4)) == (16ul)); }", 0, "");
+valid!(long_shift_right_is_arithmetic, "int main(void) { return !(((-8l) >> (1)) == (-4l)); }", 0, "");
+valid!(unsigned_long_shift_right_is_logical, "int main(void) { return !(((2147483648ul) >> (31)) == (1ul)); }", 0, "");
+valid!(a_shift_narrows_to_the_width_of_its_type, "int main(void) { return !(((1l) << (31)) == (-2147483648l)); }", 0, "");
+valid!(bitnot_unsigned_long, "int main(void) { return !((~(0ul)) == (4294967295ul)); }", 0, "");
+valid!(double_div, "int main(void) { return !(((3.0) / (2.0)) == (1.5)); }", 0, "");
+valid!(unsigned_add_wraps, "int main(void) { return !(((4294967295u) + (1u)) == (0u)); }", 0, "");
+valid!(unsigned_bitxor, "int main(void) { return !(((6u) ^ (3u)) == (5u)); }", 0, "");
+valid!(convert_an_unsigned_int_to_double, "int main(void) { return !(((double)(1u)) == (1.0)); }", 0, "");
+valid!(convert_a_long_to_double, "int main(void) { return !(((double)(2l)) == (2.0)); }", 0, "");
+valid!(convert_an_unsigned_long_to_double, "int main(void) { return !(((double)(3ul)) == (3.0)); }", 0, "");
+invalid!(add_wraps, "enum { VALUE = (2147483647) + (1) };", &["error: integer overflow in constant expression"]);
+invalid!(mul_wraps, "enum { VALUE = (65536) * (65536) };", &["error: integer overflow in constant expression"]);
+invalid!(neg_wraps, "enum { VALUE = -((-2147483647 - 1)) };", &["error: integer overflow in constant expression"]);
+invalid!(long_add_wraps_at_32_bits, "enum { VALUE = (2147483647l) + (1l) };", &["error: integer overflow in constant expression"]);

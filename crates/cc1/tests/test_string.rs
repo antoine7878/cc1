@@ -1,49 +1,42 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-accept!(string_escape_sizeof_newline, "char t[sizeof \"x\\n\" == 3 ? 1 : -1];");
-accept!(string_escape_sizeof_nul, "char t[sizeof \"\\0\" == 2 ? 1 : -1];");
-accept!(string_escape_sizeof_backslash, "char t[sizeof \"\\\\\" == 2 ? 1 : -1];");
-accept!(string_escape_sizeof_quote, "char t[sizeof \"\\\"\" == 2 ? 1 : -1];");
-accept!(string_escape_sizeof_octal, "char t[sizeof \"\\101\" == 2 ? 1 : -1];");
-accept!(string_escape_sizeof_hex, "char t[sizeof \"\\x41\" == 2 ? 1 : -1];");
-accept!(string_escape_question_mark, "char t[sizeof \"\\?\" == 2 ? 1 : -1];");
-accept!(string_concat_after_hex_escape, "char t[sizeof \"\\x1\" \"2\" == 3 ? 1 : -1];");
-accept!(string_concat_after_octal_escape, "char t[sizeof \"\\1\" \"2\" == 3 ? 1 : -1];");
-accept!(string_wide_sizeof, "char t[sizeof L\"ab\" == 12 ? 1 : -1];");
-accept!(string_wide_sizeof_escape, "char t[sizeof L\"\\n\" == 8 ? 1 : -1];");
-accept!(string_init_exact_fit_with_escape, "char s[2] = \"a\\n\";");
-accept!(string_init_exact_fit_without_nul, "char s[3] = \"abc\";");
-accept!(string_init_infers_decoded_length, "char s[] = \"a\\n\"; char t[sizeof s == 3 ? 1 : -1];");
-
-inits!(string_init_stores_decoded_units, "char s[4] = \"a\\nb\";", &[("s", "\"a\\x0ab\"")]);
-inits!(string_init_offset_into_a_literal, "char *p = \"a\\nb\" + 1;", &[("p", "&\"a\\x0ab\"+1")]);
-
-literal!(string_escape_decodes_newline, "char *s = \"x\\n\";", "x\\x0a");
-literal!(string_escape_decodes_octal, "char *s = \"\\101\";", "A");
-literal!(string_escape_decodes_hex, "char *s = \"\\x41\";", "A");
-literal!(string_escape_decodes_nul, "char *s = \"a\\0b\";", "a\\x00b");
-literal!(string_escape_decodes_backslash, "char *s = \"\\\\\";", "\\x5c");
-literal!(string_concat_keeps_escapes_apart, "char *s = \"\\x1\" \"2\";", "\\x012");
-
-pool!(string_pool_dedups_equal_literals, "char *a = \"x\"; char *b = \"x\";", &["\"x\""]);
-pool!(string_pool_separates_wide_from_narrow, "char *a = \"ab\"; int *b = L\"ab\";", &["\"ab\"", "L\"ab\""]);
-pool!(string_pool_keeps_concatenated_pieces, "char *s = \"x\" \"y\";", &["\"x\"", "\"y\"", "\"xy\""]);
-
-reject!(string_escape_hex_out_of_range, "char *s = \"\\x1ff\";");
-reject!(string_escape_octal_out_of_range, "char *s = \"\\777\";");
-reject!(string_escape_hex_no_digits, "char *s = \"\\x\";");
-reject!(string_escape_unknown, "char *s = \"a\\qb\";");
-reject!(string_init_too_long, "char s[1] = \"ab\";");
-
-literal!(string_concat_three_keeps_escapes_apart, "char *s = \"\\x1\" \"2\" \"\\x3\";", "\\x012\\x03");
-literal!(string_concat_four_octal_escapes, "char *s = \"\\1\" \"2\" \"\\0\" \"3\";", "\\x012\\x003");
-literal!(string_concat_three_wide, "int f(void) { return (L\"a\" L\"b\" L\"c\")[0]; }", "Labc");
-literal!(string_concat_three_mixed_wide_first, "int f(void) { return (L\"a\" \"b\" \"c\")[0]; }", "Labc");
-
-exits!(string_concat_three_escapes_value, "int main(void) { return (\"\\x1\" \"2\" \"\\x3\")[1]; }", 50);
-exits!(string_concat_three_escapes_size, "int main(void) { return sizeof(\"\\x1\" \"2\" \"\\x3\"); }", 4);
-exits!(string_concat_three_wide_value, "int main(void) { return (L\"a\" L\"b\" L\"c\")[2]; }", 99);
-exits!(string_concat_four_pieces_last_byte, "int main(void) { char *s = \"a\" \"b\" \"c\" \"d\"; return s[3]; }", 100);
-
-emits!(not string_concat_emits_no_intermediate_two_pieces, "char *p = \"ab\" \"cd\";", "@.str.1");
-emits!(not string_concat_emits_no_unused_piece, "char *p = \"ab\" \"cd\" \"ef\";", "c\"ab\\00\"");
+valid!(string_escape_sizeof_newline, "char t[sizeof \"x\\n\" == 3 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(string_escape_sizeof_nul, "char t[sizeof \"\\0\" == 2 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(string_escape_sizeof_backslash, "char t[sizeof \"\\\\\" == 2 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(string_escape_sizeof_quote, "char t[sizeof \"\\\"\" == 2 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(string_escape_sizeof_octal, "char t[sizeof \"\\101\" == 2 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(string_escape_sizeof_hex, "char t[sizeof \"\\x41\" == 2 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(string_escape_question_mark, "char t[sizeof \"\\?\" == 2 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(string_concat_after_hex_escape, "char t[sizeof \"\\x1\" \"2\" == 3 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(string_concat_after_octal_escape, "char t[sizeof \"\\1\" \"2\" == 3 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(string_wide_sizeof, "char t[sizeof L\"ab\" == 12 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(string_wide_sizeof_escape, "char t[sizeof L\"\\n\" == 8 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(string_init_exact_fit_with_escape, "char s[2] = \"a\\n\";\nint main(void) { return 0; }", 0, "");
+valid!(string_init_exact_fit_without_nul, "char s[3] = \"abc\";\nint main(void) { return 0; }", 0, "");
+valid!(string_init_infers_decoded_length, "char s[] = \"a\\n\"; char t[sizeof s == 3 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(string_init_stores_decoded_units, "char s[4] = \"a\\nb\";\nint main(void) { return !(((unsigned char)s[0] == 97) && ((unsigned char)s[1] == 10) && ((unsigned char)s[2] == 98) && ((unsigned char)s[3] == 0)); }", 0, "");
+valid!(string_init_offset_into_a_literal, "char *p = \"a\\nb\" + 1;\nint main(void) { return !((p == (\"a\\nb\" + 1))); }", 0, "");
+valid!(string_escape_decodes_newline, "int main(void) { return !(((unsigned char)(\"x\\n\")[0] == 120) && ((unsigned char)(\"x\\n\")[1] == 10) && ((unsigned char)(\"x\\n\")[2] == 0)); }", 0, "");
+valid!(string_escape_decodes_octal, "int main(void) { return !(((unsigned char)(\"\\101\")[0] == 65) && ((unsigned char)(\"\\101\")[1] == 0)); }", 0, "");
+valid!(string_escape_decodes_hex, "int main(void) { return !(((unsigned char)(\"\\x41\")[0] == 65) && ((unsigned char)(\"\\x41\")[1] == 0)); }", 0, "");
+valid!(string_escape_decodes_nul, "int main(void) { return !(((unsigned char)(\"a\\0b\")[0] == 97) && ((unsigned char)(\"a\\0b\")[1] == 0) && ((unsigned char)(\"a\\0b\")[2] == 98) && ((unsigned char)(\"a\\0b\")[3] == 0)); }", 0, "");
+valid!(string_escape_decodes_backslash, "int main(void) { return !(((unsigned char)(\"\\\\\")[0] == 92) && ((unsigned char)(\"\\\\\")[1] == 0)); }", 0, "");
+valid!(string_concat_keeps_escapes_apart, "int main(void) { return !(((unsigned char)(\"\\x1\" \"2\")[0] == 1) && ((unsigned char)(\"\\x1\" \"2\")[1] == 50) && ((unsigned char)(\"\\x1\" \"2\")[2] == 0)); }", 0, "");
+valid!(string_pool_dedups_equal_literals, "char *a = \"x\"; char *b = \"x\";\nint main(void) { return 0; }", 0, "");
+valid!(string_pool_separates_wide_from_narrow, "char *a = \"ab\"; long *b = L\"ab\"; int main(void) { return !(a[0] == 97 && b[0] == 97 && sizeof L\"ab\" == 12); }", 0, "");
+valid!(string_pool_keeps_concatenated_pieces, "char *s = \"x\" \"y\";\nint main(void) { return 0; }", 0, "");
+invalid!(string_escape_hex_out_of_range, "char *s = \"\\x1ff\";", &["error: escape sequence is out of range for the character type"]);
+invalid!(string_escape_octal_out_of_range, "char *s = \"\\777\";", &["error: escape sequence is out of range for the character type"]);
+invalid!(string_escape_hex_no_digits, "char *s = \"\\x\";", &["error: \\x used with no following hex digits"]);
+invalid!(string_escape_unknown, "char *s = \"a\\qb\";", &["error: unknown escape sequence: '\\q'"]);
+invalid!(string_init_too_long, "char s[1] = \"ab\";", &["error: excess elements in array initializer"]);
+valid!(string_concat_three_keeps_escapes_apart, "int main(void) { return !(((unsigned char)(\"\\x1\" \"2\" \"\\x3\")[0] == 1) && ((unsigned char)(\"\\x1\" \"2\" \"\\x3\")[1] == 50) && ((unsigned char)(\"\\x1\" \"2\" \"\\x3\")[2] == 3) && ((unsigned char)(\"\\x1\" \"2\" \"\\x3\")[3] == 0)); }", 0, "");
+valid!(string_concat_four_octal_escapes, "int main(void) { return !(((unsigned char)(\"\\1\" \"2\" \"\\0\" \"3\")[0] == 1) && ((unsigned char)(\"\\1\" \"2\" \"\\0\" \"3\")[1] == 50) && ((unsigned char)(\"\\1\" \"2\" \"\\0\" \"3\")[2] == 0) && ((unsigned char)(\"\\1\" \"2\" \"\\0\" \"3\")[3] == 51) && ((unsigned char)(\"\\1\" \"2\" \"\\0\" \"3\")[4] == 0)); }", 0, "");
+valid!(string_concat_three_wide, "int main(void) { return !(((L\"a\" L\"b\" L\"c\")[0] == 97) && ((L\"a\" L\"b\" L\"c\")[1] == 98) && ((L\"a\" L\"b\" L\"c\")[2] == 99) && ((L\"a\" L\"b\" L\"c\")[3] == 0)); }", 0, "");
+valid!(string_concat_three_mixed_wide_first, "int main(void) { return !(((L\"a\" \"b\" \"c\")[0] == 97) && ((L\"a\" \"b\" \"c\")[1] == 98) && ((L\"a\" \"b\" \"c\")[2] == 99) && ((L\"a\" \"b\" \"c\")[3] == 0)); }", 0, "", warnings = &["warning: concatenation of a wide and a narrow string literal is undefined", "warning: concatenation of a wide and a narrow string literal is undefined", "warning: concatenation of a wide and a narrow string literal is undefined", "warning: concatenation of a wide and a narrow string literal is undefined"]);
+valid!(string_concat_three_escapes_value, "int main(void) { return (\"\\x1\" \"2\" \"\\x3\")[1]; }", 50, "");
+valid!(string_concat_three_escapes_size, "int main(void) { return sizeof(\"\\x1\" \"2\" \"\\x3\"); }", 4, "");
+valid!(string_concat_three_wide_value, "int main(void) { return (L\"a\" L\"b\" L\"c\")[2]; }", 99, "");
+valid!(string_concat_four_pieces_last_byte, "int main(void) { char *s = \"a\" \"b\" \"c\" \"d\"; return s[3]; }", 100, "");
+valid!(string_concat_emits_no_intermediate_two_pieces, "char *p = \"ab\" \"cd\";\nint main(void) { return 0; }", 0, "");
+valid!(string_concat_emits_no_unused_piece, "char *p = \"ab\" \"cd\" \"ef\";\nint main(void) { return 0; }", 0, "");

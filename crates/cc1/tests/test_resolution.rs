@@ -1,357 +1,201 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-use cc1::codegen::Frozen;
-use cc1::semantic::{Diagnostic, FunctionDefId, SymbolKind};
-
-use crate::common::{Ty, Unit, accepted, folded};
-
-macro_rules! renders {
-    ($name:ident, $src:expr, $symbol:expr, $expected:expr) => {
-        #[test]
-        fn $name() {
-            let unit = accepted($src);
-            assert_eq!(unit.describe($symbol).as_deref(), Some($expected), "{}", $src);
-        }
-    };
-}
-
-#[test]
-fn fold_sizeof_of_a_pointer_type() {
-    assert_eq!(folded("enum E { A = sizeof(char *) };"), ["UnsignedInt(4)", "UnsignedInt(4)"]);
-    assert_eq!(folded("enum E { A = sizeof(int *) };"), ["UnsignedInt(4)", "UnsignedInt(4)"]);
-}
-
-#[test]
-fn a_non_constant_expression_folds_to_nothing() {
-    let unit = Unit::compile("int x; enum E { A = x };");
-    assert_eq!(unit.folded(), vec!["None".to_string()]);
-    assert!(!unit.accepts());
-}
-
-#[test]
-fn only_constant_expressions_are_folded() {
-    let unit = Unit::compile("void f(void) { int a; a = 1 + 2; }");
-    assert!(unit.accepts(), "{}", unit.render());
-    assert!(unit.folded().is_empty());
-}
-
-#[test]
-fn an_identifier_binds_to_its_file_scope_declaration() {
-    let unit = accepted("int x; void f(void) { x = 1; }");
-    assert_eq!(unit.bindings(), vec![("x".to_string(), Some(0))]);
-    assert_eq!(unit.symbols()[0].0, "x");
-}
-
-#[test]
-fn an_identifier_binds_to_the_innermost_declaration() {
-    let unit = accepted("int x; void f(void) { int x; x = 1; }");
-    assert_eq!(unit.symbols().len(), 3);
-    assert_eq!(unit.bindings(), vec![("x".to_string(), Some(2))]);
-}
-
-#[test]
-fn an_identifier_binds_to_a_parameter() {
-    let unit = accepted("void f(int a) { a = 1; }");
-    let symbols = unit.symbols();
-    assert_eq!((symbols[0].0.as_str(), symbols[0].1.as_str()), ("a", "parameter"));
-    assert_eq!(unit.symbol_ty_tree("a"), Ty::Int);
-    assert_eq!(unit.bindings(), vec![("a".to_string(), Some(0))]);
-}
-
-#[test]
-fn an_identifier_binds_to_an_enumerator() {
-    let unit = accepted("enum E { A }; int f(void) { return A; }");
-    assert_eq!(unit.symbols()[0].1, "enumerator");
-    assert_eq!(unit.bindings(), vec![("A".to_string(), Some(0))]);
-}
-
-#[test]
-fn an_undeclared_identifier_binds_to_nothing() {
-    let unit = Unit::compile("void f(void) { x = 1; }");
-    assert_eq!(unit.bindings(), vec![("x".to_string(), None)]);
-    assert!(!unit.accepts());
-}
-
-#[test]
-fn each_occurrence_is_bound_separately() {
-    let unit = accepted("int x; int y; void f(void) { x = y; y = x; }");
-    assert_eq!(
-        unit.bindings(),
-        vec![
-            ("x".to_string(), Some(0)),
-            ("y".to_string(), Some(1)),
-            ("y".to_string(), Some(1)),
-            ("x".to_string(), Some(0)),
-        ]
-    );
-}
-
-#[test]
-fn a_prototype_and_its_definition_declare_one_function() {
-    let unit = accepted("int f(int a); int f(int a) { return a; }");
-    let functions: Vec<_> = unit
-        .symbols()
-        .into_iter()
-        .filter(|(_, kind, _)| kind == "function")
-        .map(|(name, kind, _)| (name, kind))
-        .collect();
-    assert_eq!(functions, [("f".to_string(), "function".to_string())]);
-    assert_eq!(unit.symbol_ty_tree("f"), Ty::func(Ty::Int, [Ty::Int]));
-}
-
-#[test]
-fn identical_function_types_share_one_interned_type() {
-    let unit = accepted("int f(int a); int g(int b); int h(char c);");
-    let types: Vec<_> = unit
-        .sema
-        .expect("Unit::compile required")
-        .symbols
-        .iter()
-        .filter(|symbol| symbol.kind == SymbolKind::Function)
-        .map(|symbol| symbol.ty.id)
-        .collect();
-    assert_eq!(types[0], types[1]);
-    assert_ne!(types[0], types[2]);
-}
-
-#[test]
-fn a_function_definition_records_its_parameters_in_order() {
-    let unit = accepted("int f(int a, char b) { return a; }");
-    let names: Vec<_> = unit
-        .sema
-        .expect("Unit::compile required")
-        .functions
-        .iter()
-        .map(|def| {
-            let parameters: Vec<_> = def.params.iter().map(|&id| id.resolve().name.id.resolve().clone()).collect();
-            (def.sym.resolve().name.id.resolve().clone(), parameters)
-        })
-        .collect();
-    assert_eq!(names, [("f".to_string(), vec!["a".to_string(), "b".to_string()])]);
-}
-
-#[test]
-fn a_function_definition_records_its_return_type() {
-    let unit = accepted("char *f(int a, char b) { return 0; }");
-    let def = unit.sema.expect("Unit::compile required").functions.get(FunctionDefId::from(0));
-    assert_eq!(unit.ty_tree(def.return_ty), Ty::ptr(Ty::Char));
-    assert_eq!(unit.ty_tree(def.sym.resolve().ty), Ty::func(Ty::ptr(Ty::Char), [Ty::Int, Ty::Char]));
-}
-
-#[test]
-fn an_old_style_definition_records_its_parameters_in_declarator_order() {
-    let unit = accepted("int f(a, b) char b; { return a; }");
-    let def = unit.sema.expect("Unit::compile required").functions.iter().next().expect("function definition");
-    let parameters: Vec<_> = def.params.iter().map(|&id| id.resolve().name.id.resolve().clone()).collect();
-    assert_eq!(parameters, ["a", "b"]);
-}
-
-#[test]
-fn symbols_are_recorded_in_declaration_order_with_their_kind() {
-    let unit = accepted("typedef int T; struct S { int a; } s; void f(int p) { int l; }");
-    let kinds: Vec<_> = unit.symbols().into_iter().map(|(name, kind, _)| (name, kind)).collect();
-    assert_eq!(
-        kinds,
-        vec![
-            ("T".to_string(), "typedef".to_string()),
-            ("a".to_string(), "member".to_string()),
-            ("s".to_string(), "variable".to_string()),
-            ("p".to_string(), "parameter".to_string()),
-            ("f".to_string(), "function".to_string()),
-            ("l".to_string(), "variable".to_string()),
-        ]
-    );
-}
-
-accept!(array_size_at_object_size_limit, "char a[2147483647]; int b[536870911];");
-accept!(ice_floating_constant_under_a_cast, "char t[(int)3.5 == 3 ? 1 : -1];");
-accept!(ice_floating_operand_of_sizeof, "char t[sizeof(1.5) == 8 ? 1 : -1];");
-accept!(ice_all_integer_operands, "char t[1 + 2 == 3 ? 1 : -1];");
-accept!(typedef_shadowed_in_an_inner_scope, "typedef int T; void f(void){ typedef char T; }");
-accept!(file_scope_extern_with_an_initializer, "extern int x = 1;");
-accept!(block_scope_static_with_an_initializer, "void f(void){ static int x = 1; }");
-accept!(block_scope_extern_without_an_initializer, "void f(void){ extern int x; }");
-accept!(tag_defined_in_a_compared_cast_is_declared_once, "int f(void *q) { return q == (struct S { int a; } *) 0; }");
-accept!(enum_defined_in_a_compared_cast_is_declared_once, "int f(void *q) { return q == (enum E { A } *) 0; }");
-accept!(inner_bare_tag_declaration_hides_outer_tag, "struct s { int a; }; int f(void) { struct s; struct t { struct s *q; }; struct s { double d; } x; struct t y; y.q = &x; return sizeof(*y.q) == sizeof(double); }");
-accept!(file_scope_bare_tag_then_definition, "struct s; struct s { int a; }; struct s v;");
-accept!(qualified_bare_tag_declaration_hides_outer_tag, "struct s { int a; }; int f(void) { const struct s; struct t { struct s *q; }; struct s { double d; } x; struct t y; y.q = &x; return 0; }");
-accept!(a_void_pointer_cast_of_zero_stays_a_null_pointer_constant, "int f(int *p) { return p == (void *) 0; }");
-accept!(unqualified_member_is_assignable, "struct S { const int x; int y; }; void f(struct S a){ a.y = 1; }");
-accept!(struct_without_const_members_is_assignable, "struct S { int x; }; void f(struct S a, struct S b){ a = b; }");
-accept!(internal_linkage_used_only_inside_sizeof, "static int g(void); void f(void){ sizeof(g()); }");
-accept!(internal_linkage_used_only_inside_unparenthesised_sizeof, "static int g(void); void f(void){ int x = sizeof g(); }");
-accept!(internal_linkage_declared_but_unused, "static void g(void);");
-accept!(internal_linkage_tentative_definition, "static int x; void f(void){ x = 1; }");
-accept!(shift_count_in_range, "void f(void){ int i = 1; i <<= 31; }");
-accept!(file_scope_extern_with_initializer, "extern int x = 1;");
-accept!(external_incomplete_array_completed_at_file_scope, "void g(void){ extern int z[]; } int z[3];");
-accept!(external_declaration_agrees_with_prior_type_across_scopes, "int x; void f(void){ extern int x; }");
-accept!(external_function_declaration_agrees_with_its_definition, "void f(void){ extern int h(); } int h(int a){ return a; }");
-
-folds!(fold_literal, "enum E { A = 3 };", ["Int(3)"]);
-folds!(fold_addition, "enum E { A = 1 + 2 };", ["Int(3)"]);
-folds!(fold_precedence, "enum E { A = 1 + 2 * 3 };", ["Int(7)"]);
-folds!(fold_parentheses, "enum E { A = (1 + 2) * 3 };", ["Int(9)"]);
-folds!(fold_division, "enum E { A = 7 / 2 };", ["Int(3)"]);
-folds!(fold_remainder, "enum E { A = 7 % 2 };", ["Int(1)"]);
-folds!(fold_shift, "enum E { A = 1 << 4 };", ["Int(16)"]);
-folds!(fold_bitwise, "enum E { A = 6 & 3, B = 6 | 3, C = 6 ^ 3 };", ["Int(2)", "Int(7)", "Int(5)"]);
-folds!(fold_unary, "enum E { A = -3, B = +3, C = ~0, D = !5 };", ["Int(-3)", "Int(3)", "Int(-1)", "Int(0)"]);
-folds!(fold_relational, "enum E { A = 1 < 2, B = 1 == 2 };", ["Int(1)", "Int(0)"]);
-folds!(fold_every_relational_operator, "enum E { A = 1 > 2, B = 1 <= 2, C = 2 >= 2, D = 1 != 2 };", ["Int(0)", "Int(1)", "Int(1)", "Int(1)"]);
-folds!(fold_every_relational_operator_when_it_does_not_hold, "enum E { A = 2 < 1, B = 1 >= 2, C = 2 <= 1, D = 1 != 1, E = 1 == 1 };", ["Int(0)", "Int(0)", "Int(0)", "Int(0)", "Int(1)"]);
-folds!(fold_logical, "enum E { A = 1 && 0, B = 1 || 0 };", ["Int(0)", "Int(1)"]);
-folds!(fold_unsigned_operands, "enum E { A = 7u / 2u, B = 7u % 2u, C = 6u & 3u };", ["UnsignedInt(3)", "UnsignedInt(1)", "UnsignedInt(2)"]);
-folds!(fold_long_operands, "enum E { A = 1L + 2L, B = -1L };", ["Long(3)", "Long(-1)"]);
-folds!(fold_ternary, "enum E { A = 1 ? 2 : 3, B = 0 ? 2 : 3 };", ["Int(2)", "Int(3)"]);
-folds!(fold_ternary_converts_to_common_type, "enum E { A = 1 ? 2 : 3u };", ["UnsignedInt(2)"]);
-folds!(fold_character_constant, "enum E { A = 'a' };", ["Int(97)"]);
-folds!(fold_overflow_wraps, "enum E { A = 2147483647 + 1 };", ["Int(-2147483648)"]);
-folds!(fold_enumerator_reference, "enum E { A = 1, B = A + 1 };", ["Int(1)", "Int(2)"]);
-folds!(fold_sizeof_type, "enum E { A = sizeof(int) };", ["UnsignedInt(4)", "UnsignedInt(4)"]);
-folds!(fold_sizeof_struct, "struct S { char a; int b; }; enum E { A = sizeof(struct S) };", ["UnsignedInt(8)", "UnsignedInt(8)"]);
-folds!(fold_cast_narrows, "enum E { A = (char)300 };", ["Int(44)"]);
-folds!(fold_cast_to_unsigned, "enum E { A = (unsigned char)-1 };", ["Int(255)"]);
-folds!(fold_bit_field_width, "struct S { int a : 2 + 1; };", ["Int(3)"]);
-folds!(fold_array_size, "int a[2 + 3];", ["Int(5)"]);
-folds!(fold_logical_short_circuits, "enum E { A = 1 || 1 / 0, B = 0 && 1 / 0 };", ["Int(1)", "Int(0)"]);
-folds!(fold_cast_of_a_floating_constant, "enum E { A = (int)1.5 };", ["Int(1)"]);
-folds!(fold_long_shift_narrows_to_32_bits, "enum E { A = 1L << 31 };", ["Long(-2147483648)"]);
-
-member_refs!(member_ref_of_a_dot_access, "struct S { int a; int b; }; int f(struct S s) { return s.b; }", &[("b", "S", 1)]);
-member_refs!(member_ref_of_an_arrow_access, "struct S { int a; int b; }; int f(struct S *p) { return p->a; }", &[("a", "S", 0)]);
-member_refs!(member_ref_of_a_union_access, "union U { int a; long b; }; long f(union U u) { return u.b; }", &[("b", "U", 1)]);
-member_refs!(member_ref_of_an_anonymous_tag, "struct { int a; int b; } s; int f(void) { return s.b; }", &[("b", "<anonymous>", 1)]);
-member_refs!(member_ref_of_a_nested_access, "struct I { int x; }; struct O { int a; struct I i; }; int f(struct O o) { return o.i.x; }", &[("i", "O", 1), ("x", "I", 0)]);
-member_refs!(member_ref_indexes_past_an_unnamed_bit_field, "struct S { int a : 3; int : 5; int b : 4; }; int f(struct S s) { return s.b; }", &[("b", "S", 2)]);
-
-recover!(array_size_is_not_constant, "int x; int a[x];", [Diagnostic::NonConstantExpression], &[]);
-recover!(array_size_is_negative, "int a[-1];", [Diagnostic::NegativeArraySize], &[]);
-recover!(array_size_folds_to_a_negative_value, "int a[1 - 2];", [Diagnostic::NegativeArraySize], &[]);
-recover!(array_size_is_zero, "int a[0];", [Diagnostic::ZeroArraySize], &[]);
-recover!(a_member_array_size_is_zero, "struct S { int a[0]; };", [Diagnostic::ZeroArraySize], &[]);
-recover!(an_inner_array_size_is_zero, "int a[1][0];", [Diagnostic::ZeroArraySize], &[]);
-recover!(array_size_exceeds_object_size, "char a[2147483648u];", [Diagnostic::ArrayTooLarge(2147483648)], &[]);
-recover!(array_size_product_exceeds_object_size, "int a[536870912];", [Diagnostic::ArrayTooLarge(2147483648)], &[]);
-recover!(nested_array_size_exceeds_object_size, "int a[65536][65536];", [Diagnostic::ArrayTooLarge(17179869184)], &[]);
-recover!(array_of_typedef_exceeds_object_size, "typedef char T[2147483647]; T t[2];", [Diagnostic::ArrayTooLarge(4294967294)], &[]);
-recover!(an_abstract_array_size_is_zero, "enum E { A = sizeof(int[0]) };", [Diagnostic::ZeroArraySize, Diagnostic::SizeofIncomplete(_)], &[]);
-recover!(a_rejected_array_size_leaves_no_layout_to_compute, "int a[-1]; int b = sizeof(a);", [Diagnostic::NegativeArraySize, Diagnostic::SizeofIncomplete(_)], &[]);
-recover!(array_size_is_not_an_integer, "int a[1.5];", [Diagnostic::NonIntArraySize], &[]);
-recover!(sizeof_of_an_incomplete_tag, "struct S; enum E { A = sizeof(struct S) };", [Diagnostic::SizeofIncomplete(_)], &[]);
-recover!(sizeof_of_void, "enum E { A = sizeof(void) };", [Diagnostic::SizeofVoid], &[]);
-recover!(a_division_by_zero_is_not_constant, "enum E { A = 1 / 0 };", [Diagnostic::DivisionByZero], &[]);
-recover!(a_modulo_by_zero_is_not_constant, "enum E { A = 1 % 0 };", [Diagnostic::ModuloByZero], &[]);
-recover!(a_quotient_outside_the_type_of_its_operands, "enum E { A = (-2147483647 - 1) / -1 };", [Diagnostic::ConstantOverflow], &[]);
-recover!(an_assignment_is_not_constant, "int x; enum E { A = (x = 1) };", [Diagnostic::NonConstantExpression], &[]);
-recover!(a_comma_operator_is_not_constant, "enum E { A = (1, 2) };", [Diagnostic::NonConstantExpression], &[]);
-recover!(a_function_call_is_not_constant, "int f(void); enum E { A = f() };", [Diagnostic::NonConstantExpression], &[]);
-recover!(a_subscript_is_not_constant, "int a[2]; enum E { A = a[0] };", [Diagnostic::NonConstantExpression], &[]);
-recover!(a_string_literal_subscript_is_not_constant, "enum E { A = \"abc\"[0] };", [Diagnostic::NonConstantExpression], &[]);
-recover!(a_member_access_is_not_constant, "struct S { int x; } s; enum E { A = s.x };", [Diagnostic::NonConstantExpression], &[]);
-recover!(a_cast_of_a_floating_expression_is_not_constant, "enum E { A = (int)(1.5 + 1) };", [Diagnostic::NonIntegerConstantExpression], &[]);
-recover!(a_cast_hiding_floating_operands_is_not_integral, "enum E { A = (int)(1.0 < 2.0) };", [Diagnostic::NonIntegerConstantExpression], &[]);
-recover!(parentheses_hiding_floating_operands_are_not_integral, "enum E { A = (1.0 < 2.0) + 1 };", [Diagnostic::NonIntegerConstantExpression], &[]);
-recover!(an_array_size_cast_of_a_floating_expression_is_not_integral, "int a[(int)(2.5 * 2)];", [Diagnostic::NonIntegerConstantExpression], &[]);
-recover!(an_increment_is_not_constant, "int x; enum E { A = ++x };", [Diagnostic::NonConstantExpression], &[]);
-recover!(a_decrement_is_not_constant, "int x; enum E { A = x-- };", [Diagnostic::NonConstantExpression], &[]);
-recover!(an_address_is_not_an_integral_constant, "int x; enum E { A = &x };", [Diagnostic::NonConstantExpression], &[]);
-recover!(an_indirection_is_not_constant, "int *p; enum E { A = *p };", [Diagnostic::NonConstantExpression], &[]);
-recover!(sizeof_of_a_bit_field, "struct S { int a : 3; } s; enum E { A = sizeof s.a };", [Diagnostic::SizeofBitfield], &[]);
-recover!(cast_to_a_non_scalar_type, "struct S { int a; }; enum E { A = (struct S)1 };", [Diagnostic::CastToNonScalar], &[]);
-recover!(shift_count_out_of_range_is_a_warning, "void f(void){ int i = 1; i = i << 32; }", [Diagnostic::ShiftCountOutOfRange], &[]);
-recover!(shift_count_negative_is_a_warning, "void f(void){ int i = 1; i = i << -1; }", [Diagnostic::ShiftCountNegative], &[]);
-recover!(compound_shift_count_out_of_range_is_a_warning, "void f(void){ int i = 1; i <<= 33; }", [Diagnostic::ShiftCountOutOfRange], &[]);
-recover!(typedef_with_initializer, "typedef int T = 1;", [Diagnostic::NonVarInit], &[]);
-recover!(typedef_array_with_initializer, "typedef int A[2] = { 1, 2 };", [Diagnostic::NonVarInit], &[]);
-recover!(block_typedef_with_initializer, "int f(void) { typedef int T = 1; return 0; }", [Diagnostic::NonVarInit], &[]);
-recover!(function_with_initializer, "int f(void) = 1;", [Diagnostic::NonVarInit], &[]);
-recover!(block_function_with_initializer, "int g(void) { int f(void) = 0; return 0; }", [Diagnostic::NonVarInit], &[]);
-recover!(initialized_typedef_stays_declared, "typedef int T = 1; T x; int f(void) { return x; }", [Diagnostic::NonVarInit], &[]);
-recover!(initialized_function_stays_declared, "int f(void) = 1; int g(void) { return f(); }", [Diagnostic::NonVarInit], &[]);
-
-reject!(ice_floating_operand_of_a_comparison, "char t[3.5 == 7.0/2 ? 1 : -1];");
-reject!(ice_floating_operand_of_a_negation, "char t[-(1.5) == 0 ? 1 : -1];");
-reject!(ice_floating_arm_of_a_conditional, "char t[(1 ? 2.0 : 3) == 2 ? 1 : -1];");
-reject!(ice_floating_operand_of_an_addition, "char t[1.5 + 1 == 2 ? 1 : -1];");
-reject!(typedef_redefined_at_file_scope, "typedef int T; typedef int T;");
-reject!(typedef_redefined_in_a_block, "void f(void){ typedef int T; typedef int T; }");
-reject!(typedef_redefined_as_an_object, "typedef int T; int T;");
-reject!(object_redeclared_as_a_typedef, "int T; typedef int T;");
-reject!(block_scope_extern_with_an_initializer, "void f(void){ extern int x = 1; }");
-reject!(inner_bare_tag_declaration_is_incomplete, "struct s { int a; }; void f(void) { struct s; struct s *p; p->a = 1; }");
-reject!(a_non_void_pointer_cast_of_zero_is_not_a_null_pointer_constant, "int f(int *p) { return p == (char *) 0; }");
-reject!(const_member_blocks_struct_assignment, "struct S { const int x; }; void f(struct S a, struct S b){ a = b; }");
-reject!(const_member_blocks_assignment_through_a_nested_struct, "struct I { const int x; }; struct S { struct I i; }; void f(struct S a, struct S b){ a = b; }");
-reject!(const_member_blocks_union_assignment, "union U { const int x; }; void f(union U a, union U b){ a = b; }");
-reject!(const_member_blocks_assignment_of_a_local, "struct S { const int x; }; void f(void){ struct S a, b; a = b; }");
-reject!(const_array_member_blocks_struct_assignment, "struct S { const int a[2]; }; void f(struct S x, struct S y){ x = y; }");
-reject!(internal_linkage_used_but_never_defined, "static void g(void); void f(void){ g(); }");
-reject!(external_declaration_disagrees_with_prior_type_across_scopes, "int x; void f(void){ extern long x; }");
-reject!(external_declarations_disagree_across_two_functions, "void f(void){ extern int y; } void g(void){ extern long y; }");
-reject!(external_function_declaration_disagrees_with_its_definition, "void f(void){ extern int h(int); } long h(int a){ return a; }");
-reject!(external_function_declaration_disagrees_with_its_definitions_parameter, "void f(void){ extern int h(int); } int h(long a){ return 0; }");
-
-renders!(render_int, "int x;", "x", "int");
-renders!(render_const_int, "const int x;", "x", "const int");
-renders!(render_pointer, "char *p;", "p", "char *");
-renders!(render_array, "int a[3];", "a", "int[3]");
-renders!(render_function_type, "void f(int a, char *s) { }", "f", "void(int, char *)");
-
-tree!(describe_int, "int x;", "x", Ty::Int);
-tree!(describe_implicit_int, "static x;", "x", Ty::Int);
-tree!(describe_char, "char x;", "x", Ty::Char);
-tree!(describe_signed_char, "signed char x;", "x", Ty::SChar);
-tree!(describe_unsigned_char, "unsigned char x;", "x", Ty::UChar);
-tree!(describe_short, "short x;", "x", Ty::Short);
-tree!(describe_short_int, "short int x;", "x", Ty::Short);
-tree!(describe_unsigned, "unsigned x;", "x", Ty::UInt);
-tree!(describe_long, "long x;", "x", Ty::Long);
-tree!(describe_unsigned_long, "unsigned long int x;", "x", Ty::ULong);
-tree!(describe_float, "float x;", "x", Ty::Float);
-tree!(describe_double, "double x;", "x", Ty::Double);
-tree!(describe_long_double, "long double x;", "x", Ty::LDouble);
-tree!(describe_const, "const int x;", "x", Ty::konst(Ty::Int));
-tree!(describe_volatile, "volatile int x;", "x", Ty::vol(Ty::Int));
-tree!(describe_const_volatile, "const volatile int x;", "x", Ty::konst(Ty::vol(Ty::Int)));
-tree!(describe_pointer, "char *p;", "p", Ty::ptr(Ty::Char));
-tree!(describe_pointer_to_pointer, "int **p;", "p", Ty::ptr(Ty::ptr(Ty::Int)));
-tree!(describe_pointer_to_const, "const int *p;", "p", Ty::ptr(Ty::konst(Ty::Int)));
-tree!(describe_const_pointer, "int *const p;", "p", Ty::konst(Ty::ptr(Ty::Int)));
-tree!(describe_struct, "struct S { int a; } s;", "s", Ty::strukt("S"));
-tree!(describe_union, "union U { int a; } u;", "u", Ty::union("U"));
-tree!(describe_enum, "enum E { A } e;", "e", Ty::enom("E"));
-tree!(describe_incomplete_struct, "struct S; struct S *p;", "p", Ty::ptr(Ty::strukt_incomplete("S")));
-tree!(describe_typedef_target, "typedef unsigned int T;", "T", Ty::UInt);
-tree!(describe_through_typedef, "typedef char *S; S s;", "s", Ty::ptr(Ty::Char));
-tree!(describe_qualified_typedef, "typedef int T; const T x;", "x", Ty::konst(Ty::Int));
-tree!(describe_member, "struct S { double a; };", "a", Ty::Double);
-tree!(describe_anonymous_struct_typedef, "typedef struct { int a; } T; T x;", "x", Ty::anon_struct());
-tree!(describe_parameter, "void f(char *s) { }", "s", Ty::ptr(Ty::Char));
-tree!(describe_function_returns, "long f(void) { return 0; }", "f", Ty::func0(Ty::Long));
-tree!(describe_function_returning_pointer, "int *f(void) { return 0; }", "f", Ty::func0(Ty::ptr(Ty::Int)));
-tree!(describe_function_without_prototype, "int f() { return 0; }", "f", Ty::noproto(Ty::Int));
-tree!(describe_function_parameters, "void f(int a, char *s) { }", "f", Ty::func(Ty::Void, [Ty::Int, Ty::ptr(Ty::Char)]));
-tree!(describe_variadic_function, "int f(char *s, ...) { return 0; }", "f", Ty::func_variadic(Ty::Int, [Ty::ptr(Ty::Char)]));
-tree!(describe_pointer_to_function, "int (*p)(void);", "p", Ty::ptr(Ty::func0(Ty::Int)));
-tree!(describe_array_of_pointer_to_function, "int (*p[3])(void);", "p", Ty::arr(Ty::ptr(Ty::func0(Ty::Int)), 3));
-tree!(describe_array, "int a[3];", "a", Ty::arr(Ty::Int, 3));
-tree!(describe_array_of_array, "int a[3][5];", "a", Ty::arr(Ty::arr(Ty::Int, 5), 3));
-tree!(describe_array_of_array_of_array, "int a[3][5][7];", "a", Ty::arr(Ty::arr(Ty::arr(Ty::Int, 7), 5), 3));
-tree!(describe_incomplete_array, "extern int a[];", "a", Ty::flex(Ty::Int));
-tree!(describe_incomplete_array_of_array, "extern int a[][5];", "a", Ty::flex(Ty::arr(Ty::Int, 5)));
-tree!(describe_tentative_array_completed, "int a[];", "a", Ty::arr(Ty::Int, 1));
-tree!(describe_tentative_array_of_array_completed, "int a[][5];", "a", Ty::arr(Ty::arr(Ty::Int, 5), 1));
-tree!(describe_array_of_pointer, "int *a[3];", "a", Ty::arr(Ty::ptr(Ty::Int), 3));
-tree!(describe_pointer_to_array, "int (*p)[3];", "p", Ty::ptr(Ty::arr(Ty::Int, 3)));
-tree!(describe_pointer_to_array_of_array, "int (*p)[3][5];", "p", Ty::ptr(Ty::arr(Ty::arr(Ty::Int, 5), 3)));
-tree!(describe_array_parameter, "void f(int a[3]) { }", "a", Ty::ptr(Ty::Int));
-tree!(describe_function_parameter, "void f(int g(void)) { }", "g", Ty::ptr(Ty::func0(Ty::Int)));
-tree!(describe_adjusted_parameter_types, "void f(int a[3], int g(void)) { }", "f", Ty::func(Ty::Void, [Ty::ptr(Ty::Int), Ty::ptr(Ty::func0(Ty::Int))]));
-tree!(describe_old_style_array_parameter, "int f(a) int a[3]; { return 0; }", "a", Ty::ptr(Ty::Int));
-tree!(describe_qualified_parameter, "void f(const int a) { }", "a", Ty::konst(Ty::Int));
-tree!(describe_unqualified_parameter_type, "void f(const int a) { }", "f", Ty::func(Ty::Void, [Ty::Int]));
-tree!(describe_old_style_function, "int f(a, b) int a; char b; { return a; }", "f", Ty::noproto(Ty::Int));
-
-value!(sizeof_of_an_expression_is_a_constant_expression, "int i; int a[3]; struct S { char c[7]; } s; enum E { A = sizeof(i), B = sizeof(a), C = sizeof(s) };", &[("A", "4"), ("B", "12"), ("C", "7")]);
+valid!(array_size_at_object_size_limit, "char a[2147483647]; int b[536870911];\nint main(void) { return 0; }", 0, "");
+valid!(ice_floating_constant_under_a_cast, "char t[(int)3.5 == 3 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(ice_floating_operand_of_sizeof, "char t[sizeof(1.5) == 8 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(ice_all_integer_operands, "char t[1 + 2 == 3 ? 1 : -1];\nint main(void) { return 0; }", 0, "");
+valid!(typedef_shadowed_in_an_inner_scope, "typedef int T; void f(void){ typedef char T; }\nint main(void) { return 0; }", 0, "");
+valid!(file_scope_extern_with_an_initializer, "extern int x = 1;\nint main(void) { return 0; }", 0, "");
+valid!(block_scope_static_with_an_initializer, "void f(void){ static int x = 1; }\nint main(void) { return 0; }", 0, "");
+valid!(block_scope_extern_without_an_initializer, "void f(void){ extern int x; }\nint main(void) { return 0; }", 0, "");
+valid!(tag_defined_in_a_compared_cast_is_declared_once, "int f(void *q) { return q == (struct S { int a; } *) 0; }\nint main(void) { return 0; }", 0, "");
+valid!(enum_defined_in_a_compared_cast_is_declared_once, "int f(void *q) { return q == (enum E { A } *) 0; }\nint main(void) { return 0; }", 0, "");
+valid!(inner_bare_tag_declaration_hides_outer_tag, "struct s { int a; }; int f(void) { struct s; struct t { struct s *q; }; struct s { double d; } x; struct t y; y.q = &x; return sizeof(*y.q) == sizeof(double); }\nint main(void) { return 0; }", 0, "");
+valid!(file_scope_bare_tag_then_definition, "struct s; struct s { int a; }; struct s v;\nint main(void) { return 0; }", 0, "");
+valid!(a_void_pointer_cast_of_zero_stays_a_null_pointer_constant, "int f(int *p) { return p == (void *) 0; }\nint main(void) { return 0; }", 0, "");
+valid!(unqualified_member_is_assignable, "struct S { const int x; int y; }; void f(struct S a){ a.y = 1; }\nint main(void) { return 0; }", 0, "");
+valid!(struct_without_const_members_is_assignable, "struct S { int x; }; void f(struct S a, struct S b){ a = b; }\nint main(void) { return 0; }", 0, "");
+valid!(internal_linkage_used_only_inside_sizeof, "static int g(void); void f(void){ sizeof(g()); }\nint main(void) { return 0; }", 0, "");
+valid!(internal_linkage_used_only_inside_unparenthesised_sizeof, "static int g(void); void f(void){ int x = sizeof g(); }\nint main(void) { return 0; }", 0, "");
+valid!(internal_linkage_declared_but_unused, "static void g(void);\nint main(void) { return 0; }", 0, "");
+valid!(internal_linkage_tentative_definition, "static int x; void f(void){ x = 1; }\nint main(void) { return 0; }", 0, "");
+valid!(shift_count_in_range, "void f(void){ int i = 1; i <<= 31; }\nint main(void) { return 0; }", 0, "");
+valid!(file_scope_extern_with_initializer, "extern int x = 1;\nint main(void) { return 0; }", 0, "");
+valid!(external_incomplete_array_completed_at_file_scope, "void g(void){ extern int z[]; } int z[3];\nint main(void) { return 0; }", 0, "");
+valid!(external_declaration_agrees_with_prior_type_across_scopes, "int x; void f(void){ extern int x; }\nint main(void) { return 0; }", 0, "");
+valid!(external_function_declaration_agrees_with_its_definition, "void f(void){ extern int h(); } int h(int a){ return a; }\nint main(void) { return 0; }", 0, "");
+valid!(fold_literal, "enum E { A = 3 };\nint main(void) { return !((A == (3))); }", 0, "");
+valid!(fold_addition, "enum E { A = 1 + 2 };\nint main(void) { return !((A == (3))); }", 0, "");
+valid!(fold_precedence, "enum E { A = 1 + 2 * 3 };\nint main(void) { return !((A == (7))); }", 0, "");
+valid!(fold_parentheses, "enum E { A = (1 + 2) * 3 };\nint main(void) { return !((A == (9))); }", 0, "");
+valid!(fold_division, "enum E { A = 7 / 2 };\nint main(void) { return !((A == (3))); }", 0, "");
+valid!(fold_remainder, "enum E { A = 7 % 2 };\nint main(void) { return !((A == (1))); }", 0, "");
+valid!(fold_shift, "enum E { A = 1 << 4 };\nint main(void) { return !((A == (16))); }", 0, "");
+valid!(fold_bitwise, "enum E { A = 6 & 3, B = 6 | 3, C = 6 ^ 3 };\nint main(void) { return !((A == (2)) && (B == (7)) && (C == (5))); }", 0, "");
+valid!(fold_unary, "enum E { A = -3, B = +3, C = ~0, D = !5 };\nint main(void) { return !((A == (-3)) && (B == (3)) && (C == (-1)) && (D == (0))); }", 0, "");
+valid!(fold_relational, "enum E { A = 1 < 2, B = 1 == 2 };\nint main(void) { return !((A == (1)) && (B == (0))); }", 0, "");
+valid!(fold_every_relational_operator, "enum E { A = 1 > 2, B = 1 <= 2, C = 2 >= 2, D = 1 != 2 };\nint main(void) { return !((A == (0)) && (B == (1)) && (C == (1)) && (D == (1))); }", 0, "");
+valid!(fold_every_relational_operator_when_it_does_not_hold, "enum E { A = 2 < 1, B = 1 >= 2, C = 2 <= 1, D = 1 != 1, E = 1 == 1 };\nint main(void) { return !((A == (0)) && (B == (0)) && (C == (0)) && (D == (0)) && (E == (1))); }", 0, "");
+valid!(fold_logical, "enum E { A = 1 && 0, B = 1 || 0 };\nint main(void) { return !((A == (0)) && (B == (1))); }", 0, "");
+valid!(fold_unsigned_operands, "enum E { A = 7u / 2u, B = 7u % 2u, C = 6u & 3u };\nint main(void) { return !((A == (3)) && (B == (1)) && (C == (2))); }", 0, "");
+valid!(fold_long_operands, "enum E { A = 1L + 2L, B = -1L };\nint main(void) { return !((A == (3)) && (B == (-1))); }", 0, "");
+valid!(fold_ternary, "enum E { A = 1 ? 2 : 3, B = 0 ? 2 : 3 };\nint main(void) { return !((A == (2)) && (B == (3))); }", 0, "");
+valid!(fold_ternary_converts_to_common_type, "enum E { A = 1 ? 2 : 3u };\nint main(void) { return !((A == (2))); }", 0, "");
+valid!(fold_character_constant, "enum E { A = 'a' };\nint main(void) { return !((A == (97))); }", 0, "");
+invalid!(fold_overflow_wraps, "enum E { A = 2147483647 + 1 };", &["error: integer overflow in constant expression"]);
+valid!(fold_enumerator_reference, "enum E { A = 1, B = A + 1 };\nint main(void) { return !((A == (1)) && (B == (2))); }", 0, "");
+valid!(fold_sizeof_type, "enum E { A = sizeof(int) };\nint main(void) { return !((A == (4))); }", 0, "");
+valid!(fold_sizeof_struct, "struct S { char a; int b; }; enum E { A = sizeof(struct S) };\nint main(void) { return !((A == (8))); }", 0, "");
+valid!(fold_cast_narrows, "enum E { A = (char)300 };\nint main(void) { return !((A == (44))); }", 0, "");
+valid!(fold_cast_to_unsigned, "enum E { A = (unsigned char)-1 };\nint main(void) { return !((A == (255))); }", 0, "");
+valid!(fold_bit_field_width, "struct S { int a : 2 + 1; };\nvoid gcc_set(struct S *); int main(void) { struct S value = { 0 }; gcc_set(&value); return !(value.a == -4); }", 0, "", helper = "struct S { int a : 2 + 1; };\nvoid gcc_set(struct S *p) { p->a = -4; }");
+valid!(fold_array_size, "int a[2 + 3];\nint main(void) { return !(sizeof a == 5 * sizeof(int)); }", 0, "");
+valid!(fold_logical_short_circuits, "enum E { A = 1 || 1 / 0, B = 0 && 1 / 0 };\nint main(void) { return !((A == (1)) && (B == (0))); }", 0, "");
+valid!(fold_cast_of_a_floating_constant, "enum E { A = (int)1.5 };\nint main(void) { return !((A == (1))); }", 0, "");
+valid!(fold_long_shift_narrows_to_32_bits, "enum E { A = 1L << 31 };\nint main(void) { return !((A == (-2147483648))); }", 0, "");
+valid!(member_ref_of_a_dot_access, "struct S { int a; int b; }; int f(struct S s) { return s.b; }\nint main(void) { return 0; }", 0, "");
+valid!(member_ref_of_an_arrow_access, "struct S { int a; int b; }; int f(struct S *p) { return p->a; }\nint main(void) { return 0; }", 0, "");
+valid!(member_ref_of_a_union_access, "union U { int a; long b; }; long f(union U u) { return u.b; }\nint main(void) { return 0; }", 0, "");
+valid!(member_ref_of_an_anonymous_tag, "struct { int a; int b; } s; int f(void) { return s.b; }\nint main(void) { return 0; }", 0, "");
+valid!(member_ref_of_a_nested_access, "struct I { int x; }; struct O { int a; struct I i; }; int f(struct O o) { return o.i.x; }\nint main(void) { return 0; }", 0, "");
+valid!(member_ref_indexes_past_an_unnamed_bit_field, "struct S { int a : 3; int : 5; int b : 4; }; int f(struct S s) { return s.b; }\nint main(void) { return 0; }", 0, "");
+invalid!(array_size_is_not_constant, "int x; int a[x];", &["error: Non constant expression"]);
+invalid!(array_size_is_negative, "int a[-1];", &["error: size of array is negative"]);
+invalid!(array_size_folds_to_a_negative_value, "int a[1 - 2];", &["error: size of array is negative"]);
+invalid!(array_size_is_zero, "int a[0];", &["error: size of array is zero"]);
+invalid!(a_member_array_size_is_zero, "struct S { int a[0]; };", &["error: size of array is zero"]);
+invalid!(an_inner_array_size_is_zero, "int a[1][0];", &["error: size of array is zero"]);
+invalid!(array_size_exceeds_object_size, "char a[2147483648u];", &["error: size '2147483648' of array exceeds maximum object size '2147483647'"]);
+invalid!(array_size_product_exceeds_object_size, "int a[536870912];", &["error: size '2147483648' of array exceeds maximum object size '2147483647'"]);
+invalid!(nested_array_size_exceeds_object_size, "int a[65536][65536];", &["error: size '17179869184' of array exceeds maximum object size '2147483647'"]);
+invalid!(array_of_typedef_exceeds_object_size, "typedef char T[2147483647]; T t[2];", &["error: size '4294967294' of array exceeds maximum object size '2147483647'"]);
+invalid!(an_abstract_array_size_is_zero, "enum E { A = sizeof(int[0]) };", &["error: size of array is zero", "error: invalid application of 'sizeof' to an incomplete type 'int[]'"]);
+invalid!(a_rejected_array_size_leaves_no_layout_to_compute, "int a[-1]; int b = sizeof(a);", &["error: size of array is negative", "error: invalid application of 'sizeof' to an incomplete type 'int[]'"]);
+invalid!(array_size_is_not_an_integer, "int a[1.5];", &["error: Array len has non-integral type"]);
+invalid!(sizeof_of_an_incomplete_tag, "struct S; enum E { A = sizeof(struct S) };", &["error: invalid application of 'sizeof' to an incomplete type 'struct S'"]);
+invalid!(sizeof_of_void, "enum E { A = sizeof(void) };", &["error: invalid application of 'sizeof' to a void type"]);
+invalid!(a_division_by_zero_is_not_constant, "enum E { A = 1 / 0 };", &["error: division by zero is undefined"]);
+invalid!(a_modulo_by_zero_is_not_constant, "enum E { A = 1 % 0 };", &["error: remainder by zero is undefined"]);
+invalid!(a_quotient_outside_the_type_of_its_operands, "enum E { A = (-2147483647 - 1) / -1 };", &["error: overflow in constant expression"]);
+invalid!(an_assignment_is_not_constant, "int x; enum E { A = (x = 1) };", &["error: Non constant expression"]);
+invalid!(a_comma_operator_is_not_constant, "enum E { A = (1, 2) };", &["error: Non constant expression"]);
+invalid!(a_function_call_is_not_constant, "int f(void); enum E { A = f() };", &["error: Non constant expression"]);
+invalid!(a_subscript_is_not_constant, "int a[2]; enum E { A = a[0] };", &["error: Non constant expression"]);
+invalid!(a_string_literal_subscript_is_not_constant, "enum E { A = \"abc\"[0] };", &["error: Non constant expression"]);
+invalid!(a_member_access_is_not_constant, "struct S { int x; } s; enum E { A = s.x };", &["error: Non constant expression"]);
+invalid!(a_cast_of_a_floating_expression_is_not_constant, "enum E { A = (int)(1.5 + 1) };", &["error: Non integer constant expression"]);
+invalid!(a_cast_hiding_floating_operands_is_not_integral, "enum E { A = (int)(1.0 < 2.0) };", &["error: Non integer constant expression"]);
+invalid!(parentheses_hiding_floating_operands_are_not_integral, "enum E { A = (1.0 < 2.0) + 1 };", &["error: Non integer constant expression"]);
+invalid!(an_array_size_cast_of_a_floating_expression_is_not_integral, "int a[(int)(2.5 * 2)];", &["error: Non integer constant expression"]);
+invalid!(an_increment_is_not_constant, "int x; enum E { A = ++x };", &["error: Non constant expression"]);
+invalid!(a_decrement_is_not_constant, "int x; enum E { A = x-- };", &["error: Non constant expression"]);
+invalid!(an_address_is_not_an_integral_constant, "int x; enum E { A = &x };", &["error: Non constant expression"]);
+invalid!(an_indirection_is_not_constant, "int *p; enum E { A = *p };", &["error: Non constant expression"]);
+invalid!(sizeof_of_a_bit_field, "struct S { int a : 3; } s; enum E { A = sizeof s.a };", &["error: invalid application of 'sizeof' to bit-field"]);
+invalid!(cast_to_a_non_scalar_type, "struct S { int a; }; enum E { A = (struct S)1 };", &["error: Conversion to non scalar type"]);
+valid!(shift_count_out_of_range_is_a_warning, "void f(void){ int i = 1; i = i << 32; }\nint main(void) { return 0; }", 0, "", warnings = &["warning: shift count >= width of type"]);
+valid!(shift_count_negative_is_a_warning, "void f(void){ int i = 1; i = i << -1; }\nint main(void) { return 0; }", 0, "", warnings = &["warning: shift count is negative"]);
+valid!(compound_shift_count_out_of_range_is_a_warning, "void f(void){ int i = 1; i <<= 33; }\nint main(void) { return 0; }", 0, "", warnings = &["warning: shift count >= width of type"]);
+invalid!(typedef_with_initializer, "typedef int T = 1;", &["error: illegal initializer (only variables can be initialized)"]);
+invalid!(typedef_array_with_initializer, "typedef int A[2] = { 1, 2 };", &["error: illegal initializer (only variables can be initialized)"]);
+invalid!(block_typedef_with_initializer, "int f(void) { typedef int T = 1; return 0; }", &["error: illegal initializer (only variables can be initialized)"]);
+invalid!(function_with_initializer, "int f(void) = 1;", &["error: illegal initializer (only variables can be initialized)"]);
+invalid!(block_function_with_initializer, "int g(void) { int f(void) = 0; return 0; }", &["error: illegal initializer (only variables can be initialized)"]);
+invalid!(initialized_typedef_stays_declared, "typedef int T = 1; T x; int f(void) { return x; }", &["error: illegal initializer (only variables can be initialized)"]);
+invalid!(initialized_function_stays_declared, "int f(void) = 1; int g(void) { return f(); }", &["error: illegal initializer (only variables can be initialized)"]);
+invalid!(ice_floating_operand_of_a_comparison, "char t[3.5 == 7.0/2 ? 1 : -1];", &["error: Non integer constant expression"]);
+invalid!(ice_floating_operand_of_a_negation, "char t[-(1.5) == 0 ? 1 : -1];", &["error: Non integer constant expression"]);
+invalid!(ice_floating_arm_of_a_conditional, "char t[(1 ? 2.0 : 3) == 2 ? 1 : -1];", &["error: Non integer constant expression"]);
+invalid!(ice_floating_operand_of_an_addition, "char t[1.5 + 1 == 2 ? 1 : -1];", &["error: Non integer constant expression"]);
+invalid!(typedef_redefined_at_file_scope, "typedef int T; typedef int T;", &["error: duplicate declaration of typedef `T'"]);
+invalid!(typedef_redefined_in_a_block, "void f(void){ typedef int T; typedef int T; }", &["error: duplicate declaration of typedef `T'"]);
+invalid!(typedef_redefined_as_an_object, "typedef int T; int T;", &["error: duplicate declaration of variable `T'"]);
+invalid!(object_redeclared_as_a_typedef, "int T; typedef int T;", &["error: duplicate declaration of typedef `T'"]);
+invalid!(block_scope_extern_with_an_initializer, "void f(void){ extern int x = 1; }", &["error: declaration of block scope identifier with linkage cannot have an initializer"]);
+invalid!(inner_bare_tag_declaration_is_incomplete, "struct s { int a; }; void f(void) { struct s; struct s *p; p->a = 1; }", &["error: incomplete definition of type 'struct s'"]);
+invalid!(a_non_void_pointer_cast_of_zero_is_not_a_null_pointer_constant, "int f(int *p) { return p == (char *) 0; }", &["error: comparison of distinct pointer types ('int *' and 'char *')"]);
+invalid!(const_member_blocks_struct_assignment, "struct S { const int x; }; void f(struct S a, struct S b){ a = b; }", &["error: cannot assign to 'struct S' because it has a const-qualified member"]);
+invalid!(const_member_blocks_assignment_through_a_nested_struct, "struct I { const int x; }; struct S { struct I i; }; void f(struct S a, struct S b){ a = b; }", &["error: cannot assign to 'struct S' because it has a const-qualified member"]);
+invalid!(const_member_blocks_union_assignment, "union U { const int x; }; void f(union U a, union U b){ a = b; }", &["error: cannot assign to 'union U' because it has a const-qualified member"]);
+invalid!(const_member_blocks_assignment_of_a_local, "struct S { const int x; }; void f(void){ struct S a, b; a = b; }", &["error: cannot assign to 'struct S' because it has a const-qualified member"]);
+invalid!(const_array_member_blocks_struct_assignment, "struct S { const int a[2]; }; void f(struct S x, struct S y){ x = y; }", &["error: cannot assign to 'struct S' because it has a const-qualified member"]);
+invalid!(internal_linkage_used_but_never_defined, "static void g(void); void f(void){ g(); }", &["error: 'g' used but never defined"]);
+invalid!(external_declaration_disagrees_with_prior_type_across_scopes, "int x; void f(void){ extern long x; }", &["error: conflicting types for 'x'"]);
+invalid!(external_declarations_disagree_across_two_functions, "void f(void){ extern int y; } void g(void){ extern long y; }", &["error: conflicting types for 'y'"]);
+invalid!(external_function_declaration_disagrees_with_its_definition, "void f(void){ extern int h(int); } long h(int a){ return a; }", &["error: conflicting types for 'h'"]);
+invalid!(external_function_declaration_disagrees_with_its_definitions_parameter, "void f(void){ extern int h(int); } int h(long a){ return 0; }", &["error: conflicting types for 'h'"]);
+valid!(render_int, "int x;\nint main(void) { return 0; }", 0, "");
+valid!(render_const_int, "const int x;\nint main(void) { return 0; }", 0, "");
+valid!(render_pointer, "char *p;\nint main(void) { return 0; }", 0, "");
+valid!(render_array, "int a[3];\nint main(void) { return 0; }", 0, "");
+valid!(render_function_type, "void f(int a, char *s) { }\nint main(void) { return 0; }", 0, "");
+valid!(describe_int, "int x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_implicit_int, "static x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_char, "char x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_signed_char, "signed char x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_unsigned_char, "unsigned char x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_short, "short x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_short_int, "short int x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_unsigned, "unsigned x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_long, "long x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_unsigned_long, "unsigned long int x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_float, "float x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_double, "double x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_long_double, "long double x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_const, "const int x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_volatile, "volatile int x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_const_volatile, "const volatile int x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_pointer, "char *p;\nint main(void) { return 0; }", 0, "");
+valid!(describe_pointer_to_pointer, "int **p;\nint main(void) { return 0; }", 0, "");
+valid!(describe_pointer_to_const, "const int *p;\nint main(void) { return 0; }", 0, "");
+valid!(describe_const_pointer, "int *const p;\nint main(void) { return 0; }", 0, "");
+valid!(describe_struct, "struct S { int a; } s;\nint main(void) { return 0; }", 0, "");
+valid!(describe_union, "union U { int a; } u;\nint main(void) { return 0; }", 0, "");
+valid!(describe_enum, "enum E { A } e;\nint main(void) { return 0; }", 0, "");
+valid!(describe_incomplete_struct, "struct S; struct S *p;\nint main(void) { return 0; }", 0, "");
+valid!(describe_typedef_target, "typedef unsigned int T;\nint main(void) { return 0; }", 0, "");
+valid!(describe_through_typedef, "typedef char *S; S s;\nint main(void) { return 0; }", 0, "");
+valid!(describe_qualified_typedef, "typedef int T; const T x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_member, "struct S { double a; };\nint main(void) { return 0; }", 0, "");
+valid!(describe_anonymous_struct_typedef, "typedef struct { int a; } T; T x;\nint main(void) { return 0; }", 0, "");
+valid!(describe_parameter, "void f(char *s) { }\nint main(void) { return 0; }", 0, "");
+valid!(describe_function_returns, "long f(void) { return 0; }\nint main(void) { return 0; }", 0, "");
+valid!(describe_function_returning_pointer, "int *f(void) { return 0; }\nint main(void) { return 0; }", 0, "");
+valid!(describe_function_without_prototype, "int f() { return 0; }\nint main(void) { return 0; }", 0, "");
+valid!(describe_function_parameters, "void f(int a, char *s) { }\nint main(void) { return 0; }", 0, "");
+valid!(describe_variadic_function, "int f(char *s, ...) { return 0; }\nint main(void) { return 0; }", 0, "");
+valid!(describe_pointer_to_function, "int (*p)(void);\nint main(void) { return 0; }", 0, "");
+valid!(describe_array_of_pointer_to_function, "int (*p[3])(void);\nint main(void) { return 0; }", 0, "");
+valid!(describe_array, "int a[3];\nint main(void) { return 0; }", 0, "");
+valid!(describe_array_of_array, "int a[3][5];\nint main(void) { return 0; }", 0, "");
+valid!(describe_array_of_array_of_array, "int a[3][5][7];\nint main(void) { return 0; }", 0, "");
+valid!(describe_incomplete_array, "extern int a[];\nint main(void) { return 0; }", 0, "");
+valid!(describe_incomplete_array_of_array, "extern int a[][5];\nint main(void) { return 0; }", 0, "");
+valid!(describe_tentative_array_completed, "int a[];\nint main(void) { return 0; }", 0, "");
+valid!(describe_tentative_array_of_array_completed, "int a[][5];\nint main(void) { return 0; }", 0, "");
+valid!(describe_array_of_pointer, "int *a[3];\nint main(void) { return 0; }", 0, "");
+valid!(describe_pointer_to_array, "int (*p)[3];\nint main(void) { return 0; }", 0, "");
+valid!(describe_pointer_to_array_of_array, "int (*p)[3][5];\nint main(void) { return 0; }", 0, "");
+valid!(describe_array_parameter, "void f(int a[3]) { }\nint main(void) { return 0; }", 0, "");
+valid!(describe_function_parameter, "void f(int g(void)) { }\nint main(void) { return 0; }", 0, "");
+valid!(describe_adjusted_parameter_types, "void f(int a[3], int g(void)) { }\nint main(void) { return 0; }", 0, "");
+valid!(describe_old_style_array_parameter, "int f(a) int a[3]; { return 0; }\nint main(void) { return 0; }", 0, "");
+valid!(describe_qualified_parameter, "void f(const int a) { }\nint main(void) { return 0; }", 0, "");
+valid!(describe_unqualified_parameter_type, "void f(const int a) { }\nint main(void) { return 0; }", 0, "");
+valid!(describe_old_style_function, "int f(a, b) int a; char b; { return a; }\nint main(void) { return 0; }", 0, "");
+valid!(sizeof_of_an_expression_is_a_constant_expression, "int i; int a[3]; struct S { char c[7]; } s; enum E { A = sizeof(i), B = sizeof(a), C = sizeof(s) };\nint main(void) { return !((A == 4) && (B == 12) && (C == 7)); }", 0, "");
+valid!(fold_sizeof_of_a_pointer_type, "enum E { A = sizeof(char *) };\nint main(void) { return 0; }", 0, "");
+invalid!(a_non_constant_expression_folds_to_nothing, "int x; enum E { A = x };", &["error: Non constant expression"]);
+valid!(only_constant_expressions_are_folded, "void f(void) { int a; a = 1 + 2; }\nint main(void) { return 0; }", 0, "");
+valid!(an_identifier_binds_to_its_file_scope_declaration, "int x; void f(void) { x = 1; }\nint main(void) { return 0; }", 0, "");
+valid!(an_identifier_binds_to_the_innermost_declaration, "int x; void f(void) { int x; x = 1; }\nint main(void) { return 0; }", 0, "");
+valid!(an_identifier_binds_to_a_parameter, "void f(int a) { a = 1; }\nint main(void) { return 0; }", 0, "");
+valid!(an_identifier_binds_to_an_enumerator, "enum E { A }; int f(void) { return A; }\nint main(void) { return 0; }", 0, "");
+invalid!(an_undeclared_identifier_binds_to_nothing, "void f(void) { x = 1; }", &["error: Use of undeclared identifier 'x'"]);
+valid!(each_occurrence_is_bound_separately, "int x; int y; void f(void) { x = y; y = x; }\nint main(void) { return 0; }", 0, "");
+valid!(a_prototype_and_its_definition_declare_one_function, "int f(int a); int f(int a) { return a; }\nint main(void) { return 0; }", 0, "");
+valid!(identical_function_types_share_one_interned_type, "int f(int a); int g(int b); int h(char c);\nint main(void) { return 0; }", 0, "");
+valid!(a_function_definition_records_its_parameters_in_order, "int f(int a, char b) { return a; }\nint main(void) { return 0; }", 0, "");
+valid!(a_function_definition_records_its_return_type, "char *f(int a, char b) { return 0; }\nint main(void) { return 0; }", 0, "");
+valid!(an_old_style_definition_records_its_parameters_in_declarator_order, "int f(a, b) char b; { return a; }\nint main(void) { return 0; }", 0, "");
+valid!(symbols_are_recorded_in_declaration_order_with_their_kind, "typedef int T; struct S { int a; } s; void f(int p) { int l; }\nint main(void) { return 0; }", 0, "");
