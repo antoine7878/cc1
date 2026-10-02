@@ -281,3 +281,4 @@ reports!(report_invalid_additive_operands, "struct S { int x; } s; void f(void) 
 reports!(report_pointer_difference_of_distinct_types, "int *p; char *q; void f(void) { p - q; }", ["<test>:1:33: error: invalid operands to binary expression ('int *' and 'char *')"]);
 reports!(report_cast_from_pointer_to_floating, "int *p; void f(void) { (double)p; }", ["<test>:1:24: error: invalid cast from 'int *' to 'double'"]);
 reports!(report_cast_from_floating_to_pointer, "double d; void f(void) { (int *)d; }", ["<test>:1:26: error: invalid cast from 'double' to 'int *'"]);
+reports!(report_void_argument_to_unprototyped_function, "int f(); int main(void) { f((void)0); return 0; }", ["<test>:1:29: error: invalid use of void expression"]);

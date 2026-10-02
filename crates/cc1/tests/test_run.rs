@@ -512,3 +512,4 @@ reports!(report_typedef_name_as_callee, "typedef int T; int main(void) { return 
 exits!(variable_shadows_typedef_name, "typedef int T; int main(void) { int T = 3; return T; }", 3);
 exits!(label_named_like_typedef, "typedef int T; int main(void) { goto T; return 1; T: return 4; }", 4);
 exits!(member_named_like_typedef, "typedef int T; struct S { int T; }; int main(void) { struct S s; s.T = 5; return s.T; }", 5);
+exits!(void_call_statement_and_void_casts, "int f(); void g(void) {} int main(void) { g(); (void)f(1); (void)0; return 7; } int f() { return 0; }", 7);

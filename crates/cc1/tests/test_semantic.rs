@@ -275,3 +275,6 @@ recover!(main_first_parameter_enum, "enum e { A }; int main(enum e a, char **b) 
 recover!(main_is_variadic, "int main(int a, char **b, ...) { return 0; }", [Diagnostic::VariadicMain], &[]);
 recover!(main_variadic_with_one_parameter, "int main(int a, ...) { return 0; }", [Diagnostic::ArgCountMain, Diagnostic::VariadicMain], &[]);
 recover!(main_reports_every_violation, "static long main(long a, int b, int c, ...) { return 0; }", [Diagnostic::IntMain, Diagnostic::FirstArgMain, Diagnostic::SecondArgMain, Diagnostic::ThirdArgMain, Diagnostic::VariadicMain, Diagnostic::StaticMain], &[]);
+reject!(void_cast_argument_to_unprototyped_function, "int f(); int main(void) { f((void)0); return 0; } int f() { return 0; }");
+reject!(void_call_argument_in_variadic_part, "int printf(const char *, ...); void g(void) {} int main(void) { printf(\"%d\\n\", g()); return 0; }");
+reject!(void_dereference_argument_in_variadic_part, "int printf(const char *, ...); int main(void) { int x = 1; void *p = &x; printf(\"%d\\n\", *p); return 0; }");

@@ -104,6 +104,7 @@ pub enum Diagnostic {
     RValueAddress(QualifiedType),
     IndirectionNotPointer(QualifiedType),
     IndirectionToVoid,
+    VoidValueUsed,
 
     // 6.3.3.3
     InvalidUnary(QualifiedType),
@@ -379,6 +380,7 @@ impl DiagnosticNode {
             Diagnostic::RValueAddress(ty) => format!( "cannot take the address of an rvalue of type '{}'", ty.display(sema)),
             Diagnostic::IndirectionNotPointer(ty) => format!("indirection requires pointer operand ('{}' invalid)", ty.display(sema)),
             Diagnostic::IndirectionToVoid => "dereferencing 'void *' pointer".to_string(),
+            Diagnostic::VoidValueUsed => "invalid use of void expression".to_string(),
 
             // 6.3.3.3
             Diagnostic::InvalidUnary(ty) => format!("invalid argument type '{}' to unary expression", ty.display(sema)),

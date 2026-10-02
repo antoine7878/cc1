@@ -66,6 +66,9 @@ pub fn function_call(sema: &mut Sema, fn_node: &ExpressionNode, args: &[Expressi
         }
         for arg_node in args.iter().skip(param_len) {
             let promoted = with_converted(&mut *sema, [arg_node], |sema, [re]| {
+                if re.casted_ty().id.resolve_with(sema).is_void() {
+                    return Err(Diagnostic::VoidValueUsed);
+                }
                 cast::default_argument_promotions(sema, re);
                 Ok(())
             });
