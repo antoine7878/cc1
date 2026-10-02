@@ -86,6 +86,35 @@ pub enum JumpStatement {
     Return(Option<ExpressionNode>),
 }
 
+impl StatementNode {
+    pub fn has_entry_label(&self) -> bool {
+        self.has_label(false)
+    }
+
+    fn has_label(&self, in_switch: bool) -> bool {
+        match self.id.resolve() {
+            Statement::Labeled(node) => match &node.inner {
+                LabeledStatement::Identifier(..) => true,
+                LabeledStatement::Case(_, stmt) | LabeledStatement::Default(stmt) => {
+                    !in_switch || stmt.has_label(in_switch)
+                }
+            },
+            Statement::Compound(node) => node.statements.iter().any(|s| s.has_label(in_switch)),
+            Statement::Selection(node) => match &node.stmt {
+                SelectionStatement::If(_, then, otherwise) => {
+                    then.has_label(in_switch) || otherwise.as_ref().is_some_and(|s| s.has_label(in_switch))
+                }
+                SelectionStatement::Switch(_, body) => body.has_label(true),
+            },
+            Statement::Iteration(node) => match &node.stmt {
+                IterationStatement::While(_, body) | IterationStatement::Do(body, _) => body.has_label(in_switch),
+                IterationStatement::For(parts) => parts.3.has_label(in_switch),
+            },
+            Statement::Jump(_) | Statement::Expression(_) => false,
+        }
+    }
+}
+
 impl StatementArena {
     pub fn add(&mut self, stmt: Statement, span: Span) -> StatementNode {
         StatementNode::new(self.alloc(stmt), span)

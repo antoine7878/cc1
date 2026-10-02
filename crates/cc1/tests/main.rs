@@ -29,6 +29,7 @@ mod test_statement;
 mod test_string;
 mod test_scalar;
 mod test_typing;
+mod test_unreachable;
 mod test_uses;
 mod test_valid_programs;
 mod test_value;

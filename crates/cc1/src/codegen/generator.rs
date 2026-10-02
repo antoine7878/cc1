@@ -160,6 +160,18 @@ impl<W: Write> Visitor for Generator<W> {
     }
 
     fn visit_statement(&mut self, node: &StatementNode) {
+        if self.builder.has_block_ret {
+            if !node.has_entry_label() {
+                return;
+            }
+            match node.id.resolve() {
+                Statement::Compound(_) | Statement::Labeled(_) => {}
+                _ => {
+                    let l = self.builder.fresh_label();
+                    self.builder.label(l);
+                }
+            }
+        }
         let res = match node.id.resolve() {
             Statement::Jump(_) | Statement::Selection(_) | Statement::Iteration(_) | Statement::Labeled(_) => {
                 self.emit_statement(node.id)
@@ -172,6 +184,9 @@ impl<W: Write> Visitor for Generator<W> {
     fn visit_init_declarator(&mut self, node: &InitDeclaratorNode) {
         let sym_id = sema().declarations[&node.declarator.id];
         if sym_id.resolve().duration != Duration::Automatic {
+            return;
+        }
+        if self.builder.has_block_ret {
             return;
         }
         self.emit_init(sym_id);
