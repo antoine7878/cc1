@@ -58,6 +58,7 @@ pub enum Diagnostic {
     EscapeOutOfRange,
     EscapeNoHexDigits,
     UnknownEscape(char),
+    InvalidWideCharacter,
 
     // 6.1.4
     MixedWideStringConcat,
@@ -296,7 +297,7 @@ impl DiagnosticNode {
             Diagnostic::ExpressionTooDeep(limit) => format!("expression nesting exceeds the implementation limit of {limit}"),
 
             // 6.1
-            Diagnostic::StrayCharacter(text) => format!("stray '{}' in program", text.escape_default()),
+            Diagnostic::StrayCharacter(text) => format!("stray '{}' in program", stray_text(text)),
             Diagnostic::MissingTerminatingCharacter(quote) => format!("missing terminating {quote} character"),
             Diagnostic::EmptyCharacterConstant => "empty character constant".to_string(),
             Diagnostic::InvalidNumber(text) => format!("invalid numeric constant '{}'", text),
@@ -315,6 +316,7 @@ impl DiagnosticNode {
             Diagnostic::EscapeOutOfRange => "escape sequence is out of range for the character type".to_string(),
             Diagnostic::EscapeNoHexDigits => "\\x used with no following hex digits".to_string(),
             Diagnostic::UnknownEscape(c) => format!("unknown escape sequence: '\\{}'", c),
+            Diagnostic::InvalidWideCharacter => "converting to execution character set: Invalid argument".to_string(),
 
             // 6.1.4
             Diagnostic::MixedWideStringConcat => "concatenation of a wide and a narrow string literal is undefined".to_string(),
@@ -599,4 +601,13 @@ impl Display for ExpectedTokens {
         }
         Ok(())
     }
+}
+
+fn stray_text(text: &str) -> String {
+    text.chars()
+        .map(|c| match crate::ast::escape::raw_byte(c) {
+            Some(byte) => format!("\\{byte:03o}"),
+            None => c.escape_default().to_string(),
+        })
+        .collect()
 }

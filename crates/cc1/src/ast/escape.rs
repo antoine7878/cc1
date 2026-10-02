@@ -2,42 +2,69 @@ use libft::simple_escape;
 
 use crate::semantic::{Diag, Diagnostic};
 
-fn is_simple_escape(c: u8) -> bool {
-    matches!(c, b'\'' | b'"' | b'?' | b'\\' | b'a' | b'b' | b'f' | b'n' | b'r' | b't' | b'v')
+const RAW_BASE: u32 = 0x10FF00;
+
+pub enum Piece {
+    Escaped(u64),
+    Plain(char),
 }
 
-pub fn next(bytes: &[u8], i: &mut usize) -> (u64, Option<Diagnostic>) {
-    let c = bytes[*i];
-    *i += 1;
-    if c != b'\\' {
-        return (c as u64, None);
+pub fn raw_byte(c: char) -> Option<u8> {
+    let code = c as u32;
+    (RAW_BASE + 0x80..=RAW_BASE + 0xff).contains(&code).then(|| (code - RAW_BASE) as u8)
+}
+
+pub fn raw_char(byte: u8) -> char {
+    char::from_u32(RAW_BASE + byte as u32).unwrap()
+}
+
+pub fn plain_bytes(c: char) -> Vec<u8> {
+    match raw_byte(c) {
+        Some(byte) => vec![byte],
+        None => c.to_string().into_bytes(),
     }
-    let c = bytes[*i];
+}
+
+fn is_simple_escape(c: char) -> bool {
+    matches!(c, '\'' | '"' | '?' | '\\' | 'a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v')
+}
+
+pub fn next(chars: &[char], i: &mut usize) -> (Piece, Option<Diagnostic>) {
+    let c = chars[*i];
+    *i += 1;
+    if c != '\\' {
+        return (Piece::Plain(c), None);
+    }
+    let c = chars[*i];
     *i += 1;
     match c {
-        b'x' => hex(bytes, i),
-        b'0'..=b'7' => (octal(bytes, i, c) as u64, None),
-        c if is_simple_escape(c) => (simple_escape(c) as u64, None),
-        c => (c as u64, Some(Diagnostic::UnknownEscape(c as char))),
+        'x' => {
+            let (value, diag) = hex(chars, i);
+            (Piece::Escaped(value), diag)
+        }
+        '0'..='7' => (Piece::Escaped(octal(chars, i, c) as u64), None),
+        c if is_simple_escape(c) => (Piece::Escaped(simple_escape(c as u8) as u64), None),
+        c if c.is_ascii() => (Piece::Escaped(c as u64), Some(Diagnostic::UnknownEscape(c))),
+        c => (Piece::Plain(c), Some(Diagnostic::UnknownEscape(c))),
     }
 }
 
-fn hex(bytes: &[u8], i: &mut usize) -> (u64, Option<Diagnostic>) {
+fn hex(chars: &[char], i: &mut usize) -> (u64, Option<Diagnostic>) {
     let mut value: u64 = 0;
     let mut count = 0;
-    while *i < bytes.len() && (bytes[*i] as char).is_ascii_hexdigit() {
-        value = value.saturating_mul(16).saturating_add((bytes[*i] as char).to_digit(16).unwrap() as u64);
+    while *i < chars.len() && chars[*i].is_ascii_hexdigit() {
+        value = value.saturating_mul(16).saturating_add(chars[*i].to_digit(16).unwrap() as u64);
         *i += 1;
         count += 1;
     }
     if count == 0 { (0, Some(Diagnostic::EscapeNoHexDigits)) } else { (value, None) }
 }
 
-fn octal(bytes: &[u8], i: &mut usize, first: u8) -> u32 {
-    let mut value = (first - b'0') as u32;
+fn octal(chars: &[char], i: &mut usize, first: char) -> u32 {
+    let mut value = first.to_digit(8).unwrap();
     let mut len = 1;
-    while *i < bytes.len() && len < 3 && (b'0'..=b'7').contains(&bytes[*i]) {
-        value = value * 8 + (bytes[*i] - b'0') as u32;
+    while *i < chars.len() && len < 3 && ('0'..='7').contains(&chars[*i]) {
+        value = value * 8 + chars[*i].to_digit(8).unwrap();
         *i += 1;
         len += 1;
     }
@@ -45,18 +72,29 @@ fn octal(bytes: &[u8], i: &mut usize, first: u8) -> u32 {
 }
 
 pub fn decode(body: &str, is_wide: bool) -> Diag<Vec<u32>> {
-    let bytes = body.as_bytes();
+    let chars: Vec<char> = body.chars().collect();
     let mut units = Vec::new();
     let mut diagnostic = None;
     let mut i = 0;
-    while i < bytes.len() {
-        let (value, diag) = next(bytes, &mut i);
+    while i < chars.len() {
+        let (piece, diag) = next(&chars, &mut i);
         diagnostic = diagnostic.or(diag);
-        let limit = if is_wide { u32::MAX as u64 } else { 0xff };
-        if value > limit {
-            diagnostic = diagnostic.or(Some(Diagnostic::EscapeOutOfRange));
+        match piece {
+            Piece::Escaped(value) => {
+                let limit = if is_wide { u32::MAX as u64 } else { 0xff };
+                if value > limit {
+                    diagnostic = diagnostic.or(Some(Diagnostic::EscapeOutOfRange));
+                }
+                units.push(if is_wide { value as u32 } else { (value & 0xff) as u32 });
+            }
+            Piece::Plain(c) if is_wide => {
+                if raw_byte(c).is_some() {
+                    diagnostic = diagnostic.or(Some(Diagnostic::InvalidWideCharacter));
+                }
+                units.push(c as u32);
+            }
+            Piece::Plain(c) => units.extend(plain_bytes(c).into_iter().map(u32::from)),
         }
-        units.push(if is_wide { value as u32 } else { (value & 0xff) as u32 });
     }
     Diag::new(units, diagnostic)
 }

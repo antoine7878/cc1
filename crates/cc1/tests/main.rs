@@ -23,6 +23,7 @@ mod test_run;
 mod test_scope;
 mod test_semantic;
 mod test_side_table;
+mod test_source_bytes;
 mod test_statement;
 mod test_string;
 mod test_scalar;

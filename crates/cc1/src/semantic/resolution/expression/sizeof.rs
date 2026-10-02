@@ -7,8 +7,9 @@ use crate::semantic::resolution::expression::*;
 use crate::semantic::{QualifiedType, Resolver, Sema, constraints, declaration, layout};
 
 pub fn sizeof_expr(sema: &mut Sema, node: &ExpressionNode, e: &ExpressionNode) -> ExprResult {
-    let (ty, is_bit_field) =
-        with_ops(&mut *sema, [e], |sema, [re]| Ok((re.ty, is_bit_field(sema, sema.expr_bindings.get(e.id).copied()))))?;
+    let (ty, is_bit_field) = with_ops(&mut *sema, [e], |sema, [re]| {
+        Ok((re.ty, is_bit_field(sema, sema.expr_bindings.get(e.unparenthesized().id).copied())))
+    })?;
     let result = sizeof_result(sema, ty, is_bit_field)?;
     set_sizeof_constant(sema, node, ty);
     Ok(result)

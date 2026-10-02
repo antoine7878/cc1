@@ -146,31 +146,14 @@ impl ConstValue {
         let prefix = if s.starts_with("L") { "L" } else { "" };
         let s = &s[(prefix.len() + 1)..(s.len() - 1)];
         let narrow = prefix.is_empty();
-        let (value, count, diagnostic) = Self::char_sequence(s.as_bytes(), narrow);
-        let value = if narrow && count == 1 && ResolvedType::Char.is_signed() && value & 0x80 != 0 {
+        let Diag { res: units, diagnostic } = escape::decode(s, !narrow);
+        let value = units.iter().fold(0u32, |value, &unit| if narrow { (value << 8) | unit } else { unit });
+        let value = if narrow && units.len() == 1 && ResolvedType::Char.is_signed() && value & 0x80 != 0 {
             ConstValue::Int((value | 0xffffff00) as i32)
         } else {
             ConstValue::Int(value as i32)
         };
         Diag::new(value, diagnostic)
-    }
-
-    fn char_sequence(bytes: &[u8], narrow: bool) -> (u32, usize, Option<Diagnostic>) {
-        let mut i = 0;
-        let mut value: u32 = 0;
-        let mut count = 0;
-        let mut diagnostic = None;
-        while i < bytes.len() {
-            let (c, diag) = escape::next(bytes, &mut i);
-            diagnostic = diagnostic.or(diag);
-            let limit = if narrow { 0xff } else { u32::MAX as u64 };
-            if c > limit {
-                diagnostic = diagnostic.or(Some(Diagnostic::EscapeOutOfRange));
-            }
-            value = if narrow { (value << 8) | (c & 0xff) as u32 } else { c as u32 };
-            count += 1;
-        }
-        (value, count, diagnostic)
     }
 
     fn parse_integer(s: &str) -> Diag<Self> {

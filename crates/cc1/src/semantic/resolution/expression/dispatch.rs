@@ -10,7 +10,7 @@ pub fn resolve_expression(resolver: &mut Resolver, node: &ExpressionNode) {
     let resolved = match type_of(resolver, node) {
         Ok((ty, kind)) => {
             let mut re = ResolvedExpression::new(ty, kind);
-            re.bit_width = resolver.sema.member_refs.get(node.id).and_then(|r| r.member(resolver.sema).width);
+            re.bit_width = bit_width(resolver.sema, node);
             Some(re)
         }
         Err(diag) => {
@@ -19,6 +19,17 @@ pub fn resolve_expression(resolver: &mut Resolver, node: &ExpressionNode) {
         }
     };
     resolver.sema.expressions.set(node.id, resolved);
+}
+
+fn bit_width(sema: &Sema, node: &ExpressionNode) -> Option<i32> {
+    let of = |e: &ExpressionNode| sema.expressions.get(e.id).and_then(|re| re.bit_width);
+    match node.id.resolve() {
+        Expression::Member(..) => sema.member_refs.get(node.id).and_then(|r| r.member(sema).width),
+        Expression::Block(e) | Expression::Assign(_, e, _) => of(e),
+        Expression::Unary(UnaryOp::PostInc | UnaryOp::PostDec | UnaryOp::PreInc | UnaryOp::PreDec, e) => of(e),
+        Expression::List(es) => es.last().and_then(of),
+        _ => None,
+    }
 }
 
 fn type_of(resolver: &mut Resolver, node: &ExpressionNode) -> ExprResult {

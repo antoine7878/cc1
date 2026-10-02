@@ -13,7 +13,7 @@ pub fn parse_source(ctx: Context) -> Context {
     match read(&ctx.file_name) {
         Ok(bytes) => {
             let bytes: Vec<u8> = bytes.into_iter().filter(|&b| b != 0).collect();
-            let text = String::from_utf8_lossy(&bytes).into_owned();
+            let text = decode_source(&bytes);
             parse_reader(ctx, Cursor::new(text)).0
         }
         Err(error) => {
@@ -22,6 +22,27 @@ pub fn parse_source(ctx: Context) -> Context {
             ctx
         }
     }
+}
+
+fn decode_source(bytes: &[u8]) -> String {
+    let mut text = String::with_capacity(bytes.len());
+    let mut rest = bytes;
+    while !rest.is_empty() {
+        match std::str::from_utf8(rest) {
+            Ok(valid) => {
+                text.push_str(valid);
+                break;
+            }
+            Err(error) => {
+                let (valid, tail) = rest.split_at(error.valid_up_to());
+                text.push_str(std::str::from_utf8(valid).unwrap());
+                let bad = error.error_len().unwrap_or(tail.len());
+                text.extend(tail[..bad].iter().map(|&b| crate::ast::escape::raw_char(b)));
+                rest = &tail[bad..];
+            }
+        }
+    }
+    text
 }
 
 pub fn parse_reader<R: Read>(ctx: Context, reader: R) -> (Context, i32) {

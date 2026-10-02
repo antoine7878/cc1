@@ -16,6 +16,7 @@ pub struct BitField {
 
 impl<W: Write> Generator<W> {
     pub fn bitfield_of(node: &ExpressionNode) -> Option<BitField> {
+        let node = node.unparenthesized();
         let Expression::Member(_, _, _) = node.id.resolve() else { return None };
         let member = sema().member_refs[node.id].member(sema());
         let width = member.width?;

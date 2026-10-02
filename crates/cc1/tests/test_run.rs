@@ -474,3 +474,28 @@ exits_linked!(abi_float_returns_from_gcc, "float rf(void); double rd(void); long
 exits_linked!(abi_float_returns_to_gcc, "float rf(void) { return 1.25f; } double rd(void) { return 2.5; } long double rld(void) { return 3.75L; } int sum(void); int main(void) { return sum(); }", "float rf(void); double rd(void); long double rld(void); int sum(void) { return (int)((rf() + rd() + (double)rld()) * 4); }", 30);
 exits_linked!(abi_bitfield_layout_read_from_gcc, "struct B { unsigned a : 3; int b : 5; unsigned c : 7; char d; unsigned e : 20; int f : 12; }; extern struct B g; int size(void); int main(void) { return sizeof(struct B) == size() && g.a == 5 && g.b == -9 && g.c == 100 && g.d == 'x' && g.e == 999999 && g.f == -2000; }", "struct B { unsigned a : 3; int b : 5; unsigned c : 7; char d; unsigned e : 20; int f : 12; }; struct B g = { 5, -9, 100, 'x', 999999, -2000 }; int size(void) { return sizeof(struct B); }", 1);
 exits_linked!(abi_bitfield_layout_written_for_gcc, "struct B { unsigned a : 30; unsigned b : 4; char c; int x : 4; unsigned d : 31; }; struct B g; int check(void); int main(void) { g.a = 0x3ffffffe; g.b = 9; g.c = 1; g.x = -3; g.d = 0x7ffffff0; return check(); }", "struct B { unsigned a : 30; unsigned b : 4; char c; int x : 4; unsigned d : 31; }; extern struct B g; int check(void) { return g.a == 0x3ffffffe && g.b == 9 && g.c == 1 && g.x == -3 && g.d == 0x7ffffff0; }", 1);
+
+exits!(paren_bitfield_assign_keeps_neighbour, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { s.a = 1; (s.b) = 2; return s.a * 16 + s.b; }", 18);
+exits!(paren_bitfield_load_signed, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { s.c = -2; s.a = 9; return (s.c) == -2 && (s.c) * 3 == -6; }", 1);
+exits!(paren_bitfield_increment, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { s.a = 15; s.b = 3; (s.b)++; ++(s.a); return s.a * 16 + s.b; }", 4);
+exits!(paren_bitfield_compound_assign, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { s.a = 5; s.b = 1; (s.b) += 14; return s.a * 16 + s.b; }", 95);
+exits!(paren_bitfield_arrow_assign, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { struct B *p = &s; s.a = 1; (p->b) = 7; return s.a * 16 + s.b; }", 23);
+exits!(paren_bitfield_double_paren_assign, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { s.a = 3; ((s.b)) = 4; return s.a * 16 + s.b; }", 52);
+exits!(paren_bitfield_promotes_to_int, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { s.b = 2; return (s.b) - 3 < 0; }", 1);
+exits!(paren_bitfield_double_paren_promotes, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { s.b = 2; return ((s.b)) - 3 < 0; }", 1);
+exits!(bitfield_comma_result_promotes, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { s.b = 2; return (0, s.b) - 3 < 0; }", 1);
+exits!(bitfield_assign_result_promotes, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { return (s.b = 2) - 3 < 0; }", 1);
+exits!(bitfield_compound_assign_result_promotes, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { s.b = 2; return (s.b += 0) - 3 < 0; }", 1);
+exits!(bitfield_post_increment_result_promotes, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { s.b = 2; return (s.b++) - 3 < 0; }", 1);
+exits!(bitfield_post_decrement_result_promotes, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { s.b = 3; return (s.b--) - 3 < 0; }", 0);
+exits!(bitfield_pre_increment_result_promotes, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { s.b = 1; return (++s.b) - 3 < 0; }", 1);
+exits!(bitfield_pre_decrement_result_promotes, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { s.b = 3; return (--s.b) - 3 < 0; }", 1);
+exits!(bitfield_paren_assign_result_promotes, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { return ((s.b = 2)) - 3 < 0; }", 1);
+exits!(bitfield_conditional_result_promotes, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int k = 1; int main(void) { s.b = 2; return (k ? s.b : s.b) - 3 < 0; }", 1);
+reject!(paren_bitfield_address_rejected, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { unsigned *q = &(s.b); return 0; }");
+reject!(paren_bitfield_sizeof_rejected, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { return sizeof(s.b); }");
+reject!(paren_bitfield_arrow_sizeof_rejected, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { struct B *p = &s; return sizeof(p->b); }");
+reject!(double_paren_bitfield_address_rejected, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { unsigned *q = &((s.b)); return 0; }");
+accept!(bitfield_assign_result_sizeof_accepted, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { return sizeof(s.b = 2) > 0; }");
+reject!(bitfield_comma_result_address_rejected, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { unsigned *q = &(0, s.b); return 0; }");
+reject!(bitfield_assign_result_address_rejected, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { unsigned *q = &(s.b = 2); return 0; }");

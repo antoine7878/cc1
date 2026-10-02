@@ -137,3 +137,13 @@ impl ExpressionArena {
         ExpressionNode::new(self.alloc(Expression::Ternary(cond, then, or)), span)
     }
 }
+
+impl ExpressionNode {
+    pub fn unparenthesized(&self) -> &ExpressionNode {
+        let mut node = self;
+        while let Expression::Block(inner) = node.id.resolve() {
+            node = inner;
+        }
+        node
+    }
+}

@@ -5,8 +5,8 @@ use crate::ast::{Expression, ExpressionNode, MemberOp, Storage, TypeName, UnaryO
 use crate::semantic::ValueCategory::{LValue, RValue};
 use crate::semantic::resolution::expression::*;
 use crate::semantic::{
-    Diag, Diagnostic, DiagnosticSink, QualifiedType, ResolvedExpression, ResolvedType, Resolver, Sema, SymbolId, cast, constraints,
-    declaration,
+    Diag, Diagnostic, DiagnosticSink, QualifiedType, ResolvedExpression, ResolvedType, Resolver, Sema, SymbolId, cast,
+    constraints, declaration,
 };
 
 pub fn inc_dec(sema: &mut Sema, e: &ExpressionNode, op: UnaryOp) -> ExprResult {
@@ -35,7 +35,7 @@ pub fn unary_sign(sema: &mut Sema, e: &ExpressionNode) -> ExprResult {
 }
 
 pub fn address(sema: &mut Sema, e: &ExpressionNode) -> ExprResult {
-    let id = sema.expr_bindings.get(e.id).copied();
+    let id = sema.expr_bindings.get(e.unparenthesized().id).copied();
     let object = object_symbol(sema, e);
     with_ops(sema, [e], |sema, [re]| address_type(sema, re, id, object))
 }
