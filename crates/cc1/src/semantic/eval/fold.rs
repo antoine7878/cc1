@@ -5,11 +5,24 @@ use crate::semantic::{
     Diag, Diagnostic, DiagnosticNode, DiagnosticSink, QualifiedType, ResolvedType, Sema, SymbolKind,
 };
 
-struct VecSink<'a>(&'a mut Vec<DiagnosticNode>);
+struct VecSink<'a> {
+    diagnostics: &'a mut Vec<DiagnosticNode>,
+    probe: bool,
+}
+
+impl<'a> VecSink<'a> {
+    fn collecting(diagnostics: &'a mut Vec<DiagnosticNode>) -> Self {
+        Self { diagnostics, probe: false }
+    }
+
+    fn probing(diagnostics: &'a mut Vec<DiagnosticNode>) -> Self {
+        Self { diagnostics, probe: true }
+    }
+}
 
 impl DiagnosticSink for VecSink<'_> {
     fn diagnostics(&mut self) -> &mut Vec<DiagnosticNode> {
-        self.0
+        self.diagnostics
     }
 }
 
@@ -18,7 +31,7 @@ pub fn eval_constant(sema: &mut Sema, expr: &ExpressionNode) -> Option<ConstValu
         return sema.expr_consts.get(expr.id).copied();
     }
     let mut collected = Vec::new();
-    let folded = evaluate(sema, expr, &mut VecSink(&mut collected));
+    let folded = evaluate(sema, expr, &mut VecSink::collecting(&mut collected));
     sema.diagnostics.append(&mut collected);
     let value = match folded {
         Ok(value) => Some(value),
@@ -32,12 +45,12 @@ pub fn try_fold(sema: &mut Sema, expr: &ExpressionNode) -> Option<ConstValue> {
     if sema.expr_consts.contains(expr.id) {
         return sema.expr_consts.get(expr.id).copied();
     }
-    evaluate(sema, expr, &mut VecSink(&mut Vec::new())).ok()
+    evaluate(sema, expr, &mut VecSink::probing(&mut Vec::new())).ok()
 }
 
 pub fn fold_initializer(sema: &mut Sema, ty: QualifiedType, expr: &ExpressionNode) -> Option<ConstValue> {
     let mut collected = Vec::new();
-    let value = evaluate(sema, expr, &mut VecSink(&mut collected)).ok()?;
+    let value = evaluate(sema, expr, &mut VecSink::collecting(&mut collected)).ok()?;
     sema.diagnostics.append(&mut collected);
     let ty = scalar_ty(sema, ty);
     if !fits(&ty, value) {
@@ -94,6 +107,21 @@ fn evaluate(sema: &mut Sema, expr: &ExpressionNode, sink: &mut VecSink) -> Resul
     if sema.expr_consts.poisoned(expr.id) {
         return Err(Diagnostic::Poisoned);
     }
+    if !sink.probe {
+        return evaluate_node(sema, expr, sink);
+    }
+    if let Some(value) = sema.try_consts.get(expr.id) {
+        return Ok(*value);
+    }
+    if sema.try_consts.poisoned(expr.id) {
+        return Err(Diagnostic::Poisoned);
+    }
+    let result = evaluate_node(sema, expr, sink);
+    sema.try_consts.set(expr.id, result.as_ref().ok().copied());
+    result
+}
+
+fn evaluate_node(sema: &mut Sema, expr: &ExpressionNode, sink: &mut VecSink) -> Result<ConstValue, Diagnostic> {
     match expr.id.resolve() {
         Expression::ConstantExpression(inner) => {
             integral_operands(sema, inner)?;

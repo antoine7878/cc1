@@ -5,6 +5,7 @@ use std::io::{Cursor, Read};
 use libft::Span;
 
 use crate::context::Context;
+use crate::parser::depth::{MAX_EXPRESSION_DEPTH, deepest_expression};
 use crate::parser::{YYLex, Yacc};
 use crate::semantic::{Diagnostic, DiagnosticNode, ExpectedTokens};
 
@@ -27,7 +28,11 @@ pub fn parse_reader<R: Read>(ctx: Context, reader: R) -> (Context, i32) {
     let lexer = YYLex::new(reader, || None, ctx);
     let mut yacc = Yacc::new(lexer);
     let status = yacc.yyparse();
-    (yacc.lexer.ctx, status)
+    let mut ctx = yacc.lexer.ctx;
+    if let Some(span) = deepest_expression(&ctx.arenas.expressions, MAX_EXPRESSION_DEPTH + 2) {
+        ctx.diagnostics.push(DiagnosticNode::new(Diagnostic::ExpressionTooDeep(MAX_EXPRESSION_DEPTH), span));
+    }
+    (ctx, status)
 }
 
 pub fn yyerror<D: Display, R: Read>(_msg: D, yacc: &mut Yacc<R>) {

@@ -250,8 +250,9 @@ impl<W: Write> Builder<W> {
     }
 
     pub fn aggregate_constant(&mut self, name: LlvmName, qty: QualifiedType, init: &Initializer) {
-        let init = LlvmInit::new(qty, Some(init));
-        self.write_line(format_args!("{} = private unnamed_addr constant {}", name, init));
+        let init = LlvmInit::top(qty, Some(init));
+        let align = sema().layout(&qty.id).unwrap().align;
+        self.write_line(format_args!("{} = private unnamed_addr constant {}, align {align}", name, init));
         self.blank();
     }
 
@@ -351,7 +352,7 @@ impl<W: Write> Builder<W> {
             Linkage::External => "",
             Linkage::Internal | Linkage::None => "internal ",
         };
-        let init = LlvmInit::new(sym.ty, sym.initializer.map(|i| i.resolve()));
+        let init = LlvmInit::top(sym.ty, sym.initializer.map(|i| i.resolve()));
         self.write_line(format_args!("{name} = {linkage}{kind} {init}, align {align}"));
     }
 

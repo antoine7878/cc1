@@ -2,11 +2,13 @@
 mod macros;
 mod exec;
 mod facts;
+mod raw;
 mod types;
 mod unit;
 
 pub use exec::{run_emits, run_emits_warns, run_exit, run_exit_linked, run_exit_warns};
 pub use facts::run_facts;
+pub use raw::{RawRun, compile_raw};
 pub use types::{Shape, Ty, ints, lv, none, rv};
 pub use unit::{
     Unit, accepted, assert_unmentioned, fold_values, folded, repr, run_accept, run_bits, run_initializers, run_labels,

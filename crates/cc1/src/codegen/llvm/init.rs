@@ -5,14 +5,25 @@ use crate::ast::{ConstFolder, ConstValue, StringConstId, Tag};
 use crate::codegen::{Frozen, LlvmElement, LlvmName, LlvmSymbol, LlvmType, struct_elements};
 use crate::semantic::{AddressBase, AddressOffset, Initializer, QualifiedType, ResolvedType, TagDef, sema};
 
+const COMPACT_TAIL: usize = 64;
+
 pub struct LlvmInit<'a> {
     pub ty: QualifiedType,
     pub init: Option<&'a Initializer>,
+    top: bool,
 }
 
 impl<'a> LlvmInit<'a> {
     pub fn new(ty: QualifiedType, init: Option<&'a Initializer>) -> Self {
-        Self { ty, init }
+        Self { ty, init, top: false }
+    }
+
+    pub fn top(ty: QualifiedType, init: Option<&'a Initializer>) -> Self {
+        Self { ty, init, top: true }
+    }
+
+    fn compact_tail(&self, used: usize, len: usize) -> Option<usize> {
+        (self.top && used > 0 && len - used >= COMPACT_TAIL).then_some(len - used)
     }
 
     fn zero(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -50,6 +61,18 @@ impl<'a> LlvmInit<'a> {
             _ => unreachable!("string initializer on a non-array"),
         };
         let ty = if id.resolve().is_wide { LlvmType::int() } else { LlvmType::char() };
+        let used = units.len().min(len);
+        if used == 0 && len >= COMPACT_TAIL {
+            return self.zero(f);
+        }
+        if let Some(tail) = self.compact_tail(used, len) {
+            write!(f, "<{{ [{used} x {ty}], [{tail} x {ty}] }}> <{{ [{used} x {ty}] [")?;
+            for (i, c) in units.iter().enumerate() {
+                let sep = if i == 0 { "" } else { ", " };
+                write!(f, "{sep}{ty} {c}")?;
+            }
+            return write!(f, "], [{tail} x {ty}] zeroinitializer }}>");
+        }
         write!(f, "[{len} x {ty}] [")?;
         let cells = units.iter().copied().chain(std::iter::repeat(0)).take(len);
         for (i, c) in cells.enumerate() {
@@ -72,12 +95,26 @@ impl<'a> LlvmInit<'a> {
     }
 
     fn array(&self, f: &mut Formatter<'_>, elem: QualifiedType, len: usize, items: &[Initializer]) -> fmt::Result {
-        write!(f, "[{len} x {}] [", repr(elem))?;
-        for i in 0..len {
+        let used = items.iter().rposition(|item| !is_zero_item(item)).map_or(0, |last| last + 1).min(len);
+        if used == 0 && len >= COMPACT_TAIL {
+            return self.zero(f);
+        }
+        let ty = repr(elem);
+        let tail = self.compact_tail(used, len);
+        let shown = if tail.is_some() { used } else { len };
+        if let Some(tail) = tail {
+            write!(f, "<{{ [{used} x {ty}], [{tail} x {ty}] }}> <{{ ")?;
+        }
+        write!(f, "[{shown} x {ty}] [")?;
+        for i in 0..shown {
             let sep = if i == 0 { "" } else { ", " };
             write!(f, "{sep}{}", LlvmInit::new(elem, items.get(i)))?;
         }
-        write!(f, "]")
+        write!(f, "]")?;
+        match tail {
+            Some(tail) => write!(f, ", [{tail} x {ty}] zeroinitializer }}>"),
+            None => Ok(()),
+        }
     }
 
     fn structure(&self, f: &mut Formatter<'_>, def: &TagDef, items: &[Initializer]) -> fmt::Result {
@@ -146,6 +183,14 @@ impl<'a> LlvmInit<'a> {
             0 => write!(f, "{} {{ {init} }}", repr(self.ty)),
             pad => write!(f, "{} {{ {init}, [{pad} x {}] zeroinitializer }}", repr(self.ty), LlvmType::char()),
         }
+    }
+}
+
+fn is_zero_item(item: &Initializer) -> bool {
+    match item {
+        Initializer::Zero => true,
+        Initializer::Value(value) => !value.is_floating() && value.is_zero(),
+        _ => false,
     }
 }
 

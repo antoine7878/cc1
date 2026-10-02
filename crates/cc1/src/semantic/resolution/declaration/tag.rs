@@ -4,7 +4,7 @@ use crate::ast::{EnumId, ExpressionNode, Name, StructDeclaration, Tag};
 use crate::semantic::resolution::declaration::*;
 use crate::semantic::{
     Diag, Diagnostic, DiagnosticSink, Member, QualifiedType, ResolvedType, Resolver, Symbol, SymbolKind, TagDefId,
-    TagUse, constraints,
+    TagUse, constraints, layout,
 };
 
 pub fn struct_or_union_tag(
@@ -77,6 +77,9 @@ pub fn struct_or_union_tag(
         resolver.add_diag(Diag::err((), Diagnostic::TagWithoutMember(kind.symbol_kind())), span);
     }
     resolver.sema.tags.complete(tag_id, members);
+    if layout::of_tag(resolver.sema, tag_id).is_some_and(|layout| layout.size > layout::MAX_OBJECT_SIZE) {
+        resolver.add_diag(Diag::err((), Diagnostic::TypeTooLarge(kind.symbol_kind())), span);
+    }
     tag_id
 }
 

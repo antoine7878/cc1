@@ -14,6 +14,7 @@ mod test_global;
 mod test_initializer;
 mod test_layout;
 mod test_layout_abi;
+mod test_limits;
 mod test_linkage;
 mod test_operator;
 mod test_parsing;

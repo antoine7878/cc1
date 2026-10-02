@@ -35,6 +35,9 @@ pub enum Diagnostic {
     InvalidOperand,
     SyntaxError { found: &'static str, expected: ExpectedTokens },
 
+    // 5.2.4.1
+    ExpressionTooDeep(usize),
+
     // 6.1
     StrayCharacter(String),
     MissingTerminatingCharacter(char),
@@ -159,6 +162,7 @@ pub enum Diagnostic {
     NegativeBitFieldWidth(Option<Name>, i64),
     BitFieldWidthTooLarge(Option<Name>, u64, u32),
     ZeroWidthNamedBitField(Name),
+    TypeTooLarge(SymbolKind),
 
     // 6.5.2.2
     EnumeratorBadValue,
@@ -287,6 +291,9 @@ impl DiagnosticNode {
             Diagnostic::InvalidOperand => "invalid operand".to_string(),
             Diagnostic::SyntaxError { found, expected } if expected.is_empty() => format!("syntax error, unexpected {}", token_label(found)),
             Diagnostic::SyntaxError { found, expected } => format!("syntax error, unexpected {}, expecting {expected}", token_label(found)),
+
+            // 5.2.4.1
+            Diagnostic::ExpressionTooDeep(limit) => format!("expression nesting exceeds the implementation limit of {limit}"),
 
             // 6.1
             Diagnostic::StrayCharacter(text) => format!("stray '{}' in program", text.escape_default()),
@@ -419,6 +426,7 @@ impl DiagnosticNode {
             Diagnostic::NegativeBitFieldWidth(None, width) => format!("anonymous bit-field has negative width ({width})"),
             Diagnostic::BitFieldWidthTooLarge(Some(name), width, bits) => format!("width of bit-field '{}' ({width} bits) exceeds the width of its type ({bits} bits)", name.id.resolve()),
             Diagnostic::BitFieldWidthTooLarge(None, width, bits) => format!("width of anonymous bit-field ({width} bits) exceeds the width of its type ({bits} bits)"),
+            Diagnostic::TypeTooLarge(kind) => format!("{kind} is too large"),
             Diagnostic::ZeroWidthNamedBitField(name) => format!("named bit-field '{}' has zero width", name.id.resolve()),
 
             // 6.5.2.2

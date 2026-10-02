@@ -1,3 +1,4 @@
+mod depth;
 mod driver;
 mod lex;
 mod state;

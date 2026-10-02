@@ -92,10 +92,11 @@ fn fill(resolver: &mut Resolver, ty: QualifiedType, cursor: &mut Cursor, constan
     match ty.id.resolve_with(resolver.sema).clone() {
         ResolvedType::Array { elem, len } => {
             while len.is_none_or(|len| values.len() < len) && cursor.peek().is_some() {
+                let pending = cursor.len();
                 values.push(walk(resolver, elem, cursor, constant));
-            }
-            if let Some(len) = len {
-                values.resize(len, Initializer::Zero);
+                if cursor.len() == pending {
+                    break;
+                }
             }
         }
         ResolvedType::Tag(id) => {

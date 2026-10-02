@@ -63,13 +63,9 @@ pub fn render<W: Write, S: SourceMap, D: Display>(
     let col_no = caret_end(span, &line);
 
     writeln!(w, "     {:>padding$}|{:>mid_pad$}{line}", line_no, "")?;
-    writeln!(
-        w,
-        "     {:>padding$}|{:>mid_pad$}{color}{:>col_no$}{reset} ",
-        "",
-        "",
-        "^".repeat(col_no + 1 - span.start.col)
-    )
+    let carets = "^".repeat(col_no + 1 - span.start.col);
+    let lead = " ".repeat(col_no.saturating_sub(carets.len()));
+    writeln!(w, "     {:>padding$}|{:>mid_pad$}{color}{lead}{carets}{reset} ", "", "")
 }
 
 fn caret_end(span: Span, line: &str) -> usize {

@@ -23,11 +23,17 @@ pub const DOUBLE: Layout = Layout::new(8, 4);
 pub const LONG_DOUBLE: Layout = Layout::new(12, 4);
 pub const POINTER: Layout = Layout::new(4, 4);
 
+pub const MAX_OBJECT_SIZE: u32 = 0x7fff_ffff;
+
 fn round_up(value: u64, multiple: u64) -> u64 {
     match value % multiple {
         0 => value,
-        rest => value + multiple - rest,
+        rest => value.saturating_add(multiple - rest),
     }
+}
+
+fn clamp(size: u64) -> u32 {
+    size.min(u64::from(u32::MAX)) as u32
 }
 
 pub fn of(sema: &mut Sema, id: ResolvedTypeId) -> Option<Layout> {
@@ -40,7 +46,7 @@ pub fn of(sema: &mut Sema, id: ResolvedTypeId) -> Option<Layout> {
             let len = *len;
             let elem = of(sema, elem.id)?;
             let size = u64::from(elem.size).saturating_mul(len.unwrap_or(0) as u64);
-            Layout::new(size.min(u64::from(u32::MAX)) as u32, elem.align)
+            Layout::new(clamp(size), elem.align)
         }
         ty => ty.layout()?,
     };
@@ -86,13 +92,13 @@ fn member(sema: &mut Sema, mem: Member) -> Option<(Layout, Option<u64>)> {
 }
 
 fn place_plain(m: &mut Member, bits: u64) {
-    m.offset = (bits / 8) as u32;
+    m.offset = clamp(bits / 8);
     m.bit_offset = 0;
 }
 
 fn place_bitfield(m: &mut Member, bits: u64, storage: u64) {
     let unit = bits / storage * storage;
-    m.offset = (unit / 8) as u32;
+    m.offset = clamp(unit / 8);
     m.bit_offset = (bits - unit) as u32;
 }
 
@@ -117,18 +123,18 @@ fn struct_layout(sema: &mut Sema, members: &mut [Member]) -> Option<Layout> {
                     bits = round_up(bits, unit);
                 }
                 place_bitfield(m, bits, storage);
-                bits += width;
+                bits = bits.saturating_add(width);
             }
             None => {
                 bits = round_up(bits, unit);
                 place_plain(m, bits);
-                bits += u64::from(layout.size) * 8;
+                bits = bits.saturating_add(u64::from(layout.size) * 8);
             }
         }
     }
 
     let size = round_up(bits, u64::from(align) * 8) / 8;
-    Some(Layout::new(size as u32, align))
+    Some(Layout::new(clamp(size), align))
 }
 
 fn union_layout(sema: &mut Sema, members: &mut [Member]) -> Option<Layout> {
@@ -145,5 +151,5 @@ fn union_layout(sema: &mut Sema, members: &mut [Member]) -> Option<Layout> {
         m.bit_offset = 0;
     }
 
-    Some(Layout::new(round_up(size, u64::from(align)) as u32, align))
+    Some(Layout::new(clamp(round_up(size, u64::from(align))), align))
 }
