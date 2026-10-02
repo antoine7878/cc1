@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from argparse import Namespace, ArgumentParser
 import argparse
 import os
 import subprocess
 import sys
+from argparse import ArgumentParser, Namespace
 from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
@@ -359,9 +359,17 @@ def build(args: Namespace, tmp: str) -> None:
         run(TOOL[Stage.LINK], link_argv(args, outputs))
 
 
+def eprint(msg):
+    prefix = "\033[31merror\033[0m" if sys.stderr.isatty() else "error"
+    print(f"{prefix}: {msg}", file=sys.stderr)
+
+
 def main(argv: list) -> int:
     parser = make_parser()
     args = parser.parse_intermixed_args(argv)
+    if args.files[0] == args.outfile:
+        eprint(f"input file '{args.outfile}' is the same as output file")
+        return 1
     args.link_items = link_items(argv)
     check_args(parser, args)
     try:

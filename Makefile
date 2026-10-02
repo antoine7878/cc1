@@ -54,24 +54,6 @@ cc:
 llvm:
 	clang --target=i686-linux-gnu $(CFF) -O0 -S -emit-llvm rscs/hello.c -o /dev/stdout
 
-empty :=
-space := $(empty) $(empty)
-
-COV_SKIP = \
-	crates/cc1/src/main.rs \
-	crates/cc1/src/report.rs \
-	crates/cc1/src/ast/mod.rs \
-	crates/cc1/src/ast/name.rs \
-	crates/cc1/src/ast/print.rs \
-	crates/cc1/src/parser/lex.rs \
-	crates/cc1/src/parser/yacc.rs \
-	crates/cc1/src/ast/display.rs \
-	crates/cc1/src/parser/driver.rs \
-	crates/cc1/src/ast/type_specifier.rs
-
-coverage: all
-	cargo llvm-cov nextest --ignore-filename-regex '$(subst $(space),|,$(strip $(COV_SKIP)))'
-
 clean:
 	cargo clean
 	rm -f $(LEX_RS) $(YACC_RS)
