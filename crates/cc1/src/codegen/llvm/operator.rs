@@ -34,7 +34,7 @@ impl LlvmOperator {
             (BinaryOp::Div, NumericClass::Float) => "fdiv",
             (BinaryOp::Mod, NumericClass::Signed) => "srem",
             (BinaryOp::Mod, NumericClass::Unsigned) => "urem",
-            (BinaryOp::Left, NumericClass::Signed) => "shl nsw",
+            (BinaryOp::Left, NumericClass::Signed) => "shl",
             (BinaryOp::Left, NumericClass::Unsigned) => "shl",
             (BinaryOp::Right, NumericClass::Signed) => "ashr",
             (BinaryOp::Right, NumericClass::Unsigned) => "lshr",

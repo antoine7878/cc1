@@ -70,3 +70,6 @@ op!(sizeof_type, "void f(void) { int s; s = sizeof(int); }", "Sizeof");
 op!(cast, "void f(double d) { int a; a = (int)d; }", "Cast");
 op!(comma_list, "void f(int a, int b) { a, b; }", "List");
 op!(constant_expression, "enum E { A = 1 };", "ConstantExpression");
+emits!(not signed_shift_left_no_nsw, "int f(int x) { return x << 3; }", "shl nsw");
+emits!(not signed_shift_left_assign_no_nsw, "void f(int x) { x <<= 3; }", "shl nsw");
+emits!(signed_shift_left_plain, "int f(int x) { return x << 3; }", "shl i32");

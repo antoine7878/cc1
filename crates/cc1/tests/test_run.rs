@@ -499,3 +499,4 @@ reject!(double_paren_bitfield_address_rejected, "struct B { unsigned a : 4, b : 
 accept!(bitfield_assign_result_sizeof_accepted, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { return sizeof(s.b = 2) > 0; }");
 reject!(bitfield_comma_result_address_rejected, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { unsigned *q = &(0, s.b); return 0; }");
 reject!(bitfield_assign_result_address_rejected, "struct B { unsigned a : 4, b : 4; int c : 3; } s; int main(void) { unsigned *q = &(s.b = 2); return 0; }");
+exits!(signed_shift_left_wraps, "int main(void) { volatile int x = 200; return ((x << 24) >> 24) == -56; }", 1);
