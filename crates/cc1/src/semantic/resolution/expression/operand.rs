@@ -46,15 +46,15 @@ where
 /// Operands are resolved before the parent that inspects them, so the cast type is read back from
 /// the expression table instead of resolving the type name a second time.
 pub fn is_null_pointer_constant(sema: &mut Sema, node: &ExpressionNode) -> bool {
-    let mut node = node;
+    let mut node = node.unparenthesized();
     if let Expression::Cast(_, op) = node.id.resolve()
         && let Some(re) = sema.expressions.get(node.id)
         && is_void_pointer(sema, re.ty)
     {
-        node = op;
+        node = op.unparenthesized();
     }
     let Some(re) = sema.expressions.get(node.id) else { return false };
-    re.ty.is_integer(sema) && fold::try_fold(sema, node).is_some_and(|v| v.is_zero())
+    re.ty.is_integral(sema) && fold::try_fold(sema, node).is_some_and(|v| v.is_zero())
 }
 
 fn is_void_pointer(sema: &Sema, qty: QualifiedType) -> bool {

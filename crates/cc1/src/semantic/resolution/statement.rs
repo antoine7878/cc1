@@ -134,10 +134,11 @@ fn check_scalar(sema: &mut Sema, node: &ExpressionNode) -> Result<QualifiedType,
     let mut ops = operands(sema, [node])?;
     let (sema, [re]) = ops.parts();
     cast::convert_operand(sema, re, &node.span);
-    if !re.ty.is_scalar(sema) {
-        return Err(Diagnostic::NonScalarStatement(re.ty));
+    let ty = re.casted_ty();
+    if !ty.is_scalar(sema) {
+        return Err(Diagnostic::NonScalarStatement(ty));
     }
-    Ok(re.ty)
+    Ok(ty)
 }
 
 fn check_integral(sema: &mut Sema, node: &ExpressionNode) -> Result<QualifiedType, Diagnostic> {

@@ -185,6 +185,7 @@ pub enum Diagnostic {
     FunctionReturningArray(QualifiedType),
     FunctionReturningFunction(QualifiedType),
     VoidParameter,
+    NamedVoidParameter,
     ParameterNotRegister,
     DuplicateParameterName,
     IdentifierListInDeclaration,
@@ -238,6 +239,7 @@ impl Diagnostic {
             | Diagnostic::ReturnWithoutValue
             | Diagnostic::ShiftCountNegative
             | Diagnostic::IndirectionToVoid
+            | Diagnostic::NamedVoidParameter
             | Diagnostic::ShiftCountOutOfRange => Severity::Warning,
             _ => Severity::Error
         }
@@ -451,6 +453,7 @@ impl DiagnosticNode {
             Diagnostic::FunctionReturningArray(ty) => format!("function cannot return array type '{}'", ty.display(sema)),
             Diagnostic::FunctionReturningFunction(ty) => format!("function cannot return function type '{}'", ty.display(sema)),
             Diagnostic::VoidParameter => "Parameter shall not have void type".to_string(),
+            Diagnostic::NamedVoidParameter => "parameter has void type".to_string(),
             Diagnostic::ParameterNotRegister => "Parameter shall only by declared with register storage".to_string(),
             Diagnostic::DuplicateParameterName => "Duplicate paramter identifier".to_string(),
             Diagnostic::IdentifierListInDeclaration => "parameter names (without types) in function declaration".to_string(),

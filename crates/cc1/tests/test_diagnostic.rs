@@ -192,9 +192,9 @@ reports!(report_zero_width_named_bit_field, "struct S { int a : 0; };", ["<test>
 reports!(report_old_style_parameter_declared_twice, "int f(a, b) int a; int a; { return a; }", ["<test>:1:24: error: duplicate declaration of parameter `a'"]);
 reports!(report_void_is_not_the_only_parameter, "void f(void, int) { }", ["<test>:1:8: error: Parameter shall not have void type", "<test>:1:6: error: Parameter shall include an identifier"]);
 reports!(report_named_void_parameter, "void f(void x) { }", ["<test>:1:8: error: Parameter shall not have void type"]);
-reports!(report_named_void_parameter_in_prototype, "int f(void x);", ["<test>:1:7: error: Parameter shall not have void type"]);
-reports!(report_named_typedef_void_parameter_in_prototype, "typedef void V; int f(V x);", ["<test>:1:23: error: Parameter shall not have void type"]);
-reports!(report_named_void_parameter_in_nested_prototype, "void g(void) { int f(void x); }", ["<test>:1:22: error: Parameter shall not have void type"]);
+reports!(report_named_void_parameter_in_prototype, "int f(void x);", ["<test>:1:7: warning: parameter has void type"]);
+reports!(report_named_typedef_void_parameter_in_prototype, "typedef void V; int f(V x);", ["<test>:1:23: warning: parameter has void type"]);
+reports!(report_named_void_parameter_in_nested_prototype, "void g(void) { int f(void x); }", ["<test>:1:22: warning: parameter has void type"]);
 reports!(report_old_style_void_parameter, "void f(a, b) int b; void a; { }", ["<test>:1:26: error: Parameter shall not have void type"]);
 reports!(report_old_style_initialized_parameter, "int f(a) int a = 1; { return a; }", ["<test>:1:18: error: parameter cannot have an initializer"]);
 reports!(report_old_style_declaration_without_parameter, "int f(a) int; int a; { return a; }", ["<test>:1:10: error: declaration does not declare a parameter"]);
@@ -212,7 +212,7 @@ reports!(report_syntax_error_lists_expected_tokens, "struct s { int a }", ["<tes
 reports!(report_struct_error_recovers_at_the_next_member, "struct s { int a; : 0; int b; };", ["<test>:1:19: error: syntax error, unexpected ':'"]);
 reports!(report_struct_error_recovers_on_a_leading_member, "struct s { : 0; int a; };", ["<test>:1:12: error: syntax error, unexpected ':'"]);
 reports!(report_syntax_error_at_end_of_file, "int f(void) { return 0; } }", ["<test>:1:27: error: syntax error, unexpected '}', expecting end of file"]);
-reports!(report_unterminated_block_expects_a_closing_brace, "int f(void) { return 0;", ["<test>:1:24: error: syntax error, unexpected end of file, expecting ';' or '}'"]);
+reports!(report_unterminated_block_expects_a_closing_brace, "int f(void) { return 0;", ["<test>:1:24: error: syntax error, unexpected end of file, expecting '}' or ';'"]);
 reports!(report_syntax_error_without_expected_tokens, "int x = ;", ["<test>:1:9: error: syntax error, unexpected ';'"]);
 reports!(report_struct_without_member, "struct s { int; };", ["<test>:1:12: error: Declaration declares nothing", "<test>:1:1: error: struct has no named member"]);
 reports!(report_union_without_member, "union u { int; };", ["<test>:1:11: error: Declaration declares nothing", "<test>:1:1: error: union has no named member"]);

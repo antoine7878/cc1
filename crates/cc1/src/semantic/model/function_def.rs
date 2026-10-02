@@ -107,11 +107,11 @@ pub enum DeclaredParams {
 }
 
 impl DeclaredParams {
-    pub fn types(&self) -> ParamTypes {
+    pub fn types(&self, sema: &Sema) -> ParamTypes {
         match self {
             DeclaredParams::Unspecified | DeclaredParams::Names(_) => ParamTypes::Unspecified,
             DeclaredParams::Prototype { params, is_variadic, .. } => ParamTypes::Prototype {
-                params: params.iter().map(|param| param.ty).collect(),
+                params: params.iter().filter(|param| !param.ty.is_void(sema)).map(|param| param.ty).collect(),
                 is_variadic: *is_variadic,
             },
         }

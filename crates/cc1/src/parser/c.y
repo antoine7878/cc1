@@ -6,7 +6,7 @@ use crate::ast::{DeclarationNode, InitDeclaratorNode, DeclaratorNode, Initialize
 use crate::ast::{StructDeclaration, StructMemberDeclarator, EnumeratorId, EnumId, LabeledStatementNode, StatementNode, LabeledStatement, CompoundStatementNode};
 use crate::ast::{ExpressionStatementNode, SelectionStatementNode, IterationStatementNode, JumpStatementNode, JumpStatement};
 use crate::ast::{ExternalDeclarationNode, FunctionDefinitionNode, TranslationUnitNode, ConstValueNode, StringLiteralNode};
-use crate::ast::{BinaryOp, Expression, MemberOp, UnaryOp};
+use crate::ast::{BinaryOp, Declarator, Expression, MemberOp, UnaryOp};
 
 use crate::context::Context;
 use libft::Span;
@@ -136,7 +136,7 @@ macro_rules! spec {
 %type<FunctionDefinitionNode> function_definition
 %type<ExternalDeclarationNode> external_declaration
 %type<Vec<ExternalDeclarationNode>> external_declaration_list
-%type<()> translation_unit enter_scope exit_scope enter_struct exit_struct reopen_params
+%type<()> translation_unit enter_scope exit_scope close_scope enter_struct exit_struct reopen_params
 
 %start translation_unit
 
@@ -144,6 +144,7 @@ macro_rules! spec {
 
 enter_scope:                                                                                { self.lexer.ctx.parse.push_scope(); } ;
 exit_scope:                                                                                 { self.lexer.ctx.parse.pop_scope(); } ;
+close_scope: '}'                                                                            { self.lexer.ctx.parse.pop_scope(); } ;
 reopen_params:                                                                              { self.lexer.ctx.parse.unstash_scope(); } ;
 enter_struct:                                                                               { self.lexer.ctx.parse.enter_struct(); } ;
 exit_struct:                                                                                { self.lexer.ctx.parse.exit_struct(); } ;
@@ -329,9 +330,9 @@ direct_declarator /* DeclaratorNode */
 	| '(' declarator ')'                                                                    { $2 }
 	| direct_declarator '[' constant_expression ']'                                         { node_span!(self, declarators, array, $1, Some($3)) }
 	| direct_declarator '[' ']'                                                             { node_span!(self, declarators, array, $1, None) }
-	| direct_declarator '(' enter_scope parameter_type_list exit_scope ')'                  { node_span!(self, declarators, function, $1, $4) }
-	| direct_declarator '(' enter_scope identifier_list exit_scope ')'                      { let a = with_span!(self, FunctionParametersNode::old_style, $4); node_span!(self, declarators, function, $1, a) }
-	| direct_declarator '(' enter_scope exit_scope ')'                                      { let a = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, $1, a) } ;
+	| direct_declarator '(' enter_scope parameter_type_list exit_scope ')'                  { self.lexer.ctx.parse.keep_params(matches!($1.id.resolve_with(&self.lexer.ctx.arenas), Declarator::Ident(_))); node_span!(self, declarators, function, $1, $4) }
+	| direct_declarator '(' enter_scope identifier_list exit_scope ')'                      { self.lexer.ctx.parse.keep_params(matches!($1.id.resolve_with(&self.lexer.ctx.arenas), Declarator::Ident(_))); let a = with_span!(self, FunctionParametersNode::old_style, $4); node_span!(self, declarators, function, $1, a) }
+	| direct_declarator '(' enter_scope exit_scope ')'                                      { self.lexer.ctx.parse.keep_params(matches!($1.id.resolve_with(&self.lexer.ctx.arenas), Declarator::Ident(_))); let a = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, $1, a) } ;
 
 
 pointer  /* Vec<Vec<Qualifier>> */
@@ -402,7 +403,7 @@ direct_abstract_declarator /* DeclaratorNode */
 	| direct_abstract_declarator '[' ']'                                                    { node_span!(self, declarators, array, $1, None) }
 	| direct_abstract_declarator '[' constant_expression ']'                                { node_span!(self, declarators, array, $1, Some($3)) }
 	| '(' ')'                                                                               { let a = node_span!(self, declarators, abstract_declarator); let b = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, a, b) }
-	| '(' parameter_type_list ')'                                                           { let a = node_span!(self, declarators, abstract_declarator); node_span!(self, declarators, function, a, $2) }
+	| '(' enter_scope parameter_type_list exit_scope ')'                                    { let a = node_span!(self, declarators, abstract_declarator); node_span!(self, declarators, function, a, $3) }
 	| direct_abstract_declarator '(' ')'                                                    { let a = with_span!(self, FunctionParametersNode::empty); node_span!(self, declarators, function, $1, a) }
 	| direct_abstract_declarator '(' enter_scope parameter_type_list exit_scope ')'         { node_span!(self, declarators, function, $1, $4) }
 	;
@@ -453,8 +454,8 @@ enumerator_list /* Vec<EnumeratorId> */
 	;
 
 enumerator /* EnumeratorId */
-	: IDENTIFIER                                                                            { node_span!(self, enumerators, add, $1, None) }
-	| IDENTIFIER '=' constant_expression                                                    { node_span!(self, enumerators, add, $1, Some($3)) }
+	: IDENTIFIER                                                                            { self.lexer.ctx.parse.add_enumerator($1.id); node_span!(self, enumerators, add, $1, None) }
+	| IDENTIFIER '=' constant_expression                                                    { self.lexer.ctx.parse.add_enumerator($1.id); node_span!(self, enumerators, add, $1, Some($3)) }
 	;
 
 statement /* StatementNode */
@@ -475,10 +476,10 @@ labeled_statement /* LabeledStatementNode */
 	;
 
 compound_statement /* CompoundStatementNode */
-	: '{' enter_scope '}' exit_scope                                                        { with_span!(self, CompoundStatementNode::new, vec![], vec![]) }
-	| '{' enter_scope statement_list '}' exit_scope                                         { with_span!(self, CompoundStatementNode::new, vec![], $3) }
-	| '{' enter_scope declaration_list '}' exit_scope                                       { with_span!(self, CompoundStatementNode::new, $3, vec![]) }
-	| '{' enter_scope declaration_list statement_list '}' exit_scope                        { with_span!(self, CompoundStatementNode::new, $3, $4) }
+	: '{' enter_scope close_scope                                                           { with_span!(self, CompoundStatementNode::new, vec![], vec![]) }
+	| '{' enter_scope statement_list close_scope                                            { with_span!(self, CompoundStatementNode::new, vec![], $3) }
+	| '{' enter_scope declaration_list close_scope                                          { with_span!(self, CompoundStatementNode::new, $3, vec![]) }
+	| '{' enter_scope declaration_list statement_list close_scope                           { with_span!(self, CompoundStatementNode::new, $3, $4) }
 	;
 
 declaration_list /* Vec<DeclarationNode> */

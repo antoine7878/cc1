@@ -11,6 +11,13 @@ pub fn check_void_param(is_void: bool) -> Diag<()> {
     }
 }
 
+pub fn check_declared_void_param(is_tolerated: bool) -> Diag<()> {
+    match is_tolerated {
+        true => Diag::err((), Diagnostic::NamedVoidParameter),
+        false => Diag::err((), Diagnostic::VoidParameter),
+    }
+}
+
 pub fn check_identifier_list(is_forbidden: bool) -> Diag<()> {
     match is_forbidden {
         true => Diag::err((), Diagnostic::IdentifierListInDeclaration),

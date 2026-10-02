@@ -90,14 +90,14 @@ fn extract_declarator(
             extract_declarator(resolver, inner, QualifiedType::plain(id), this_level_erred, is_definition)
         }
         Declarator::Function { declarator: inner, params } => {
-            let list = resolve_params(resolver, params);
             let is_attached = matches!(inner.id.resolve(), Declarator::Ident(_) | Declarator::Abstract);
+            let list = resolve_params(resolver, params, is_definition && is_attached);
             let is_names = matches!(list, DeclaredParams::Names(_));
             constraints::param::check_identifier_list(is_names && !(is_definition && is_attached))
                 .collect(resolver, &params.span);
             constraints::types::check_return_type(inner_most.id.resolve_with(resolver.sema), inner_most)
                 .collect(resolver, &declarator.span);
-            let id = resolver.sema.types.function(inner_most, list.types());
+            let id = resolver.sema.types.function(inner_most, list.types(resolver.sema));
             let (ty, leaf, inner_list) =
                 extract_declarator(resolver, inner, QualifiedType::plain(id), false, is_definition);
             match is_attached {
@@ -109,16 +109,21 @@ fn extract_declarator(
     }
 }
 
-fn resolve_params(resolver: &mut Resolver, params: &FunctionParametersNode) -> DeclaredParams {
+fn resolve_params(resolver: &mut Resolver, params: &FunctionParametersNode, defining: bool) -> DeclaredParams {
     match &params.param {
         FunctionParameters::Empty => DeclaredParams::Unspecified,
         FunctionParameters::OldStyle(names) => DeclaredParams::Names(names.clone()),
-        FunctionParameters::ParameterTypeList(params) => resolve_prototype(resolver, params, false),
-        FunctionParameters::Variadic(params) => resolve_prototype(resolver, params, true),
+        FunctionParameters::ParameterTypeList(params) => resolve_prototype(resolver, params, false, defining),
+        FunctionParameters::Variadic(params) => resolve_prototype(resolver, params, true, defining),
     }
 }
 
-fn resolve_prototype(resolver: &mut Resolver, params: &[ParameterDeclaration], is_variadic: bool) -> DeclaredParams {
+fn resolve_prototype(
+    resolver: &mut Resolver,
+    params: &[ParameterDeclaration],
+    is_variadic: bool,
+    defining: bool,
+) -> DeclaredParams {
     if let [only] = params
         && !is_variadic
         && only.is_abstract_void(resolver)
@@ -131,18 +136,24 @@ fn resolve_prototype(resolver: &mut Resolver, params: &[ParameterDeclaration], i
         };
     }
     resolver.enter_prototype();
-    let mut params: Vec<ParamInfo> = params.iter().filter_map(|param| resolve_param(resolver, param)).collect();
-    for param in &mut params {
-        param.symbol = declare_param(resolver, param);
-    }
+    let params: Vec<ParamInfo> = params
+        .iter()
+        .filter_map(|param| {
+            let mut info = resolve_param(resolver, param)?;
+            info.symbol = declare_param(resolver, &info);
+            Some(info)
+        })
+        .collect();
     let (tags, ordinaries) = resolver.leave_scope().into_parts();
     let enumerators = ordinaries
         .into_iter()
         .filter(|&(_, sym)| sym.resolve_with(resolver.sema).kind == SymbolKind::Enumerator)
         .collect();
     for param in &params {
-        let is_void = matches!(param.ty.id.resolve_with(resolver.sema), ResolvedType::Void);
-        constraints::param::check_void_param(is_void).collect(resolver, &param.span);
+        if matches!(param.ty.id.resolve_with(resolver.sema), ResolvedType::Void) {
+            let is_tolerated = param.name.is_some() && !defining;
+            constraints::param::check_declared_void_param(is_tolerated).collect(resolver, &param.span);
+        }
     }
     DeclaredParams::Prototype { params, is_variadic, tags, enumerators }
 }

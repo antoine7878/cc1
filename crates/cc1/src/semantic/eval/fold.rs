@@ -87,6 +87,9 @@ fn operand(sema: &mut Sema, e: &ExpressionNode, sink: &mut VecSink) -> Result<Co
 }
 
 fn divisor(ty: &ResolvedType, lhs: ConstValue, rhs: ConstValue, op: BinaryOp) -> Result<(), Diagnostic> {
+    if ty.is_floating() {
+        return Ok(());
+    }
     if rhs.is_zero() {
         return match op {
             BinaryOp::Div => Err(Diagnostic::DivisionByZero),

@@ -29,7 +29,7 @@ pub fn address_constant(sema: &mut Sema, e: &ExpressionNode) -> Option<AddressOf
         return place(sema, e);
     }
     match e.id.resolve() {
-        Expression::ConstantExpression(inner) => address_constant(sema, inner),
+        Expression::ConstantExpression(inner) | Expression::Block(inner) => address_constant(sema, inner),
         Expression::StringLiteral(literal) => Some(AddressOffset::at(AddressBase::String(literal.id), 0)),
         Expression::Unary(UnaryOp::Addr, inner) => place(sema, inner),
         Expression::Cast(_, inner) => cast(sema, e, inner),
@@ -44,7 +44,7 @@ pub fn address_constant(sema: &mut Sema, e: &ExpressionNode) -> Option<AddressOf
 
 fn place(sema: &mut Sema, e: &ExpressionNode) -> Option<AddressOffset> {
     match e.id.resolve() {
-        Expression::ConstantExpression(inner) => place(sema, inner),
+        Expression::ConstantExpression(inner) | Expression::Block(inner) => place(sema, inner),
         Expression::Identifier(_) => object(sema, e),
         Expression::StringLiteral(literal) => Some(AddressOffset::at(AddressBase::String(literal.id), 0)),
         Expression::Unary(UnaryOp::Deref, inner) => address_constant(sema, inner),

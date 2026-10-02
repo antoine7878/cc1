@@ -11,6 +11,7 @@ pub struct ParseState {
     in_typedef_stack: Vec<bool>,
     struct_depth: usize,
     stashed: Option<HashMap<NameId, SymbolKind>>,
+    params: Option<HashMap<NameId, SymbolKind>>,
     type_name_id: usize,
     type_name_ok: bool,
 }
@@ -23,6 +24,7 @@ impl Default for ParseState {
             in_typedef_stack: Vec::new(),
             struct_depth: 0,
             stashed: None,
+            params: None,
             type_name_id: YYToken::id_of("TYPE_NAME").expect("TYPE_NAME token"),
             type_name_ok: false,
         }
@@ -40,10 +42,17 @@ impl ParseState {
         self.in_typedef = self.in_typedef_stack.pop().unwrap_or(false);
     }
 
+    pub fn keep_params(&mut self, is_identifier: bool) {
+        if is_identifier {
+            self.params = self.stashed.take();
+        }
+    }
+
     pub fn unstash_scope(&mut self) {
         self.push_scope();
-        if let Some(stashed) = self.stashed.take() {
-            *self.typedefs.last_mut().unwrap() = stashed;
+        self.stashed = None;
+        if let Some(params) = self.params.take() {
+            *self.typedefs.last_mut().unwrap() = params;
         }
     }
 
@@ -62,6 +71,7 @@ impl ParseState {
         self.in_typedef = false;
         self.struct_depth = 0;
         self.stashed = None;
+        self.params = None;
     }
 
     pub fn enter_struct(&mut self) {
@@ -78,6 +88,10 @@ impl ParseState {
         }
         let kind = if self.in_typedef { SymbolKind::Typedef } else { SymbolKind::Variable };
         self.typedefs.last_mut().map(|ts| ts.insert(id, kind));
+    }
+
+    pub fn add_enumerator(&mut self, id: NameId) {
+        self.typedefs.last_mut().map(|ts| ts.insert(id, SymbolKind::Variable));
     }
 
     pub fn feedback(&mut self, accepts: &dyn Fn(usize) -> bool) {
